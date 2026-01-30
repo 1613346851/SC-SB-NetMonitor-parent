@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<!-- 1. 继承项目书标准父工程（路径正确，直接复用父工程版本配置） -->
+	<parent>
+		<groupId>com.network</groupId>
+		<artifactId>network-monitor-parent</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+		<relativePath>../pom.xml</relativePath> <!-- 指向父工程pom.xml，无需修改 -->
+	</parent>
+
+	<!-- 2. 网关服务自身信息（项目书核心子模块） -->
+	<artifactId>gateway-service</artifactId>
+	<name>gateway-service</name>
+	<description>网关服务：统一流量入口、流量采集、基础防御（项目书标准版本）</description>
+
+	<!-- 3. 核心属性（仅保留Java版本，其他继承父工程） -->
+	<properties>
+		<java.version>17</java.version>
+	</properties>
+
+	<!-- 4. 核心依赖（版本由父工程统一管理，无需手动指定，无冲突） -->
+	<dependencies>
+		<!-- Gateway 核心依赖（项目书适配版本，继承父工程版本） -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-gateway</artifactId>
+		</dependency>
+
+		<!-- WebFlux 依赖（Gateway 底层必须，继承Spring Boot 3.2.5版本） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+
+		<!-- 健康检查/监控依赖（项目书推荐，便于后续排查问题） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+		<!-- 测试依赖（继承父工程版本，统一测试环境） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<!-- 5. 构建插件（继承父工程配置，无需重复编写，保持统一） -->
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+</project>

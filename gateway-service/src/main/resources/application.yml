@@ -1,0 +1,29 @@
+# 服务端口（项目书指定网关为统一入口，建议固定9000）
+server:
+  port: 9000
+
+# 服务名称（微服务标识，后续用于跨服务调用）
+spring:
+  application:
+    name: gateway-service
+  # Gateway核心配置：路由规则
+  cloud:
+    gateway:
+      routes:
+        # 测试路由：访问http://localhost:9000/test → 转发到百度（用于验证网关是否生效）
+        - id: test_route  # 路由ID，唯一即可
+          uri: https://www.baidu.com  # 转发目标地址（后续替换为靶场服务地址）
+          predicates:
+            - Path=/test/**  # 匹配路径：以/test开头的请求都走这个路由
+          filters:
+            - StripPrefix=1  # 去掉前缀/test，转发到百度根路径（否则百度会报404）
+
+# Actuator配置：暴露网关监控端点（方便后续查看路由、健康状态）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: routes, health  # 仅暴露路由和健康检查端点（生产环境够用）
+  endpoint:
+    health:
+      show-details: always  # 显示健康检查详情
