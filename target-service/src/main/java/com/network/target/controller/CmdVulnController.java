@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 命令注入漏洞接口（预设漏洞）
@@ -44,7 +45,7 @@ public class CmdVulnController {
             // 2. 关键：按操作系统动态指定流编码（解决乱码核心）
             Charset streamCharset = os.contains("win")
                     ? Charset.forName("GBK")  // Windows命令输出默认GBK
-                    : Charset.forName("UTF-8");// Linux/Mac默认UTF-8
+                    : StandardCharsets.UTF_8;// Linux/Mac默认UTF-8
 
             // 3. 执行命令：同时读取正常流和错误流（避免遗漏攻击结果）
             Process process = Runtime.getRuntime().exec(cmd);
