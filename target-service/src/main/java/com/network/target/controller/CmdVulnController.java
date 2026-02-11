@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 纯命令注入漏洞接口（URL无任何固定命令，完全由参数决定执行内容）
@@ -47,7 +48,7 @@ public class CmdVulnController {
             log.warn("【高危纯命令注入漏洞】执行用户输入的原始命令：{}", finalCmd);
 
             // 2. 系统编码适配（解决乱码）
-            Charset streamCharset = os.contains("win") ? Charset.forName("GBK") : Charset.forName("UTF-8");
+            Charset streamCharset = os.contains("win") ? Charset.forName("GBK") : StandardCharsets.UTF_8;
             Process process = Runtime.getRuntime().exec(finalCmd);
 
             // 读取命令执行结果
