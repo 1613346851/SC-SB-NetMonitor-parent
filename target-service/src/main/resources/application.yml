@@ -1,0 +1,19 @@
+# 服务基础配置（端口9001，与网关路由配置的靶场地址对应）
+server:
+  port: 9001
+  servlet:
+    context-path: /  # 根路径，确保接口路径符合 /target/** 规范
+    encoding:
+      force: true
+      charset: UTF-8
+      enabled: true
+
+spring:
+  application:
+    name: target-service  # 服务名，后续可扩展服务注册发现（如Nacos）
+
+# 日志配置（可选，便于调试流量交互）
+logging:
+  level:
+    com.network.target: info  # 本模块日志级别
+    org.springframework.web: warn  # 框架日志降级，减少冗余
