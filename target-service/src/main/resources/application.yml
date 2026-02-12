@@ -11,6 +11,13 @@ server:
 spring:
   application:
     name: target-service  # 服务名，后续可扩展服务注册发现（如Nacos）
+  # 数据库连接配置（本地MySQL）
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/vuln_target?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root  # 你的MySQL用户名
+    password: root  # 你的MySQL密码
+
 
 # 日志配置（可选，便于调试流量交互）
 logging:
