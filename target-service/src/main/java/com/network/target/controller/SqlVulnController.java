@@ -8,76 +8,57 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * SQL注入漏洞靶场（基于真实MySQL数据库）
- * 核心：直接拼接用户输入到SQL，用真实JDBC执行，完全还原生产环境漏洞
+ * SQL注入漏洞靶场（基于真实MySQL数据库，使用Spring JdbcTemplate）
  */
 @RestController
 @RequestMapping("/target/sql")
 @Slf4j
 public class SqlVulnController {
 
-    // 注入Spring JDBC（简化数据库操作，也可直接用原生JDBC）
+    // 注入Spring自动配置的JdbcTemplate，它会读取application.yml中的数据库配置
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    // 数据库连接参数（也可从application.yml读取，这里简化）
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/vuln_target?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai";
-    private static final String DB_USER = "root";
-    private static final String DB_PWD = "123456";
-
     /**
-     * 漏洞接口：直接拼接用户输入，用Statement执行（无参数化查询）
+     * 漏洞接口：直接拼接用户输入，用JdbcTemplate执行（无参数化查询）
      */
     @GetMapping("/query")
     public String queryUser(@RequestParam("id") String userId) {
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
-
         try {
-            // 漏洞核心：无过滤拼接用户输入到SQL（真实生产环境漏洞成因）
+            // 漏洞核心：无过滤拼接用户输入到SQL
             String sql = "SELECT id, username, password, phone FROM sys_user WHERE id = " + userId;
             log.warn("【高危SQL注入漏洞】执行未过滤的SQL：{}", sql);
 
-            // 1. 真实JDBC连接（不使用PreparedStatement，保留漏洞）
-            conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PWD);
-            stmt = conn.createStatement(); // 关键：用Statement（有注入），而非PreparedStatement（安全）
+            // 使用Spring注入的JdbcTemplate执行SQL，自动读取application.yml的配置
+            List<Map<String, Object>> queryResult = jdbcTemplate.queryForList(sql);
 
-            // 2. 执行SQL（真实数据库执行，而非内存模拟）
-            rs = stmt.executeQuery(sql);
+            // 转换结果格式
+            List<Map<String, String>> result = new ArrayList<>();
+            for (Map<String, Object> row : queryResult) {
+                Map<String, String> user = new HashMap<>();
+                user.put("id", row.get("id").toString());
+                user.put("username", row.get("username").toString());
+                user.put("password", row.get("password").toString());
+                user.put("phone", row.get("phone").toString());
+                result.add(user);
+            }
 
-            // 3. 解析查询结果（真实数据库返回的结果集）
-            List<Map<String, String>> queryResult = parseResultSet(rs);
-
-            return buildSuccessResponse(queryResult, sql);
+            return buildSuccessResponse(result, sql);
 
         } catch (Exception e) {
             log.error("【SQL执行异常】注入攻击触发真实数据库报错：", e);
             return buildErrorResponse(e.getMessage());
-        } finally {
-            // 关闭资源（避免连接泄漏）
-            try {
-                if (rs != null) rs.close();
-                if (stmt != null) stmt.close();
-                if (conn != null) conn.close();
-            } catch (Exception e) {
-                log.error("关闭数据库资源失败", e);
-            }
         }
     }
 
     /**
-     * 安全对比接口：使用PreparedStatement参数化查询
+     * 安全对比接口：使用参数化查询
      */
     @GetMapping("/safe-query")
     public String safeQuery(@RequestParam("id") String userId) {
@@ -113,23 +94,7 @@ public class SqlVulnController {
     }
 
     /**
-     * 解析真实数据库的ResultSet结果集
-     */
-    private List<Map<String, String>> parseResultSet(ResultSet rs) throws Exception {
-        List<Map<String, String>> result = new ArrayList<>();
-        while (rs.next()) {
-            Map<String, String> user = new HashMap<>();
-            user.put("id", rs.getString("id"));
-            user.put("username", rs.getString("username"));
-            user.put("password", rs.getString("password"));
-            user.put("phone", rs.getString("phone"));
-            result.add(user);
-        }
-        return result;
-    }
-
-    /**
-     * 构造成功响应（复用原有逻辑）
+     * 构造成功响应
      */
     private String buildSuccessResponse(List<Map<String, String>> data, String sql) {
         StringBuilder json = new StringBuilder();
@@ -157,7 +122,7 @@ public class SqlVulnController {
     }
 
     /**
-     * 构造错误响应（复用原有逻辑）
+     * 构造错误响应
      */
     private String buildErrorResponse(String errorMsg) {
         return "{\n" +
