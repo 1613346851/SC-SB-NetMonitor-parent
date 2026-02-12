@@ -4,41 +4,60 @@
 		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<!-- 1. 修正：继承项目书标准父工程（而非直接继承Spring Boot父工程），统一依赖管理 -->
+	<!-- 继承父工程（统一依赖版本） -->
 	<parent>
 		<groupId>com.network</groupId>
 		<artifactId>network-monitor-parent</artifactId>
 		<version>1.0.0-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath> <!-- 指向父工程pom.xml，确保版本统一 -->
+		<relativePath>../pom.xml</relativePath> <!-- 父工程相对路径，需保证目录结构正确 -->
 	</parent>
 
-	<!-- 2. 模块基础信息（匹配项目书命名规范） -->
+	<!-- 模块基础信息 -->
 	<artifactId>target-service</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<name>target-service</name>
 	<description>靶场服务：提供植入漏洞的测试接口，作为监测系统流量载体与攻击验证场景</description>
 
-	<!-- 3. 核心属性（仅保留Java版本，其他继承父工程） -->
+	<!-- 核心属性（仅声明Java版本，其他继承父工程） -->
 	<properties>
 		<java.version>17</java.version>
 	</properties>
 
-	<!-- 4. 修正依赖：移除冗余/错误依赖，保留核心必要依赖 -->
+	<!-- 核心依赖（版本由父工程统一管理，无需手动指定） -->
 	<dependencies>
-		<!-- 核心依赖：Spring Boot Web（处理HTTP请求，实现漏洞接口） -->
+		<!-- Spring Boot Web（处理HTTP请求，实现漏洞接口） -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
 
-		<!-- 工具依赖：Lombok（简化实体类代码，与全项目技术栈一致） -->
+		<!-- JDBC 核心依赖（操作真实MySQL数据库） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jdbc</artifactId>
+		</dependency>
+
+		<!-- MySQL驱动（运行时依赖，连接真实数据库） -->
+		<dependency>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- 健康监控依赖（继承父工程，无需重复指定版本） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+		<!-- Lombok 依赖（简化代码） -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
 			<optional>true</optional>
 		</dependency>
 
-		<!-- 测试依赖：统一测试环境（继承父工程版本，无需重复指定） -->
+		<!-- 测试依赖 -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -46,7 +65,7 @@
 		</dependency>
 	</dependencies>
 
-		<!-- 5. 构建插件：继承父工程配置，保持编译、打包逻辑统一 -->
+	<!-- 构建插件（继承父工程配置） -->
 	<build>
 		<plugins>
 			<plugin>
