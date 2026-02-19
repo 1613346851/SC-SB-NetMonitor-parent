@@ -1,6 +1,6 @@
 package com.network.target.controller;
 
-import com.network.target.common.R;
+import com.network.target.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,7 +37,7 @@ public class CmdVulnController {
      * @param cmd 用户输入的任意系统命令（ping、tasklist、dir、ls等）
      */
     @GetMapping("/execute")  // 去掉/ping，改为通用的/execute
-    public R cmdInject(@RequestParam("cmd") String cmd) {
+    public ApiResponse cmdInject(@RequestParam("cmd") String cmd) {
         try {
             // 1. 纯漏洞逻辑：用户输入的cmd参数直接作为系统命令执行，无任何额外拼接
             String os = System.getProperty("os.name").toLowerCase();
@@ -64,8 +64,8 @@ public class CmdVulnController {
                 totalResult.append("\n❌ 命令执行错误（命令可能非法）：\n").append(errorResult);
             }
 
-            return R.ok()
-                    .msg("纯命令注入漏洞触发成功（URL无固定命令）")
+            return ApiResponse.success()
+                    .message("纯命令注入漏洞触发成功（URL无固定命令）")
                     .data("用户输入的命令", cmd)
                     .data("后端执行的完整命令", finalCmd)
                     .data("命令执行结果", totalResult.toString())
@@ -73,8 +73,8 @@ public class CmdVulnController {
 
         } catch (Exception e) {
             log.error("命令执行异常", e);
-            return R.error()
-                    .msg("命令执行失败")
+            return ApiResponse.error()
+                    .message("命令执行失败")
                     .data("用户输入的命令", cmd)
                     .data("异常信息", e.getMessage());
         }
