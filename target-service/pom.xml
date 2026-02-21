@@ -57,6 +57,12 @@
 			<optional>true</optional>
 		</dependency>
 
+		<!-- Thymeleaf 模板引擎（用于前端页面渲染） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+		</dependency>
+
 		<!-- 测试依赖 -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
