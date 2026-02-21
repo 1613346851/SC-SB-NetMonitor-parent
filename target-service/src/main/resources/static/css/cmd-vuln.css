@@ -1,0 +1,270 @@
+/* CMD漏洞测试平台样式文件 */
+
+/* 全局样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    overflow-x: hidden;
+}
+
+/* 输出容器样式 */
+.output-container {
+    height: calc(100vh - 200px);
+    overflow-y: auto;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 20px;
+}
+
+/* 欢迎消息样式 */
+.welcome-message {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.welcome-message h4 {
+    color: #6c757d;
+    margin-bottom: 15px;
+}
+
+.welcome-message p {
+    color: #adb5bd;
+}
+
+/* 命令输出项样式 */
+.command-output {
+    margin-bottom: 25px;
+    border-left: 3px solid #007bff;
+    padding-left: 15px;
+}
+
+.command-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
+}
+
+.command-timestamp {
+    color: #888;
+    font-size: 12px;
+}
+
+.command-input {
+    color: #4ec9b0;
+    font-weight: bold;
+    margin-bottom: 10px;
+    word-break: break-all;
+}
+
+.command-result {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 10px;
+}
+
+.result-success {
+    color: #4caf50;
+}
+
+.result-error {
+    color: #f44336;
+}
+
+.result-warning {
+    color: #ff9800;
+}
+
+/* 系统信息样式 */
+.system-info {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    padding: 12px;
+    border: 1px solid #dee2e6;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.info-item:last-child {
+    margin-bottom: 0;
+}
+
+/* 快捷命令按钮样式 */
+.quick-commands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.btn-sm {
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+/* 状态指示器动画 */
+.status-executing {
+    background-color: #ffc107 !important;
+    animation: pulse 1.5s infinite;
+}
+
+.status-success {
+    background-color: #28a745 !important;
+}
+
+.status-error {
+    background-color: #dc3545 !important;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+/* 加载遮罩层 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    z-index: 10000;
+}
+
+.loading-overlay.show {
+    display: flex;
+}
+
+/* 滚动条美化 */
+.output-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.output-container::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+.output-container::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.output-container::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .output-container {
+        height: 400px;
+    }
+    
+    .quick-commands {
+        justify-content: center;
+    }
+    
+    .command-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+}
+
+/* 卡片阴影增强 */
+.card.shadow-sm {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+.card.shadow-sm:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    transition: box-shadow 0.3s ease;
+}
+
+/* 表单元素焦点状态 */
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.btn-primary:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* 代码高亮模拟 */
+.code-highlight {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Consolas', monospace;
+}
+
+/* 警告横幅样式 */
+.alert-banner {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    max-width: 400px;
+    z-index: 9999;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* 命令历史记录样式 */
+.command-history-item {
+    cursor: pointer;
+    transition: background-color 0.2s;
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.command-history-item:hover {
+    background-color: #e9ecef;
+}
+
+.command-history-item.active {
+    background-color: #007bff;
+    color: white;
+}
+
+/* 性能优化 */
+.output-container {
+    will-change: scroll-position;
+}
+
+.command-output {
+    will-change: transform;
+}
