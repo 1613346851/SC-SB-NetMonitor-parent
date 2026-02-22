@@ -407,22 +407,36 @@ function showLoading(show) {
 }
 
 /**
- * 显示通知消息
+ * 显示通知消息（改进版：确保定位正确）
  */
 function showNotification(message, type = 'info') {
+    // 先移除已存在的同类型通知（防重复）
+    const existing = document.querySelector('.alert-banner');
+    if (existing) {
+        existing.remove();
+    }
+
     // 创建通知元素
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${getAlertType(type)} alert-banner fade show`;
-    alertDiv.role = 'alert';
+    alertDiv.className = `alert-banner alert alert-${getAlertType(type)}`;
+    alertDiv.style.position = 'fixed';
+    alertDiv.style.top = '70px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.maxWidth = '400px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    alertDiv.style.animation = 'slideInRight 0.3s ease-out';
     alertDiv.innerHTML = `
         <i class="${getAlertIcon(type)} me-2"></i>
         ${escapeHtml(message)}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" style="float:right; margin-left:8px;" onclick="this.parentElement.remove()">
+            <span>&times;</span>
+        </button>
     `;
-    
-    // 添加到页面
-    document.body.appendChild(alertDiv);
-    
+
+    // 直接插入到 body 开头（确保在最上层）
+    document.body.insertBefore(alertDiv, document.body.firstChild);
+
     // 3秒后自动移除
     setTimeout(() => {
         if (alertDiv.parentNode) {
@@ -430,6 +444,7 @@ function showNotification(message, type = 'info') {
         }
     }, 3000);
 }
+
 
 /**
  * 获取通知类型对应的Bootstrap类
