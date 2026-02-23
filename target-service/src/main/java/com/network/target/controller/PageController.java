@@ -49,6 +49,21 @@ public class PageController {
     }
 
     /**
+     * DDoS攻击模拟测试页面
+     * 提供DDoS攻击测试界面，模拟各种攻击场景
+     */
+    @GetMapping("/ddos-vuln")
+    public String ddosTargetPage(Model model) {
+        log.info("访问DDoS攻击模拟测试页面");
+        
+        // 添加页面元数据
+        model.addAttribute("pageTitle", "DDoS攻击模拟靶场");
+        model.addAttribute("pageDescription", "模拟DDoS攻击测试环境，支持多种攻击场景验证");
+        
+        return "ddos-vuln";
+    }
+
+    /**
      * 首页路由 - 可扩展为漏洞类型选择页面
      */
     @GetMapping("/index")
