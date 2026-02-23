@@ -211,16 +211,20 @@ function displayCommandResult(resultData) {
     // 构建HTML内容
     resultElement.innerHTML = `
         <div class="command-header">
-            <div class="command-input">
-                <i class="fas fa-terminal me-2"></i>${escapeHtml(resultData.command)}
+            <div>
+                <span class="badge bg-primary">命令执行</span>
+                <span class="ms-2">输入: ${escapeHtml(resultData.command)}</span>
             </div>
             <div class="command-timestamp">${resultData.timestamp}</div>
+        </div>
+        <div class="command-input">
+            <i class="fas fa-terminal me-2"></i>执行命令: ${escapeHtml(resultData.command)}
         </div>
         <div class="command-result ${getResultClass(resultData)}">
             ${formatCommandResult(resultData)}
         </div>
         ${resultData.isError ? '' : `
-        <div class="command-details mt-3 p-3 bg-dark rounded">
+        <div class="command-details">
             <small class="text-muted">
                 <i class="fas fa-info-circle me-1"></i>
                 ${resultData.success ? '✅ 命令执行成功' : '❌ 命令执行失败'}
