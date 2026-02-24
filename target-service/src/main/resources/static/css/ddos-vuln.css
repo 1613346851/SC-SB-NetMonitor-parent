@@ -23,7 +23,7 @@ body {
     height: calc(100vh - 56px); /* 减去导航栏高度 */
 }
 
-/* 左侧控制面板优化 - 增加宽度到380px */
+/* 左侧控制面板优化 */
 .col-md-4.col-lg-3 {
     flex: 0 0 380px;
     max-width: 380px;
@@ -34,7 +34,7 @@ body {
     height: 100%;
 }
 
-/* 右侧输出区域优化 - 自适应剩余空间 */
+/* 右侧输出区域优化 */
 .col-md-8.col-lg-9 {
     flex: 1;
     padding: 15px;
@@ -64,8 +64,8 @@ body {
     overflow-y: auto;
 }
 
-/* 系统信息区域优化 */
-.system-info {
+/* 靶场信息区域优化 */
+.target-info {
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     border-radius: 8px;
     padding: 15px;
@@ -86,34 +86,38 @@ body {
 }
 
 .badge {
-    min-width: 80px;
+    min-width: 70px;
     text-align: center;
     font-weight: 500;
 }
 
+/* 攻击配置区域样式 */
+.attack-config {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+    border: 1px solid #90caf9;
+    border-radius: 8px !important;
+    padding: 15px !important;
+    margin-bottom: 20px !important;
+}
+
+.form-range {
+    height: 25px;
+    cursor: pointer;
+}
+
+.form-range::-webkit-slider-thumb {
+    background: #007bff;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.form-range::-moz-range-thumb {
+    background: #007bff;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
 /* 测试用例区域优化 */
-.test-category {
-    margin-bottom: 25px;
-    padding: 15px;
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border-radius: 8px;
-    border: 1px solid #e9ecef;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-}
-
-.test-category:last-child {
-    margin-bottom: 0;
-}
-
-.test-category h6 {
-    margin-bottom: 15px;
-    padding-left: 0;
-}
-
-.test-category h6::before {
-    display: none;
-}
-
 .test-cases-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -208,12 +212,12 @@ body {
     flex-direction: column;
 }
 
-.main-content .output-container {
+.main-content .attack-log-container {
     flex: 1;
 }
 
-/* 输出容器样式 */
-.output-container {
+/* 攻击日志容器样式 */
+.attack-log-container {
     height: calc(100vh - 130px);
     overflow-y: auto;
     background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
@@ -245,8 +249,8 @@ body {
     color: #adb5bd;
 }
 
-/* 攻击结果项样式 */
-.attack-result {
+/* 攻击日志项样式 */
+.attack-log-entry {
     margin-bottom: 25px;
     border-left: 5px solid #007bff;
     padding: 20px 20px 20px 25px;
@@ -274,7 +278,36 @@ body {
     font-size: 12px;
 }
 
-.attack-input {
+.attack-type {
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.attack-type.cpu {
+    background-color: #dc3545;
+    color: white;
+}
+
+.attack-type.io {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.attack-type.flood {
+    background-color: #007bff;
+    color: white;
+}
+
+.attack-type.monitor {
+    background-color: #28a745;
+    color: white;
+}
+
+.attack-target {
     color: #007bff;
     font-weight: bold;
     margin-bottom: 12px;
@@ -284,74 +317,83 @@ body {
     border-radius: 4px;
 }
 
-.attack-result-content {
-    white-space: pre-wrap;
-    word-break: break-word;
+.attack-details {
     margin-bottom: 15px;
-    padding: 15px;
-    background-color: #f8f9fa;
+}
+
+.attack-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border: 1px solid #dee2e6;
-    border-radius: 4px;
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
 }
 
-.result-success {
-    color: #28a745;
-}
-
-.result-error {
+.metric-value {
+    font-size: 1.2em;
+    font-weight: bold;
     color: #007bff;
 }
 
-.result-warning {
-    color: #ffc107;
-}
-
-/* 攻击详情样式 */
-.attack-details {
-    margin-top: 15px;
-    padding: 15px;
-    background-color: #f8f9fa;
-    border-radius: 4px;
-    border: 1px solid #dee2e6;
-}
-
-.attack-details small {
+.metric-label {
+    font-size: 0.85em;
     color: #6c757d;
+    margin-top: 5px;
 }
 
-/* 响应时间徽章样式 */
-.badge.bg-info {
-    background-color: #17a2b8 !important;
-    font-weight: 600;
+/* 状态信息样式 */
+.attack-status {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
-/* null值显示优化 */
-.text-muted {
-    color: #6c757d !important;
-    font-style: italic;
+.attack-status.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
 }
 
-/* 状态指示器动画 */
-.status-executing {
-    background-color: #ffc107 !important;
-    animation: pulse 1.5s infinite;
+.attack-status.warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
 }
 
-.status-success {
-    background-color: #28a745 !important;
+.attack-status.danger {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
 }
 
-.status-error {
-    background-color: #007bff !important;
+.attack-status.info {
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
 }
 
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.6; }
-    100% { opacity: 1; }
+/* 进度条样式 */
+.progress {
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
 }
 
-/* 加载遮罩层 - 居中显示 */
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* 加载遮罩层 */
 .loading-overlay {
     position: fixed;
     top: 0;
@@ -384,22 +426,12 @@ body {
     to { transform: rotate(360deg); }
 }
 
-/* 滚动条美化 */
-.output-container::-webkit-scrollbar {
-    width: 8px;
-}
-
-.output-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-.output-container::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-}
-
-.output-container::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+/* 通知横幅优化 */
+.alert-banner {
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    font-weight: 500;
+    backdrop-filter: blur(10px);
 }
 
 /* 响应式设计优化 */
@@ -469,7 +501,7 @@ body {
         font-size: 1rem;
     }
     
-    .output-container {
+    .attack-log-container {
         padding: 15px;
     }
 }
@@ -487,110 +519,45 @@ body {
         padding: 15px;
     }
     
-    .output-container {
+    .attack-log-container {
         padding: 15px;
     }
 }
 
-/* 卡片阴影增强 */
-.card.shadow-sm {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+/* 动画效果 */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
 }
 
-.card.shadow-sm:hover {
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
-    transition: box-shadow 0.3s ease;
+.status-executing {
+    background-color: #ffc107 !important;
+    animation: pulse 1.5s infinite;
 }
 
-/* 表单元素焦点状态 */
-.form-control:focus {
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+.status-success {
+    background-color: #28a745 !important;
 }
 
-.btn-primary:focus {
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+.status-error {
+    background-color: #dc3545 !important;
 }
 
-/* 代码高亮模拟 */
-.code-highlight {
-    background-color: rgba(255, 255, 255, 0.1);
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-family: 'Consolas', monospace;
+/* 滚动条美化 */
+.attack-log-container::-webkit-scrollbar {
+    width: 8px;
 }
 
-/* 通知横幅优化 */
-.alert-banner {
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    font-weight: 500;
-    backdrop-filter: blur(10px);
+.attack-log-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
 }
 
-/* 攻击历史记录样式 */
-.attack-history-item {
-    cursor: pointer;
-    transition: background-color 0.2s;
-    padding: 8px;
+.attack-log-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
     border-radius: 4px;
-    margin-bottom: 5px;
 }
 
-.attack-history-item:hover {
-    background-color: #e9ecef;
-}
-
-.attack-history-item.active {
-    background-color: #007bff;
-    color: white;
-}
-
-/* 性能优化 */
-.output-container {
-    will-change: scroll-position;
-}
-
-.attack-result {
-    will-change: transform;
-}
-
-/* 进度条样式 */
-.progress {
-    background-color: #e9ecef;
-    border-radius: 10px;
-    height: 20px;
-}
-
-.progress-bar {
-    transition: width 0.3s ease;
-}
-
-/* 攻击统计信息样式 */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px;
-    margin: 20px 0;
-}
-
-.stat-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border-radius: 8px;
-    padding: 15px;
-    text-align: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    border: 1px solid #e9ecef;
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #007bff;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #6c757d;
-    margin-top: 5px;
+.attack-log-container::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
 }

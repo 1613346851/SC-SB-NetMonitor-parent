@@ -9,18 +9,18 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container-fluid vh-100">
+    <div class="container-fluid vh-100 p-0">
         <!-- 顶部导航栏 -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
-            <div class="container">
-                <a class="navbar-brand" href="#">
-                    <i class="fas fa-bolt me-2"></i>
-                    <span th:text="${pageTitle}">DDoS攻击模拟靶场</span>
+            <div class="container-fluid">
+                <a class="navbar-brand d-flex align-items-center" href="#">
+                    <i class="fas fa-bolt me-3"></i>
+                    <span th:text="${pageTitle}" class="fw-bold">DDoS攻击模拟靶场</span>
                 </a>
                 <div class="navbar-nav ms-auto">
-                    <span class="navbar-text">
-                        <i class="fas fa-shield-alt text-warning"></i>
-                        攻击测试环境
+                    <span class="navbar-text d-flex align-items-center">
+                        <i class="fas fa-shield-alt text-warning me-2"></i>
+                        <span class="fw-medium">安全测试环境</span>
                     </span>
                 </div>
             </div>
@@ -35,168 +35,170 @@
                         <h5 class="mb-0 fw-bold">攻击控制台</h5>
                     </div>
                     <div class="card-body">
-                        <!-- 系统状态信息 -->
+                        <!-- 系统信息显示 -->
                         <div class="section mb-4">
                             <h6 class="text-muted fw-semibold mb-3">
-                                <i class="fas fa-info-circle me-2"></i>系统信息
+                                <i class="fas fa-info-circle me-2"></i>靶场信息
                             </h6>
-                            <div class="system-info">
+                            <div class="target-info">
                                 <div class="info-item">
-                                    <span class="badge bg-secondary">总请求数</span>
-                                    <span id="totalRequests" class="ms-3 text-dark fw-medium">0</span>
+                                    <span class="badge bg-secondary">攻击类型</span>
+                                    <span class="ms-3 text-dark fw-medium">DDoS分布式拒绝服务</span>
                                 </div>
-                                <div class="info-item mt-2">
-                                    <span class="badge bg-secondary">CPU使用率</span>
-                                    <span id="cpuUsage" class="ms-3 text-dark fw-medium">0%</span>
+                                <div class="info-item">
+                                    <span class="badge bg-secondary">测试目标</span>
+                                    <span class="ms-3 text-dark fw-medium">模拟高负载Web服务</span>
                                 </div>
-                                <div class="info-item mt-2">
-                                    <span class="badge bg-secondary">内存使用</span>
-                                    <span id="memoryUsage" class="ms-3 text-dark fw-medium">0MB</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- CPU密集型测试用例 -->
-                        <div class="section mb-4">
-                            <div class="test-category mb-4">
-                                <h6 class="text-muted fw-semibold mb-3">
-                                    <i class="fas fa-microchip me-2 text-primary"></i>CPU密集型攻击
-                                </h6>
-                                <div class="test-cases-grid">
-                                    <button class="btn btn-outline-primary btn-sm" onclick="executeDdosTest('/target/ddos/compute-heavy', 'TC001')">
-                                        <i class="fas fa-calculator me-1"></i>单次调用
-                                    </button>
-                                    <button class="btn btn-outline-primary btn-sm" onclick="executeMultipleCalls('/target/ddos/compute-heavy', 3, 'TC002')">
-                                        <i class="fas fa-sync me-1"></i>连续3次
-                                    </button>
-                                    <button class="btn btn-outline-warning btn-sm" onclick="startStressTest('/target/ddos/compute-heavy', 10, 60, 'TC003')">
-                                        <i class="fas fa-fire me-1"></i>10并发/1分钟
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="startStressTest('/target/ddos/compute-heavy', 100, 600, 'TC004')">
-                                        <i class="fas fa-skull me-1"></i>100并发/10分钟
-                                    </button>
+                                <div class="info-item">
+                                    <span class="badge bg-secondary">状态监控</span>
+                                    <span id="attackStatus" class="ms-3 text-success fw-medium">准备就绪</span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- I/O延迟测试用例 -->
+                        <!-- 攻击配置区域 -->
                         <div class="section mb-4">
-                            <div class="test-category mb-4">
-                                <h6 class="text-muted fw-semibold mb-3">
-                                    <i class="fas fa-clock me-2 text-info"></i>I/O延迟攻击
-                                </h6>
-                                <div class="test-cases-grid">
-                                    <button class="btn btn-outline-info btn-sm" onclick="executeDdosTest('/target/ddos/io-delay', 'TC005')">
-                                        <i class="fas fa-hourglass-half me-1"></i>默认延迟
-                                    </button>
-                                    <button class="btn btn-outline-info btn-sm" onclick="executeDdosTest('/target/ddos/io-delay?delay=10000', 'TC006')">
-                                        <i class="fas fa-hourglass-end me-1"></i>最大延迟
-                                    </button>
-                                    <button class="btn btn-outline-warning btn-sm" onclick="executeDdosTest('/target/ddos/io-delay?delay=15000', 'TC007')">
-                                        <i class="fas fa-exclamation-triangle me-1"></i>超限延迟
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="executeDdosTest('/target/ddos/io-delay?delay=-500', 'TC008')">
-                                        <i class="fas fa-minus-circle me-1"></i>负数延迟
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="executeDdosTest('/target/ddos/io-delay?delay=abc', 'TC009')">
-                                        <i class="fas fa-font me-1"></i>非法参数
-                                    </button>
-                                    <button class="btn btn-outline-warning btn-sm" onclick="startConnectionTest('/target/ddos/io-delay?delay=5000', 50, 'TC010')">
-                                        <i class="fas fa-network-wired me-1"></i>50并发连接
-                                    </button>
+                            <h6 class="text-muted fw-semibold mb-3">
+                                <i class="fas fa-sliders-h me-2"></i>攻击参数配置
+                            </h6>
+                            <div class="attack-config p-3 bg-light rounded border">
+                                <div class="mb-3">
+                                    <label class="form-label fw-medium mb-2">
+                                        <i class="fas fa-tachometer-alt me-1"></i>并发请求数:
+                                    </label>
+                                    <input type="range" class="form-range" id="concurrentRequests" min="1" max="100" value="10">
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">1</small>
+                                        <span class="badge bg-primary" id="concurrentDisplay">10</span>
+                                        <small class="text-muted">100</small>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-medium mb-2">
+                                        <i class="fas fa-stopwatch me-1"></i>攻击持续时间 (秒):
+                                    </label>
+                                    <input type="range" class="form-range" id="attackDuration" min="5" max="300" value="30">
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">5s</small>
+                                        <span class="badge bg-info" id="durationDisplay">30s</span>
+                                        <small class="text-muted">300s</small>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-medium mb-2">
+                                        <i class="fas fa-wave-square me-1"></i>请求间隔 (毫秒):
+                                    </label>
+                                    <input type="range" class="form-range" id="requestInterval" min="0" max="1000" value="100">
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">0ms</small>
+                                        <span class="badge bg-warning" id="intervalDisplay">100ms</span>
+                                        <small class="text-muted">1000ms</small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Ping洪水测试用例 -->
+                        <!-- CPU密集型攻击测试用例 -->
                         <div class="section mb-4">
-                            <div class="test-category mb-4">
-                                <h6 class="text-muted fw-semibold mb-3">
-                                    <i class="fas fa-water me-2 text-success"></i>Ping洪水攻击
-                                </h6>
-                                <div class="test-cases-grid">
-                                    <button class="btn btn-outline-success btn-sm" onclick="executeDdosTest('/target/ddos/ping', 'TC011')">
-                                        <i class="fas fa-ping-pong-paddle-ball me-1"></i>单次Ping
-                                    </button>
-                                    <button class="btn btn-outline-warning btn-sm" onclick="startHighFrequencyTest('/target/ddos/ping', 10000, 1, 'TC012')">
-                                        <i class="fas fa-wave-square me-1"></i>10000QPS/1秒
-                                    </button>
-                                    <button class="btn btn-outline-warning btn-sm" onclick="startHighFrequencyTest('/target/ddos/ping', 5000, 3600, 'TC013')">
-                                        <i class="fas fa-infinity me-1"></i>5000QPS/1小时
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm" onclick="startExtremeTest('/target/ddos/ping', 20000, 'TC014')">
-                                        <i class="fas fa-bomb me-1"></i>极限20000QPS
-                                    </button>
-                                </div>
+                            <h6 class="text-muted fw-semibold mb-3">
+                                <i class="fas fa-microchip me-2 text-danger"></i>CPU密集型攻击
+                            </h6>
+                            <div class="test-cases-grid">
+                                <button class="btn btn-outline-danger btn-sm" onclick="executeDdosAttack('/target/ddos/compute-heavy', 'CPU密集型计算')">
+                                    <i class="fas fa-calculator me-1"></i>斐波那契计算
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="executeBatchAttack('/target/ddos/compute-heavy', 50, '批量CPU攻击')">
+                                    <i class="fas fa-layer-group me-1"></i>批量计算
+                                </button>
+                                <button class="btn btn-outline-warning btn-sm" onclick="executeStressTest('cpu', 20, 60, 'CPU压力测试')">
+                                    <i class="fas fa-fire me-1"></i>持续压力
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- I/O延迟型攻击测试用例 -->
+                        <div class="section mb-4">
+                            <h6 class="text-muted fw-semibold mb-3">
+                                <i class="fas fa-clock me-2 text-info"></i>I/O延迟型攻击
+                            </h6>
+                            <div class="test-cases-grid">
+                                <button class="btn btn-outline-info btn-sm" onclick="executeDdosAttack('/target/ddos/io-delay?delay=1000', 'I/O延迟1秒')">
+                                    <i class="fas fa-hourglass-start me-1"></i>1秒延迟
+                                </button>
+                                <button class="btn btn-outline-info btn-sm" onclick="executeDdosAttack('/target/ddos/io-delay?delay=5000', 'I/O延迟5秒')">
+                                    <i class="fas fa-hourglass-half me-1"></i>5秒延迟
+                                </button>
+                                <button class="btn btn-outline-info btn-sm" onclick="executeDdosAttack('/target/ddos/io-delay?delay=10000', 'I/O延迟10秒')">
+                                    <i class="fas fa-hourglass-end me-1"></i>10秒延迟
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 洪水攻击测试用例 -->
+                        <div class="section mb-4">
+                            <h6 class="text-muted fw-semibold mb-3">
+                                <i class="fas fa-water me-2 text-primary"></i>洪水攻击
+                            </h6>
+                            <div class="test-cases-grid">
+                                <button class="btn btn-outline-primary btn-sm" onclick="executeDdosAttack('/target/ddos/ping', '简单Ping洪水')">
+                                    <i class="fas fa-bullseye me-1"></i>Ping攻击
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm" onclick="executeHighFrequencyAttack('/target/ddos/ping', 1000, '高频Ping洪水')">
+                                    <i class="fas fa-bolt me-1"></i>高频攻击
+                                </button>
+                                <button class="btn btn-outline-success btn-sm" onclick="executeMultiTargetAttack('洪水组合攻击')">
+                                    <i class="fas fa-crosshairs me-1"></i>多目标攻击
+                                </button>
                             </div>
                         </div>
 
                         <!-- 状态查询测试用例 -->
                         <div class="section mb-4">
-                            <div class="test-category">
-                                <h6 class="text-muted fw-semibold mb-3">
-                                    <i class="fas fa-search me-2 text-secondary"></i>状态查询
-                                </h6>
-                                <div class="test-cases-grid">
-                                    <button class="btn btn-outline-secondary btn-sm" onclick="executeDdosTest('/target/ddos/status', 'TC015')">
-                                        <i class="fas fa-info-circle me-1"></i>初始状态
-                                    </button>
-                                    <button class="btn btn-outline-secondary btn-sm" onclick="testConsistency('TC016')">
-                                        <i class="fas fa-balance-scale me-1"></i>一致性测试
-                                    </button>
-                                    <button class="btn btn-outline-secondary btn-sm" onclick="testConcurrentCalls('TC017')">
-                                        <i class="fas fa-users me-1"></i>并发一致性
-                                    </button>
-                                </div>
+                            <h6 class="text-muted fw-semibold mb-3">
+                                <i class="fas fa-chart-bar me-2 text-success"></i>状态监控
+                            </h6>
+                            <div class="test-cases-grid">
+                                <button class="btn btn-outline-success btn-sm" onclick="checkAttackStatus()">
+                                    <i class="fas fa-heartbeat me-1"></i>实时状态
+                                </button>
+                                <button class="btn btn-outline-success btn-sm" onclick="getSystemMetrics()">
+                                    <i class="fas fa-tasks me-1"></i>系统指标
+                                </button>
                             </div>
                         </div>
 
                         <!-- 自定义攻击区域 -->
                         <div class="section mb-3">
                             <h6 class="text-muted fw-semibold mb-3">
-                                <i class="fas fa-sliders-h me-2"></i>自定义攻击
+                                <i class="fas fa-edit me-2"></i>自定义攻击
                             </h6>
                             <div class="mb-3">
                                 <label for="customEndpoint" class="form-label fw-medium">
                                     <i class="fas fa-link me-1"></i>攻击端点:
                                 </label>
-                                <select class="form-select" id="customEndpoint">
-                                    <option value="/target/ddos/compute-heavy">/target/ddos/compute-heavy (CPU密集型)</option>
-                                    <option value="/target/ddos/io-delay">/target/ddos/io-delay (I/O延迟)</option>
-                                    <option value="/target/ddos/ping">/target/ddos/ping (Ping洪水)</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="concurrentThreads" class="form-label fw-medium">
-                                    <i class="fas fa-project-diagram me-1"></i>并发线程数:
-                                </label>
-                                <input type="range" class="form-range" id="concurrentThreads" min="1" max="100" value="10">
-                                <div class="d-flex justify-content-between">
-                                    <small class="text-muted">1</small>
-                                    <span id="threadCountDisplay" class="badge bg-primary">10</span>
-                                    <small class="text-muted">100</small>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="attackDuration" class="form-label fw-medium">
-                                    <i class="fas fa-clock me-1"></i>攻击持续时间(秒):
-                                </label>
-                                <input type="number" class="form-control" id="attackDuration" min="1" max="3600" value="10">
+                                <input type="text" class="form-control" id="customEndpoint" 
+                                       placeholder="/target/ddos/..." value="/target/ddos/ping">
                             </div>
                             <div class="d-grid gap-2">
-                                <button class="btn btn-danger btn-lg" type="button" id="startCustomAttackBtn">
-                                    <i class="fas fa-fighter-jet me-2"></i>开始自定义攻击
+                                <button class="btn btn-danger btn-lg" type="button" id="customAttackBtn">
+                                    <i class="fas fa-skull me-2"></i>发起自定义攻击
                                 </button>
-                                <button class="btn btn-outline-secondary" type="button" id="stopAttackBtn" disabled>
-                                    <i class="fas fa-stop me-2"></i>停止攻击
-                                </button>
+                            </div>
+                            <div class="form-text text-muted mt-3">
+                                <small>
+                                    <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                                    请注意控制攻击强度，避免影响其他服务
+                                </small>
                             </div>
                         </div>
 
                         <!-- 操作按钮 -->
                         <div class="section">
-                            <button class="btn btn-outline-secondary w-100 py-2" onclick="clearOutput()">
-                                <i class="fas fa-trash-alt me-2"></i>清空输出
+                            <button class="btn btn-outline-secondary w-100 py-2" onclick="clearAttackLog()">
+                                <i class="fas fa-trash-alt me-2"></i>清空攻击日志
+                            </button>
+                            <button class="btn btn-outline-info w-100 py-2 mt-2" onclick="exportAttackReport()">
+                                <i class="fas fa-file-export me-2"></i>导出攻击报告
                             </button>
                         </div>
                     </div>
@@ -209,23 +211,23 @@
                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center">
                             <i class="fas fa-scroll me-2"></i>
-                            <h5 class="mb-0 fw-bold">攻击结果监控</h5>
+                            <h5 class="mb-0 fw-bold">攻击日志与监控</h5>
                         </div>
                         <div>
                             <span id="statusIndicator" class="badge bg-secondary">
-                                <i class="fas fa-circle-notch fa-spin me-1"></i>就绪
+                                <i class="fas fa-circle-notch fa-spin me-1"></i>待命中
                             </span>
                         </div>
                     </div>
                     <div class="card-body p-0">
-                        <div id="outputContainer" class="output-container">
+                        <div id="attackLogContainer" class="attack-log-container">
                             <div class="welcome-message text-center text-muted d-flex flex-column justify-content-center align-items-center h-100">
-                                <i class="fas fa-bolt fa-4x mb-4 text-danger"></i>
+                                <i class="fas fa-bolt fa-4x mb-4 text-primary"></i>
                                 <h4 class="fw-bold text-dark">欢迎使用DDoS攻击模拟靶场</h4>
-                                <p class="mb-0 lead">请选择左侧测试用例开始DDoS攻击测试</p>
+                                <p class="mb-0 lead">请选择左侧攻击类型或配置参数开始模拟DDoS攻击测试</p>
                                 <div class="mt-4">
                                     <i class="fas fa-mouse-pointer text-muted"></i>
-                                    <small class="ms-2">选择预设测试用例或配置自定义攻击参数</small>
+                                    <small class="ms-2">选择攻击类型或调整攻击参数进行测试</small>
                                 </div>
                             </div>
                         </div>
@@ -238,9 +240,18 @@
     <!-- 加载指示器 -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">攻击中...</span>
+            <span class="visually-hidden">攻击进行中...</span>
         </div>
-        <p class="mt-2 text-white">攻击执行中，请稍候...</p>
+        <p class="mt-3 text-white fw-medium">攻击进行中，请稍候...</p>
+        <div class="attack-progress mt-3">
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" style="width: 0%" id="attackProgress">
+                    0%
+                </div>
+            </div>
+            <small class="text-white mt-2" id="progressText">准备启动攻击...</small>
+        </div>
     </div>
 
     <!-- JavaScript资源 -->
