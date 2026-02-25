@@ -32,11 +32,6 @@
         <java.version>17</java.version>
         <spring-boot.version>2.7.18</spring-boot.version> <!-- 显式定义 -->
         <spring-cloud.version>2021.0.8</spring-cloud.version>
-
-
-        <java.version>17</java.version>
-        <!-- Spring Cloud 与 Spring Boot 2.7.18 完美兼容 -->
-        <spring-cloud.version>2021.0.8</spring-cloud.version>
         <!-- 持久层依赖版本 -->
         <mybatis.version>2.3.1</mybatis.version>
         <!-- MySQL驱动（9.5.0 兼容MySQL 5.7+/8.0+，适配JDBC） -->

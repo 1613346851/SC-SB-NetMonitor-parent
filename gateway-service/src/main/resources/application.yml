@@ -10,13 +10,13 @@ spring:
   cloud:
     gateway:
       routes:
-        # 测试路由：访问http://localhost:9000/test → 转发到百度（用于验证网关是否生效）
-        - id: test_route  # 路由ID，唯一即可
-          uri: https://www.baidu.com  # 转发目标地址（后续替换为靶场服务地址）
+        # 靶场服务路由：所有/target/**的请求转发到靶场服务（target-service:9001）
+        - id: target_service_route  # 唯一路由ID
+          uri: http://localhost:9001  # 靶场服务的地址+端口（本地部署）
           predicates:
-            - Path=/test/**  # 匹配路径：以/test开头的请求都走这个路由
+            - Path=/target/**  # 匹配所有/target开头的请求（靶场接口都是/target/xxx）
           filters:
-            - StripPrefix=1  # 去掉前缀/test，转发到百度根路径（否则百度会报404）
+            - StripPrefix=0  # 保留/target前缀（因为靶场接口路径就是/target/xxx，无需剥离）
 
 # Actuator配置：暴露网关监控端点（方便后续查看路由、健康状态）
 management:

@@ -1,0 +1,686 @@
+/* DDoS攻击模拟靶场样式文件 */
+
+/* 全局样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    overflow-x: hidden;
+}
+
+/* 主布局优化 */
+.container-fluid {
+    padding: 0;
+}
+
+.row {
+    margin: 0;
+    height: calc(100vh - 56px); /* 减去导航栏高度 */
+}
+
+/* 左侧控制面板优化 */
+.col-md-4.col-lg-3 {
+    flex: 0 0 380px;
+    max-width: 380px;
+    padding: 15px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-right: 1px solid #dee2e6;
+    overflow-y: auto;
+    height: 100%;
+}
+
+/* 右侧输出区域优化 */
+.col-md-8.col-lg-9 {
+    flex: 1;
+    padding: 15px;
+    height: 100%;
+}
+
+/* 控制面板卡片优化 */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+    padding: 15px 20px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.card-body {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+/* 靶场信息区域优化 */
+.target-info {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 8px 0;
+}
+
+.info-item:last-child {
+    margin-bottom: 0;
+}
+
+.badge {
+    min-width: 70px;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* 攻击配置区域样式 */
+.attack-config {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+    border: 1px solid #90caf9;
+    border-radius: 8px !important;
+    padding: 15px !important;
+    margin-bottom: 20px !important;
+}
+
+.form-range {
+    height: 25px;
+    cursor: pointer;
+}
+
+.form-range::-webkit-slider-thumb {
+    background: #007bff;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.form-range::-moz-range-thumb {
+    background: #007bff;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* 测试用例区域优化 */
+.test-cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+}
+
+.test-cases-grid .btn {
+    white-space: normal;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.test-cases-grid .btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+/* 板块间距优化 */
+.section {
+    padding: 5px 0;
+}
+
+.section:not(:last-child) {
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+}
+
+.section h6 {
+    position: relative;
+    padding-left: 25px;
+}
+
+.section h6::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(to bottom, #007bff, #0056b3);
+    border-radius: 2px;
+}
+
+/* 侧边栏滚动优化 */
+.sidebar {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f8f9fa;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #f8f9fa;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* 主内容区域优化 */
+.main-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content .card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content .attack-log-container {
+    flex: 1;
+}
+
+/* 攻击日志容器样式 */
+.attack-log-container {
+    height: calc(100vh - 130px);
+    overflow-y: auto;
+    background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+    color: #333;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 25px;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* 欢迎消息样式 */
+.welcome-message {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.welcome-message h4 {
+    color: #6c757d;
+    margin-bottom: 15px;
+}
+
+.welcome-message p {
+    color: #adb5bd;
+}
+
+/* 攻击日志项样式 */
+.attack-log-entry {
+    margin-bottom: 25px;
+    border-left: 5px solid #007bff;
+    padding: 20px 20px 20px 25px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 0 8px 8px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.attack-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.attack-header .badge {
+    font-size: 0.85em;
+    padding: 5px 10px;
+}
+
+.attack-timestamp {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.attack-type {
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.attack-type.cpu {
+    background-color: #dc3545;
+    color: white;
+}
+
+.attack-type.io {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.attack-type.flood {
+    background-color: #007bff;
+    color: white;
+}
+
+.attack-type.monitor {
+    background-color: #28a745;
+    color: white;
+}
+
+.attack-target {
+    color: #007bff;
+    font-weight: bold;
+    margin-bottom: 12px;
+    word-break: break-all;
+    background-color: #e9ecef;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.attack-details {
+    margin-bottom: 15px;
+}
+
+.attack-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    text-align: center;
+}
+
+.metric-value {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.metric-label {
+    font-size: 0.85em;
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+/* 状态信息样式 */
+.attack-status {
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 15px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.attack-status.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.attack-status.warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.attack-status.danger {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.attack-status.info {
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+/* 进度条样式 */
+.progress {
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* 加载遮罩层 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.9) 100%);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    z-index: 10000;
+    backdrop-filter: blur(5px);
+    transition: opacity 0.3s ease;
+}
+
+.loading-overlay.show {
+    display: flex;
+    opacity: 1;
+}
+
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+    animation: spinner-border 0.75s linear infinite;
+    color: #007bff;
+}
+
+@keyframes spinner-border {
+    to { transform: rotate(360deg); }
+}
+
+/* 通知横幅优化 */
+.alert-banner {
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+/* 响应式设计优化 */
+@media (max-width: 1400px) {
+    .col-md-4.col-lg-3 {
+        flex: 0 0 350px;
+        max-width: 350px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 10px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .col-md-4.col-lg-3 {
+        flex: 0 0 320px;
+        max-width: 320px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 8px;
+    }
+}
+
+@media (max-width: 992px) {
+    .col-md-4.col-lg-3 {
+        flex: 0 0 280px;
+        max-width: 280px;
+    }
+    
+    .card-body {
+        padding: 15px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .row {
+        flex-direction: column;
+        height: auto;
+    }
+    
+    .col-md-4.col-lg-3,
+    .col-md-8.col-lg-9 {
+        flex: 1;
+        max-width: 100%;
+    }
+    
+    .col-md-4.col-lg-3 {
+        max-height: 400px;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+    }
+    
+    .section h6 {
+        font-size: 1rem;
+    }
+    
+    .attack-log-container {
+        padding: 15px;
+    }
+}
+
+@media (max-width: 576px) {
+    .test-cases-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .card-header {
+        padding: 12px 15px;
+    }
+    
+    .card-body {
+        padding: 15px;
+    }
+    
+    .attack-log-container {
+        padding: 15px;
+    }
+    
+    /* 移动端响应时间显示优化 */
+    .request-details-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    
+    .response-time-display {
+        margin-left: 0;
+        margin-top: 4px;
+    }
+    
+    /* 移动端状态检查优化 */
+    .attack-target-list {
+        padding: 10px;
+    }
+    
+    .target-item {
+        padding: 10px !important;
+    }
+}
+
+/* 动画效果 */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.status-executing {
+    background-color: #ffc107 !important;
+    animation: pulse 1.5s infinite;
+}
+
+.status-success {
+    background-color: #28a745 !important;
+}
+
+.status-error {
+    background-color: #dc3545 !important;
+}
+
+/* 滚动条美化 */
+.attack-log-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.attack-log-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.attack-log-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.attack-log-container::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* 响应时间显示样式 */
+.response-time-display {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.response-time-fast {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.response-time-normal {
+    background-color: #cce7ff;
+    color: #004085;
+    border: 1px solid #b8daff;
+}
+
+.response-time-slow {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.response-time-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.response-time-unknown {
+    background-color: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
+/* 请求详情行样式 */
+.request-details-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px dashed #e9ecef;
+}
+
+.request-details-row:last-child {
+    border-bottom: none;
+}
+
+.request-id {
+    font-family: 'Consolas', 'Courier New', monospace;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.response-time-value {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-weight: 600;
+}
+
+/* 警告信息样式 */
+.attack-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #856404;
+}
+
+.attack-warning i {
+    margin-right: 5px;
+}
+
+/* 状态检查目标列表样式 */
+.attack-target-list {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 15px;
+    border: 1px solid #e9ecef;
+}
+
+.target-item {
+    transition: all 0.2s ease;
+}
+
+.target-item:hover {
+    background-color: #e9ecef !important;
+    transform: translateX(3px);
+}
+
+.target-item .badge {
+    font-size: 0.7em;
+    padding: 4px 8px;
+}

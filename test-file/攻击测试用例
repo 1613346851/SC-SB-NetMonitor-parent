@@ -1,0 +1,50 @@
+根据您的配置文件，靶场服务（target-service）运行在 端口 9001，上下文路径为根路径 /。以下是您已实现的所有漏洞靶场接口的 完整 HTTP 请求链接 汇总，可直接用于 Postman 测试。
+
+靶场服务完整接口测试链接 (端口：9001)
+
+1. 命令注入攻击接口
+
+测试用例 方法 完整URL (示例) 说明
+
+执行系统命令 GET http://localhost:9001/target/cmd/execute?cmd=whoami 执行 whoami 命令，返回当前用户
+
+Windows进程列表 GET http://localhost:9001/target/cmd/execute?cmd=tasklist 执行 tasklist，返回进程列表
+
+Linux文件列表 GET http://localhost:9001/target/cmd/execute?cmd=ls -l / 执行 ls -l /，列出根目录
+
+网络连通测试 GET http://localhost:9001/target/cmd/execute?cmd=ping 127.0.0.1 -n 2 (Windows)<br>http://localhost:9001/target/cmd/execute?cmd=ping 127.0.0.1 -c 2 (Linux) 执行 ping 命令
+2. SQL注入攻击接口
+测试用例 方法 完整URL (示例) 说明
+
+正常查询 GET http://localhost:9001/target/sql/query?id=1 查询ID=1的用户（需确保 sys_user 表存在）
+
+永真条件攻击 GET http://localhost:9001/target/sql/query?id=1 OR 1=1 泄露 sys_user 表全部数据
+
+联合查询攻击 GET http://localhost:9001/target/sql/query?id=1 UNION SELECT null, database(), user(), version() 尝试联合查询获取数据库信息
+
+报错注入攻击 GET http://localhost:9001/target/sql/query?id=1 AND extractvalue(1, concat(0x7e, user())) 触发数据库报错泄露信息
+
+安全对比接口 GET http://localhost:9001/target/sql/safe-query?id=1 参数化查询的安全接口
+3. XSS攻击接口
+测试用例 方法 完整URL (示例) 请求体/参数说明
+
+存储型XSS - 提交 POST http://localhost:9001/target/xss/submit-comment Body (JSON): {"content": "<script>alert('存储型XSS')</script>"}
+
+存储型XSS - 查询 GET http://localhost:9001/target/xss/list-comments 查询所有评论（触发已存储的XSS）
+
+反射型XSS GET http://localhost:9001/target/xss/search?keyword=<script>alert('反射型XSS')</script> 恶意脚本通过URL参数反射
+
+DOM型XSS GET http://localhost:9001/target/xss/profile?username=<img src=x onerror=alert('DOM型XSS')> 返回未转义的HTML片段
+
+安全对比接口 POST http://localhost:9001/target/xss/safe-submit-comment Body (JSON): {"content": "<script>alert('被转义')</script>"}
+4. DDoS攻击目标接口
+测试用例 方法 完整URL (示例) 说明
+
+CPU消耗型接口 GET http://localhost:9001/target/ddos/compute-heavy 模拟高CPU计算（斐波那契数列）
+
+I/O延迟型接口 GET http://localhost:9001/target/ddos/io-delay?delay=3000 模拟I/O等待（延迟3秒）
+
+洪水攻击型接口 GET http://localhost:9001/target/ddos/ping 最简单的响应接口，用于洪水攻击
+
+靶场状态查询 GET http://localhost:9001/target/ddos/status 查看DDoS靶场总请求数和目标列表
+
