@@ -95,6 +95,39 @@
                                         <small class="text-muted">1000ms</small>
                                     </div>
                                 </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-medium mb-2">
+                                        <i class="fas fa-list-ol me-1"></i>批量攻击请求数:
+                                    </label>
+                                    <input type="range" class="form-range" id="batchRequestCount" min="10" max="1000" value="50">
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">10</small>
+                                        <span class="badge bg-info" id="batchCountDisplay">50</span>
+                                        <small class="text-muted">1000</small>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-medium mb-2">
+                                        <i class="fas fa-bolt me-1"></i>高频攻击请求数:
+                                    </label>
+                                    <input type="range" class="form-range" id="highFreqRequestCount" min="100" max="5000" value="1000">
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">100</small>
+                                        <span class="badge bg-danger" id="highFreqCountDisplay">1000</span>
+                                        <small class="text-muted">5000</small>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-medium mb-2">
+                                        <i class="fas fa-tasks me-1"></i>最大并发请求数:
+                                    </label>
+                                    <input type="range" class="form-range" id="maxConcurrentLimit" min="1" max="200" value="50">
+                                    <div class="d-flex justify-content-between">
+                                        <small class="text-muted">1</small>
+                                        <span class="badge bg-success" id="maxConcurrentDisplay">50</span>
+                                        <small class="text-muted">200</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -107,7 +140,7 @@
                                 <button class="btn btn-outline-danger btn-sm" onclick="executeDdosAttack('/target/ddos/compute-heavy', 'CPU密集型计算')">
                                     <i class="fas fa-calculator me-1"></i>斐波那契计算
                                 </button>
-                                <button class="btn btn-outline-danger btn-sm" onclick="executeBatchAttack('/target/ddos/compute-heavy', 50, '批量CPU攻击')">
+                                <button class="btn btn-outline-danger btn-sm" onclick="executeBatchAttackWithConfig()">
                                     <i class="fas fa-layer-group me-1"></i>批量计算
                                 </button>
                                 <button class="btn btn-outline-warning btn-sm" onclick="executeStressTest('cpu', 20, 60, 'CPU压力测试')">
