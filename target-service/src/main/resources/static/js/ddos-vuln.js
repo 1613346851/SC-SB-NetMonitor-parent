@@ -259,6 +259,12 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
             return;
         }
 
+        // 记录攻击开始时间
+        ddosState.attackStats.startTime = new Date();
+        ddosState.attackStats.totalRequests = 0;
+        ddosState.attackStats.successfulRequests = 0;
+        ddosState.attackStats.failedRequests = 0;
+        
         showLoading(true);
         updateStatus('executing', '批量攻击中...');
         logAttackStart(attackName, endpoint, requestCount, '批量');
@@ -289,6 +295,9 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
                     updateProgressBar(progress, `已完成 ${completed}/${requestCount} 请求`);
 
                     if (completed >= requestCount) {
+                        // 记录攻击结束时间
+                        ddosState.attackStats.endTime = new Date();
+                        
                         showLoading(false);
                         updateStatus('ready', '待命中');
                         logAttackCompletion(attackName, endpoint);
@@ -311,42 +320,7 @@ function executeHighFrequencyAttack(endpoint, qps, attackName) {
     executeBatchAttack(endpoint, totalRequests, `${attackName} (${qps}QPS)`);
 }
 
-/**
- * 执行多目标攻击
- */
-function executeMultiTargetAttack(attackName) {
-    const targets = [
-        { endpoint: DDOS_CONFIG.ENDPOINTS.COMPUTE_HEAVY, name: 'CPU计算' },
-        { endpoint: DDOS_CONFIG.ENDPOINTS.IO_DELAY + '?delay=1000', name: 'I/O延迟' },
-        { endpoint: DDOS_CONFIG.ENDPOINTS.PING, name: 'Ping洪水' }
-    ];
-    
-    if (ddosState.attackInProgress) {
-        showNotification('已有攻击正在进行中', 'warning');
-        return;
-    }
-    
-    showLoading(true);
-    updateStatus('executing', '多目标攻击中...');
-    logAttackStart(attackName, '多个端点', targets.length, '多目标');
 
-    let completedTargets = 0;
-
-    targets.forEach((target, index) => {
-        setTimeout(() => {
-            executeBatchAttack(target.endpoint, 20, `${attackName}-${target.name}`)
-                .finally(() => {
-                    completedTargets++;
-                    if (completedTargets >= targets.length) {
-                        showLoading(false);
-                        updateStatus('ready', '待命中');
-                        logAttackCompletion(attackName, '多目标攻击');
-                        showNotification(`${attackName}完成`, 'success');
-                    }
-                });
-        }, index * 1000); // 间隔1秒启动每个目标
-    });
-}
 
 /**
  * 执行压力测试
@@ -863,3 +837,10 @@ ${ddosState.attackLogs.map(log => `- [${log.timestamp}] ${log.type}: ${JSON.stri
 
 // 暴露全局函数供HTML调用
 window.executeDdosAttack = executeDdosAttack;
+window.executeBatchAttack = executeBatchAttack;
+window.executeHighFrequencyAttack = executeHighFrequencyAttack;
+window.executeStressTest = executeStressTest;
+window.checkAttackStatus = checkAttackStatus;
+window.getSystemMetrics = getSystemMetrics;
+window.clearAttackLog = clearAttackLog;
+window.exportAttackReport = exportAttackReport;
