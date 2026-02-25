@@ -3,6 +3,8 @@
  * 实现前后端交互、攻击模拟、结果展示等功能
  */
 
+
+
 // 全局配置
 const DDOS_CONFIG = {
     ENDPOINTS: {
@@ -28,7 +30,7 @@ const DDOS_CONFIG = {
     }
 };
 
-// 全局状态
+// 全局状态（修改为可代理对象）
 const ddosState = {
     attackInProgress: false,
     attackLogs: [],
@@ -40,6 +42,13 @@ const ddosState = {
         endTime: null
     }
 };
+
+
+// 新增原子递增方法
+ddosState.increment = (key, delta) => {
+    ddosState.attackStats[key] += delta;
+};
+
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -178,8 +187,6 @@ async function executeDdosAttack(endpoint, attackType) {
 async function performAttack(endpoint, concurrentRequests, durationSeconds, intervalMs) {
     const startTime = Date.now();
     const durationMs = durationSeconds * 1000;
-    let requestCount = 0;
-    
     // 创建并发请求Promise数组
     const promises = [];
     
@@ -198,6 +205,7 @@ async function performAttack(endpoint, concurrentRequests, durationSeconds, inte
  * 发送并发请求
  */
 async function sendConcurrentRequests(endpoint, startTime, durationMs, intervalMs, threadId) {
+    let requestCount = 0;
     while (Date.now() - startTime < durationMs) {
         try {
             const response = await fetch(endpoint, {
@@ -208,22 +216,22 @@ async function sendConcurrentRequests(endpoint, startTime, durationMs, intervalM
                 },
                 credentials: 'same-origin'
             });
-            
-            ddosState.attackStats.totalRequests++;
+
+            ddosState.increment('totalRequests', 1);
             requestCount++;
             
             if (response.ok) {
-                ddosState.attackStats.successfulRequests++;
+                ddosState.increment('successfulRequests', 1);
                 const data = await response.json();
                 logSuccessfulRequest(threadId, endpoint, data);
             } else {
-                ddosState.attackStats.failedRequests++;
+                ddosState.increment('failedRequests', 1);
                 logFailedRequest(threadId, endpoint, response.status);
             }
             
         } catch (error) {
-            ddosState.attackStats.failedRequests++;
-            ddosState.attackStats.totalRequests++;
+            ddosState.increment('failedRequests', 1);
+            ddosState.increment('totalRequests', 1);
             logFailedRequest(threadId, endpoint, error.message);
         }
         
@@ -240,50 +248,58 @@ async function sendConcurrentRequests(endpoint, startTime, durationMs, intervalM
 /**
  * 执行批量攻击
  */
+/**
+ * 执行批量攻击（返回 Promise）
+ */
 function executeBatchAttack(endpoint, requestCount, attackName) {
-    if (ddosState.attackInProgress) {
-        showNotification('已有攻击正在进行中', 'warning');
-        return;
-    }
-    
-    showLoading(true);
-    updateStatus('executing', '批量攻击中...');
-    logAttackStart(attackName, endpoint, requestCount, '批量');
-    
-    let completed = 0;
-    
-    for (let i = 0; i < requestCount; i++) {
-        fetch(endpoint)
-            .then(response => {
-                completed++;
-                if (response.ok) {
-                    ddosState.attackStats.successfulRequests++;
-                    return response.json();
-                } else {
-                    ddosState.attackStats.failedRequests++;
-                    throw new Error(`HTTP ${response.status}`);
-                }
-            })
-            .then(data => {
-                logSuccessfulRequest(i, endpoint, data);
-            })
-            .catch(error => {
-                logFailedRequest(i, endpoint, error.message);
-            })
-            .finally(() => {
-                ddosState.attackStats.totalRequests++;
-                const progress = (completed / requestCount) * 100;
-                updateProgressBar(progress, `已完成 ${completed}/${requestCount} 请求`);
-                
-                if (completed >= requestCount) {
-                    showLoading(false);
-                    updateStatus('ready', '待命中');
-                    logAttackCompletion(attackName, endpoint);
-                    showNotification(`${attackName}完成`, 'success');
-                }
-            });
-    }
+    return new Promise((resolve) => {
+        if (ddosState.attackInProgress) {
+            showNotification('已有攻击正在进行中', 'warning');
+            resolve(); // 提前结束
+            return;
+        }
+
+        showLoading(true);
+        updateStatus('executing', '批量攻击中...');
+        logAttackStart(attackName, endpoint, requestCount, '批量');
+
+        let completed = 0;
+
+        for (let i = 0; i < requestCount; i++) {
+            fetch(endpoint)
+                .then(response => {
+                    completed++;
+                    if (response.ok) {
+                        ddosState.increment('successfulRequests', 1);
+                        return response.json();
+                    } else {
+                        ddosState.increment('failedRequests', 1);
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                })
+                .then(data => {
+                    logSuccessfulRequest(i, endpoint, data);
+                })
+                .catch(error => {
+                    logFailedRequest(i, endpoint, error.message);
+                })
+                .finally(() => {
+                    ddosState.increment('totalRequests', 1);
+                    const progress = (completed / requestCount) * 100;
+                    updateProgressBar(progress, `已完成 ${completed}/${requestCount} 请求`);
+
+                    if (completed >= requestCount) {
+                        showLoading(false);
+                        updateStatus('ready', '待命中');
+                        logAttackCompletion(attackName, endpoint);
+                        showNotification(`${attackName}完成`, 'success');
+                        resolve(); // 👈 关键：通知 Promise 完成
+                    }
+                });
+        }
+    });
 }
+
 
 /**
  * 执行高频攻击
@@ -313,9 +329,9 @@ function executeMultiTargetAttack(attackName) {
     showLoading(true);
     updateStatus('executing', '多目标攻击中...');
     logAttackStart(attackName, '多个端点', targets.length, '多目标');
-    
+
     let completedTargets = 0;
-    
+
     targets.forEach((target, index) => {
         setTimeout(() => {
             executeBatchAttack(target.endpoint, 20, `${attackName}-${target.name}`)
@@ -365,8 +381,10 @@ async function getSystemMetrics() {
         const data = await response.json();
         
         const metrics = {
-            totalRequests: data.data?.total_requests_received || 0,
-            availableTargets: data.data?.available_targets?.length || 0,
+            totalRequests: data?.data?.total_requests_received || 0,
+            availableTargets: Array.isArray(data?.data?.available_targets)
+                ? data.data.available_targets.length
+                : 0,
             timestamp: new Date().toLocaleString('zh-CN')
         };
         
@@ -600,8 +618,8 @@ function buildLogHTML(logEntry) {
                 </div>
                 <div class="attack-details">
                     <small class="text-muted">
-                        请求ID: ${logEntry.response.data?.request_id || 'N/A'} | 
-                        响应时间: ${logEntry.response.data?.cost_time_ms || 'N/A'}ms
+                        请求ID: ${logEntry.response?.data?.request_id ?? 'N/A'} | 
+                        响应时间: ${logEntry.response?.data?.cost_time_ms ?? 'N/A'}ms
                     </small>
                 </div>
             `;
@@ -844,14 +862,4 @@ ${ddosState.attackLogs.map(log => `- [${log.timestamp}] ${log.type}: ${JSON.stri
 }
 
 // 暴露全局函数供HTML调用
-Object.assign(window, {
-    executeDdosAttack,
-    executeBatchAttack,
-    executeHighFrequencyAttack,
-    executeMultiTargetAttack,
-    executeStressTest,
-    checkAttackStatus,
-    getSystemMetrics,
-    clearAttackLog,
-    exportAttackReport
-});
+window.executeDdosAttack = executeDdosAttack;
