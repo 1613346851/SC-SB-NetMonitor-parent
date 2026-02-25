@@ -120,10 +120,14 @@ function bindEventListeners() {
 function bindCustomAttackButton() {
     const customBtn = document.querySelector(DDOS_CONFIG.SELECTORS.CUSTOM_ATTACK_BTN);
     if (customBtn) {
-        customBtn.addEventListener('click', () => {
+        customBtn.addEventListener('click', async () => {
             const endpoint = document.querySelector(DDOS_CONFIG.SELECTORS.CUSTOM_ENDPOINT).value.trim();
             if (endpoint) {
-                executeDdosAttack(endpoint, '自定义攻击');
+                try {
+                    await executeDdosAttack(endpoint, '自定义攻击');
+                } catch (error) {
+                    console.error('自定义攻击执行失败:', error);
+                }
             } else {
                 showNotification('请输入攻击端点', 'warning');
             }
@@ -313,11 +317,16 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
 /**
  * 执行高频攻击
  */
-function executeHighFrequencyAttack(endpoint, qps, attackName) {
+async function executeHighFrequencyAttack(endpoint, qps, attackName) {
     const duration = 10; // 10秒攻击
     const totalRequests = qps * duration;
     
-    executeBatchAttack(endpoint, totalRequests, `${attackName} (${qps}QPS)`);
+    try {
+        await executeBatchAttack(endpoint, totalRequests, `${attackName} (${qps}QPS)`);
+    } catch (error) {
+        console.error('高频攻击执行失败:', error);
+        showNotification(`高频攻击执行失败: ${error.message}`, 'error');
+    }
 }
 
 
@@ -325,9 +334,14 @@ function executeHighFrequencyAttack(endpoint, qps, attackName) {
 /**
  * 执行压力测试
  */
-function executeStressTest(testType, concurrent, duration, testName) {
+async function executeStressTest(testType, concurrent, duration, testName) {
     const endpoint = testType === 'cpu' ? DDOS_CONFIG.ENDPOINTS.COMPUTE_HEAVY : DDOS_CONFIG.ENDPOINTS.IO_DELAY;
-    executeDdosAttack(endpoint, testName);
+    try {
+        await executeDdosAttack(endpoint, testName);
+    } catch (error) {
+        console.error('压力测试执行失败:', error);
+        showNotification(`压力测试执行失败: ${error.message}`, 'error');
+    }
 }
 
 /**
