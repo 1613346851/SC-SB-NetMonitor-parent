@@ -1,9 +1,39 @@
 /**
+ * @typedef {Object} TargetInfo
+ * @property {string} method
+ * @property {string} path
+ * @property {string} desc
+ * @property {string} [vulnerability]
+ */
+
+/**
+ * @typedef {Object} ServerResponseData
+ * @property {number} [request_id]
+ * @property {number} [cost_time_ms]
+ * @property {number} [server_processing_time_ms]
+ * @property {number} [server_response_time_ms]
+ * @property {number} [actual_cost_time_ms]
+ * @property {number} [simulated_delay_ms]
+ * @property {number} [total_requests]
+ * @property {number} [total_requests_received]
+ * @property {number} [status_check_timestamp]
+ * @property {string} [warning]
+ * @property {string} [security_warning]
+ * @property {string} [tip]
+ * @property {TargetInfo[]} [available_targets]
+ */
+
+/**
+ * @typedef {Object} ApiResponse
+ * @property {number} code
+ * @property {string} msg
+ * @property {ServerResponseData} [data]
+ */
+
+/**
  * DDoS攻击模拟靶场JavaScript逻辑
  * 实现前后端交互、攻击模拟、结果展示等功能
  */
-
-
 
 // 全局配置
 const DDOS_CONFIG = {
@@ -97,57 +127,57 @@ function bindSliderEvents() {
     // 并发请求数滑块
     const concurrentSlider = document.querySelector(DDOS_CONFIG.SELECTORS.CONCURRENT_REQUESTS);
     const concurrentDisplay = document.querySelector(DDOS_CONFIG.SELECTORS.CONCURRENT_DISPLAY);
-    
+
     if (concurrentSlider && concurrentDisplay) {
         concurrentSlider.addEventListener('input', () => {
             concurrentDisplay.textContent = concurrentSlider.value;
         });
     }
-    
+
     // 攻击持续时间滑块
     const durationSlider = document.querySelector(DDOS_CONFIG.SELECTORS.ATTACK_DURATION);
     const durationDisplay = document.querySelector(DDOS_CONFIG.SELECTORS.DURATION_DISPLAY);
-    
+
     if (durationSlider && durationDisplay) {
         durationSlider.addEventListener('input', () => {
             durationDisplay.textContent = `${durationSlider.value}s`;
         });
     }
-    
+
     // 请求间隔滑块
     const intervalSlider = document.querySelector(DDOS_CONFIG.SELECTORS.REQUEST_INTERVAL);
     const intervalDisplay = document.querySelector(DDOS_CONFIG.SELECTORS.INTERVAL_DISPLAY);
-    
+
     if (intervalSlider && intervalDisplay) {
         intervalSlider.addEventListener('input', () => {
             intervalDisplay.textContent = `${intervalSlider.value}ms`;
         });
     }
-    
+
     // 批量攻击请求数滑块
     const batchCountSlider = document.querySelector(DDOS_CONFIG.SELECTORS.BATCH_REQUEST_COUNT);
     const batchCountDisplay = document.querySelector(DDOS_CONFIG.SELECTORS.BATCH_COUNT_DISPLAY);
-    
+
     if (batchCountSlider && batchCountDisplay) {
         batchCountSlider.addEventListener('input', () => {
             batchCountDisplay.textContent = batchCountSlider.value;
         });
     }
-    
+
     // 高频攻击请求数滑块
     const highFreqCountSlider = document.querySelector(DDOS_CONFIG.SELECTORS.HIGH_FREQ_REQUEST_COUNT);
     const highFreqCountDisplay = document.querySelector(DDOS_CONFIG.SELECTORS.HIGH_FREQ_COUNT_DISPLAY);
-    
+
     if (highFreqCountSlider && highFreqCountDisplay) {
         highFreqCountSlider.addEventListener('input', () => {
             highFreqCountDisplay.textContent = highFreqCountSlider.value;
         });
     }
-    
+
     // 最大并发请求数滑块
     const maxConcurrentSlider = document.querySelector(DDOS_CONFIG.SELECTORS.MAX_CONCURRENT_LIMIT);
     const maxConcurrentDisplay = document.querySelector(DDOS_CONFIG.SELECTORS.MAX_CONCURRENT_DISPLAY);
-    
+
     if (maxConcurrentSlider && maxConcurrentDisplay) {
         maxConcurrentSlider.addEventListener('input', () => {
             maxConcurrentDisplay.textContent = maxConcurrentSlider.value;
@@ -197,36 +227,36 @@ async function executeDdosAttack(endpoint, attackType) {
         showNotification('已有攻击正在进行中，请稍后再试', 'warning');
         return;
     }
-    
+
     // 获取攻击参数
     const concurrentRequests = parseInt(document.querySelector(DDOS_CONFIG.SELECTORS.CONCURRENT_REQUESTS)?.value || '10');
     const attackDuration = parseInt(document.querySelector(DDOS_CONFIG.SELECTORS.ATTACK_DURATION)?.value || '30');
     const requestInterval = parseInt(document.querySelector(DDOS_CONFIG.SELECTORS.REQUEST_INTERVAL)?.value || '100');
-    
+
     // 重置攻击状态
     ddosState.resetAttackState();
-    
+
     // 记录攻击开始
     ddosState.attackInProgress = true;
     ddosState.attackStats.startTime = new Date();
-    
+
     // 更新UI状态
     showLoading(true);
     updateStatus('executing', '攻击进行中...');
     updateProgressBar(0, '攻击启动中...');
-    
+
     // 记录攻击日志
     logAttackStart(attackType, endpoint, concurrentRequests, attackDuration);
-    
+
     try {
         // 执行攻击
         await performAttack(endpoint, concurrentRequests, attackDuration, requestInterval);
-        
+
         // 攻击完成
         ddosState.attackStats.endTime = new Date();
         logAttackCompletion(attackType, endpoint);
         showNotification(`${attackType}执行完成`, 'success');
-        
+
     } catch (error) {
         console.error('攻击执行出错:', error);
         logAttackError(attackType, endpoint, error);
@@ -247,20 +277,25 @@ async function performAttack(endpoint, concurrentRequests, durationSeconds, inte
     const durationMs = durationSeconds * 1000;
     // 创建并发请求Promise数组
     const promises = [];
-    
+
     for (let i = 0; i < concurrentRequests; i++) {
         promises.push(sendConcurrentRequests(endpoint, startTime, durationMs, intervalMs, i));
     }
-    
+
     // 等待所有并发请求完成
     await Promise.all(promises);
-    
+
     // 更新进度到最后
     updateProgressBar(100, '攻击已完成');
 }
 
 /**
  * 发送并发请求
+ * @param {string} endpoint
+ * @param {number} startTime
+ * @param {number} durationMs
+ * @param {number} intervalMs
+ * @param {number} threadId
  */
 async function sendConcurrentRequests(endpoint, startTime, durationMs, intervalMs, threadId) {
     let requestCount = 0;
@@ -277,37 +312,39 @@ async function sendConcurrentRequests(endpoint, startTime, durationMs, intervalM
 
             ddosState.increment('totalRequests', 1);
             requestCount++;
-            
+
             if (response.ok) {
                 ddosState.increment('successfulRequests', 1);
+                /** @type {ApiResponse} */
                 const data = await response.json();
                 logSuccessfulRequest(threadId, endpoint, data);
             } else {
                 ddosState.increment('failedRequests', 1);
-                logFailedRequest(threadId, endpoint, response.status);
+                logFailedRequest(threadId, endpoint, String(response.status));
             }
-            
+
         } catch (error) {
             ddosState.increment('failedRequests', 1);
             ddosState.increment('totalRequests', 1);
-            logFailedRequest(threadId, endpoint, error.message);
+            logFailedRequest(threadId, endpoint, error instanceof Error ? error.message : String(error));
         }
-        
+
         // 更新进度
         const elapsed = Date.now() - startTime;
         const progress = Math.min((elapsed / durationMs) * 100, 100);
         updateProgressBar(progress, `线程${threadId + 1}活跃中...`);
-        
+
         // 等待间隔时间
         await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
 }
 
 /**
- * 执行批量攻击
- */
-/**
  * 执行批量攻击（返回 Promise）
+ * @param {string} endpoint
+ * @param {number} requestCount
+ * @param {string} attackName
+ * @returns {Promise<void>}
  */
 function executeBatchAttack(endpoint, requestCount, attackName) {
     return new Promise((resolve) => {
@@ -319,10 +356,10 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
 
         // 重置攻击状态
         ddosState.resetAttackState();
-        
+
         // 记录攻击开始时间
         ddosState.attackStats.startTime = new Date();
-        
+
         showLoading(true);
         updateStatus('executing', '批量攻击中...');
         logAttackStart(attackName, endpoint, requestCount, '批量');
@@ -336,13 +373,13 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
 
         // 使用队列确保请求按顺序处理，避免竞态条件
         const requestQueue = [];
-        
+
         function processQueue() {
             // 处理已完成的请求
             while (requestQueue.length > 0 && requestQueue[0].completed) {
                 const finishedRequest = requestQueue.shift();
                 completed++;
-                
+
                 // 更新统计信息（使用原子操作）
                 ddosState.increment('totalRequests', 1);
                 if (finishedRequest.success) {
@@ -350,19 +387,19 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
                 } else {
                     ddosState.increment('failedRequests', 1);
                 }
-                
+
                 // 记录日志
                 if (finishedRequest.success) {
                     logSuccessfulRequest(finishedRequest.index, endpoint, finishedRequest.data);
                 } else {
                     logFailedRequest(finishedRequest.index, endpoint, finishedRequest.error);
                 }
-                
+
                 // 更新进度条
                 const progress = (completed / requestCount) * 100;
                 updateProgressBar(progress, `已完成 ${completed}/${requestCount} 请求`);
             }
-            
+
             // 检查是否所有请求都已完成
             if (completed >= requestCount && requestQueue.length === 0 && !hasLoggedCompletion) {
                 hasLoggedCompletion = true;
@@ -380,7 +417,7 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
             if (completed >= requestCount) {
                 return;
             }
-            
+
             // 并发控制检查
             if (activeRequests >= MAX_CONCURRENT) {
                 return;
@@ -388,13 +425,13 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
 
             activeRequests++;
             const currentIndex = completed + requestQueue.length;
-            
+
             // 再次检查，确保不会超出请求总数
             if (currentIndex >= requestCount) {
                 activeRequests--;
                 return;
             }
-            
+
             // 创建请求对象
             const requestObj = {
                 index: currentIndex,
@@ -403,9 +440,9 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
                 data: null,
                 error: null
             };
-            
+
             requestQueue.push(requestObj);
-            
+
             fetch(endpoint)
                 .then(response => {
                     if (response.ok) {
@@ -422,7 +459,7 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
                 })
                 .catch(error => {
                     if (!requestObj.error) {
-                        requestObj.error = error.message;
+                        requestObj.error = error instanceof Error ? error.message : String(error);
                     }
                     requestObj.success = false;
                 })
@@ -447,16 +484,19 @@ function executeBatchAttack(endpoint, requestCount, attackName) {
 
 /**
  * 执行高频攻击
+ * @param {string} endpoint
+ * @param {number} qps
+ * @param {string} attackName
  */
 async function executeHighFrequencyAttack(endpoint, qps, attackName) {
     // 获取高频攻击的请求数量配置
     const requestCount = parseInt(document.querySelector(DDOS_CONFIG.SELECTORS.HIGH_FREQ_REQUEST_COUNT)?.value || '1000');
-    
+
     try {
         await executeBatchAttack(endpoint, requestCount, `${attackName} (${qps}QPS, ${requestCount}请求)`);
     } catch (error) {
         console.error('高频攻击执行失败:', error);
-        showNotification(`高频攻击执行失败: ${error.message}`, 'error');
+        showNotification(`高频攻击执行失败: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
 }
 
@@ -464,6 +504,10 @@ async function executeHighFrequencyAttack(endpoint, qps, attackName) {
 
 /**
  * 执行压力测试
+ * @param {string} testType
+ * @param {number} concurrent
+ * @param {number} duration
+ * @param {string} testName
  */
 async function executeStressTest(testType, concurrent, duration, testName) {
     const endpoint = testType === 'cpu' ? DDOS_CONFIG.ENDPOINTS.COMPUTE_HEAVY : DDOS_CONFIG.ENDPOINTS.IO_DELAY;
@@ -471,7 +515,7 @@ async function executeStressTest(testType, concurrent, duration, testName) {
         await executeDdosAttack(endpoint, testName);
     } catch (error) {
         console.error('压力测试执行失败:', error);
-        showNotification(`压力测试执行失败: ${error.message}`, 'error');
+        showNotification(`压力测试执行失败: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
 }
 
@@ -481,12 +525,13 @@ async function executeStressTest(testType, concurrent, duration, testName) {
 async function checkAttackStatus() {
     try {
         const response = await fetch(DDOS_CONFIG.ENDPOINTS.STATUS);
+        /** @type {ApiResponse} */
         const data = await response.json();
         logStatusCheck(data);
         showNotification('状态检查完成', 'success');
     } catch (error) {
         console.error('状态检查失败:', error);
-        showNotification(`状态检查失败: ${error.message}`, 'error');
+        showNotification(`状态检查失败: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
 }
 
@@ -497,8 +542,9 @@ async function getSystemMetrics() {
     try {
         // 这里可以扩展为获取更多系统指标
         const response = await fetch(DDOS_CONFIG.ENDPOINTS.STATUS);
+        /** @type {ApiResponse} */
         const data = await response.json();
-        
+
         const metrics = {
             totalRequests: data?.data?.total_requests_received || 0,
             availableTargets: Array.isArray(data?.data?.available_targets)
@@ -506,17 +552,21 @@ async function getSystemMetrics() {
                 : 0,
             timestamp: new Date().toLocaleString('zh-CN')
         };
-        
+
         logSystemMetrics(metrics);
         showNotification('系统指标获取完成', 'success');
     } catch (error) {
         console.error('获取系统指标失败:', error);
-        showNotification(`获取指标失败: ${error.message}`, 'error');
+        showNotification(`获取指标失败: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
 }
 
 /**
  * 日志记录函数
+ * @param {string} attackType
+ * @param {string} endpoint
+ * @param {number} concurrent
+ * @param {number | string} duration
  */
 function logAttackStart(attackType, endpoint, concurrent, duration) {
     const logEntry = {
@@ -527,23 +577,32 @@ function logAttackStart(attackType, endpoint, concurrent, duration) {
         duration: duration,
         timestamp: new Date().toLocaleString('zh-CN')
     };
-    
+
     displayAttackLog(logEntry);
 }
 
+/**
+ * @param {string} attackType
+ * @param {string} endpoint
+ */
 function logAttackCompletion(attackType, endpoint) {
     const logEntry = {
         type: 'completion',
         attackType: attackType,
         endpoint: endpoint,
         stats: { ...ddosState.attackStats },
-        duration: ddosState.attackStats.endTime - ddosState.attackStats.startTime,
+        duration: ddosState.attackStats.endTime ? ddosState.attackStats.endTime - (ddosState.attackStats.startTime || 0) : 0,
         timestamp: new Date().toLocaleString('zh-CN')
     };
-    
+
     displayAttackLog(logEntry);
 }
 
+/**
+ * @param {string} attackType
+ * @param {string} endpoint
+ * @param {Error} error
+ */
 function logAttackError(attackType, endpoint, error) {
     const logEntry = {
         type: 'error',
@@ -552,14 +611,19 @@ function logAttackError(attackType, endpoint, error) {
         error: error.message,
         timestamp: new Date().toLocaleString('zh-CN')
     };
-    
+
     displayAttackLog(logEntry);
 }
 
+/**
+ * @param {number} threadId
+ * @param {string} endpoint
+ * @param {ApiResponse} responseData
+ */
 function logSuccessfulRequest(threadId, endpoint, responseData) {
     // 计算响应时间
     const responseTimeInfo = calculateResponseTime(responseData);
-    
+
     const logEntry = {
         type: 'success',
         threadId: threadId,
@@ -568,10 +632,15 @@ function logSuccessfulRequest(threadId, endpoint, responseData) {
         responseTimeInfo: responseTimeInfo,
         timestamp: new Date().toLocaleString('zh-CN')
     };
-    
+
     displayAttackLog(logEntry);
 }
 
+/**
+ * @param {number} threadId
+ * @param {string} endpoint
+ * @param {string} error
+ */
 function logFailedRequest(threadId, endpoint, error) {
     const logEntry = {
         type: 'failure',
@@ -581,57 +650,66 @@ function logFailedRequest(threadId, endpoint, error) {
         timestamp: new Date().toLocaleString('zh-CN'),
         responseTimeInfo: { displayTime: 'N/A', type: 'error' }
     };
-    
+
     displayAttackLog(logEntry);
 }
 
+/**
+ * @param {ApiResponse} statusData
+ */
 function logStatusCheck(statusData) {
     const logEntry = {
         type: 'status',
         data: statusData,
         timestamp: new Date().toLocaleString('zh-CN')
     };
-    
+
     displayAttackLog(logEntry);
 }
 
+/**
+ * @param {{totalRequests: number, availableTargets: number, timestamp: string}} metrics
+ */
 function logSystemMetrics(metrics) {
     const logEntry = {
         type: 'metrics',
         metrics: metrics,
         timestamp: new Date().toLocaleString('zh-CN')
     };
-    
+
     displayAttackLog(logEntry);
 }
 
 /**
  * 显示攻击日志
+ * @param {any} logEntry
  */
 function displayAttackLog(logEntry) {
     const container = document.querySelector(DDOS_CONFIG.SELECTORS.ATTACK_LOG_CONTAINER);
     if (!container) return;
-    
+
     // 移除欢迎消息
     const welcomeMessage = container.querySelector('.welcome-message');
     if (welcomeMessage) {
         welcomeMessage.remove();
     }
-    
+
     // 创建日志元素
     const logElement = document.createElement('div');
     logElement.className = 'attack-log-entry';
     logElement.innerHTML = buildLogHTML(logEntry);
-    
+
     container.appendChild(logElement);
     container.scrollTop = container.scrollHeight;
-    
+
     // 保存到状态中
     ddosState.attackLogs.push(logEntry);
 }
 
 /**
  * 构建日志HTML
+ * @param {any} logEntry
+ * @returns {string}
  */
 function buildLogHTML(logEntry) {
     switch (logEntry.type) {
@@ -665,12 +743,12 @@ function buildLogHTML(logEntry) {
                     正在对目标发起DDoS攻击...
                 </div>
             `;
-            
+
         case 'completion':
-            const successRate = logEntry.stats.totalRequests > 0 
+            const successRate = logEntry.stats.totalRequests > 0
                 ? ((logEntry.stats.successfulRequests / logEntry.stats.totalRequests) * 100).toFixed(1)
                 : 0;
-                
+
             return `
                 <div class="attack-header">
                     <div>
@@ -708,7 +786,7 @@ function buildLogHTML(logEntry) {
                     总耗时: ${(logEntry.duration / 1000).toFixed(2)}秒
                 </div>
             `;
-            
+
         case 'error':
             return `
                 <div class="attack-header">
@@ -727,12 +805,12 @@ function buildLogHTML(logEntry) {
                     错误信息: ${escapeHtml(logEntry.error)}
                 </div>
             `;
-            
+
         case 'success':
             const responseTimeInfo = logEntry.responseTimeInfo || { displayTime: 'N/A', type: 'unknown' };
             const responseTimeDisplay = responseTimeInfo.displayTime;
             const responseTimeType = responseTimeInfo.type;
-            
+
             // 根据响应时间类型确定样式类
             let timeStyleClass = 'response-time-unknown';
             if (responseTimeType === 'error') {
@@ -748,7 +826,7 @@ function buildLogHTML(logEntry) {
                     timeStyleClass = 'response-time-slow';
                 }
             }
-            
+
             return `
                 <div class="attack-header">
                     <div>
@@ -776,7 +854,7 @@ function buildLogHTML(logEntry) {
                     </div>` : ''}
                 </div>
             `;
-            
+
         case 'failure':
             return `
                 <div class="attack-header">
@@ -794,12 +872,12 @@ function buildLogHTML(logEntry) {
                     错误: ${escapeHtml(logEntry.error)}
                 </div>
             `;
-            
+
         case 'status':
             // 格式化显示状态信息
             const statusData = logEntry.data?.data || {};
             const targets = Array.isArray(statusData.available_targets) ? statusData.available_targets : [];
-            
+
             let targetListHtml = '';
             if (targets.length > 0) {
                 targetListHtml = `
@@ -821,7 +899,7 @@ function buildLogHTML(logEntry) {
                     </div>`).join('')}
                 </div>`;
             }
-            
+
             return `
                 <div class="attack-header">
                     <div>
@@ -862,7 +940,7 @@ function buildLogHTML(logEntry) {
                     </div>` : ''}
                 </div>
             `;
-            
+
         case 'metrics':
             return `
                 <div class="attack-header">
@@ -888,7 +966,7 @@ function buildLogHTML(logEntry) {
                     </div>
                 </div>
             `;
-            
+
         default:
             return `<div>未知日志类型: ${logEntry.type}</div>`;
     }
@@ -896,6 +974,8 @@ function buildLogHTML(logEntry) {
 
 /**
  * 状态管理函数
+ * @param {string} status
+ * @param {string} text
  */
 function updateStatus(status, text) {
     const indicator = document.querySelector(DDOS_CONFIG.SELECTORS.STATUS_INDICATOR);
@@ -905,6 +985,10 @@ function updateStatus(status, text) {
     }
 }
 
+/**
+ * @param {string} status
+ * @returns {string}
+ */
 function getStatusClass(status) {
     const classes = {
         'executing': 'bg-warning status-executing',
@@ -915,6 +999,10 @@ function getStatusClass(status) {
     return classes[status] || 'bg-secondary';
 }
 
+/**
+ * @param {string} status
+ * @returns {string}
+ */
 function getStatusIcon(status) {
     const icons = {
         'executing': '<i class="fas fa-circle-notch fa-spin"></i>',
@@ -927,16 +1015,18 @@ function getStatusIcon(status) {
 
 /**
  * 进度条更新
+ * @param {number} percent
+ * @param {string} text
  */
 function updateProgressBar(percent, text) {
     const progressBar = document.querySelector(DDOS_CONFIG.SELECTORS.ATTACK_PROGRESS);
     const progressText = document.querySelector(DDOS_CONFIG.SELECTORS.PROGRESS_TEXT);
-    
+
     if (progressBar) {
         progressBar.style.width = `${percent}%`;
         progressBar.textContent = `${Math.round(percent)}%`;
     }
-    
+
     if (progressText) {
         progressText.textContent = text;
     }
@@ -944,6 +1034,7 @@ function updateProgressBar(percent, text) {
 
 /**
  * 加载状态管理
+ * @param {boolean} show
  */
 function showLoading(show) {
     const overlay = document.querySelector(DDOS_CONFIG.SELECTORS.LOADING_OVERLAY);
@@ -954,6 +1045,8 @@ function showLoading(show) {
 
 /**
  * 通知系统
+ * @param {string} message
+ * @param {string} type
  */
 function showNotification(message, type = 'info') {
     const alertDiv = document.createElement('div');
@@ -972,9 +1065,9 @@ function showNotification(message, type = 'info') {
         ${escapeHtml(message)}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     document.body.appendChild(alertDiv);
-    
+
     // 3秒后自动移除
     setTimeout(() => {
         if (alertDiv.parentNode) {
@@ -983,6 +1076,10 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
+/**
+ * @param {string} type
+ * @returns {string}
+ */
 function getAlertType(type) {
     const types = {
         'success': 'success',
@@ -992,6 +1089,10 @@ function getAlertType(type) {
     return types[type] || 'info';
 }
 
+/**
+ * @param {string} type
+ * @returns {string}
+ */
 function getAlertIcon(type) {
     const icons = {
         'success': 'fas fa-check-circle',
@@ -1003,6 +1104,8 @@ function getAlertIcon(type) {
 
 /**
  * HTML转义函数
+ * @param {string} text
+ * @returns {string}
  */
 function escapeHtml(text) {
     if (!text) return '';
@@ -1036,9 +1139,10 @@ async function exportAttackReport() {
     try {
         // 获取最新的总请求数
         const response = await fetch(DDOS_CONFIG.ENDPOINTS.STATUS);
+        /** @type {ApiResponse} */
         const statusData = await response.json();
         const totalReceivedRequests = statusData?.data?.total_requests_received || 0;
-        
+
         const reportContent = `
 DDoS攻击测试报告
 ========================
@@ -1060,7 +1164,7 @@ ${ddosState.attackLogs.map(log => `- [${log.timestamp}] ${log.type}: ${JSON.stri
 ---
 报告生成完毕
         `.trim();
-        
+
         // 创建下载链接
         const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -1071,24 +1175,28 @@ ${ddosState.attackLogs.map(log => `- [${log.timestamp}] ${log.type}: ${JSON.stri
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
+
         showNotification('攻击报告已导出', 'success');
     } catch (error) {
         console.error('导出报告失败:', error);
-        showNotification(`导出报告失败: ${error.message}`, 'error');
+        showNotification(`导出报告失败: ${error instanceof Error ? error.message : String(error)}`, 'error');
     }
 }
 
-// 响应时间计算函数
+/**
+ * 响应时间计算函数
+ * @param {ApiResponse} responseData
+ * @returns {{displayTime: string, type: string, rawValue: number|null, unit: string}}
+ */
 function calculateResponseTime(responseData) {
     if (!responseData || !responseData.data) {
-        return { displayTime: 'N/A', type: 'unknown', rawValue: null };
+        return { displayTime: 'N/A', type: 'unknown', rawValue: null, unit: 'unknown' };
     }
-    
+
     const data = responseData.data;
     let responseTime = null;
     let timeType = 'unknown';
-    
+
     // 按优先级尝试获取不同的时间字段
     if (data.server_response_time_ms !== undefined) {
         responseTime = data.server_response_time_ms;
@@ -1106,7 +1214,7 @@ function calculateResponseTime(responseData) {
         responseTime = data.simulated_delay_ms;
         timeType = 'simulated_delay';
     }
-    
+
     // 格式化显示时间
     let displayTime;
     if (responseTime === null) {
@@ -1118,7 +1226,7 @@ function calculateResponseTime(responseData) {
     } else {
         displayTime = `${(responseTime / 1000).toFixed(2)}s`;
     }
-    
+
     return {
         displayTime: displayTime,
         type: timeType,
@@ -1127,10 +1235,15 @@ function calculateResponseTime(responseData) {
     };
 }
 
-// 新增带配置的批量攻击函数
-function executeBatchAttackWithConfig() {
+// 新增带配置的批量攻击函数（修复Promise被忽略问题）
+async function executeBatchAttackWithConfig() {
     const requestCount = parseInt(document.querySelector(DDOS_CONFIG.SELECTORS.BATCH_REQUEST_COUNT)?.value || '50');
-    executeBatchAttack('/target/ddos/compute-heavy', requestCount, `批量CPU攻击(${requestCount}请求)`);
+    try {
+        await executeBatchAttack('/target/ddos/compute-heavy', requestCount, `批量CPU攻击(${requestCount}请求)`);
+    } catch (error) {
+        console.error('批量攻击执行失败:', error);
+        showNotification(`批量攻击执行失败: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    }
 }
 
 // 暴露全局函数供HTML调用

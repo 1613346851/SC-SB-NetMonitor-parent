@@ -39,7 +39,6 @@
 
 /* 攻击日志容器样式 */
 .attack-log-container {
-    height: calc(100vh - 130px);
     overflow-y: auto;
     background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
     color: #333;
