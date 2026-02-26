@@ -9,18 +9,18 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container-fluid vh-100">
+    <div class="container-fluid vh-100 p-0">
         <!-- 顶部导航栏 -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
-            <div class="container">
-                <a class="navbar-brand" href="#">
-                    <i class="fas fa-terminal me-2"></i>
-                    <span th:text="${pageTitle}">CMD命令注入漏洞测试平台</span>
+            <div class="container-fluid">
+                <a class="navbar-brand d-flex align-items-center" href="#">
+                    <i class="fas fa-terminal me-3"></i>
+                    <span th:text="${pageTitle}" class="fw-bold">CMD命令注入漏洞测试平台</span>
                 </a>
                 <div class="navbar-nav ms-auto">
-                    <span class="navbar-text">
-                        <i class="fas fa-shield-alt text-warning"></i>
-                        安全测试环境
+                    <span class="navbar-text d-flex align-items-center">
+                        <i class="fas fa-shield-alt text-warning me-2"></i>
+                        <span class="fw-medium">安全测试环境</span>
                     </span>
                 </div>
             </div>
