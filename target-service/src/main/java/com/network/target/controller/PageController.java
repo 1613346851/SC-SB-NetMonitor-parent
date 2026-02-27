@@ -64,6 +64,21 @@ public class PageController {
     }
 
     /**
+     * XSS漏洞测试页面
+     * 提供存储型、反射型、DOM型XSS测试界面
+     */
+    @GetMapping("/xss-vuln")
+    public String xssVulnPage(Model model) {
+        log.info("访问XSS漏洞测试页面");
+        
+        // 添加页面元数据
+        model.addAttribute("pageTitle", "XSS漏洞测试平台");
+        model.addAttribute("pageDescription", "支持存储型、反射型、DOM型三种XSS漏洞测试");
+        
+        return "xss-vuln";
+    }
+
+    /**
      * 首页路由 - 可扩展为漏洞类型选择页面
      */
     @GetMapping("/index")

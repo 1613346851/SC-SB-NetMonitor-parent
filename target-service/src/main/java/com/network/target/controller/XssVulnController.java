@@ -129,11 +129,19 @@ public class XssVulnController {
     public String getUserProfile(@RequestParam("username") String username) {
         log.warn("【DOM型XSS漏洞】接收未过滤的用户名：{}", username);
         String htmlFragment = "<div class=\"profile\"><h3>用户资料</h3><p>用户名：" + username + "</p></div>";
+        
+        // 对HTML内容进行JSON转义，避免双引号破坏JSON格式
+        String escapedHtml = htmlFragment.replace("\\", "\\\\")
+                                         .replace("\"", "\\\"")
+                                         .replace("\n", "\\n")
+                                         .replace("\r", "\\r")
+                                         .replace("\t", "\\t");
+        
         return "{\n" +
                 "  \"code\": 200,\n" +
                 "  \"msg\": \"获取资料成功\",\n" +
                 "  \"data\": {\n" +
-                "    \"html\": \"" + htmlFragment + "\",\n" +
+                "    \"html\": \"" + escapedHtml + "\",\n" +
                 "    \"warning\": \"DOM型XSS漏洞：前端渲染时执行脚本！\"\n" +
                 "  }\n" +
                 "}";

@@ -7,6 +7,9 @@ server:
       force: true
       charset: UTF-8
       enabled: true
+  tomcat:
+    relaxed-path-chars: '<,>,[,],{,},|,^,`'
+    relaxed-query-chars: '<,>,[,],{,},|,^,`'
 
 spring:
   application:
@@ -19,10 +22,10 @@ spring:
     password: root  # 你的MySQL密码
     # HikariCP连接池自定义配置（核心修复部分）
     hikari:
-      # 连接最大生命周期（必须小于MySQL的wait_timeout，建议15分钟，单位ms）
-      max-lifetime: 900000
-      # 连接空闲超时时间（建议5分钟，单位ms）
-      idle-timeout: 300000
+      # 核心修复：max-lifetime 设为 5 分钟（300000ms），远小于MySQL默认的8小时，也适配你的环境
+      max-lifetime: 300000
+      # 空闲超时设为 2 分钟，让闲置连接更快被回收
+      idle-timeout: 120000
       # 连接验证超时时间（单位ms）
       validation-timeout: 5000
       # 最小空闲连接数
