@@ -142,3 +142,74 @@
     border-radius: 3px;
     font-family: 'Consolas', monospace;
 }
+
+/* 移动端CMD特有优化 */
+/* 平板横屏适配 */
+@media (min-width: 576px) and (max-width: 767px) {
+    .system-info {
+        padding: 12px;
+    }
+    
+    .test-category {
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .command-output {
+        padding: 18px 18px 18px 23px;
+    }
+}
+
+/* 手机竖屏适配 */
+@media (max-width: 575px) {
+    /* 移动端命令输出优化 */
+    .command-output {
+        padding: 15px 15px 15px 20px;
+        margin-bottom: 15px;
+    }
+    
+    .command-result {
+        padding: 10px;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    
+    .command-input {
+        padding: 6px;
+        font-size: 13px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+    
+    .system-info {
+        padding: 10px;
+    }
+    
+    .test-category {
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .command-header {
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+    }
+    
+    .command-details {
+        padding: 12px;
+        margin-top: 12px;
+    }
+}

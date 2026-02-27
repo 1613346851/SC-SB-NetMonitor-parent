@@ -218,3 +218,90 @@
     color: #6d5203;
 }
 
+/* 移动端SQL特有优化 */
+/* 平板横屏适配 */
+@media (min-width: 576px) and (max-width: 767px) {
+    .database-info {
+        padding: 12px;
+    }
+    
+    .mb-3.p-3.bg-light.rounded {
+        padding: 12px !important;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    
+    .user-table th {
+        padding: 12px 10px;
+        font-size: 13px;
+    }
+    
+    .user-table td {
+        padding: 10px;
+        font-size: 12px;
+    }
+}
+
+/* 手机竖屏适配 */
+@media (max-width: 575px) {
+    .database-info {
+        padding: 10px;
+    }
+    
+    .mb-3.p-3.bg-light.rounded {
+        padding: 10px !important;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+    
+    .query-result {
+        padding: 15px 15px 15px 20px;
+        margin-bottom: 15px;
+    }
+    
+    .query-input {
+        padding: 6px;
+        font-size: 13px;
+    }
+    
+    .query-sql {
+        padding: 8px;
+        font-size: 12px;
+    }
+    
+    .user-table {
+        font-size: 12px;
+    }
+    
+    .user-table th {
+        padding: 10px 8px;
+        font-size: 12px;
+    }
+    
+    .user-table td {
+        padding: 8px;
+        font-size: 11px;
+    }
+    
+    .query-header {
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+    }
+    
+    #sleepTimeDisplay {
+        font-size: 1rem;
+        min-width: 40px;
+    }
+}
+
