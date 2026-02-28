@@ -152,14 +152,31 @@
                             <button class="btn btn-outline-info btn-sm" onclick="loadXssTestCase('dom', 'input')">
                                 <i class="fas fa-keyboard me-1"></i>自动聚焦
                             </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="loadXssTestCase('dom', 'svg')">
+                                <i class="fas fa-vector-square me-1"></i>svg加载
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="loadXssTestCase('dom', 'cookieSteal')">
+                                <i class="fas fa-cookie-bite me-1"></i>窃取Cookie
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="loadXssTestCase('dom', 'redirect')">
+                                <i class="fas fa-directions me-1"></i>页面跳转
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="loadXssTestCase('dom', 'linkHijack')">
+                                <i class="fas fa-link me-1"></i>链接劫持
+                            </button>
                         </div>
                     </div>
 
                     <!-- 操作按钮 -->
                     <div class="section">
-                        <button class="btn btn-outline-secondary w-100 py-2" onclick="clearOutput()">
-                            <i class="fas fa-trash-alt me-2"></i>清空结果
-                        </button>
+                        <div class="d-grid gap-2 mb-3">
+                            <button class="btn btn-outline-secondary w-100 py-2" onclick="clearOutput()">
+                                <i class="fas fa-trash-alt me-2"></i>清空结果
+                            </button>
+                            <button class="btn btn-outline-info w-100 py-2" onclick="setTestCookie()">
+                                <i class="fas fa-cookie me-2"></i>设置测试Cookie
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

