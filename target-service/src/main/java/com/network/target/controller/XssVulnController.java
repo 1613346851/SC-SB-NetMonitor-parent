@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -124,17 +125,39 @@ public class XssVulnController {
     /**
      * 场景3：DOM型XSS（无数据库依赖，返回未转义HTML片段）
      * 漏洞点：后端返回原始HTML，前端DOM渲染时执行脚本
+     * 真实场景：AJAX请求返回HTML片段，前端innerHTML直接插入DOM
      */
     @GetMapping("/profile")
     public String getUserProfile(@RequestParam("username") String username) {
         log.warn("【DOM型XSS漏洞】接收未过滤的用户名：{}", username);
-        String htmlFragment = "<div class=\"profile\"><h3>用户资料</h3><p>用户名：" + username + "</p></div>";
+        
+        // 真实场景模拟：解码URL编码的参数
+        String decodedUsername;
+        try {
+            decodedUsername = java.net.URLDecoder.decode(username, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            decodedUsername = username; // 解码失败则使用原始值
+        }
+        
+        // 构造包含用户输入的HTML片段（漏洞核心：未转义）
+        String htmlFragment = "<div class=\"profile\"><h3>用户资料</h3><p>用户名：" + decodedUsername + "</p></div>";
+        
+        // 注意：这里故意不进行HTML转义，保持XSS漏洞
+        // 真实应用中应该使用escapeHtml()进行转义防护
+        
+        // 为了前端正确解析，对JSON特殊字符进行必要转义
+        String jsonSafeHtml = htmlFragment.replace("\"", "\\\"")
+                                          .replace("\n", "\\n")
+                                          .replace("\r", "\\r");
+        
         return "{\n" +
                 "  \"code\": 200,\n" +
                 "  \"msg\": \"获取资料成功\",\n" +
                 "  \"data\": {\n" +
-                "    \"html\": \"" + htmlFragment + "\",\n" +
-                "    \"warning\": \"DOM型XSS漏洞：前端渲染时执行脚本！\"\n" +
+                "    \"html\": \"" + jsonSafeHtml + "\",\n" +
+                "    \"raw_input\": \"" + username + "\",\n" +
+                "    \"decoded_input\": \"" + decodedUsername.replace("\"", "\\\"") + "\",\n" +
+                "    \"warning\": \"DOM型XSS漏洞：前端innerHTML渲染时执行恶意脚本！\"\n" +
                 "  }\n" +
                 "}";
     }
