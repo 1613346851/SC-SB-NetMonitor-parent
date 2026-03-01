@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">CMD命令注入漏洞测试平台</title>
+    <link rel="stylesheet" th:href="@{/css/cmd-vuln.css}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid vh-100 p-0">
+        <!-- 顶部导航栏 -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+            <div class="container-fluid">
+                <a class="navbar-brand d-flex align-items-center" href="#">
+                    <i class="fas fa-terminal me-3"></i>
+                    <span th:text="${pageTitle}" class="fw-bold">CMD命令注入漏洞测试平台</span>
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <span class="navbar-text d-flex align-items-center">
+                        <i class="fas fa-shield-alt text-warning me-2"></i>
+                        <span class="fw-medium">安全测试环境</span>
+                    </span>
+                </div>
+            </div>
+        </nav>
+
+        <div class="row g-0 h-100">
+            <!-- 左侧控制面板 -->
+            <div class="col-md-4 col-lg-3 sidebar sidebar-panel">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white d-flex align-items-center">
+                        <i class="fas fa-cog me-2"></i>
+                        <h5 class="mb-0 fw-bold">命令控制台</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- 系统信息显示 -->
+                        <div class="section mb-4">
+                            <h6 class="text-muted fw-semibold mb-3">
+                                <i class="fas fa-info-circle me-2"></i>系统信息
+                            </h6>
+                            <div class="system-info">
+                                <div class="info-item">
+                                    <span class="badge bg-secondary">操作系统</span>
+                                    <span id="osInfo" class="ms-3 text-dark fw-medium">检测中...</span>
+                                </div>
+                                <div class="info-item mt-2">
+                                    <span class="badge bg-secondary">API端点</span>
+                                    <span id="apiEndpoint" class="ms-3 text-monospace text-danger fw-medium" th:text="${apiEndpoint}">/target/cmd/execute</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 测试用例区域 -->
+                        <div class="section mb-4">
+                            <!-- 基础功能验证用例 -->
+                            <div class="test-category mb-4">
+                                <h6 class="text-muted fw-semibold mb-3">
+                                    <i class="fas fa-check-circle me-2 text-success"></i>基础功能验证
+                                </h6>
+                                <div class="test-cases-grid">
+                                    <button class="btn btn-outline-primary btn-sm" onclick="executeQuickCommand('ping 127.0.0.1 -n 2')">
+                                        <i class="fas fa-satellite-dish me-1"></i>Ping测试
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="executeQuickCommand('tasklist')">
+                                        <i class="fas fa-list me-1"></i>进程列表
+                                    </button>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="executeQuickCommand('dir C:\\')">
+                                        <i class="fas fa-folder-open me-1"></i>目录遍历
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- 命令拼接注入用例 -->
+                            <div class="test-category mb-4">
+                                <h6 class="text-muted fw-semibold mb-3">
+                                    <i class="fas fa-bug me-2 text-danger"></i>命令拼接注入
+                                </h6>
+                                <div class="test-cases-grid">
+                                    <button class="btn btn-outline-danger btn-sm" onclick="executeQuickCommand('ping 127.0.0.1 -n 1 & whoami')">
+                                        <i class="fas fa-code me-1"></i>& 并行执行
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="executeQuickCommand('ping 1.1.1.1 -n 1 & ipconfig')">
+                                        <i class="fas fa-network-wired me-1"></i>& 命令连接
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="executeQuickCommand('dir & whoami')">
+                                        <i class="fas fa-user me-1"></i>目录+用户
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- 系统信息探测用例 -->
+                            <div class="test-category mb-4">
+                                <h6 class="text-muted fw-semibold mb-3">
+                                    <i class="fas fa-search me-2 text-info"></i>系统信息探测
+                                </h6>
+                                <div class="test-cases-grid">
+                                    <button class="btn btn-outline-info btn-sm" onclick="executeQuickCommand('systeminfo')">
+                                        <i class="fas fa-desktop me-1"></i>系统信息
+                                    </button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="executeQuickCommand('net localgroup administrators')">
+                                        <i class="fas fa-users me-1"></i>管理员组
+                                    </button>
+                                    <button class="btn btn-outline-info btn-sm" onclick="executeQuickCommand('ver')">
+                                        <i class="fas fa-info-circle me-1"></i>系统版本
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- 文件读取测试用例 -->
+                            <div class="test-category mb-4">
+                                <h6 class="text-muted fw-semibold mb-3">
+                                    <i class="fas fa-file-alt me-2 text-warning"></i>文件读取测试
+                                </h6>
+                                <div class="test-cases-grid">
+                                    <button class="btn btn-outline-warning btn-sm" onclick="executeQuickCommand('type C:\\Windows\\win.ini')">
+                                        <i class="fas fa-file me-1"></i>Win配置文件
+                                    </button>
+                                    <button class="btn btn-outline-warning btn-sm" onclick="executeQuickCommand('type C:\\Windows\\system32\\drivers\\etc\\hosts')">
+                                        <i class="fas fa-network-wired me-1"></i>Hosts文件
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- 特殊字符绕过用例 -->
+                            <div class="test-category">
+                                <h6 class="text-muted fw-semibold mb-3">
+                                    <i class="fas fa-shield-alt me-2 text-dark"></i>特殊字符绕过
+                                </h6>
+                                <div class="test-cases-grid">
+                                    <button class="btn btn-outline-dark btn-sm" onclick="executeQuickCommand('who%61mi')">
+                                        <i class="fas fa-link me-1"></i>URL编码
+                                    </button>
+                                    <button class="btn btn-outline-dark btn-sm" onclick="executeQuickCommand('who^ami')">
+                                        <i class="fas fa-undo me-1"></i>脱字符绕过
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 命令输入区域 -->
+                        <div class="section mb-3">
+                            <h6 class="text-muted fw-semibold mb-3">
+                                <i class="fas fa-keyboard me-2"></i>自定义命令
+                            </h6>
+                            <div class="mb-3">
+                                <label for="commandInput" class="form-label fw-medium">
+                                    <i class="fas fa-terminal me-1"></i>命令输入:
+                                </label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="commandInput" 
+                                           placeholder="请输入要执行的命令..." autocomplete="off">
+                                    <button class="btn btn-danger btn-lg" type="button" id="executeBtn">
+                                        <i class="fas fa-skull me-2"></i>执行命令
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-text text-muted mt-3">
+                                <small>
+                                    <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                                    此为高危命令注入漏洞测试环境，请谨慎测试
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <div class="section">
+                            <button class="btn btn-outline-secondary w-100 py-2" onclick="clearOutput()">
+                                <i class="fas fa-trash-alt me-2"></i>清空输出
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧输出区域 -->
+            <div class="col-md-8 col-lg-9 main-content main-panel">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-scroll me-2"></i>
+                            <h5 class="mb-0 fw-bold">命令执行结果</h5>
+                        </div>
+                        <div>
+                            <span id="statusIndicator" class="badge bg-secondary">
+                                <i class="fas fa-circle-notch fa-spin me-1"></i>就绪
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="outputContainer" class="output-container">
+                            <div class="welcome-message text-center text-muted d-flex flex-column justify-content-center align-items-center h-100">
+                                <i class="fas fa-terminal fa-4x mb-4 text-primary"></i>
+                                <h4 class="fw-bold text-dark">欢迎使用CMD命令注入测试平台</h4>
+                                <p class="mb-0 lead">请输入命令或点击测试用例开始命令执行测试</p>
+                                <div class="mt-4">
+                                    <i class="fas fa-mouse-pointer text-muted"></i>
+                                    <small class="ms-2">选择左侧测试用例或输入自定义命令</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载指示器 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">执行中...</span>
+        </div>
+        <p class="mt-2 text-white">命令执行中，请稍候...</p>
+    </div>
+
+    <!-- JavaScript资源 -->
+    <script th:src="@{/js/cmd-vuln.js}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

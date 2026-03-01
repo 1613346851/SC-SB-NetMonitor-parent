@@ -1,0 +1,215 @@
+/* CMD漏洞测试平台特有样式文件 */
+@import url('./vuln-common.css');
+
+/* 系统信息区域优化 */
+.system-info {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
+}
+
+/* 测试类别区域样式 */
+.test-category {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.test-category:last-child {
+    margin-bottom: 0;
+}
+
+.test-category h6 {
+    margin-bottom: 15px;
+    padding-left: 0;
+}
+
+.test-category h6::before {
+    display: none;
+}
+
+/* 命令输出项样式 */
+.command-output {
+    margin-bottom: 25px;
+    border-left: 5px solid #007bff;
+    padding: 20px 20px 20px 25px;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 0 8px 8px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.command-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.command-header .badge {
+    font-size: 0.85em;
+    padding: 5px 10px;
+}
+
+.command-timestamp {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.command-input {
+    color: #007bff;
+    font-weight: bold;
+    margin-bottom: 12px;
+    word-break: break-all;
+    background-color: #e9ecef;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.command-result {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 15px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.result-success {
+    color: #28a745;
+}
+
+.result-error {
+    color: #dc3545;
+}
+
+.result-warning {
+    color: #ffc107;
+}
+
+/* 命令详情样式 */
+.command-details {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+}
+
+.command-details small {
+    color: #6c757d;
+}
+
+/* 命令历史记录样式 */
+.command-history-item {
+    cursor: pointer;
+    transition: background-color 0.2s;
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.command-history-item:hover {
+    background-color: #e9ecef;
+}
+
+.command-history-item.active {
+    background-color: #007bff;
+    color: white;
+}
+
+/* 性能优化 */
+.output-container {
+    will-change: scroll-position;
+}
+
+.command-output {
+    will-change: transform;
+}
+
+/* 代码高亮模拟 */
+.code-highlight {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Consolas', monospace;
+}
+
+/* 移动端CMD特有优化 */
+/* 平板横屏适配 */
+@media (min-width: 576px) and (max-width: 767px) {
+    .system-info {
+        padding: 12px;
+    }
+    
+    .test-category {
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .command-output {
+        padding: 18px 18px 18px 23px;
+    }
+}
+
+/* 手机竖屏适配 */
+@media (max-width: 575px) {
+    /* 移动端命令输出优化 */
+    .command-output {
+        padding: 15px 15px 15px 20px;
+        margin-bottom: 15px;
+    }
+    
+    .command-result {
+        padding: 10px;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    
+    .command-input {
+        padding: 6px;
+        font-size: 13px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+    
+    .system-info {
+        padding: 10px;
+    }
+    
+    .test-category {
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .command-header {
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+    }
+    
+    .command-details {
+        padding: 12px;
+        margin-top: 12px;
+    }
+}
