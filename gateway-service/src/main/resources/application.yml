@@ -1,29 +1,173 @@
-# 服务端口（项目书指定网关为统一入口，建议固定9000）
+# 网关服务核心配置
 server:
+  # 网关服务端口（统一入口）
   port: 9000
+  # 响应式Web应用类型（必须配置，适配WebFlux）
+  servlet:
+    context-path: /
 
-# 服务名称（微服务标识，后续用于跨服务调用）
+# 微服务基础配置
 spring:
   application:
     name: gateway-service
-  # Gateway核心配置：路由规则
+  
+  # WebFlux配置（关闭Spring MVC自动配置）
+  main:
+    web-application-type: reactive
+  
+  # Gateway核心配置
   cloud:
     gateway:
+      # 全局过滤器配置
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+      
+      # 路由配置
       routes:
-        # 靶场服务路由：所有/target/**的请求转发到靶场服务（target-service:9001）
-        - id: target_service_route  # 唯一路由ID
-          uri: http://localhost:9001  # 靶场服务的地址+端口（本地部署）
+        # 靶场服务路由
+        - id: target_service_route
+          uri: http://localhost:9001
           predicates:
-            - Path=/target/**  # 匹配所有/target开头的请求（靶场接口都是/target/xxx）
+            - Path=/target/**
           filters:
-            - StripPrefix=0  # 保留/target前缀（因为靶场接口路径就是/target/xxx，无需剥离）
+            - StripPrefix=0
+            # 添加响应头
+            - AddResponseHeader=X-Gateway-Version, 1.0.0
+        
+        # 静态资源路由
+        - id: static_css_route
+          uri: http://localhost:9001
+          predicates:
+            - Path=/css/**
+          filters:
+            - StripPrefix=0
+            - AddResponseHeader=X-Gateway-Version, 1.0.0
+        
+        - id: static_js_route
+          uri: http://localhost:9001
+          predicates:
+            - Path=/js/**
+          filters:
+            - StripPrefix=0
+            - AddResponseHeader=X-Gateway-Version, 1.0.0
+        
+        - id: static_favicon_route
+          uri: http://localhost:9001
+          predicates:
+            - Path=/favicon.ico
+          filters:
+            - StripPrefix=0
+            - AddResponseHeader=X-Gateway-Version, 1.0.0
+        
+        # 网关管理端点路由（可选）
+        - id: gateway_management_route
+          uri: http://localhost:9000
+          predicates:
+            - Path=/gateway/**
+          filters:
+            - StripPrefix=1
+      
+      # 全局超时配置
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 30s
+        pool:
+          max-idle-time: 15s
+          max-connections: 1000
+          acquire-timeout: 5000
+  
+  # 缓存配置
+  cache:
+    type: none  # 网关使用自定义内存缓存，禁用Spring Cache
+  
+  # JVM配置
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
-# Actuator配置：暴露网关监控端点（方便后续查看路由、健康状态）
+# 监控端点配置
 management:
   endpoints:
     web:
       exposure:
-        include: routes, health  # 仅暴露路由和健康检查端点（生产环境够用）
+        include: routes, health, gateway, logfile, metrics, env
+      base-path: /actuator
   endpoint:
     health:
-      show-details: always  # 显示健康检查详情
+      show-details: always
+    gateway:
+      enabled: true
+  
+  # 指标配置
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    enable:
+      jvm: true
+      web:
+        server:
+          request:
+            autotime:
+              enabled: true
+
+# 日志配置
+logging:
+  level:
+    com.network.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
+    org.springframework.web.reactive: INFO
+    reactor.netty: INFO
+    org.apache.http: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/gateway-service.log
+    max-size: 10MB
+    max-history: 30
+
+# 自定义配置
+gateway:
+  # 流量采集配置
+  traffic:
+    collection:
+      enabled: true
+      skip-paths:
+        - /actuator/**
+        - /health
+        - /**/*.css
+        - /**/*.js
+        - /**/*.png
+        - /**/*.jpg
+        - /**/*.ico
+  
+  # 防御配置
+  defense:
+    blacklist:
+      enabled: true
+      default-expire-minutes: 10
+    rate-limit:
+      enabled: true
+      default-threshold: 10
+    malicious-request:
+      enabled: true
+      
+  # 缓存配置
+  cache:
+    cleanup-interval: 60000  # 1分钟清理一次
+    
+  # 跨域配置
+  cors:
+    allowed-origins:
+      - "http://localhost:*"
+      - "http://127.0.0.1:*"
+    allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    allowed-headers:
+      - "*"
+    allow-credentials: true
+    max-age: 3600
