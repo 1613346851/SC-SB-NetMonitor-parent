@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * 负责处理前端页面访问请求，提供统一的页面入口
  */
 @Controller
-@RequestMapping("/page")
+@RequestMapping({"/page", "/target/page"})
 @Slf4j
 public class PageController {
 

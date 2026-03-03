@@ -30,7 +30,7 @@ spring:
           predicates:
             - Path=/target/**
           filters:
-            - StripPrefix=1
+            - StripPrefix=0
             # 添加响应头
             - AddResponseHeader=X-Gateway-Version, 1.0.0
         
