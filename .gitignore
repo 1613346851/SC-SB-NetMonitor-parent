@@ -36,3 +36,16 @@ build/
 
 ### Mac OS ###
 .DS_Store
+.idea/dataSources.xml
+.idea/encodings.xml
+.idea/jsLibraryMappings.xml
+/monitor-service/src/test/java/com/network/monitor/MonitorServiceApplicationTests.java
+/target-service/src/test/java/com/network/target/TargetServiceApplicationTests.java
+/logs/gateway-service.log
+/logs/gateway-service.log.2026-03-02.0.gz
+/gateway-service/logs/gateway-service.log
+/.idea/dictionaries/project.xml
+/.idea/.gitignore
+/.idea/misc.xml
+/.idea/sqldialects.xml
+/.idea/vcs.xml
