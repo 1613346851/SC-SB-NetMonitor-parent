@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.AttackMonitorMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.AttackMonitorEntity">
+        <id column="id" property="id"/>
+        <result column="traffic_id" property="trafficId"/>
+        <result column="attack_type" property="attackType"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="confidence" property="confidence"/>
+        <result column="rule_id" property="ruleId"/>
+        <result column="rule_content" property="ruleContent"/>
+        <result column="source_ip" property="sourceIp"/>
+        <result column="target_uri" property="targetUri"/>
+        <result column="attack_content" property="attackContent"/>
+        <result column="handled" property="handled"/>
+        <result column="handle_time" property="handleTime"/>
+        <result column="handle_remark" property="handleRemark"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, traffic_id, attack_type, risk_level, confidence, rule_id, rule_content, 
+        source_ip, target_uri, attack_content, handled, handle_time, handle_remark, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.AttackMonitorEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_attack_monitor (
+            traffic_id, attack_type, risk_level, confidence, rule_id, rule_content,
+            source_ip, target_uri, attack_content, handled, handle_time, handle_remark, create_time, update_time
+        ) VALUES (
+            #{trafficId}, #{attackType}, #{riskLevel}, #{confidence}, #{ruleId}, #{ruleContent},
+            #{sourceIp}, #{targetUri}, #{attackContent}, #{handled}, #{handleTime}, #{handleRemark}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_monitor
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_monitor
+        <where>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="riskLevel != null and riskLevel != ''">
+                AND risk_level = #{riskLevel}
+            </if>
+            <if test="sourceIp != null and sourceIp != ''">
+                AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
+            </if>
+            <if test="handled != null">
+                AND handled = #{handled}
+            </if>
+            <if test="startTime != null">
+                AND create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND create_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_attack_monitor
+        <where>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="riskLevel != null and riskLevel != ''">
+                AND risk_level = #{riskLevel}
+            </if>
+            <if test="sourceIp != null and sourceIp != ''">
+                AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
+            </if>
+            <if test="handled != null">
+                AND handled = #{handled}
+            </if>
+            <if test="startTime != null">
+                AND create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND create_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <update id="updateHandled">
+        UPDATE sys_attack_monitor
+        SET handled = #{handled}, handle_time = NOW(), handle_remark = #{handleRemark}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectUnHandledHighRisk" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_monitor
+        WHERE handled = 0 AND risk_level = 'HIGH'
+        ORDER BY create_time DESC
+        LIMIT 10
+    </select>
+
+    <select id="countByAttackType" resultType="com.network.monitor.mapper.AttackMonitorMapper$AttackTypeStat">
+        SELECT attack_type AS attackType, COUNT(*) AS count
+        FROM sys_attack_monitor
+        GROUP BY attack_type
+    </select>
+
+    <select id="countByRiskLevel" resultType="com.network.monitor.mapper.AttackMonitorMapper$RiskLevelStat">
+        SELECT risk_level AS riskLevel, COUNT(*) AS count
+        FROM sys_attack_monitor
+        GROUP BY risk_level
+    </select>
+
+    <select id="countTopSourceIps" resultType="com.network.monitor.mapper.AttackMonitorMapper$SourceIpStat">
+        SELECT source_ip AS sourceIp, COUNT(*) AS count
+        FROM sys_attack_monitor
+        GROUP BY source_ip
+        ORDER BY count DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countTopTargetUris" resultType="com.network.monitor.mapper.AttackMonitorMapper$TargetUriStat">
+        SELECT target_uri AS targetUri, COUNT(*) AS count
+        FROM sys_attack_monitor
+        GROUP BY target_uri
+        ORDER BY count DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countAttackTrend" resultType="com.network.monitor.mapper.AttackMonitorMapper$TrendStat">
+        SELECT 
+            DATE_FORMAT(create_time, '%Y-%m-%d %H:00:00') AS time,
+            COUNT(*) AS count
+        FROM sys_attack_monitor
+        WHERE create_time &gt;= #{startTime} AND create_time &lt;= #{endTime}
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d %H:00:00')
+        ORDER BY time ASC
+    </select>
+</mapper>

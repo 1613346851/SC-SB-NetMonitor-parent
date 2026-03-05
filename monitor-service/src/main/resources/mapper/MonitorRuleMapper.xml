@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.MonitorRuleMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.MonitorRuleEntity">
+        <id column="id" property="id"/>
+        <result column="rule_name" property="ruleName"/>
+        <result column="attack_type" property="attackType"/>
+        <result column="rule_content" property="ruleContent"/>
+        <result column="description" property="description"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="enabled" property="enabled"/>
+        <result column="priority" property="priority"/>
+        <result column="hit_count" property="hitCount"/>
+        <result column="last_hit_time" property="lastHitTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, rule_name, attack_type, rule_content, description, risk_level, enabled, priority, 
+        hit_count, last_hit_time, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.MonitorRuleEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_monitor_rule (
+            rule_name, attack_type, rule_content, description, risk_level, enabled, priority,
+            hit_count, last_hit_time, create_time, update_time
+        ) VALUES (
+            #{ruleName}, #{attackType}, #{ruleContent}, #{description}, #{riskLevel}, #{enabled}, #{priority},
+            #{hitCount}, #{lastHitTime}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_monitor_rule
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAllEnabled" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_monitor_rule
+        WHERE enabled = 1
+        ORDER BY priority ASC
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_monitor_rule
+        ORDER BY priority ASC, create_time DESC
+    </select>
+
+    <select id="selectByAttackType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_monitor_rule
+        WHERE attack_type = #{attackType} AND enabled = 1
+        ORDER BY priority ASC
+    </select>
+
+    <update id="update" parameterType="com.network.monitor.entity.MonitorRuleEntity">
+        UPDATE sys_monitor_rule
+        SET rule_name = #{ruleName},
+            attack_type = #{attackType},
+            rule_content = #{ruleContent},
+            description = #{description},
+            risk_level = #{riskLevel},
+            enabled = #{enabled},
+            priority = #{priority},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_monitor_rule WHERE id = #{id}
+    </delete>
+
+    <update id="updateEnabled">
+        UPDATE sys_monitor_rule
+        SET enabled = #{enabled}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateHitCount">
+        UPDATE sys_monitor_rule
+        SET hit_count = #{hitCount}, last_hit_time = NOW(), update_time = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>
