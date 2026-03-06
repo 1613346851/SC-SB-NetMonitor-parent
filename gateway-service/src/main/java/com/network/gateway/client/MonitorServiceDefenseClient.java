@@ -53,9 +53,10 @@ public class MonitorServiceDefenseClient {
             // 构建请求实体
             HttpEntity<DefenseLogDTO> requestEntity = new HttpEntity<>(defenseLogDTO, headers);
 
-            // 发送POST请求
+            // 发送 POST 请求
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT,
+                    url,
                     requestEntity,
                     String.class
             );
@@ -180,8 +181,9 @@ public class MonitorServiceDefenseClient {
 
             HttpEntity<DefenseLogDTO> requestEntity = new HttpEntity<>(defenseLogDTO, headers);
 
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT,
+                    url,
                     requestEntity,
                     String.class
             );
@@ -212,16 +214,17 @@ public class MonitorServiceDefenseClient {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> entity = new HttpEntity<>("{}", headers);
-
+    
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT,
+                    url,
                     entity,
                     String.class
             );
-
+    
             return response.getStatusCode().is2xxSuccessful();
         } catch (Exception e) {
-            logger.debug("监控服务防御日志接口连通性检查失败: {}", e.getMessage());
+            logger.debug("监控服务防御日志接口连通性检查失败：{}", e.getMessage());
             return false;
         }
     }
@@ -233,6 +236,6 @@ public class MonitorServiceDefenseClient {
      */
     public String getStatistics() {
         // 这里可以添加更详细的统计信息收集
-        return "防御日志推送客户端 - 配置端点: " + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
+        return "防御日志推送客户端 - 配置端点：" + GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
     }
 }

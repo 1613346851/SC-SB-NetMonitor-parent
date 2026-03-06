@@ -52,9 +52,10 @@ public class MonitorServiceTrafficClient {
             // 构建请求实体
             HttpEntity<TrafficMonitorDTO> requestEntity = new HttpEntity<>(trafficDTO, headers);
 
-            // 发送POST请求
+            // 发送 POST 请求
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT,
+                    url,
                     requestEntity,
                     String.class
             );
@@ -164,16 +165,17 @@ public class MonitorServiceTrafficClient {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> entity = new HttpEntity<>("{}", headers);
-
+    
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT,
+                    url,
                     entity,
                     String.class
             );
-
+    
             return response.getStatusCode().is2xxSuccessful();
         } catch (Exception e) {
-            logger.debug("监控服务连通性检查失败: {}", e.getMessage());
+            logger.debug("监控服务连通性检查失败：{}", e.getMessage());
             return false;
         }
     }
@@ -185,6 +187,6 @@ public class MonitorServiceTrafficClient {
      */
     public String getStatistics() {
         // 这里可以添加更详细的统计信息收集
-        return "流量推送客户端 - 配置端点: " + GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT;
+        return "流量推送客户端 - 配置端点：" + GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT;
     }
 }
