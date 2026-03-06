@@ -66,4 +66,18 @@ public class DashboardController {
             return ApiResponse.error("获取数据失败");
         }
     }
+
+    /**
+     * 获取漏洞等级分布
+     */
+    @GetMapping("/vulnerability-level")
+    public ApiResponse<List<Map<String, Object>>> getVulnerabilityLevelDistribution() {
+        try {
+            List<Map<String, Object>> data = dashboardStatService.getVulnerabilityLevelDistribution();
+            return ApiResponse.success(data);
+        } catch (Exception e) {
+            log.error("获取漏洞等级分布失败：", e);
+            return ApiResponse.error("获取数据失败");
+        }
+    }
 }

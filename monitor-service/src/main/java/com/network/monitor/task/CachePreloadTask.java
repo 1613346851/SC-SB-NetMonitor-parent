@@ -66,7 +66,8 @@ public class CachePreloadTask implements CommandLineRunner {
         try {
             log.info("开始预加载漏洞缓存...");
             vulnerabilityCache.refreshCache();
-            int vulnCount = vulnerabilityCache.getAllVulnerabilities().size();
+            java.util.List<com.network.monitor.entity.VulnerabilityMonitorEntity> vulns = vulnerabilityCache.getAllVulnerabilities();
+            int vulnCount = vulns != null ? vulns.size() : 0;
             log.info("漏洞缓存预加载完成，共加载 {} 条漏洞", vulnCount);
         } catch (Exception e) {
             log.error("漏洞缓存预加载失败：", e);

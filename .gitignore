@@ -49,3 +49,4 @@ build/
 /.idea/misc.xml
 /.idea/sqldialects.xml
 /.idea/vcs.xml
+/logs/gateway-service.log.2026-03-03.0.gz

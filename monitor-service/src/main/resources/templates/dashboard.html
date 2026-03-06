@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仪表盘 - 网络监测系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"></div>
+                <h1 class="sidebar-title">网络监测系统</h1>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="/" class="menu-item active">
+                    <span class="menu-icon">📊</span>
+                    <span>仪表盘</span>
+                </a>
+                <a href="/traffic" class="menu-item">
+                    <span class="menu-icon">🌐</span>
+                    <span>流量列表</span>
+                </a>
+                <a href="/attack" class="menu-item">
+                    <span class="menu-icon">⚠️</span>
+                    <span>攻击监测</span>
+                </a>
+                <a href="/vulnerability" class="menu-item">
+                    <span class="menu-icon">🔓</span>
+                    <span>漏洞监测</span>
+                </a>
+                <a href="/defense" class="menu-item">
+                    <span class="menu-icon">🛡️</span>
+                    <span>防御日志</span>
+                </a>
+                <a href="/rule" class="menu-item">
+                    <span class="menu-icon">📋</span>
+                    <span>规则管理</span>
+                </a>
+                <a href="/blacklist" class="menu-item">
+                    <span class="menu-icon">🚫</span>
+                    <span>黑名单管理</span>
+                </a>
+                <a href="/report" class="menu-item">
+                    <span class="menu-icon">📈</span>
+                    <span>数据报表</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <div class="main-container">
+            <!-- 顶部导航 -->
+            <header class="header">
+                <div class="header-left">
+                    <h2>仪表盘</h2>
+                </div>
+                <div class="header-right">
+                    <div class="user-info">
+                        <div class="user-avatar">A</div>
+                        <span>管理员</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- 内容区域 -->
+            <main class="content">
+                <!-- 统计卡片 -->
+                <div class="stat-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">总流量数</div>
+                            <div class="stat-card-icon primary">🌐</div>
+                        </div>
+                        <div class="stat-card-value" id="totalTraffic">0</div>
+                        <div class="stat-card-footer">
+                            <span>今日</span>
+                            <span class="stat-change up" id="trafficChange">
+                                ↑ 0%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">攻击次数</div>
+                            <div class="stat-card-icon danger">⚠️</div>
+                        </div>
+                        <div class="stat-card-value" id="totalAttack">0</div>
+                        <div class="stat-card-footer">
+                            <span>今日</span>
+                            <span class="stat-change down" id="attackChange">
+                                ↓ 0%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">高危漏洞</div>
+                            <div class="stat-card-icon warning">🔓</div>
+                        </div>
+                        <div class="stat-card-value" id="totalVulnerability">0</div>
+                        <div class="stat-card-footer">
+                            <span>已验证</span>
+                            <span class="stat-change up" id="vulnerabilityChange">
+                                ↑ 0%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">防御操作</div>
+                            <div class="stat-card-icon success">🛡️</div>
+                        </div>
+                        <div class="stat-card-value" id="totalDefense">0</div>
+                        <div class="stat-card-footer">
+                            <span>今日</span>
+                            <span class="stat-change up" id="defenseChange">
+                                ↑ 0%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图表区域 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">流量趋势</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="trafficTrendChart" style="width: 100%; height: 400px;"></div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                    <!-- 攻击类型分布 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">攻击类型分布</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="attackTypeChart" style="width: 100%; height: 300px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 漏洞等级分布 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">漏洞等级分布</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="vulnerabilityLevelChart" style="width: 100%; height: 300px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 最新告警 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">最新告警</h3>
+                        <a href="/attack" class="btn btn-primary btn-sm">查看全部</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>源 IP</th>
+                                        <th>攻击类型</th>
+                                        <th>风险等级</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentAttacks">
+                                    <tr>
+                                        <td colspan="5" class="text-center">暂无数据</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/dashboard.js}"></script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+/**
+ * 黑名单管理页面 JavaScript
+ * 负责黑名单数据加载、筛选、分页、添加、移除等功能
+ */
+
+let currentPage = 1;
+const pageSize = 10;
+let searchParams = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadBlacklistData();
+});
+
+async function loadBlacklistData() {
+    try {
+        const params = {
+            page: currentPage,
+            size: pageSize,
+            ...searchParams
+        };
+
+        const result = await http.get('/blacklist/list', params);
+        
+        renderBlacklistTable(result.records || []);
+        renderPagination(result.total || 0);
+    } catch (error) {
+        console.error('加载黑名单数据失败:', error);
+    }
+}
+
+function renderBlacklistTable(data) {
+    const tbody = document.getElementById('blacklistTableBody');
+    
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = data.map(item => `
+        <tr>
+            <td>${item.id || '-'}</td>
+            <td>${item.ipAddress || '-'}</td>
+            <td>${item.reason || '-'}</td>
+            <td>${item.expireTime ? dateFormat.format(item.expireTime) : '永久'}</td>
+            <td>${renderStatus(item.status)}</td>
+            <td>${item.createTime ? dateFormat.format(item.createTime) : '-'}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="removeFromBlacklist(${item.id})">移除</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderStatus(status) {
+    if (status === 1) {
+        return '<span class="tag danger">生效中</span>';
+    } else if (status === 2) {
+        return '<span class="tag info">已过期</span>';
+    } else {
+        return '<span class="tag info">未知</span>';
+    }
+}
+
+function renderPagination(total) {
+    const totalPages = Math.ceil(total / pageSize);
+    const paginationEl = document.getElementById('pagination');
+    
+    let html = `
+        <span class="pagination-item ${currentPage === 1 ? 'disabled' : ''}" 
+              onclick="goPage(${currentPage - 1})">上一页</span>
+    `;
+    
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+            html += `
+                <span class="pagination-item ${i === currentPage ? 'active' : ''}" 
+                      onclick="goPage(${i})">${i}</span>
+            `;
+        } else if (i === currentPage - 2 || i === currentPage + 2) {
+            html += `<span class="pagination-item">...</span>`;
+        }
+    }
+    
+    html += `
+        <span class="pagination-item ${currentPage === totalPages ? 'disabled' : ''}" 
+              onclick="goPage(${currentPage + 1})">下一页</span>
+        <span class="pagination-item">共 ${total} 条</span>
+    `;
+    
+    paginationEl.innerHTML = html;
+}
+
+function goPage(page) {
+    const totalPages = Math.ceil((searchParams.total || 10) / pageSize);
+    
+    if (page < 1 || page > totalPages || page === currentPage) {
+        return;
+    }
+    
+    currentPage = page;
+    loadBlacklistData();
+}
+
+function searchBlacklist() {
+    const ipAddress = document.getElementById('ipAddress').value.trim();
+    
+    searchParams = {};
+    
+    if (ipAddress) searchParams.ipAddress = ipAddress;
+    
+    currentPage = 1;
+    loadBlacklistData();
+}
+
+function resetSearch() {
+    document.getElementById('ipAddress').value = '';
+    
+    searchParams = {};
+    currentPage = 1;
+    loadBlacklistData();
+}
+
+function showAddBlacklistModal() {
+    document.getElementById('blacklistForm').reset();
+    document.getElementById('blacklistModal').style.display = 'flex';
+}
+
+function closeBlacklistModal() {
+    document.getElementById('blacklistModal').style.display = 'none';
+}
+
+async function saveBlacklist() {
+    const ipAddress = document.getElementById('ipInput').value.trim();
+    const reason = document.getElementById('reasonInput').value.trim();
+    const expireTime = document.getElementById('expireTimeInput').value;
+
+    if (!ipAddress) {
+        message.error('请输入 IP 地址');
+        return;
+    }
+
+    const ipRegex = /^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$/;
+    if (!ipRegex.test(ipAddress)) {
+        message.error('IP 地址格式不正确');
+        return;
+    }
+
+    try {
+        const data = {
+            ipAddress: ipAddress,
+            reason: reason || '手动添加',
+            expireTime: expireTime ? expireTime.replace('T', ' ') + ':00' : null
+        };
+
+        await http.post('/blacklist', data);
+        
+        message.success('添加成功');
+        closeBlacklistModal();
+        loadBlacklistData();
+    } catch (error) {
+        console.error('添加黑名单失败:', error);
+    }
+}
+
+async function removeFromBlacklist(id) {
+    if (!confirm('确定要从黑名单中移除该 IP 吗？')) {
+        return;
+    }
+
+    try {
+        await http.delete(`/blacklist/${id}`);
+        message.success('移除成功');
+        loadBlacklistData();
+    } catch (error) {
+        console.error('移除黑名单失败:', error);
+    }
+}
+
+document.getElementById('blacklistModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeBlacklistModal();
+    }
+});

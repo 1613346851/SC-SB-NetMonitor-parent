@@ -2,6 +2,7 @@ package com.network.monitor.service.impl;
 
 import com.network.monitor.mapper.AttackMonitorMapper;
 import com.network.monitor.mapper.TrafficMonitorMapper;
+import com.network.monitor.mapper.VulnerabilityMonitorMapper;
 import com.network.monitor.service.DashboardStatService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,9 @@ public class DashboardStatServiceImpl implements DashboardStatService {
 
     @Autowired
     private AttackMonitorMapper attackMonitorMapper;
+
+    @Autowired
+    private VulnerabilityMonitorMapper vulnerabilityMonitorMapper;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -218,6 +222,72 @@ public class DashboardStatServiceImpl implements DashboardStatService {
         } catch (Exception e) {
             log.error("获取攻击趋势失败：", e);
             return new ArrayList<>();
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> getVulnerabilityLevelDistribution() {
+        try {
+            List<VulnerabilityMonitorMapper.VulnLevelStat> stats = vulnerabilityMonitorMapper.countByVulnLevel();
+            
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (VulnerabilityMonitorMapper.VulnLevelStat stat : stats) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("name", stat.getVulnLevel());
+                item.put("value", stat.getCount());
+                result.add(item);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            log.error("获取漏洞等级分布失败：", e);
+            return new ArrayList<>();
+        }
+    }
+
+    @Override
+    public long getTotalTraffic(String startTime, String endTime) {
+        try {
+            LocalDateTime startDateTime = parseDateTime(startTime);
+            LocalDateTime endDateTime = parseDateTime(endTime);
+            return trafficMonitorMapper.countByCondition(null, null, startDateTime, endDateTime);
+        } catch (Exception e) {
+            log.error("获取总流量数失败：", e);
+            return 0;
+        }
+    }
+
+    @Override
+    public long getTotalAttacks(String startTime, String endTime) {
+        try {
+            LocalDateTime startDateTime = parseDateTime(startTime);
+            LocalDateTime endDateTime = parseDateTime(endTime);
+            return attackMonitorMapper.countByCondition(null, null, null, null, startDateTime, endDateTime);
+        } catch (Exception e) {
+            log.error("获取总攻击次数失败：", e);
+            return 0;
+        }
+    }
+
+    @Override
+    public long getTotalVulnerabilities(String startTime, String endTime) {
+        try {
+            return vulnerabilityMonitorMapper.countByCondition(null, null, null);
+        } catch (Exception e) {
+            log.error("获取总漏洞数失败：", e);
+            return 0;
+        }
+    }
+
+    @Override
+    public long getTotalDefenses(String startTime, String endTime) {
+        try {
+            // 防御日志统计（假设有 defenseLogMapper）
+            // 暂时返回 0，后续可根据实际情况实现
+            return 0;
+        } catch (Exception e) {
+            log.error("获取总防御次数失败：", e);
+            return 0;
         }
     }
 }

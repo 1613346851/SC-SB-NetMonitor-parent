@@ -42,4 +42,29 @@ public interface DashboardStatService {
      * 获取攻击趋势数据
      */
     List<Map<String, Object>> getAttackTrend(String startTime, String endTime);
+
+    /**
+     * 获取漏洞等级分布数据
+     */
+    List<Map<String, Object>> getVulnerabilityLevelDistribution();
+
+    /**
+     * 获取总流量数
+     */
+    long getTotalTraffic(String startTime, String endTime);
+
+    /**
+     * 获取总攻击次数
+     */
+    long getTotalAttacks(String startTime, String endTime);
+
+    /**
+     * 获取总漏洞数
+     */
+    long getTotalVulnerabilities(String startTime, String endTime);
+
+    /**
+     * 获取总防御次数
+     */
+    long getTotalDefenses(String startTime, String endTime);
 }

@@ -97,7 +97,7 @@
             </plugin>
         </plugins>
 
-        <!-- 资源文件扫描（确保MyBatis的XML映射文件、配置文件能被正确加载） -->
+        <!-- 资源文件扫描（确保 MyBatis 的 XML 映射文件、配置文件、HTML 模板能被正确加载） -->
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -105,8 +105,17 @@
                     <include>**/*.yml</include>
                     <include>**/*.xml</include>
                     <include>**/*.properties</include>
+                    <include>**/*.html</include>
                 </includes>
                 <filtering>true</filtering>
+            </resource>
+            <!-- 静态资源（CSS、JS、图片等，不经过过滤） -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>**/static/**</include>
+                </includes>
+                <filtering>false</filtering>
             </resource>
         </resources>
     </build>
