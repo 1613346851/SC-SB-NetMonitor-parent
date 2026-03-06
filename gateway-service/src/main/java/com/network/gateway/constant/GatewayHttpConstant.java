@@ -70,7 +70,7 @@ public class GatewayHttpConstant {
      */
     public static class MonitorService {
         /** 流量监控接口路径 */
-        public static final String TRAFFIC_MONITOR_ENDPOINT = "http://localhost:9002/api/monitor/traffic";
+        public static final String TRAFFIC_MONITOR_ENDPOINT = "http://localhost:9002/api/inner/traffic/receive";
         /** 防御日志接口路径 */
         public static final String DEFENSE_LOG_ENDPOINT = "http://localhost:9002/api/monitor/defense/log";
         /** 防御指令接口路径 */
