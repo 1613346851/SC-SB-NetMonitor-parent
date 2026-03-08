@@ -24,7 +24,7 @@ async function loadTrafficData() {
 
         const result = await http.get('/traffic/list', params);
         
-        renderTrafficTable(result.records || []);
+        renderTrafficTable(result.list || []);
         renderPagination(result.total || 0);
     } catch (error) {
         console.error('加载流量数据失败:', error);

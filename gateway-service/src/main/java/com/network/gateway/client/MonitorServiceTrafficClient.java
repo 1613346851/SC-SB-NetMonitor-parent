@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,9 +32,16 @@ public class MonitorServiceTrafficClient {
     private RestTemplate restTemplate;
 
     /**
+     * 跨服务鉴权 Token（从配置文件读取）
+     */
+    @Value("${cross-service.auth.monitor-token:MonitorSecureToken456}")
+    private String monitorAuthToken;
+
+    /**
      * 推送流量数据到监控服务
+     * 添加跨服务鉴权头，确保调用安全性
      *
-     * @param trafficDTO 流量监控DTO
+     * @param trafficDTO 流量监控 DTO
      * @throws RestClientException 网络异常
      */
     public void pushTraffic(TrafficMonitorDTO trafficDTO) throws RestClientException {
@@ -48,6 +56,8 @@ public class MonitorServiceTrafficClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("X-Gateway-Timestamp", String.valueOf(System.currentTimeMillis()));
             headers.set("X-Request-ID", trafficDTO.getRequestId());
+            // 添加跨服务鉴权头
+            headers.set("X-Auth-Token", monitorAuthToken);
 
             // 构建请求实体
             HttpEntity<TrafficMonitorDTO> requestEntity = new HttpEntity<>(trafficDTO, headers);

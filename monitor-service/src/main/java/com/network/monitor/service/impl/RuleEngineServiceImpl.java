@@ -92,10 +92,14 @@ public class RuleEngineServiceImpl implements RuleEngineService {
                 return attacks;
             }
 
-            // 多字段联合检测：URI、查询参数、请求体
+            // 多字段联合检测：URI、查询参数（转换为字符串）、请求体
+            String queryParamsStr = trafficDTO.getQueryParams() != null 
+                ? trafficDTO.getQueryParams().toString() 
+                : null;
+            
             String[] checkFields = {
                 trafficDTO.getRequestUri(),
-                trafficDTO.getQueryParams(),
+                queryParamsStr,
                 trafficDTO.getRequestBody()
             };
 

@@ -24,7 +24,7 @@ async function loadDefenseData() {
 
         const result = await http.get('/defense/list', params);
         
-        renderDefenseTable(result.records || []);
+        renderDefenseTable(result.list || []);
         renderPagination(result.total || 0);
     } catch (error) {
         console.error('加载防御日志失败:', error);

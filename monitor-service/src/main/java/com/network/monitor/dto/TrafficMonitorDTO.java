@@ -1,6 +1,7 @@
 package com.network.monitor.dto;
 
 import lombok.Data;
+import java.util.Map;
 
 /**
  * 流量监测数据传输对象
@@ -49,14 +50,14 @@ public class TrafficMonitorDTO {
     private String requestUri;
 
     /**
-     * 查询参数
+     * 查询参数（Map 格式）
      */
-    private String queryParams;
+    private Map<String, String> queryParams;
 
     /**
      * 请求头（JSON 格式）
      */
-    private String requestHeaders;
+    private Map<String, String> requestHeaders;
 
     /**
      * 请求体

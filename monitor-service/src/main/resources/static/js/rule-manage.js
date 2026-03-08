@@ -21,7 +21,7 @@ async function loadRuleData() {
 
         const result = await http.get('/rule/list', params);
         
-        renderRuleTable(result.records || []);
+        renderRuleTable(result.list || result || []);
         renderPagination(result.total || 0);
     } catch (error) {
         console.error('加载规则数据失败:', error);

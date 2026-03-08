@@ -9,7 +9,7 @@ import com.network.monitor.entity.VulnerabilityMonitorEntity;
 import com.network.monitor.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,6 +21,9 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/inner/traffic")
 public class TrafficReceiveController {
+
+    @Value("${cross-service.auth.verify-token:MonitorSecureToken456}")
+    private String expectedToken;
 
     @Autowired
     private TrafficAnalyzeService trafficAnalyzeService;
@@ -53,36 +56,65 @@ public class TrafficReceiveController {
     private AttackDetectService attackDetectServiceImpl;
 
     /**
-     * 接收网关推送的流量数据（异步处理）
+     * 接收网关推送的流量数据（同步处理）
+     * 添加跨服务鉴权验证，确保数据来源合法
      */
     @PostMapping("/receive")
-    public ApiResponse<Void> receiveTraffic(@RequestBody TrafficMonitorDTO trafficDTO) {
+    public ApiResponse<Void> receiveTraffic(
+            @RequestBody TrafficMonitorDTO trafficDTO,
+            @RequestHeader(value = "X-Auth-Token", required = false) String authToken) {
         try {
-            log.info("接收到流量数据：sourceIp={}, uri={}", 
-                trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+            // 验证跨服务鉴权 Token
+            if (!validateCrossServiceToken(authToken)) {
+                log.warn("接收到未授权的流量推送请求：token={}, sourceIp={}", 
+                    authToken, trafficDTO.getSourceIp());
+                return ApiResponse.error("未授权访问");
+            }
 
-            // 异步处理流量数据
-            processTrafficAsync(trafficDTO);
+            log.info("接收到流量数据：sourceIp={}, uri={}, method={}", 
+                trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getHttpMethod());
 
+            // 同步处理流量数据（确保数据写入数据库）
+            processTrafficSync(trafficDTO);
+
+            log.info("流量数据处理完成：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
             return ApiResponse.success();
         } catch (Exception e) {
-            log.error("接收流量数据失败：", e);
-            return ApiResponse.error("接收流量数据失败");
+            log.error("接收流量数据失败：sourceIp={}, error={}", 
+                trafficDTO.getSourceIp(), e.getMessage(), e);
+            return ApiResponse.error("接收流量数据失败：" + e.getMessage());
         }
     }
 
     /**
-     * 异步处理流量数据
+     * 验证跨服务鉴权 Token
      */
-    @Async
-    public void processTrafficAsync(TrafficMonitorDTO trafficDTO) {
+    private boolean validateCrossServiceToken(String authToken) {
+        return expectedToken != null && expectedToken.equals(authToken);
+    }
+
+    /**
+     * 同步处理流量数据（确保数据写入数据库）
+     */
+    public void processTrafficSync(TrafficMonitorDTO trafficDTO) {
         try {
+            log.debug("开始预处理流量：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+            
             // 1. 预处理流量（解码等）
             trafficAnalyzeService.preprocessTraffic(trafficDTO);
 
+            log.debug("开始保存流量数据：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+            
             // 2. 保存原始流量数据到数据库
             TrafficMonitorEntity trafficEntity = trafficStoreService.convertToEntity(trafficDTO);
             Long trafficId = trafficStoreService.saveTraffic(trafficEntity);
+            
+            if (trafficId == null) {
+                throw new RuntimeException("保存流量数据失败：sourceIp=" + trafficDTO.getSourceIp());
+            }
+            
+            log.info("流量数据已保存：trafficId={}, sourceIp={}, uri={}", 
+                trafficId, trafficDTO.getSourceIp(), trafficEntity.getSourceIp());
 
             // 3. 执行规则引擎检测
             List<AttackMonitorDTO> detectedAttacks = ruleEngineService.executeMatching(trafficDTO);
@@ -121,9 +153,11 @@ public class TrafficReceiveController {
 
                 log.info("流量检测完成：trafficId={}, 检测到攻击数={}", trafficId, detectedAttacks.size());
             }
-
+            
         } catch (Exception e) {
-            log.error("异步处理流量数据失败：", e);
+            log.error("同步处理流量数据失败：sourceIp={}, error={}", 
+                trafficDTO.getSourceIp(), e.getMessage(), e);
+            throw new RuntimeException("处理流量数据失败", e);
         }
     }
 }

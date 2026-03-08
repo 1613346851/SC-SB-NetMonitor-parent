@@ -30,7 +30,7 @@
 			<artifactId>spring-cloud-starter-gateway</artifactId>
 		</dependency>
 
-		<!-- WebFlux 依赖（Gateway 底层必须，继承Spring Boot 3.2.5版本） -->
+		<!-- WebFlux 依赖（Gateway 底层必须，继承 Spring Boot 3.2.5 版本） -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webflux</artifactId>
@@ -42,6 +42,12 @@
 			<artifactId>jackson-databind</artifactId>
 		</dependency>
 
+		<!-- Lombok 依赖（简化 DTO/BO 开发） -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<scope>provided</scope>
+		</dependency>
 	</dependencies>
 
 	<!-- 5. 构建插件（继承父工程配置，无需重复编写，保持统一） -->

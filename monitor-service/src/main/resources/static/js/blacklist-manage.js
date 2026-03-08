@@ -21,7 +21,7 @@ async function loadBlacklistData() {
 
         const result = await http.get('/blacklist/list', params);
         
-        renderBlacklistTable(result.records || []);
+        renderBlacklistTable(result.list || result || []);
         renderPagination(result.total || 0);
     } catch (error) {
         console.error('加载黑名单数据失败:', error);

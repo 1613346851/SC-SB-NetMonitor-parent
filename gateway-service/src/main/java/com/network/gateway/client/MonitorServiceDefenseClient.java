@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,9 +32,16 @@ public class MonitorServiceDefenseClient {
     private RestTemplate restTemplate;
 
     /**
+     * 跨服务鉴权 Token（从配置文件读取）
+     */
+    @Value("${cross-service.auth.monitor-token:MonitorSecureToken456}")
+    private String monitorAuthToken;
+
+    /**
      * 推送防御日志到监控服务
+     * 添加跨服务鉴权头，确保调用安全性
      *
-     * @param defenseLogDTO 防御日志DTO
+     * @param defenseLogDTO 防御日志 DTO
      * @throws RestClientException 网络异常
      */
     public void pushDefenseLog(DefenseLogDTO defenseLogDTO) throws RestClientException {
@@ -49,6 +57,8 @@ public class MonitorServiceDefenseClient {
             headers.set("X-Gateway-Timestamp", String.valueOf(System.currentTimeMillis()));
             headers.set("X-Defense-Log-ID", defenseLogDTO.getLogId());
             headers.set("X-Defense-Type", defenseLogDTO.getDefenseType().name());
+            // 添加跨服务鉴权头
+            headers.set("X-Auth-Token", monitorAuthToken);
 
             // 构建请求实体
             HttpEntity<DefenseLogDTO> requestEntity = new HttpEntity<>(defenseLogDTO, headers);

@@ -40,7 +40,7 @@
         <!-- 接口文档依赖 -->
         <springdoc.version>2.1.0</springdoc.version>
         <!-- 工具依赖 -->
-        <lombok.version>1.18.28</lombok.version>
+        <lombok.version>1.18.30</lombok.version>
     </properties>
 
     <!-- 依赖管理（子模块直接引用，无需指定版本） -->
@@ -146,7 +146,7 @@
                     </excludes>
                 </configuration>
             </plugin>
-            <!-- JDK 编译插件（统一Java 17） -->
+            <!-- JDK 编译插件（统一 Java 17） -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -155,6 +155,13 @@
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                     <encoding>UTF-8</encoding>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                     <compilerArgs>
                         <arg>-parameters</arg>
                     </compilerArgs>

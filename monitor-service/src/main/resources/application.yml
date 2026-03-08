@@ -3,6 +3,16 @@ server:
   servlet:
     context-path: /
 
+# 跨服务鉴权配置
+cross-service:
+  auth:
+    # 调用网关服务的 Token
+    gateway-token: SecureToken123
+    # 接收网关推送的验证 Token
+    verify-token: MonitorSecureToken456
+    # 网关服务 IP 地址（用于日志记录）
+    gateway-ip: 127.0.0.1
+
 spring:
   application:
     name: monitor-service

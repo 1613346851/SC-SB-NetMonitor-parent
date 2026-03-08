@@ -25,7 +25,8 @@ public class TrafficAnalyzeServiceImpl implements TrafficAnalyzeService {
         }
 
         if (trafficDTO.getQueryParams() != null) {
-            trafficDTO.setQueryParams(decodeContent(trafficDTO.getQueryParams()));
+            // Map 类型不需要解码，保持原样
+            // 如果需要解码 Map 中的值，可以在这里处理
         }
 
         if (trafficDTO.getRequestBody() != null) {

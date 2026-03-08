@@ -5,6 +5,7 @@ import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.dto.DefenseLogDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -25,7 +26,19 @@ public class GatewayApiClient {
     /**
      * 网关服务基础 URL（可配置）
      */
-    private static final String GATEWAY_BASE_URL = "http://localhost:8080";
+    private static final String GATEWAY_BASE_URL = "http://localhost:9000";
+
+    /**
+     * 跨服务鉴权 Token（从配置文件读取）
+     */
+    @Value("${cross-service.auth.gateway-token:SecureToken123}")
+    private String gatewayAuthToken;
+
+    /**
+     * 监测服务 IP 地址（用于跨服务鉴权）
+     */
+    @Value("${cross-service.auth.monitor-ip:127.0.0.1}")
+    private String monitorIp;
 
     /**
      * 最大重试次数
@@ -39,6 +52,7 @@ public class GatewayApiClient {
 
     /**
      * 推送防御指令到网关（支持重试机制）
+     * 添加跨服务鉴权头，确保调用安全性
      *
      * @param commandDTO 防御指令
      * @return 是否成功
@@ -54,6 +68,9 @@ public class GatewayApiClient {
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+            // 添加跨服务鉴权头
+            headers.set("X-Auth-Token", gatewayAuthToken);
+            headers.set("X-Source-IP", monitorIp);
             
             HttpEntity<DefenseCommandDTO> request = new HttpEntity<>(commandDTO, headers);
             

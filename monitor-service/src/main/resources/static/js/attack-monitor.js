@@ -31,7 +31,7 @@ async function loadAttackData() {
 
         const result = await http.get('/attack/list', params);
         
-        renderAttackTable(result.records || []);
+        renderAttackTable(result.list || []);
         renderPagination(result.total || 0);
     } catch (error) {
         console.error('加载攻击数据失败:', error);

@@ -1,5 +1,7 @@
 package com.network.monitor.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.monitor.dto.TrafficMonitorDTO;
 import com.network.monitor.entity.TrafficMonitorEntity;
 import com.network.monitor.mapper.TrafficMonitorMapper;
@@ -10,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * 流量数据存储服务实现类
@@ -21,10 +24,13 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
     @Autowired
     private TrafficMonitorMapper trafficMonitorMapper;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Override
     public Long saveTraffic(TrafficMonitorEntity entity) {
         if (entity == null) {
-            return null;
+            throw new IllegalArgumentException("流量实体对象不能为空");
         }
 
         try {
@@ -41,13 +47,13 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
 
             trafficMonitorMapper.insert(entity);
             
-            log.debug("保存流量数据成功：id={}, sourceIp={}, uri={}", 
+            log.info("保存流量数据成功：id={}, sourceIp={}, uri={}", 
                 entity.getId(), entity.getSourceIp(), entity.getRequestUri());
             
             return entity.getId();
         } catch (Exception e) {
-            log.error("保存流量数据失败：", e);
-            return null;
+            log.error("保存流量数据失败：entity={}, error={}", entity, e.getMessage(), e);
+            throw new RuntimeException("保存流量数据失败：" + e.getMessage(), e);
         }
     }
 
@@ -72,6 +78,35 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
             entity.setRequestTime(LocalDateTime.now());
         }
 
+        // 转换 Map 类型为 JSON 字符串
+        if (dto.getQueryParams() != null) {
+            try {
+                entity.setQueryParams(mapToJson(dto.getQueryParams()));
+            } catch (JsonProcessingException e) {
+                log.warn("转换查询参数为 JSON 失败：{}", e.getMessage());
+                entity.setQueryParams(dto.getQueryParams().toString());
+            }
+        }
+
+        if (dto.getRequestHeaders() != null) {
+            try {
+                entity.setRequestHeaders(mapToJson(dto.getRequestHeaders()));
+            } catch (JsonProcessingException e) {
+                log.warn("转换请求头为 JSON 失败：{}", e.getMessage());
+                entity.setRequestHeaders(dto.getRequestHeaders().toString());
+            }
+        }
+
         return entity;
+    }
+
+    /**
+     * 将 Map 转换为 JSON 字符串
+     */
+    private String mapToJson(Map<String, String> map) throws JsonProcessingException {
+        if (map == null || map.isEmpty()) {
+            return null;
+        }
+        return objectMapper.writeValueAsString(map);
     }
 }
