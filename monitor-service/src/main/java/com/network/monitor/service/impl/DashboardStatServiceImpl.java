@@ -47,7 +47,7 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             long highRiskAttacks = attackMonitorMapper.countByCondition(null, "HIGH", null, null, null, null);
             stats.put("highRiskAttacks", highRiskAttacks);
 
-            // 今日流量数（简化实现）
+            // 今日流量数
             LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
             long todayTraffic = trafficMonitorMapper.countByCondition(null, null, todayStart, null);
             stats.put("todayTraffic", todayTraffic);
@@ -56,6 +56,18 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             long todayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, todayStart, null);
             stats.put("todayAttacks", todayAttacks);
 
+            // 计算昨日数据用于对比
+            LocalDateTime yesterdayStart = todayStart.minusDays(1);
+            long yesterdayTraffic = trafficMonitorMapper.countByCondition(null, null, yesterdayStart, todayStart);
+            long yesterdayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart);
+
+            // 计算增长率
+            double trafficChange = calculateGrowthRate(todayTraffic, yesterdayTraffic);
+            double attackChange = calculateGrowthRate(todayAttacks, yesterdayAttacks);
+
+            stats.put("trafficChange", trafficChange);
+            stats.put("attackChange", attackChange);
+
             stats.put("updateTime", LocalDateTime.now().format(FORMATTER));
         } catch (Exception e) {
             log.error("获取仪表盘统计数据失败：", e);
@@ -63,6 +75,16 @@ public class DashboardStatServiceImpl implements DashboardStatService {
         }
 
         return stats;
+    }
+
+    /**
+     * 计算增长率
+     */
+    private double calculateGrowthRate(long current, long previous) {
+        if (previous == 0) {
+            return current > 0 ? 100.0 : 0.0;
+        }
+        return Math.round(((double) (current - previous) / previous) * 100.0 * 100.0) / 100.0;
     }
 
     @Override
@@ -80,17 +102,17 @@ public class DashboardStatServiceImpl implements DashboardStatService {
                 endDateTime = LocalDateTime.now();
             }
 
-            // TODO: 从数据库查询流量趋势数据
-            // 暂时返回示例数据
+            // 查询实际流量数据
+            List<TrafficMonitorMapper.HourlyStat> stats = trafficMonitorMapper.countHourlyTraffic(startDateTime, endDateTime);
+            
             List<Map<String, Object>> result = new ArrayList<>();
-            for (int i = 23; i >= 0; i--) {
-                LocalDateTime time = endDateTime.minusHours(i);
+            for (TrafficMonitorMapper.HourlyStat stat : stats) {
                 Map<String, Object> dataPoint = new HashMap<>();
-                dataPoint.put("time", time.format(FORMATTER));
-                dataPoint.put("count", (int) (Math.random() * 100));
+                dataPoint.put("time", stat.getTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+                dataPoint.put("count", stat.getCount());
                 result.add(dataPoint);
             }
-
+            
             return result;
         } catch (Exception e) {
             log.error("获取流量趋势失败：", e);

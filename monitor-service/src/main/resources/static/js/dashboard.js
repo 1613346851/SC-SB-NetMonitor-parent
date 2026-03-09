@@ -43,17 +43,21 @@ async function loadTrafficTrend() {
         const chartData = await http.get('/dashboard/traffic-trend');
         const chart = chartHelper.init('trafficTrendChart');
         
+        // 将后端返回的数据格式转换为前端需要的格式
+        const dates = (chartData || []).map(item => item.time);
+        const values = (chartData || []).map(item => item.count);
+        
         const option = chartHelper.getOption({
             xAxis: {
                 type: 'category',
-                data: chartData.dates || [],
+                data: dates,
                 boundaryGap: false
             },
             yAxis: {
                 type: 'value'
             },
             series: [{
-                data: chartData.values || [],
+                data: values,
                 type: 'line',
                 smooth: true,
                 areaStyle: {
@@ -91,7 +95,7 @@ async function loadAttackTypeDistribution() {
             series: [{
                 type: 'pie',
                 radius: '50%',
-                data: chartData.data || [],
+                data: chartData || [],
                 emphasis: {
                     itemStyle: {
                         shadowBlur: 10,
@@ -128,7 +132,7 @@ async function loadVulnerabilityLevelDistribution() {
             series: [{
                 type: 'pie',
                 radius: '50%',
-                data: chartData.data || [],
+                data: chartData || [],
                 emphasis: {
                     itemStyle: {
                         shadowBlur: 10,

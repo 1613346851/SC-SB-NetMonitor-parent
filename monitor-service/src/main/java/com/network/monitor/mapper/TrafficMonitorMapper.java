@@ -54,4 +54,22 @@ public interface TrafficMonitorMapper {
      * 批量插入流量记录
      */
     int batchInsert(@Param("list") List<TrafficMonitorEntity> list);
+
+    /**
+     * 按小时统计流量数据
+     */
+    List<HourlyStat> countHourlyTraffic(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * 小时流量统计内部类
+     */
+    class HourlyStat {
+        private LocalDateTime time;
+        private Long count;
+
+        public LocalDateTime getTime() { return time; }
+        public void setTime(LocalDateTime time) { this.time = time; }
+        public Long getCount() { return count; }
+        public void setCount(Long count) { this.count = count; }
+    }
 }

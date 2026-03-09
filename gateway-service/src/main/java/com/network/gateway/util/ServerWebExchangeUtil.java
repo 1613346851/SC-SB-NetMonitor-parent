@@ -30,13 +30,13 @@ public class ServerWebExchangeUtil {
     public static RawTrafficBO extractTrafficInfo(ServerWebExchange exchange) {
         ServerHttpRequest request = exchange.getRequest();
         
-        // 生成请求ID
+        // 生成请求 ID
         String requestId = generateRequestId();
         
-        // 提取源IP
+        // 提取源 IP
         String sourceIp = extractSourceIp(request);
         
-        // 提取目标IP
+        // 提取目标 IP
         String targetIp = extractTargetIp(request);
         
         // 提取基本请求信息
@@ -53,6 +53,16 @@ public class ServerWebExchangeUtil {
         // 提取用户代理
         String userAgent = extractUserAgent(headers);
         
+        // 提取端口信息
+        Integer sourcePort = extractSourcePort(request);
+        Integer targetPort = extractTargetPort(request);
+        
+        // 提取协议类型
+        String protocol = extractProtocol(request);
+        
+        // 提取内容类型
+        String contentType = extractContentType(request);
+        
         // 创建原始流量对象
         RawTrafficBO trafficBO = new RawTrafficBO(
                 requestId, sourceIp, method, uri, System.currentTimeMillis()
@@ -63,6 +73,10 @@ public class ServerWebExchangeUtil {
         trafficBO.setRawQueryParams(rawQueryParams);
         trafficBO.setHeaders(headers);
         trafficBO.setUserAgent(userAgent);
+        trafficBO.setSourcePort(sourcePort);
+        trafficBO.setTargetPort(targetPort);
+        trafficBO.setProtocol(protocol);
+        trafficBO.setContentType(contentType);
         
         return trafficBO;
     }
@@ -250,7 +264,7 @@ public class ServerWebExchangeUtil {
     /**
      * 获取请求内容长度
      *
-     * @param exchange ServerWebExchange对象
+     * @param exchange ServerWebExchange 对象
      * @return 内容长度
      */
     public static Long getContentLength(ServerWebExchange exchange) {
@@ -263,5 +277,67 @@ public class ServerWebExchangeUtil {
             }
         }
         return 0L;
+    }
+
+    /**
+     * 提取源端口
+     *
+     * @param request ServerHttpRequest 对象
+     * @return 源端口
+     */
+    public static Integer extractSourcePort(ServerHttpRequest request) {
+        InetSocketAddress remoteAddress = request.getRemoteAddress();
+        if (remoteAddress != null) {
+            return remoteAddress.getPort();
+        }
+        return 0;
+    }
+
+    /**
+     * 提取目标端口
+     *
+     * @param request ServerHttpRequest 对象
+     * @return 目标端口
+     */
+    public static Integer extractTargetPort(ServerHttpRequest request) {
+        InetSocketAddress localAddress = request.getLocalAddress();
+        if (localAddress != null) {
+            return localAddress.getPort();
+        }
+        return 0;
+    }
+
+    /**
+     * 提取协议类型
+     *
+     * @param request ServerHttpRequest 对象
+     * @return 协议类型
+     */
+    public static String extractProtocol(ServerHttpRequest request) {
+        // 从请求头中获取协议版本信息
+        String protocol = request.getHeaders().getFirst("X-Forwarded-Proto");
+        if (protocol != null) {
+            return protocol.toUpperCase() + "/1.1";
+        }
+        
+        // 根据是否为 HTTPS 判断
+        String scheme = request.getURI().getScheme();
+        if ("https".equalsIgnoreCase(scheme)) {
+            return "HTTPS/1.1";
+        }
+        
+        // 默认为 HTTP/1.1
+        return "HTTP/1.1";
+    }
+
+    /**
+     * 提取内容类型
+     *
+     * @param request ServerHttpRequest 对象
+     * @return 内容类型
+     */
+    public static String extractContentType(ServerHttpRequest request) {
+        String contentType = request.getHeaders().getFirst(GatewayHttpConstant.Header.CONTENT_TYPE);
+        return contentType != null ? contentType : "unknown";
     }
 }

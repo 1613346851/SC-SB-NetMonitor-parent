@@ -50,22 +50,26 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         try {
             // 检查是否需要跳过采集（健康检查、管理端点等）
             if (shouldSkipCollection(exchange)) {
-                logger.debug("跳过流量采集: {}", exchange.getRequest().getURI().getPath());
+                logger.debug("跳过流量采集：{}", exchange.getRequest().getURI().getPath());
                 return chain.filter(exchange);
             }
 
-            // 提取原始流量信息
+            // 检查是否已经采集过该请求（防止重复采集）
             RawTrafficBO rawTraffic = ServerWebExchangeUtil.extractTrafficInfo(exchange);
-            logger.debug("开始采集流量: {}", rawTraffic.getTrafficSummary());
+            String requestId = rawTraffic.getRequestId();
+            
+            if (trafficTempCache.containsTraffic(requestId)) {
+                logger.debug("请求已采集，跳过：{}", requestId);
+                return chain.filter(exchange);
+            }
+            
+            logger.debug("开始采集流量：{}", rawTraffic.getTrafficSummary());
 
             // 预处理流量数据
             TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
 
-            // 存储到临时缓存
-            trafficTempCache.putTraffic(monitorDTO.getRequestId(), monitorDTO);
-
-            // 异步推送流量数据到监控服务
-            pushTrafficAsync(monitorDTO);
+            // 存储到临时缓存（仅存储，不推送）
+            trafficTempCache.putTraffic(requestId, monitorDTO);
 
             // 继续执行过滤器链（非阻塞）
             return chain.filter(exchange)
@@ -116,47 +120,10 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
     }
 
     /**
-     * 异步推送流量数据到监控服务
-     *
-     * @param monitorDTO 流量监控DTO
-     */
-    private void pushTrafficAsync(TrafficMonitorDTO monitorDTO) {
-        // 使用异步方式推送，避免阻塞主流程
-        Mono.fromRunnable(() -> {
-            try {
-                trafficClient.pushTraffic(monitorDTO);
-                logger.debug("异步推送流量数据成功: 请求ID[{}]", monitorDTO.getRequestId());
-            } catch (Exception e) {
-                logger.warn("异步推送流量数据失败: 请求ID[{}], 错误: {}", 
-                           monitorDTO.getRequestId(), e.getMessage());
-                // 失败重试机制（简化版）
-                retryPushTraffic(monitorDTO);
-            }
-        }).subscribe();
-    }
-
-    /**
-     * 失败重试推送流量数据
-     *
-     * @param monitorDTO 流量监控DTO
-     */
-    private void retryPushTraffic(TrafficMonitorDTO monitorDTO) {
-        try {
-            // 简单的一次重试机制
-            Thread.sleep(1000); // 等待1秒后重试
-            trafficClient.pushTraffic(monitorDTO);
-            logger.info("重试推送流量数据成功: 请求ID[{}]", monitorDTO.getRequestId());
-        } catch (Exception retryException) {
-            logger.error("重试推送流量数据也失败: 请求ID[{}], 错误: {}", 
-                        monitorDTO.getRequestId(), retryException.getMessage());
-        }
-    }
-
-    /**
      * 处理请求成功的情况
      *
-     * @param exchange ServerWebExchange对象
-     * @param monitorDTO 流量监控DTO
+     * @param exchange ServerWebExchange 对象
+     * @param monitorDTO 流量监控 DTO
      * @param startTime 开始时间
      */
     private void handleRequestSuccess(ServerWebExchange exchange, 
@@ -167,13 +134,15 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
                            exchange.getResponse().getStatusCode().value() : 200;
             
             // 更新响应信息
-            monitorDTO.setResponseInfo(endTime, statusCode, 
-                                     ServerWebExchangeUtil.getContentLength(exchange));
+            monitorDTO.setResponseInfo(statusCode, "", endTime - startTime);
 
-            // 重新存储到缓存（更新响应信息）
+            // 更新缓存
             trafficTempCache.putTraffic(monitorDTO.getRequestId(), monitorDTO);
 
-            logger.debug("流量采集完成: {} 耗时{}ms 状态码{}", 
+            // 推送完整的流量数据（包含响应信息）
+            pushTraffic(monitorDTO);
+
+            logger.debug("流量采集完成：{} 耗时{}ms 状态码{}", 
                         monitorDTO.getRequestId(), 
                         endTime - startTime, 
                         statusCode);
@@ -186,8 +155,8 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
     /**
      * 处理请求失败的情况
      *
-     * @param exchange ServerWebExchange对象
-     * @param monitorDTO 流量监控DTO
+     * @param exchange ServerWebExchange 对象
+     * @param monitorDTO 流量监控 DTO
      * @param throwable 异常对象
      * @param startTime 开始时间
      */
@@ -197,20 +166,43 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         try {
             long endTime = System.currentTimeMillis();
             
+            // 确定实际的状态码
+            int statusCode = exchange.getResponse().getStatusCode() != null ? 
+                           exchange.getResponse().getStatusCode().value() : 500;
+            
             // 标记为处理失败
             monitorDTO.markAsFailed(throwable.getMessage());
-            monitorDTO.setResponseInfo(endTime, 500, 0L);
+            monitorDTO.setResponseInfo(statusCode, "", endTime - startTime);
 
-            // 重新存储到缓存
+            // 更新缓存
             trafficTempCache.putTraffic(monitorDTO.getRequestId(), monitorDTO);
 
-            logger.warn("流量采集记录错误: {} 耗时{}ms 错误: {}", 
+            // 推送完整的流量数据（包含响应信息）
+            pushTraffic(monitorDTO);
+
+            logger.warn("流量采集记录错误：{} 耗时{}ms 错误：{} 状态码{}", 
                        monitorDTO.getRequestId(), 
                        endTime - startTime, 
-                       throwable.getMessage());
+                       throwable.getMessage(),
+                       statusCode);
 
         } catch (Exception e) {
             logger.error("处理请求错误回调时发生异常", e);
+        }
+    }
+
+    /**
+     * 推送流量数据到监控服务
+     *
+     * @param monitorDTO 流量监控 DTO
+     */
+    private void pushTraffic(TrafficMonitorDTO monitorDTO) {
+        try {
+            trafficClient.pushTraffic(monitorDTO);
+            logger.debug("推送流量数据成功：请求 ID[{}]", monitorDTO.getRequestId());
+        } catch (Exception e) {
+            logger.warn("推送流量数据失败：请求 ID[{}], 错误：{}", 
+                       monitorDTO.getRequestId(), e.getMessage());
         }
     }
 

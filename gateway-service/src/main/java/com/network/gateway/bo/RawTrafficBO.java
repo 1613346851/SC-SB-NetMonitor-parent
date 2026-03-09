@@ -114,6 +114,31 @@ public class RawTrafficBO {
     private String errorMessage;
 
     /**
+     * 协议类型
+     */
+    private String protocol;
+
+    /**
+     * 源端口
+     */
+    private Integer sourcePort;
+
+    /**
+     * 目标端口
+     */
+    private Integer targetPort;
+
+    /**
+     * 内容类型
+     */
+    private String contentType;
+
+    /**
+     * 请求时间
+     */
+    private String requestTime;
+
+    /**
      * 构造函数（用于创建新的原始流量记录）
      *
      * @param requestId 请求ID
@@ -129,6 +154,7 @@ public class RawTrafficBO {
         this.method = method;
         this.uri = uri;
         this.requestTimestamp = requestTimestamp;
+        this.requestTime = java.time.LocalDateTime.now().toString(); // 设置默认请求时间
         this.success = true; // 默认成功
         this.abnormalTraffic = false; // 默认不是异常流量
     }

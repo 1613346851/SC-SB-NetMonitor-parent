@@ -105,4 +105,16 @@
             #{item.responseBody}, #{item.responseTime}, #{item.contentType}, #{item.userAgent}, #{item.cookie}, #{item.createTime}, #{item.updateTime})
         </foreach>
     </insert>
+
+    <!-- 按小时统计流量 -->
+    <select id="countHourlyTraffic" resultType="com.network.monitor.mapper.TrafficMonitorMapper$HourlyStat">
+        SELECT 
+            DATE_FORMAT(request_time, '%Y-%m-%d %H:00') as time,
+            COUNT(*) as count
+        FROM sys_traffic_monitor
+        WHERE request_time &gt;= #{startTime}
+        AND request_time &lt;= #{endTime}
+        GROUP BY DATE_FORMAT(request_time, '%Y-%m-%d %H:00')
+        ORDER BY time ASC
+    </select>
 </mapper>
