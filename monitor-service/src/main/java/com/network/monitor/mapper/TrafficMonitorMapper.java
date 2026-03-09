@@ -61,9 +61,29 @@ public interface TrafficMonitorMapper {
     List<HourlyStat> countHourlyTraffic(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
 
     /**
-     * 小时流量统计内部类
+     * 按指定时间间隔统计流量数据
+     */
+    List<TimeStat> countByTimeInterval(@Param("startTime") LocalDateTime startTime, 
+                                        @Param("endTime") LocalDateTime endTime,
+                                        @Param("dateFormat") String dateFormat);
+
+    /**
+     * 时间统计内部类
      */
     class HourlyStat {
+        private LocalDateTime time;
+        private Long count;
+
+        public LocalDateTime getTime() { return time; }
+        public void setTime(LocalDateTime time) { this.time = time; }
+        public Long getCount() { return count; }
+        public void setCount(Long count) { this.count = count; }
+    }
+
+    /**
+     * 时间统计内部类（通用）
+     */
+    class TimeStat {
         private LocalDateTime time;
         private Long count;
 

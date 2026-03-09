@@ -117,4 +117,16 @@
         GROUP BY DATE_FORMAT(request_time, '%Y-%m-%d %H:00')
         ORDER BY time ASC
     </select>
+
+    <!-- 按指定时间间隔统计流量 -->
+    <select id="countByTimeInterval" resultType="com.network.monitor.mapper.TrafficMonitorMapper$TimeStat">
+        SELECT 
+            DATE_FORMAT(request_time, ${dateFormat}) as time,
+            COUNT(*) as count
+        FROM sys_traffic_monitor
+        WHERE request_time &gt;= #{startTime}
+        AND request_time &lt;= #{endTime}
+        GROUP BY DATE_FORMAT(request_time, ${dateFormat})
+        ORDER BY time ASC
+    </select>
 </mapper>

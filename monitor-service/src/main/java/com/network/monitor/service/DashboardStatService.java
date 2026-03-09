@@ -19,6 +19,11 @@ public interface DashboardStatService {
     List<Map<String, Object>> getTrafficTrend(String startTime, String endTime);
 
     /**
+     * 获取流量趋势数据（带时间范围和统计精度）
+     */
+    List<Map<String, Object>> getTrafficTrend(String timeRange, String interval, boolean includeAttacks, boolean includeDefenses);
+
+    /**
      * 获取攻击类型分布数据
      */
     List<Map<String, Object>> getAttackTypeDistribution();

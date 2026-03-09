@@ -17,25 +17,25 @@ async function loadReportData() {
     try {
         const params = { startDate, endDate };
         
-        const summary = await http.get('/report/summary', params);
+        // 并行加载所有数据，提升加载速度
+        const [summary, trafficTrend, attackTrend, attackType, riskLevel, topAttackers] = await Promise.all([
+            http.get('/report/summary', params),
+            http.get('/report/traffic-trend', params),
+            http.get('/report/attack-trend', params),
+            http.get('/report/attack-type', params),
+            http.get('/report/risk-level', params),
+            http.get('/report/top-attackers', params)
+        ]);
+        
         document.getElementById('totalTrafficReport').textContent = summary.totalTraffic || 0;
         document.getElementById('totalAttacksReport').textContent = summary.totalAttacks || 0;
         document.getElementById('totalVulnsReport').textContent = summary.totalVulnerabilities || 0;
         document.getElementById('totalDefensesReport').textContent = summary.totalDefenses || 0;
         
-        const trafficTrend = await http.get('/report/traffic-trend', params);
         renderTrafficTrendChart(trafficTrend);
-        
-        const attackTrend = await http.get('/report/attack-trend', params);
         renderAttackTrendChart(attackTrend);
-        
-        const attackType = await http.get('/report/attack-type', params);
         renderAttackTypeChart(attackType);
-        
-        const riskLevel = await http.get('/report/risk-level', params);
         renderRiskLevelChart(riskLevel);
-        
-        const topAttackers = await http.get('/report/top-attackers', params);
         renderTopAttackers(topAttackers);
     } catch (error) {
         console.error('加载报表数据失败:', error);
@@ -43,19 +43,45 @@ async function loadReportData() {
 }
 
 function renderTrafficTrendChart(data) {
+    const chartDom = document.getElementById('trafficTrendReportChart');
+    const emptyStateDom = document.getElementById('trafficTrendReportEmpty');
+    
+    if (!chartDom) {
+        return;
+    }
+    
+    // 检测数据是否充分
+    const dates = data.dates || [];
+    const values = data.values || [];
+    const hasSufficientData = dates.length >= 2 && values.length >= 2;
+    
+    if (!hasSufficientData) {
+        // 显示空状态，隐藏图表
+        if (emptyStateDom) emptyStateDom.style.display = 'flex';
+        chartDom.style.pointerEvents = 'none';
+        return;
+    }
+    
+    // 隐藏空状态，显示图表
+    if (emptyStateDom) emptyStateDom.style.display = 'none';
+    chartDom.style.pointerEvents = 'auto';
+    
     const chart = chartHelper.init('trafficTrendReportChart');
+    if (!chart) {
+        return;
+    }
     
     const option = chartHelper.getOption({
         xAxis: {
             type: 'category',
-            data: data.dates || [],
+            data: dates,
             boundaryGap: false
         },
         yAxis: {
             type: 'value'
         },
         series: [{
-            data: data.values || [],
+            data: values,
             type: 'line',
             smooth: true,
             areaStyle: {
@@ -71,19 +97,45 @@ function renderTrafficTrendChart(data) {
 }
 
 function renderAttackTrendChart(data) {
+    const chartDom = document.getElementById('attackTrendReportChart');
+    const emptyStateDom = document.getElementById('attackTrendReportEmpty');
+    
+    if (!chartDom) {
+        return;
+    }
+    
+    // 检测数据是否充分
+    const dates = data.dates || [];
+    const values = data.values || [];
+    const hasSufficientData = dates.length >= 2 && values.length >= 2;
+    
+    if (!hasSufficientData) {
+        // 显示空状态，隐藏图表
+        if (emptyStateDom) emptyStateDom.style.display = 'flex';
+        chartDom.style.pointerEvents = 'none';
+        return;
+    }
+    
+    // 隐藏空状态，显示图表
+    if (emptyStateDom) emptyStateDom.style.display = 'none';
+    chartDom.style.pointerEvents = 'auto';
+    
     const chart = chartHelper.init('attackTrendReportChart');
+    if (!chart) {
+        return;
+    }
     
     const option = chartHelper.getOption({
         xAxis: {
             type: 'category',
-            data: data.dates || [],
+            data: dates,
             boundaryGap: false
         },
         yAxis: {
             type: 'value'
         },
         series: [{
-            data: data.values || [],
+            data: values,
             type: 'line',
             smooth: true,
             areaStyle: {
@@ -99,9 +151,23 @@ function renderAttackTrendChart(data) {
 }
 
 function renderAttackTypeChart(data) {
+    const chartDom = document.getElementById('attackTypeReportChart');
+    if (!chartDom) {
+        return;
+    }
+
     const chart = chartHelper.init('attackTypeReportChart');
+    if (!chart) {
+        return;
+    }
     
-    const option = chartHelper.getOption({
+    // 处理无数据情况
+    const seriesData = (data.data && data.data.length > 0) ? data.data : [{
+        name: '无数据',
+        value: 1
+    }];
+    
+    const option = {
         tooltip: {
             trigger: 'item'
         },
@@ -112,7 +178,14 @@ function renderAttackTypeChart(data) {
         series: [{
             type: 'pie',
             radius: '50%',
-            data: data.data || [],
+            data: seriesData,
+            label: {
+                show: true,
+                formatter: data.data && data.data.length > 0 ? '{b}: {c}' : '{b}'
+            },
+            itemStyle: {
+                color: data.data && data.data.length > 0 ? undefined : '#d9d9d9'
+            },
             emphasis: {
                 itemStyle: {
                     shadowBlur: 10,
@@ -121,15 +194,29 @@ function renderAttackTypeChart(data) {
                 }
             }
         }]
-    });
+    };
     
     chart.setOption(option);
 }
 
 function renderRiskLevelChart(data) {
+    const chartDom = document.getElementById('riskLevelReportChart');
+    if (!chartDom) {
+        return;
+    }
+
     const chart = chartHelper.init('riskLevelReportChart');
+    if (!chart) {
+        return;
+    }
     
-    const option = chartHelper.getOption({
+    // 处理无数据情况
+    const seriesData = (data.data && data.data.length > 0) ? data.data : [{
+        name: '无数据',
+        value: 1
+    }];
+    
+    const option = {
         tooltip: {
             trigger: 'item'
         },
@@ -140,7 +227,14 @@ function renderRiskLevelChart(data) {
         series: [{
             type: 'pie',
             radius: '50%',
-            data: data.data || [],
+            data: seriesData,
+            label: {
+                show: true,
+                formatter: data.data && data.data.length > 0 ? '{b}: {c}' : '{b}'
+            },
+            itemStyle: {
+                color: data.data && data.data.length > 0 ? undefined : '#d9d9d9'
+            },
             emphasis: {
                 itemStyle: {
                     shadowBlur: 10,
@@ -149,7 +243,7 @@ function renderRiskLevelChart(data) {
                 }
             }
         }]
-    });
+    };
     
     chart.setOption(option);
 }

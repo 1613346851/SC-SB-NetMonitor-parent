@@ -57,9 +57,19 @@ public class DashboardController {
     @GetMapping("/traffic-trend")
     public ApiResponse<List<Map<String, Object>>> getTrafficTrend(
             @RequestParam(required = false) String startTime,
-            @RequestParam(required = false) String endTime) {
+            @RequestParam(required = false) String endTime,
+            @RequestParam(required = false, defaultValue = "7d") String timeRange,
+            @RequestParam(required = false, defaultValue = "1h") String interval,
+            @RequestParam(required = false, defaultValue = "false") boolean includeAttacks,
+            @RequestParam(required = false, defaultValue = "false") boolean includeDefenses) {
         try {
-            List<Map<String, Object>> data = dashboardStatService.getTrafficTrend(startTime, endTime);
+            // 兼容旧接口：如果传了 startTime/endTime，使用旧方法
+            List<Map<String, Object>> data;
+            if (startTime != null || endTime != null) {
+                data = dashboardStatService.getTrafficTrend(startTime, endTime);
+            } else {
+                data = dashboardStatService.getTrafficTrend(timeRange, interval, includeAttacks, includeDefenses);
+            }
             return ApiResponse.success(data);
         } catch (Exception e) {
             log.error("获取流量趋势失败：", e);

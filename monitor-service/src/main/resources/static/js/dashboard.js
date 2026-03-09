@@ -5,12 +5,16 @@
 
 // 页面初始化
 document.addEventListener('DOMContentLoaded', async function() {
-    await loadDashboardStats();
-    await loadTrafficTrend();
-    await loadAttackTypeDistribution();
-    await loadVulnerabilityLevelDistribution();
-    await loadRecentAttacks();
+    // 并行加载所有数据，提升加载速度
+    await Promise.all([
+        loadDashboardStats(),
+        loadTrafficTrend(),
+        loadAttackTypeDistribution(),
+        loadVulnerabilityLevelDistribution(),
+        loadRecentAttacks()
+    ]);
     
+    // 5 秒后刷新最新告警
     setInterval(loadRecentAttacks, 5000);
 });
 
@@ -40,33 +44,115 @@ async function loadDashboardStats() {
 
 async function loadTrafficTrend() {
     try {
-        const chartData = await http.get('/dashboard/traffic-trend');
+        // 获取用户选择的参数
+        const timeRange = document.getElementById('trafficTimeRange')?.value || '7d';
+        const interval = document.getElementById('trafficInterval')?.value || '1h';
+        const showAttacks = document.getElementById('showAttacks')?.checked || false;
+        const showDefenses = document.getElementById('showDefenses')?.checked || false;
+        
+        const chartDom = document.getElementById('trafficTrendChart');
+        const emptyStateDom = document.getElementById('trafficTrendEmpty');
+        
+        if (!chartDom) {
+            return;
+        }
+        
+        // 调用新接口
+        const chartData = await http.get(`/dashboard/traffic-trend?timeRange=${timeRange}&interval=${interval}&includeAttacks=${showAttacks}&includeDefenses=${showDefenses}`);
+        
+        if (!chartData || chartData.length === 0) {
+            // 显示空状态
+            if (emptyStateDom) emptyStateDom.style.display = 'flex';
+            chartDom.style.pointerEvents = 'none';
+            return;
+        }
+        
+        // 隐藏空状态，显示图表
+        if (emptyStateDom) emptyStateDom.style.display = 'none';
+        chartDom.style.pointerEvents = 'auto';
+        
         const chart = chartHelper.init('trafficTrendChart');
+        if (!chart) {
+            return;
+        }
         
-        // 将后端返回的数据格式转换为前端需要的格式
-        const dates = (chartData || []).map(item => item.time);
-        const values = (chartData || []).map(item => item.count);
+        // 准备数据
+        const dates = chartData.map(item => item.time);
+        const trafficValues = chartData.map(item => item.traffic);
         
-        const option = chartHelper.getOption({
-            xAxis: {
-                type: 'category',
-                data: dates,
-                boundaryGap: false
-            },
-            yAxis: {
-                type: 'value'
-            },
-            series: [{
-                data: values,
+        // 构建系列
+        const series = [
+            {
+                name: '流量',
                 type: 'line',
                 smooth: true,
+                data: trafficValues,
                 areaStyle: {
                     color: 'rgba(24, 144, 255, 0.1)'
                 },
                 itemStyle: {
                     color: '#1890ff'
                 }
-            }]
+            }
+        ];
+        
+        // 添加攻击趋势
+        if (showAttacks && chartData[0]?.attacks !== undefined) {
+            const attackValues = chartData.map(item => item.attacks || 0);
+            series.push({
+                name: '攻击次数',
+                type: 'line',
+                smooth: true,
+                data: attackValues,
+                areaStyle: {
+                    color: 'rgba(245, 34, 45, 0.1)'
+                },
+                itemStyle: {
+                    color: '#f5222d'
+                }
+            });
+        }
+        
+        // 添加防御趋势
+        if (showDefenses && chartData[0]?.defenses !== undefined) {
+            const defenseValues = chartData.map(item => item.defenses || 0);
+            series.push({
+                name: '防御次数',
+                type: 'line',
+                smooth: true,
+                data: defenseValues,
+                areaStyle: {
+                    color: 'rgba(82, 196, 26, 0.1)'
+                },
+                itemStyle: {
+                    color: '#52c41a'
+                }
+            });
+        }
+        
+        const option = chartHelper.getOption({
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross'
+                }
+            },
+            legend: {
+                data: series.map(s => s.name),
+                top: 0
+            },
+            xAxis: {
+                type: 'category',
+                data: dates,
+                boundaryGap: false,
+                axisLabel: {
+                    rotate: dates.length > 24 ? 45 : 0
+                }
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: series
         });
         
         chart.setOption(option);
@@ -76,15 +162,33 @@ async function loadTrafficTrend() {
         });
     } catch (error) {
         console.error('加载流量趋势失败:', error);
+        // 发生错误时显示空状态
+        const emptyStateDom = document.getElementById('trafficTrendEmpty');
+        if (emptyStateDom) emptyStateDom.style.display = 'flex';
     }
 }
 
 async function loadAttackTypeDistribution() {
     try {
         const chartData = await http.get('/dashboard/attack-type');
-        const chart = chartHelper.init('attackTypeChart');
+        const chartDom = document.getElementById('attackTypeChart');
         
-        const option = chartHelper.getOption({
+        if (!chartDom) {
+            return;
+        }
+
+        const chart = chartHelper.init('attackTypeChart');
+        if (!chart) {
+            return;
+        }
+        
+        // 处理无数据情况
+        const seriesData = (chartData && chartData.length > 0) ? chartData : [{
+            name: '无数据',
+            value: 1
+        }];
+        
+        const option = {
             tooltip: {
                 trigger: 'item'
             },
@@ -95,7 +199,14 @@ async function loadAttackTypeDistribution() {
             series: [{
                 type: 'pie',
                 radius: '50%',
-                data: chartData || [],
+                data: seriesData,
+                label: {
+                    show: true,
+                    formatter: chartData && chartData.length > 0 ? '{b}: {c}' : '{b}'
+                },
+                itemStyle: {
+                    color: chartData && chartData.length > 0 ? undefined : '#d9d9d9'
+                },
                 emphasis: {
                     itemStyle: {
                         shadowBlur: 10,
@@ -104,7 +215,7 @@ async function loadAttackTypeDistribution() {
                     }
                 }
             }]
-        });
+        };
         
         chart.setOption(option);
         
@@ -119,9 +230,24 @@ async function loadAttackTypeDistribution() {
 async function loadVulnerabilityLevelDistribution() {
     try {
         const chartData = await http.get('/dashboard/vulnerability-level');
-        const chart = chartHelper.init('vulnerabilityLevelChart');
+        const chartDom = document.getElementById('vulnerabilityLevelChart');
         
-        const option = chartHelper.getOption({
+        if (!chartDom) {
+            return;
+        }
+
+        const chart = chartHelper.init('vulnerabilityLevelChart');
+        if (!chart) {
+            return;
+        }
+        
+        // 处理无数据情况
+        const seriesData = (chartData && chartData.length > 0) ? chartData : [{
+            name: '无数据',
+            value: 1
+        }];
+        
+        const option = {
             tooltip: {
                 trigger: 'item'
             },
@@ -132,7 +258,14 @@ async function loadVulnerabilityLevelDistribution() {
             series: [{
                 type: 'pie',
                 radius: '50%',
-                data: chartData || [],
+                data: seriesData,
+                label: {
+                    show: true,
+                    formatter: chartData && chartData.length > 0 ? '{b}: {c}' : '{b}'
+                },
+                itemStyle: {
+                    color: chartData && chartData.length > 0 ? undefined : '#d9d9d9'
+                },
                 emphasis: {
                     itemStyle: {
                         shadowBlur: 10,
@@ -141,7 +274,7 @@ async function loadVulnerabilityLevelDistribution() {
                     }
                 }
             }]
-        });
+        };
         
         chart.setOption(option);
         
