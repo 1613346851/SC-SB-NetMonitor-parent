@@ -76,3 +76,6 @@ logs/gateway-service.log.2026-03-08.0.gz
 /.idea/dataSources/9af1906e-7250-41f7-8dde-d1412c9e5604.xml
 /.idea/dataSources/196a59fd-4049-4af9-821e-ef1cdbad2914.xml
 /.idea/dataSources.local.xml
+/gateway-service/logs/gateway-service.log.2026-03-02.0.gz
+/logs/gateway-service.log.2026-03-06.0.gz
+/logs/gateway-service.log.2026-03-09.0.gz

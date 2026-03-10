@@ -89,4 +89,16 @@
             #{item.expireTime}, #{item.executeStatus}, #{item.executeResult}, #{item.operator}, #{item.createTime}, #{item.updateTime})
         </foreach>
     </insert>
+
+    <!-- 按小时统计防御趋势 -->
+    <select id="countDefenseTrend" resultType="com.network.monitor.mapper.DefenseMonitorMapper$TrendStat">
+        SELECT 
+            DATE_FORMAT(create_time, '%Y-%m-%d %H:00') as time,
+            COUNT(*) as count
+        FROM sys_defense_monitor
+        WHERE create_time &gt;= #{startTime}
+        AND create_time &lt;= #{endTime}
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d %H:00')
+        ORDER BY time ASC
+    </select>
 </mapper>

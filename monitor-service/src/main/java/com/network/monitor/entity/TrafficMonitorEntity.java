@@ -17,6 +17,11 @@ public class TrafficMonitorEntity {
     private Long id;
 
     /**
+     * 原始流量 ID（网关生成）
+     */
+    private String trafficId;
+
+    /**
      * 请求时间
      */
     private LocalDateTime requestTime;

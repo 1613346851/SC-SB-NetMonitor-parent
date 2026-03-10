@@ -1,6 +1,7 @@
 package com.network.monitor.service.impl;
 
 import com.network.monitor.mapper.AttackMonitorMapper;
+import com.network.monitor.mapper.DefenseMonitorMapper;
 import com.network.monitor.mapper.TrafficMonitorMapper;
 import com.network.monitor.mapper.VulnerabilityMonitorMapper;
 import com.network.monitor.service.DashboardStatService;
@@ -27,6 +28,9 @@ public class DashboardStatServiceImpl implements DashboardStatService {
 
     @Autowired
     private VulnerabilityMonitorMapper vulnerabilityMonitorMapper;
+
+    @Autowired
+    private DefenseMonitorMapper defenseMonitorMapper;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -95,35 +99,32 @@ public class DashboardStatServiceImpl implements DashboardStatService {
 
     public List<Map<String, Object>> getTrafficTrend(String timeRange, String interval, boolean includeAttacks, boolean includeDefenses) {
         try {
-            // 解析时间范围和统计精度
             LocalDateTime endDateTime = LocalDateTime.now();
             LocalDateTime startDateTime = parseTimeRange(timeRange);
-            String dateFormat = parseInterval(interval);
+            int intervalMinutes = parseIntervalMinutes(interval);
             
-            log.info("流量趋势查询：时间范围={}, 统计精度={}, 包含攻击={}, 包含防御={}", 
-                timeRange, interval, includeAttacks, includeDefenses);
+            log.info("流量趋势查询：时间范围={}, 统计精度={}分钟, 开始时间={}, 结束时间={}", 
+                timeRange, intervalMinutes, startDateTime, endDateTime);
             
-            // 查询流量数据
             List<TrafficMonitorMapper.TimeStat> trafficStats = 
-                trafficMonitorMapper.countByTimeInterval(startDateTime, endDateTime, dateFormat);
+                trafficMonitorMapper.countByTimeInterval(startDateTime, endDateTime, intervalMinutes);
             
-            // 生成完整时间序列（无数据补 0）
             List<Map<String, Object>> result = generateCompleteTimeSeries(
-                trafficStats, startDateTime, endDateTime, dateFormat, "traffic");
+                trafficStats, startDateTime, endDateTime, intervalMinutes, "traffic");
             
-            // 如果需要包含攻击趋势
             if (includeAttacks) {
                 List<AttackMonitorMapper.TrendStat> attackStats = 
                     attackMonitorMapper.countAttackTrend(startDateTime, endDateTime);
-                mergeAttackData(result, attackStats, dateFormat);
+                mergeAttackData(result, attackStats, intervalMinutes);
             }
             
-            // 如果需要包含防御趋势
             if (includeDefenses) {
-                // TODO: 防御数据查询待实现
-                log.warn("防御趋势数据查询尚未实现");
+                List<DefenseMonitorMapper.TrendStat> defenseStats = 
+                    defenseMonitorMapper.countDefenseTrend(startDateTime, endDateTime);
+                mergeDefenseData(result, defenseStats, intervalMinutes);
             }
             
+            log.info("流量趋势查询结果：共{}个数据点", result.size());
             return result;
         } catch (Exception e) {
             log.error("获取流量趋势失败：", e);
@@ -154,29 +155,28 @@ public class DashboardStatServiceImpl implements DashboardStatService {
     }
 
     /**
-     * 解析统计精度为日期格式
+     * 解析统计精度为分钟数
+     * @param interval 间隔字符串，如 "5m", "30m", "1h", "1d"
+     * @return 分钟数
      */
-    private String parseInterval(String interval) {
+    private int parseIntervalMinutes(String interval) {
         if (interval == null || interval.isEmpty()) {
-            return "%Y-%m-%d %H:00"; // 默认按小时
+            return 60;
         }
         
         try {
-            int minutes = Integer.parseInt(interval.replaceAll("[a-zA-Z]", ""));
+            int amount = Integer.parseInt(interval.replaceAll("[a-zA-Z]", ""));
             String unit = interval.replaceAll("[0-9]", "");
             
-            if ("d".equals(unit)) {
-                return "%Y-%m-%d"; // 按天
-            } else if ("m".equals(unit)) {
-                if (minutes >= 60) {
-                    return "%Y-%m-%d %H:00"; // 按小时
-                } else {
-                    return "%Y-%m-%d %H:%i"; // 按分钟
-                }
+            switch (unit) {
+                case "m": return amount;
+                case "h": return amount * 60;
+                case "d": return amount * 24 * 60;
+                default: return 60;
             }
-            return "%Y-%m-%d %H:00";
         } catch (Exception e) {
-            return "%Y-%m-%d %H:00";
+            log.warn("解析统计精度失败：{}，使用默认值60分钟", interval);
+            return 60;
         }
     }
 
@@ -187,35 +187,35 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             List<TrafficMonitorMapper.TimeStat> originalStats,
             LocalDateTime startTime,
             LocalDateTime endTime,
-            String dateFormat,
+            int intervalMinutes,
             String dataType) {
         
         List<Map<String, Object>> result = new ArrayList<>();
         
+        List<LocalDateTime> timePoints = generateTimePoints(startTime, endTime, intervalMinutes);
+        
         if (originalStats == null || originalStats.isEmpty()) {
-            // 完全没有数据，生成完整时间序列，值都为 0
-            List<LocalDateTime> timePoints = generateTimePoints(startTime, endTime, dateFormat);
             for (LocalDateTime time : timePoints) {
                 Map<String, Object> dataPoint = new HashMap<>();
-                dataPoint.put("time", time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+                dataPoint.put("time", formatTimeForDisplay(time, intervalMinutes));
                 dataPoint.put("traffic", 0L);
                 result.add(dataPoint);
             }
             return result;
         }
         
-        // 创建时间点到数据的映射
-        Map<LocalDateTime, Long> dataMap = new HashMap<>();
+        Map<String, Long> dataMap = new HashMap<>();
         for (TrafficMonitorMapper.TimeStat stat : originalStats) {
-            dataMap.put(stat.getTime(), stat.getCount());
+            if (stat.getTime() != null && stat.getCount() != null) {
+                dataMap.put(stat.getTime(), stat.getCount());
+            }
         }
         
-        // 生成完整时间序列
-        List<LocalDateTime> timePoints = generateTimePoints(startTime, endTime, dateFormat);
         for (LocalDateTime time : timePoints) {
             Map<String, Object> dataPoint = new HashMap<>();
-            dataPoint.put("time", time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-            dataPoint.put("traffic", dataMap.getOrDefault(time, 0L));
+            String timeKey = formatTimeForQuery(time, intervalMinutes);
+            dataPoint.put("time", formatTimeForDisplay(time, intervalMinutes));
+            dataPoint.put("traffic", dataMap.getOrDefault(timeKey, 0L));
             result.add(dataPoint);
         }
         
@@ -225,32 +225,56 @@ public class DashboardStatServiceImpl implements DashboardStatService {
     /**
      * 生成时间序列点
      */
-    private List<LocalDateTime> generateTimePoints(LocalDateTime startTime, LocalDateTime endTime, String dateFormat) {
+    private List<LocalDateTime> generateTimePoints(LocalDateTime startTime, LocalDateTime endTime, int intervalMinutes) {
         List<LocalDateTime> timePoints = new ArrayList<>();
-        LocalDateTime current = startTime;
         
-        // 根据日期格式确定时间间隔
-        if (dateFormat.contains("%H:%i")) {
-            // 按分钟统计
-            while (!current.isAfter(endTime)) {
-                timePoints.add(current);
-                current = current.plusMinutes(1);
-            }
-        } else if (dateFormat.contains("%H:00")) {
-            // 按小时统计
-            while (!current.isAfter(endTime)) {
-                timePoints.add(current.withMinute(0).withSecond(0).withNano(0));
-                current = current.plusHours(1);
-            }
-        } else {
-            // 按天统计
-            while (!current.isAfter(endTime)) {
-                timePoints.add(current.withHour(0).withMinute(0).withSecond(0).withNano(0));
-                current = current.plusDays(1);
-            }
+        LocalDateTime alignedStart = alignToInterval(startTime, intervalMinutes);
+        
+        LocalDateTime current = alignedStart;
+        while (!current.isAfter(endTime)) {
+            timePoints.add(current);
+            current = current.plusMinutes(intervalMinutes);
         }
         
         return timePoints;
+    }
+
+    /**
+     * 将时间对齐到指定的间隔边界
+     */
+    private LocalDateTime alignToInterval(LocalDateTime time, int intervalMinutes) {
+        if (intervalMinutes >= 1440) {
+            return time.withHour(0).withMinute(0).withSecond(0).withNano(0);
+        } else if (intervalMinutes >= 60) {
+            int hours = intervalMinutes / 60;
+            int alignedHour = (time.getHour() / hours) * hours;
+            return time.withHour(alignedHour).withMinute(0).withSecond(0).withNano(0);
+        } else {
+            int alignedMinute = (time.getMinute() / intervalMinutes) * intervalMinutes;
+            return time.withMinute(alignedMinute).withSecond(0).withNano(0);
+        }
+    }
+
+    /**
+     * 格式化时间用于显示
+     */
+    private String formatTimeForDisplay(LocalDateTime time, int intervalMinutes) {
+        if (intervalMinutes >= 1440) {
+            return time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        } else {
+            return time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        }
+    }
+
+    /**
+     * 格式化时间用于查询匹配
+     */
+    private String formatTimeForQuery(LocalDateTime time, int intervalMinutes) {
+        if (intervalMinutes >= 1440) {
+            return time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        } else {
+            return time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        }
     }
 
     /**
@@ -258,46 +282,38 @@ public class DashboardStatServiceImpl implements DashboardStatService {
      */
     private void mergeAttackData(List<Map<String, Object>> result, 
                                   List<AttackMonitorMapper.TrendStat> attackStats,
-                                  String dateFormat) {
-        // 创建攻击数据映射
-        Map<LocalDateTime, Long> attackMap = new HashMap<>();
+                                  int intervalMinutes) {
+        Map<String, Long> attackMap = new HashMap<>();
         for (AttackMonitorMapper.TrendStat stat : attackStats) {
-            attackMap.put(stat.getTime(), stat.getCount());
+            if (stat.getTime() != null && stat.getCount() != null) {
+                String timeKey = formatTimeForQuery(stat.getTime(), intervalMinutes);
+                attackMap.merge(timeKey, stat.getCount(), Long::sum);
+            }
         }
         
-        // 合并到结果中
         for (Map<String, Object> dataPoint : result) {
             String timeStr = (String) dataPoint.get("time");
-            LocalDateTime time = LocalDateTime.parse(timeStr.replace(" ", "T"));
-            
-            // 根据时间精度匹配
-            LocalDateTime attackTime = attackMap.keySet().stream()
-                .filter(t -> isSameTimePeriod(t, time, dateFormat))
-                .findFirst()
-                .orElse(null);
-            
-            if (attackTime != null) {
-                dataPoint.put("attacks", attackMap.get(attackTime));
-            } else {
-                dataPoint.put("attacks", 0L);
-            }
+            dataPoint.put("attacks", attackMap.getOrDefault(timeStr, 0L));
         }
     }
 
     /**
-     * 判断两个时间是否在同一统计周期内
+     * 合并防御数据到结果中
      */
-    private boolean isSameTimePeriod(LocalDateTime t1, LocalDateTime t2, String dateFormat) {
-        if (dateFormat.contains("%Y-%m-%d")) {
-            // 按天统计
-            return t1.toLocalDate().equals(t2.toLocalDate());
-        } else if (dateFormat.contains("%H")) {
-            // 按小时统计
-            return t1.toLocalDate().equals(t2.toLocalDate()) && t1.getHour() == t2.getHour();
-        } else {
-            // 按分钟统计
-            return t1.toLocalDate().equals(t2.toLocalDate()) && 
-                   t1.getHour() == t2.getHour() && t1.getMinute() == t2.getMinute();
+    private void mergeDefenseData(List<Map<String, Object>> result, 
+                                   List<DefenseMonitorMapper.TrendStat> defenseStats,
+                                   int intervalMinutes) {
+        Map<String, Long> defenseMap = new HashMap<>();
+        for (DefenseMonitorMapper.TrendStat stat : defenseStats) {
+            if (stat.getTime() != null && stat.getCount() != null) {
+                String timeKey = formatTimeForQuery(stat.getTime(), intervalMinutes);
+                defenseMap.merge(timeKey, stat.getCount(), Long::sum);
+            }
+        }
+        
+        for (Map<String, Object> dataPoint : result) {
+            String timeStr = (String) dataPoint.get("time");
+            dataPoint.put("defenses", defenseMap.getOrDefault(timeStr, 0L));
         }
     }
 

@@ -35,13 +35,14 @@ function renderTrafficTable(data) {
     const tbody = document.getElementById('trafficTableBody');
     
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center">暂无数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center">暂无数据</td></tr>';
         return;
     }
     
     tbody.innerHTML = data.map(item => `
         <tr>
             <td>${item.id || '-'}</td>
+            <td>${item.trafficId || '-'}</td>
             <td>${dateFormat.format(item.requestTime)}</td>
             <td>${item.sourceIp || '-'}</td>
             <td>${item.targetIp || '-'}</td>
@@ -146,6 +147,8 @@ async function viewTrafficDetail(id) {
         content.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div>
+                    <p><strong>ID:</strong> ${detail.id}</p>
+                    <p><strong>流量 ID:</strong> ${detail.trafficId || '-'}</p>
                     <p><strong>请求时间:</strong> ${dateFormat.format(detail.requestTime)}</p>
                     <p><strong>源 IP:</strong> ${detail.sourceIp}</p>
                     <p><strong>源端口:</strong> ${detail.sourcePort}</p>

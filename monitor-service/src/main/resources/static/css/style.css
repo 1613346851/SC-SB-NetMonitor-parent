@@ -709,7 +709,8 @@ body {
 }
 
 .time-range-select,
-.interval-select {
+.interval-select,
+.interval-display {
     padding: 6px 12px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -717,6 +718,14 @@ body {
     background: var(--bg-white);
     cursor: pointer;
     transition: all 0.3s;
+}
+
+.interval-display {
+    color: var(--text-secondary);
+    font-size: 13px;
+    padding: 6px 12px;
+    background: var(--bg-light);
+    border-radius: 4px;
 }
 
 .time-range-select:hover,

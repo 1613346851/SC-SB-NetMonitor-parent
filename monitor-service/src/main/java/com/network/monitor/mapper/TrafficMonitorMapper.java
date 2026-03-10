@@ -62,10 +62,11 @@ public interface TrafficMonitorMapper {
 
     /**
      * 按指定时间间隔统计流量数据
+     * @param intervalMinutes 时间间隔（分钟），如5、10、30、60、1440等
      */
     List<TimeStat> countByTimeInterval(@Param("startTime") LocalDateTime startTime, 
                                         @Param("endTime") LocalDateTime endTime,
-                                        @Param("dateFormat") String dateFormat);
+                                        @Param("intervalMinutes") int intervalMinutes);
 
     /**
      * 时间统计内部类
@@ -84,11 +85,11 @@ public interface TrafficMonitorMapper {
      * 时间统计内部类（通用）
      */
     class TimeStat {
-        private LocalDateTime time;
+        private String time;
         private Long count;
 
-        public LocalDateTime getTime() { return time; }
-        public void setTime(LocalDateTime time) { this.time = time; }
+        public String getTime() { return time; }
+        public void setTime(String time) { this.time = time; }
         public Long getCount() { return count; }
         public void setCount(Long count) { this.count = count; }
     }

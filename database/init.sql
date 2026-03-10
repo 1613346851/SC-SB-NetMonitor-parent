@@ -32,6 +32,7 @@ USE `network_monitor`;
 DROP TABLE IF EXISTS `sys_traffic_monitor`;
 CREATE TABLE `sys_traffic_monitor` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
+  `traffic_id` VARCHAR(64) DEFAULT NULL COMMENT '原始流量 ID（网关生成）',
   `request_time` DATETIME NOT NULL COMMENT '请求时间',
   `source_ip` VARCHAR(50) NOT NULL COMMENT '源 IP 地址',
   `target_ip` VARCHAR(50) NOT NULL COMMENT '目标 IP 地址',
@@ -52,6 +53,7 @@ CREATE TABLE `sys_traffic_monitor` (
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_traffic_id` (`traffic_id`),
   KEY `idx_source_ip` (`source_ip`),
   KEY `idx_target_ip` (`target_ip`),
   KEY `idx_request_time` (`request_time`),

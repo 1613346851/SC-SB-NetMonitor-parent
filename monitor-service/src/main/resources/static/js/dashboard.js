@@ -18,6 +18,51 @@ document.addEventListener('DOMContentLoaded', async function() {
     setInterval(loadRecentAttacks, 5000);
 });
 
+/**
+ * 时间范围变化时自动调整统计精度
+ */
+function onTimeRangeChange() {
+    const timeRange = document.getElementById('trafficTimeRange').value;
+    
+    const recommendations = {
+        '1h': { interval: '5m', display: '5 分钟' },
+        '6h': { interval: '10m', display: '10 分钟' },
+        '12h': { interval: '30m', display: '30 分钟' },
+        '24h': { interval: '30m', display: '30 分钟' },
+        '3d': { interval: '1h', display: '1 小时' },
+        '7d': { interval: '1h', display: '1 小时' },
+        '14d': { interval: '1d', display: '1 天' },
+        '30d': { interval: '1d', display: '1 天' }
+    };
+    
+    const recommended = recommendations[timeRange] || { interval: '30m', display: '30 分钟' };
+    
+    const intervalDisplay = document.getElementById('trafficIntervalDisplay');
+    if (intervalDisplay) {
+        intervalDisplay.textContent = `统计精度：${recommended.display}`;
+    }
+    
+    loadTrafficTrend();
+}
+
+/**
+ * 获取自动推荐的统计精度
+ */
+function getAutoInterval(timeRange) {
+    const recommendations = {
+        '1h': '5m',
+        '6h': '10m',
+        '12h': '30m',
+        '24h': '30m',
+        '3d': '1h',
+        '7d': '1h',
+        '14d': '1d',
+        '30d': '1d'
+    };
+    
+    return recommendations[timeRange] || '30m';
+}
+
 async function loadDashboardStats() {
     try {
         const stats = await http.get('/dashboard/stats');
@@ -44,11 +89,10 @@ async function loadDashboardStats() {
 
 async function loadTrafficTrend() {
     try {
-        // 获取用户选择的参数
-        const timeRange = document.getElementById('trafficTimeRange')?.value || '7d';
-        const interval = document.getElementById('trafficInterval')?.value || '1h';
-        const showAttacks = document.getElementById('showAttacks')?.checked || false;
-        const showDefenses = document.getElementById('showDefenses')?.checked || false;
+        const timeRangeSelect = document.getElementById('trafficTimeRange');
+        
+        const timeRange = timeRangeSelect?.value || '24h';
+        const interval = getAutoInterval(timeRange);
         
         const chartDom = document.getElementById('trafficTrendChart');
         const emptyStateDom = document.getElementById('trafficTrendEmpty');
@@ -57,17 +101,14 @@ async function loadTrafficTrend() {
             return;
         }
         
-        // 调用新接口
-        const chartData = await http.get(`/dashboard/traffic-trend?timeRange=${timeRange}&interval=${interval}&includeAttacks=${showAttacks}&includeDefenses=${showDefenses}`);
+        const chartData = await http.get(`/dashboard/traffic-trend?timeRange=${timeRange}&interval=${interval}&includeAttacks=true&includeDefenses=true`);
         
         if (!chartData || chartData.length === 0) {
-            // 显示空状态
             if (emptyStateDom) emptyStateDom.style.display = 'flex';
             chartDom.style.pointerEvents = 'none';
             return;
         }
         
-        // 隐藏空状态，显示图表
         if (emptyStateDom) emptyStateDom.style.display = 'none';
         chartDom.style.pointerEvents = 'auto';
         
@@ -76,28 +117,25 @@ async function loadTrafficTrend() {
             return;
         }
         
-        // 准备数据
         const dates = chartData.map(item => item.time);
+        
+        const series = [];
+        
         const trafficValues = chartData.map(item => item.traffic);
-        
-        // 构建系列
-        const series = [
-            {
-                name: '流量',
-                type: 'line',
-                smooth: true,
-                data: trafficValues,
-                areaStyle: {
-                    color: 'rgba(24, 144, 255, 0.1)'
-                },
-                itemStyle: {
-                    color: '#1890ff'
-                }
+        series.push({
+            name: '流量',
+            type: 'line',
+            smooth: true,
+            data: trafficValues,
+            areaStyle: {
+                color: 'rgba(24, 144, 255, 0.1)'
+            },
+            itemStyle: {
+                color: '#1890ff'
             }
-        ];
+        });
         
-        // 添加攻击趋势
-        if (showAttacks && chartData[0]?.attacks !== undefined) {
+        if (chartData[0]?.attacks !== undefined) {
             const attackValues = chartData.map(item => item.attacks || 0);
             series.push({
                 name: '攻击次数',
@@ -113,8 +151,7 @@ async function loadTrafficTrend() {
             });
         }
         
-        // 添加防御趋势
-        if (showDefenses && chartData[0]?.defenses !== undefined) {
+        if (chartData[0]?.defenses !== undefined) {
             const defenseValues = chartData.map(item => item.defenses || 0);
             series.push({
                 name: '防御次数',
@@ -130,6 +167,8 @@ async function loadTrafficTrend() {
             });
         }
         
+        const xAxisInterval = calculateXAxisInterval(dates.length);
+        
         const option = chartHelper.getOption({
             tooltip: {
                 trigger: 'axis',
@@ -139,32 +178,57 @@ async function loadTrafficTrend() {
             },
             legend: {
                 data: series.map(s => s.name),
-                top: 0
+                top: 0,
+                selected: {
+                    '流量': true,
+                    '攻击次数': true,
+                    '防御次数': true
+                }
             },
             xAxis: {
                 type: 'category',
                 data: dates,
                 boundaryGap: false,
                 axisLabel: {
-                    rotate: dates.length > 24 ? 45 : 0
+                    rotate: dates.length > 10 ? 45 : 0,
+                    interval: xAxisInterval
                 }
             },
             yAxis: {
                 type: 'value'
             },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: dates.length > 10 ? '15%' : '10%',
+                containLabel: true
+            },
             series: series
         });
         
-        chart.setOption(option);
+        chart.setOption(option, { notMerge: true });
         
         window.addEventListener('resize', () => {
             chart.resize();
         });
     } catch (error) {
         console.error('加载流量趋势失败:', error);
-        // 发生错误时显示空状态
         const emptyStateDom = document.getElementById('trafficTrendEmpty');
         if (emptyStateDom) emptyStateDom.style.display = 'flex';
+    }
+}
+
+function calculateXAxisInterval(dataLength) {
+    if (dataLength <= 7) {
+        return 0;
+    } else if (dataLength <= 14) {
+        return 1;
+    } else if (dataLength <= 30) {
+        return Math.floor(dataLength / 10);
+    } else if (dataLength <= 100) {
+        return Math.floor(dataLength / 15);
+    } else {
+        return Math.floor(dataLength / 20);
     }
 }
 

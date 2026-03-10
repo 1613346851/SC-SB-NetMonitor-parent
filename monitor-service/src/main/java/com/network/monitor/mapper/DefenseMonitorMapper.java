@@ -49,4 +49,22 @@ public interface DefenseMonitorMapper {
      * 批量插入防御日志
      */
     int batchInsert(@Param("list") List<DefenseMonitorEntity> list);
+
+    /**
+     * 按时间统计防御趋势
+     */
+    List<TrendStat> countDefenseTrend(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * 防御趋势统计内部类
+     */
+    class TrendStat {
+        private LocalDateTime time;
+        private Long count;
+
+        public LocalDateTime getTime() { return time; }
+        public void setTime(LocalDateTime time) { this.time = time; }
+        public Long getCount() { return count; }
+        public void setCount(Long count) { this.count = count; }
+    }
 }

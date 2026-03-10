@@ -66,6 +66,11 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
         TrafficMonitorEntity entity = new TrafficMonitorEntity();
         BeanUtils.copyProperties(dto, entity);
         
+        // 设置原始流量 ID
+        if (dto.getRequestId() != null) {
+            entity.setTrafficId(dto.getRequestId());
+        }
+        
         // 转换时间字段
         if (dto.getRequestTime() != null && !dto.getRequestTime().isEmpty()) {
             try {

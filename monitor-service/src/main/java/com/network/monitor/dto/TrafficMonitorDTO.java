@@ -10,6 +10,11 @@ import java.util.Map;
 public class TrafficMonitorDTO {
 
     /**
+     * 请求唯一标识（网关生成）
+     */
+    private String requestId;
+
+    /**
      * 请求时间
      */
     private String requestTime;
