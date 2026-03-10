@@ -1,12 +1,13 @@
 package com.network.monitor.service.impl;
 
+import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.common.constant.AttackTypeConstant;
 import com.network.monitor.common.constant.RiskLevelConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;
 import com.network.monitor.service.DDoSDetectService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -23,11 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class DDoSDetectServiceImpl implements DDoSDetectService {
 
-    /**
-     * DDoS 检测阈值：每分钟请求数
-     */
-    @Value("${ddos.threshold:100}")
-    private int ddosThreshold;
+    @Autowired
+    private SysConfigCache sysConfigCache;
 
     /**
      * 源 IP 请求计数器
@@ -55,12 +53,15 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
         AtomicInteger count = requestCounter.computeIfAbsent(counterKey, k -> new AtomicInteger(0));
         int currentCount = count.incrementAndGet();
 
+        // 从配置缓存获取阈值
+        int ddosThreshold = sysConfigCache.getIntValue("ddos.threshold", 100);
+
         // 检查是否超过阈值
         if (currentCount > ddosThreshold) {
             log.warn("检测到 DDoS 攻击！sourceIp={}, 当前窗口请求数={}, 阈值={}", 
-                sourceIp, currentCount, ddosThreshold);
+                    sourceIp, currentCount, ddosThreshold);
             
-            return buildDDoSAttackDTO(trafficDTO, currentCount);
+            return buildDDoSAttackDTO(trafficDTO, currentCount, ddosThreshold);
         }
 
         return null;
@@ -83,14 +84,14 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
     /**
      * 构建 DDoS 攻击记录
      */
-    private AttackMonitorDTO buildDDoSAttackDTO(TrafficMonitorDTO trafficDTO, int requestCount) {
+    private AttackMonitorDTO buildDDoSAttackDTO(TrafficMonitorDTO trafficDTO, int requestCount, int ddosThreshold) {
         AttackMonitorDTO dto = new AttackMonitorDTO();
         
-        dto.setTrafficId(null); // 后续由 Controller 填充
+        dto.setTrafficId(null);
         dto.setAttackType(AttackTypeConstant.DDOS);
         dto.setRiskLevel(RiskLevelConstant.HIGH);
-        dto.setConfidence(Math.min(90 + (requestCount - ddosThreshold) / 10, 100)); // 超过越多置信度越高
-        dto.setRuleId(null); // DDoS 是频率检测，不依赖规则
+        dto.setConfidence(Math.min(90 + (requestCount - ddosThreshold) / 10, 100));
+        dto.setRuleId(null);
         dto.setRuleContent("1 分钟内请求次数超过 " + ddosThreshold + " 次");
         dto.setSourceIp(trafficDTO.getSourceIp());
         dto.setTargetUri(trafficDTO.getRequestUri());
@@ -106,7 +107,6 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
         String currentWindow = getCurrentMinuteWindow();
         
         requestCounter.keySet().removeIf(key -> {
-            // 如果不是当前分钟的计数器，则删除
             return !key.endsWith("_" + currentWindow);
         });
         

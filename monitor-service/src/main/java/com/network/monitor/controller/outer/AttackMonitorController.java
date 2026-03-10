@@ -1,6 +1,7 @@
 package com.network.monitor.controller.outer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.mapper.AttackMonitorMapper;
@@ -26,6 +27,9 @@ public class AttackMonitorController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private SysConfigCache sysConfigCache;
 
     /**
      * 分页查询攻击记录
@@ -103,6 +107,19 @@ public class AttackMonitorController {
             HttpServletResponse response) {
         
         try {
+            // 检查告警是否启用
+            boolean alertEnabled = sysConfigCache.getBooleanValue("alert.enabled", true);
+            if (!alertEnabled) {
+                response.getWriter().write("data: []\n\n");
+                response.getWriter().write(": alert disabled\n\n");
+                response.getWriter().flush();
+                return;
+            }
+
+            // 从配置缓存获取告警推送间隔
+            long pushInterval = sysConfigCache.getLongValue("alert.push.interval", 5000);
+            long heartbeatInterval = sysConfigCache.getLongValue("alert.heartbeat.interval", 10000);
+
             // 设置 SSE 响应头
             response.setContentType("text/event-stream");
             response.setCharacterEncoding("UTF-8");
@@ -119,13 +136,13 @@ public class AttackMonitorController {
                     response.getWriter().write("data: " + toJson(alerts) + "\n\n");
                     response.getWriter().flush();
                     
-                    // 发送后休眠 5 秒，避免频繁推送
-                    Thread.sleep(5000);
+                    // 发送后休眠，避免频繁推送
+                    Thread.sleep(pushInterval);
                 } else {
-                    // 每 10 秒发送一次心跳
+                    // 发送心跳
                     response.getWriter().write(": heartbeat\n\n");
                     response.getWriter().flush();
-                    Thread.sleep(10000);
+                    Thread.sleep(heartbeatInterval);
                 }
                 
                 // 检查客户端是否已断开连接

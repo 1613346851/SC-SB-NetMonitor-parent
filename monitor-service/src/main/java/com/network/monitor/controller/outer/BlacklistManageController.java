@@ -1,6 +1,8 @@
 package com.network.monitor.controller.outer;
 
+import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.dto.BlacklistAddDTO;
 import com.network.monitor.service.BlacklistManageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +26,9 @@ public class BlacklistManageController {
     @Autowired
     private BlacklistManageService blacklistManageService;
 
+    @Autowired
+    private SysConfigCache sysConfigCache;
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /**
@@ -43,21 +48,22 @@ public class BlacklistManageController {
     /**
      * 添加 IP 到黑名单
      */
-    @PostMapping("/add")
-    public ApiResponse<Void> addToBlacklist(
-            @RequestParam String ip,
-            @RequestParam String reason,
-            @RequestParam(required = false) Integer expireMinutes,
-            @RequestParam(required = false) String operator) {
-
+    @PostMapping
+    public ApiResponse<Void> addToBlacklist(@RequestBody BlacklistAddDTO dto) {
         try {
+            String ip = dto.getIpAddress();
+            String reason = dto.getReason();
+            Integer expireSeconds = dto.getExpireSeconds();
+            String operator = dto.getOperator();
+
             // 计算过期时间
             LocalDateTime expireTime;
-            if (expireMinutes != null && expireMinutes > 0) {
-                expireTime = LocalDateTime.now().plusMinutes(expireMinutes);
+            if (expireSeconds != null && expireSeconds > 0) {
+                expireTime = LocalDateTime.now().plusSeconds(expireSeconds);
             } else {
-                // 默认 24 小时
-                expireTime = LocalDateTime.now().plusHours(24);
+                // 从配置缓存获取默认过期时间（秒）
+                int defaultExpireSeconds = sysConfigCache.getIntValue("blacklist.default.expire.seconds", 86400);
+                expireTime = LocalDateTime.now().plusSeconds(defaultExpireSeconds);
             }
 
             // 操作人默认为"admin"
@@ -72,7 +78,7 @@ public class BlacklistManageController {
 
             return ApiResponse.success();
         } catch (Exception e) {
-            log.error("添加 IP 到黑名单失败：ip={}", ip, e);
+            log.error("添加 IP 到黑名单失败：", e);
             return ApiResponse.error("添加黑名单失败：" + e.getMessage());
         }
     }

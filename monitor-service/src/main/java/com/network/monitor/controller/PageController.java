@@ -72,4 +72,12 @@ public class PageController {
     public String blacklistManage() {
         return "blacklist-manage";
     }
+
+    /**
+     * 系统配置页面
+     */
+    @GetMapping("/config")
+    public String sysConfig() {
+        return "sys-config";
+    }
 }

@@ -340,8 +340,10 @@ CREATE TABLE `sys_config` (
 
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('ddos.threshold', '100', 'DDoS 检测阈值（次/分钟）'),
-('blacklist.expire', '3600', '黑名单自动过期时间（秒）'),
-('alert.enabled', 'true', '是否启用告警通知');
+('blacklist.default.expire.seconds', '86400', '黑名单默认过期时间（秒）'),
+('alert.enabled', 'true', '是否启用告警通知'),
+('alert.push.interval', '5000', '告警推送间隔（毫秒）'),
+('alert.heartbeat.interval', '10000', '告警心跳间隔（毫秒）');
 */
 
 -- ============================================================

@@ -129,10 +129,67 @@ function closeBlacklistModal() {
     document.getElementById('blacklistModal').style.display = 'none';
 }
 
+function convertToTotalSeconds() {
+    const years = parseInt(document.getElementById('expireYears').value) || 0;
+    const months = parseInt(document.getElementById('expireMonths').value) || 0;
+    const days = parseInt(document.getElementById('expireDays').value) || 0;
+    const hours = parseInt(document.getElementById('expireHours').value) || 0;
+    const minutes = parseInt(document.getElementById('expireMinutes').value) || 0;
+    const seconds = parseInt(document.getElementById('expireSeconds').value) || 0;
+
+    // 计算总秒数
+    const totalSeconds = 
+        years * 365 * 24 * 60 * 60 +
+        months * 30 * 24 * 60 * 60 +
+        days * 24 * 60 * 60 +
+        hours * 60 * 60 +
+        minutes * 60 +
+        seconds;
+
+    return totalSeconds;
+}
+
+function validateExpireInputs() {
+    const years = parseInt(document.getElementById('expireYears').value);
+    const months = parseInt(document.getElementById('expireMonths').value);
+    const days = parseInt(document.getElementById('expireDays').value);
+    const hours = parseInt(document.getElementById('expireHours').value);
+    const minutes = parseInt(document.getElementById('expireMinutes').value);
+    const seconds = parseInt(document.getElementById('expireSeconds').value);
+
+    const errors = [];
+
+    if (years !== undefined && (years < 0 || years > 99)) {
+        errors.push('年必须在0-99之间');
+    }
+
+    if (months !== undefined && (months < 0 || months > 11)) {
+        errors.push('月必须在0-11之间');
+    }
+
+    if (days !== undefined && (days < 0 || days > 30)) {
+        errors.push('日必须在0-30之间');
+    }
+
+    if (hours !== undefined && (hours < 0 || hours > 23)) {
+        errors.push('时必须在0-23之间');
+    }
+
+    if (minutes !== undefined && (minutes < 0 || minutes > 59)) {
+        errors.push('分必须在0-59之间');
+    }
+
+    if (seconds !== undefined && (seconds < 0 || seconds > 59)) {
+        errors.push('秒必须在0-59之间');
+    }
+
+    return errors;
+}
+
 async function saveBlacklist() {
     const ipAddress = document.getElementById('ipInput').value.trim();
     const reason = document.getElementById('reasonInput').value.trim();
-    const expireTime = document.getElementById('expireTimeInput').value;
+    const isPermanent = document.getElementById('permanentBlacklist').checked;
 
     if (!ipAddress) {
         message.error('请输入 IP 地址');
@@ -145,12 +202,30 @@ async function saveBlacklist() {
         return;
     }
 
+    if (!isPermanent) {
+        const validationErrors = validateExpireInputs();
+        if (validationErrors.length > 0) {
+            message.error(validationErrors.join('；'));
+            return;
+        }
+    }
+
     try {
         const data = {
             ipAddress: ipAddress,
-            reason: reason || '手动添加',
-            expireTime: expireTime ? expireTime.replace('T', ' ') + ':00' : null
+            reason: reason || '手动添加'
         };
+
+        if (isPermanent) {
+            data.expireSeconds = null;
+        } else {
+            const totalSeconds = convertToTotalSeconds();
+            if (totalSeconds > 0) {
+                data.expireSeconds = totalSeconds;
+            } else {
+                data.expireSeconds = null;
+            }
+        }
 
         await http.post('/blacklist', data);
         
