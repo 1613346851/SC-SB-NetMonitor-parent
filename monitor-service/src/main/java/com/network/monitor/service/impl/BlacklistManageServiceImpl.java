@@ -99,6 +99,7 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
                 BlacklistCache.BlacklistInfo info = blacklistCache.getBlacklistInfo(ip);
                 if (info != null) {
                     BlacklistInfoDTO dto = new BlacklistInfoDTO();
+                    dto.setId(info.getId());
                     dto.setIp(info.getIp());
                     dto.setReason(info.getReason());
                     dto.setExpireTime(info.getExpireTime());

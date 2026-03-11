@@ -42,22 +42,22 @@ function renderDefenseTable(data) {
     tbody.innerHTML = data.map(item => `
         <tr>
             <td>${item.id || '-'}</td>
-            <td>${dateFormat.format(item.defenseTime)}</td>
-            <td>${item.sourceIp || '-'}</td>
+            <td>${dateFormat.format(item.createTime)}</td>
+            <td>${item.defenseTarget || '-'}</td>
             <td>${renderDefenseType(item.defenseType)}</td>
             <td>${item.attackId || '-'}</td>
-            <td>${item.success ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
+            <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
             <td>${item.operator || '-'}</td>
-            <td>${item.remark || '-'}</td>
+            <td>${item.executeResult || item.defenseReason || '-'}</td>
         </tr>
     `).join('');
 }
 
 function renderDefenseType(type) {
     const typeMap = {
-        'BLOCK_IP': { text: '封禁 IP', class: 'danger' },
+        'IP_BLOCK': { text: '封禁 IP', class: 'danger' },
         'RATE_LIMIT': { text: '限流', class: 'warning' },
-        'BLOCK_REQUEST': { text: '拦截请求', class: 'primary' },
+        'MALICIOUS_REQUEST': { text: '拦截请求', class: 'primary' },
     };
     
     const config = typeMap[type] || { text: type, class: 'info' };

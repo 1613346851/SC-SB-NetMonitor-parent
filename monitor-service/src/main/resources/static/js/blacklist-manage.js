@@ -73,7 +73,7 @@ function renderBlacklistTable(data) {
     
     tbody.innerHTML = data.map((item, index) => `
         <tr>
-            <td>${index + 1}</td>
+            <td>${item.id || index + 1}</td>
             <td>${item.ip || '-'}</td>
             <td>${item.reason || '-'}</td>
             <td>${item.expireTime ? dateFormat.format(item.expireTime) : '永久'}</td>

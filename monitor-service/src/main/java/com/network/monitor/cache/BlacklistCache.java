@@ -40,9 +40,11 @@ public class BlacklistCache {
             for (DefenseMonitorEntity entity : validBlacklists) {
                 if (entity.getDefenseTarget() != null) {
                     BlacklistEntry entry = new BlacklistEntry(
+                        entity.getId(),
                         entity.getDefenseTarget(),
                         entity.getDefenseReason(),
                         entity.getExpireTime(),
+                        entity.getCreateTime(),
                         entity.getOperator()
                     );
                     blacklistMap.put(entity.getDefenseTarget(), entry);
@@ -58,6 +60,7 @@ public class BlacklistCache {
     }
 
     private static class BlacklistEntry {
+        private final Long id;
         private final String ip;
         private final String reason;
         private final LocalDateTime expireTime;
@@ -65,11 +68,20 @@ public class BlacklistCache {
         private final String operator;
 
         public BlacklistEntry(String ip, String reason, LocalDateTime expireTime, String operator) {
+            this(null, ip, reason, expireTime, LocalDateTime.now(), operator);
+        }
+
+        public BlacklistEntry(Long id, String ip, String reason, LocalDateTime expireTime, LocalDateTime createTime, String operator) {
+            this.id = id;
             this.ip = ip;
             this.reason = reason;
             this.expireTime = expireTime;
-            this.createTime = LocalDateTime.now();
+            this.createTime = createTime;
             this.operator = operator;
+        }
+
+        public Long getId() {
+            return id;
         }
 
         public boolean isExpired() {
@@ -173,10 +185,11 @@ public class BlacklistCache {
         }
 
         return new BlacklistInfo(
+                entry.getId(),
                 entry.getIp(),
                 entry.getReason(),
                 entry.getExpireTime() != null ? entry.getExpireTime().format(TIME_FORMATTER) : null,
-                entry.getCreateTime().format(TIME_FORMATTER),
+                entry.getCreateTime() != null ? entry.getCreateTime().format(TIME_FORMATTER) : null,
                 entry.getOperator()
         );
     }
@@ -214,6 +227,7 @@ public class BlacklistCache {
     @lombok.Data
     @lombok.AllArgsConstructor
     public static class BlacklistInfo {
+        private Long id;
         private String ip;
         private String reason;
         private String expireTime;
