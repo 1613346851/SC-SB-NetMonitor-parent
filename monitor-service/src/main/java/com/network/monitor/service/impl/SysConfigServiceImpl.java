@@ -1,11 +1,13 @@
 package com.network.monitor.service.impl;
 
-import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.entity.SysConfigEntity;
+import com.network.monitor.event.ConfigRefreshEvent;
+import com.network.monitor.loader.ConfigLoader;
 import com.network.monitor.mapper.SysConfigMapper;
 import com.network.monitor.service.SysConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -13,13 +15,18 @@ import java.util.List;
 
 @Slf4j
 @Service
-public class SysConfigServiceImpl implements SysConfigService {
+public class SysConfigServiceImpl implements SysConfigService, ConfigLoader {
 
     @Autowired
     private SysConfigMapper sysConfigMapper;
 
     @Autowired
-    private SysConfigCache sysConfigCache;
+    private ApplicationEventPublisher eventPublisher;
+
+    @Override
+    public List<SysConfigEntity> loadAllConfigs() {
+        return getAllConfigs();
+    }
 
     @Override
     public List<SysConfigEntity> getAllConfigs() {
@@ -123,12 +130,7 @@ public class SysConfigServiceImpl implements SysConfigService {
 
     @Override
     public void refreshCache() {
-        try {
-            sysConfigCache.refresh();
-            log.info("刷新配置缓存成功");
-        } catch (Exception e) {
-            log.error("刷新配置缓存失败：", e);
-            throw new RuntimeException("刷新配置失败：" + e.getMessage(), e);
-        }
+        eventPublisher.publishEvent(new ConfigRefreshEvent(this));
+        log.info("发布配置刷新事件成功");
     }
 }

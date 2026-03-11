@@ -88,7 +88,7 @@ public class RuleManageController {
     /**
      * 删除规则
      */
-    @PostMapping("/delete/{id}")
+    @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteRule(@PathVariable Long id) {
         try {
             monitorRuleMapper.deleteById(id);

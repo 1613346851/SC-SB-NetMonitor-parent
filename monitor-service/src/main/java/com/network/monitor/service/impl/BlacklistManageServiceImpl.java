@@ -3,6 +3,7 @@ package com.network.monitor.service.impl;
 import com.network.monitor.cache.BlacklistCache;
 import com.network.monitor.client.GatewayApiClient;
 import com.network.monitor.common.constant.DefenseTypeConstant;
+import com.network.monitor.dto.BlacklistInfoDTO;
 import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.entity.DefenseMonitorEntity;
 import com.network.monitor.service.BlacklistManageService;
@@ -18,10 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * IP 黑名单管理服务实现类
- * 实现 IP 黑名单的全生命周期管理，维护内存中的黑名单缓存，与网关服务的黑名单缓存保持同步
- */
 @Slf4j
 @Service
 public class BlacklistManageServiceImpl implements BlacklistManageService {
@@ -44,13 +41,15 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         }
 
         try {
-            // 添加到本地缓存
+            if (blacklistCache.contains(ip)) {
+                log.warn("IP 已在黑名单中，跳过添加：ip={}", ip);
+                return;
+            }
+
             blacklistCache.add(ip, reason, expireTime, operator);
 
-            // 同步到网关服务
             syncToGateway(ip, "ADD");
 
-            // 记录防御日志
             recordDefenseLog(ip, "ADD", reason, operator, expireTime);
 
             log.info("添加 IP 到黑名单成功：ip={}, reason={}, expireTime={}, operator={}", 
@@ -68,13 +67,10 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         }
 
         try {
-            // 从本地缓存移除
             blacklistCache.remove(ip);
 
-            // 同步到网关服务
             syncToGateway(ip, "REMOVE");
 
-            // 记录防御日志
             recordDefenseLog(ip, "REMOVE", "手动移除黑名单", "MANUAL", null);
 
             log.info("从黑名单移除 IP 成功：ip={}", ip);
@@ -94,21 +90,22 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
     }
 
     @Override
-    public List<Map<String, Object>> getBlacklist() {
-        List<Map<String, Object>> result = new ArrayList<>();
+    public List<BlacklistInfoDTO> getBlacklist() {
+        List<BlacklistInfoDTO> result = new ArrayList<>();
 
         try {
             List<String> allIps = blacklistCache.getAllIps();
             for (String ip : allIps) {
                 BlacklistCache.BlacklistInfo info = blacklistCache.getBlacklistInfo(ip);
                 if (info != null) {
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("ip", info.getIp());
-                    item.put("reason", info.getReason());
-                    item.put("expireTime", info.getExpireTime());
-                    item.put("createTime", info.getCreateTime());
-                    item.put("operator", info.getOperator());
-                    result.add(item);
+                    BlacklistInfoDTO dto = new BlacklistInfoDTO();
+                    dto.setIp(info.getIp());
+                    dto.setReason(info.getReason());
+                    dto.setExpireTime(info.getExpireTime());
+                    dto.setCreateTime(info.getCreateTime());
+                    dto.setOperator(info.getOperator());
+                    dto.setStatus(info.isExpired() ? 2 : 1);
+                    result.add(dto);
                 }
             }
         } catch (Exception e) {
@@ -133,6 +130,7 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
                 result.put("expireTime", info.getExpireTime());
                 result.put("createTime", info.getCreateTime());
                 result.put("operator", info.getOperator());
+                result.put("status", info.isExpired() ? 2 : 1);
             }
         } catch (Exception e) {
             log.error("获取黑名单信息失败：ip={}", ip, e);
@@ -145,9 +143,6 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
     public int cleanExpiredBlacklist() {
         try {
             int count = blacklistCache.cleanExpired();
-            
-            // 同步清理网关服务
-            // 网关服务会自行清理过期的黑名单
             
             log.info("清理过期黑名单完成，数量：{}", count);
             return count;
@@ -215,20 +210,17 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         return blacklistCache.getSize();
     }
 
-    /**
-     * 记录防御日志
-     */
     private void recordDefenseLog(String ip, String action, String reason, String operator, LocalDateTime expireTime) {
         try {
             DefenseMonitorEntity defenseLog = new DefenseMonitorEntity();
-            defenseLog.setAttackId(null); // 黑名单操作不关联具体攻击
-            defenseLog.setTrafficId(null); // 不关联具体流量
+            defenseLog.setAttackId(null);
+            defenseLog.setTrafficId(null);
             defenseLog.setDefenseType(DefenseTypeConstant.IP_BLOCK);
             defenseLog.setDefenseAction(action);
             defenseLog.setDefenseTarget(ip);
             defenseLog.setDefenseReason(reason);
             defenseLog.setExpireTime(expireTime);
-            defenseLog.setExecuteStatus(1); // 执行成功
+            defenseLog.setExecuteStatus(1);
             defenseLog.setExecuteResult("黑名单" + ("ADD".equals(action) ? "添加" : "移除") + "成功");
             defenseLog.setOperator(operator);
             defenseLog.setCreateTime(LocalDateTime.now());
@@ -239,7 +231,6 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
             log.debug("记录黑名单防御日志成功：ip={}, action={}, operator={}", ip, action, operator);
         } catch (Exception e) {
             log.error("记录黑名单防御日志失败：ip={}", ip, e);
-            // 防御日志记录失败不影响主流程
         }
     }
 }

@@ -1,5 +1,7 @@
 package com.network.monitor.service;
 
+import com.network.monitor.dto.BlacklistInfoDTO;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +41,7 @@ public interface BlacklistManageService {
      *
      * @return 黑名单列表
      */
-    List<Map<String, Object>> getBlacklist();
+    List<BlacklistInfoDTO> getBlacklist();
 
     /**
      * 根据 IP 获取黑名单信息

@@ -1,15 +1,50 @@
-/**
- * 黑名单管理页面 JavaScript
- * 负责黑名单数据加载、筛选、分页、添加、移除等功能
- */
-
 let currentPage = 1;
 const pageSize = 10;
 let searchParams = {};
+let defaultExpireSeconds = 86400;
 
 document.addEventListener('DOMContentLoaded', function() {
+    loadDefaultExpireTime();
     loadBlacklistData();
 });
+
+async function loadDefaultExpireTime() {
+    try {
+        const result = await http.get('/config/value/blacklist.default.expire.seconds');
+        if (result && result.data) {
+            defaultExpireSeconds = parseInt(result.data);
+            updateExpireTimeHint();
+        }
+    } catch (error) {
+        console.error('加载默认过期时间失败:', error);
+    }
+}
+
+function updateExpireTimeHint() {
+    const hintElement = document.querySelector('#blacklistForm small');
+    if (hintElement) {
+        const hours = Math.floor(defaultExpireSeconds / 3600);
+        const minutes = Math.floor((defaultExpireSeconds % 3600) / 60);
+        const seconds = defaultExpireSeconds % 60;
+        
+        let hintText = '留空或全部为0表示使用默认时长（';
+        if (hours > 0) {
+            hintText += hours + '小时';
+        }
+        if (minutes > 0) {
+            hintText += minutes + '分';
+        }
+        if (seconds > 0) {
+            hintText += seconds + '秒';
+        }
+        if (hours === 0 && minutes === 0 && seconds === 0) {
+            hintText += '0秒';
+        }
+        hintText += '）';
+        
+        hintElement.textContent = hintText;
+    }
+}
 
 async function loadBlacklistData() {
     try {
@@ -36,16 +71,16 @@ function renderBlacklistTable(data) {
         return;
     }
     
-    tbody.innerHTML = data.map(item => `
+    tbody.innerHTML = data.map((item, index) => `
         <tr>
-            <td>${item.id || '-'}</td>
-            <td>${item.ipAddress || '-'}</td>
+            <td>${index + 1}</td>
+            <td>${item.ip || '-'}</td>
             <td>${item.reason || '-'}</td>
             <td>${item.expireTime ? dateFormat.format(item.expireTime) : '永久'}</td>
             <td>${renderStatus(item.status)}</td>
             <td>${item.createTime ? dateFormat.format(item.createTime) : '-'}</td>
             <td>
-                <button class="btn btn-danger btn-sm" onclick="removeFromBlacklist(${item.id})">移除</button>
+                <button class="btn btn-danger btn-sm" onclick="removeFromBlacklist('${item.ip}')">移除</button>
             </td>
         </tr>
     `).join('');
@@ -137,7 +172,6 @@ function convertToTotalSeconds() {
     const minutes = parseInt(document.getElementById('expireMinutes').value) || 0;
     const seconds = parseInt(document.getElementById('expireSeconds').value) || 0;
 
-    // 计算总秒数
     const totalSeconds = 
         years * 365 * 24 * 60 * 60 +
         months * 30 * 24 * 60 * 60 +
@@ -234,25 +268,36 @@ async function saveBlacklist() {
         loadBlacklistData();
     } catch (error) {
         console.error('添加黑名单失败:', error);
+        message.error(error.message || '添加失败');
     }
 }
 
-async function removeFromBlacklist(id) {
+async function removeFromBlacklist(ip) {
     if (!confirm('确定要从黑名单中移除该 IP 吗？')) {
         return;
     }
 
     try {
-        await http.delete(`/blacklist/${id}`);
+        await http.delete(`/blacklist/${ip}`);
         message.success('移除成功');
         loadBlacklistData();
     } catch (error) {
         console.error('移除黑名单失败:', error);
+        message.error(error.message || '移除失败');
     }
 }
 
-document.getElementById('blacklistModal')?.addEventListener('click', function(e) {
-    if (e.target === this) {
-        closeBlacklistModal();
+async function cleanExpiredBlacklist() {
+    if (!confirm('确定要清理所有过期的黑名单吗？')) {
+        return;
     }
-});
+
+    try {
+        const result = await http.post('/blacklist/clean-expired');
+        message.success(`清理完成，共清理 ${result.cleanedCount} 条记录`);
+        loadBlacklistData();
+    } catch (error) {
+        console.error('清理过期黑名单失败:', error);
+        message.error(error.message || '清理失败');
+    }
+}

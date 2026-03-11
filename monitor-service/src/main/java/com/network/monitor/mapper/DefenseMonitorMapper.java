@@ -56,6 +56,11 @@ public interface DefenseMonitorMapper {
     List<TrendStat> countDefenseTrend(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
 
     /**
+     * 查询所有有效的黑名单记录
+     */
+    List<DefenseMonitorEntity> selectValidBlacklists();
+
+    /**
      * 防御趋势统计内部类
      */
     class TrendStat {

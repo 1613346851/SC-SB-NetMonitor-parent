@@ -3,6 +3,7 @@ package com.network.monitor.controller.outer;
 import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.dto.BlacklistAddDTO;
+import com.network.monitor.dto.BlacklistInfoDTO;
 import com.network.monitor.service.BlacklistManageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,9 +36,9 @@ public class BlacklistManageController {
      * 获取黑名单列表
      */
     @GetMapping("/list")
-    public ApiResponse<List<Map<String, Object>>> getBlacklist() {
+    public ApiResponse<List<BlacklistInfoDTO>> getBlacklist() {
         try {
-            List<Map<String, Object>> list = blacklistManageService.getBlacklist();
+            List<BlacklistInfoDTO> list = blacklistManageService.getBlacklist();
             return ApiResponse.success(list);
         } catch (Exception e) {
             log.error("获取黑名单列表失败：", e);
@@ -86,7 +87,7 @@ public class BlacklistManageController {
     /**
      * 从黑名单移除 IP
      */
-    @PostMapping("/remove/{ip}")
+    @DeleteMapping("/{ip}")
     public ApiResponse<Void> removeFromBlacklist(@PathVariable String ip) {
         try {
             blacklistManageService.removeFromBlacklist(ip);

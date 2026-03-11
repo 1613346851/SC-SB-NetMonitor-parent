@@ -1,6 +1,6 @@
 package com.network.monitor.cache;
 
-import com.network.monitor.service.SysConfigService;
+import com.network.monitor.loader.ConfigLoader;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SysConfigCache {
 
     @Autowired
-    private SysConfigService sysConfigService;
+    private ConfigLoader configLoader;
 
     private final Map<String, String> configCache = new ConcurrentHashMap<>();
 
@@ -26,7 +26,7 @@ public class SysConfigCache {
 
     public void loadAllConfigs() {
         try {
-            sysConfigService.getAllConfigs().forEach(config -> {
+            configLoader.loadAllConfigs().forEach(config -> {
                 configCache.put(config.getConfigKey(), config.getConfigValue());
             });
             log.info("加载系统配置完成，共{}项", configCache.size());

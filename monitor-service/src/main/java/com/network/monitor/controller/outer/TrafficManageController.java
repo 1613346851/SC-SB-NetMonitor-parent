@@ -82,7 +82,7 @@ public class TrafficManageController {
     /**
      * 删除流量记录
      */
-    @PostMapping("/delete/{id}")
+    @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteTraffic(@PathVariable Long id) {
         try {
             trafficMonitorMapper.deleteById(id);
