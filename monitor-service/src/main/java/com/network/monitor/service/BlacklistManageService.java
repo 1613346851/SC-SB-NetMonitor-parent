@@ -52,6 +52,37 @@ public interface BlacklistManageService {
     Map<String, Object> getBlacklistInfo(String ip);
 
     /**
+     * 根据 IP 获取黑名单信息（包含历史记录）
+     *
+     * @param ip IP 地址
+     * @return 黑名单信息（包含历史记录）
+     */
+    Map<String, Object> getBlacklistWithHistory(String ip);
+
+    /**
+     * 获取黑名单列表（按 IP 分组）
+     *
+     * @return 黑名单列表
+     */
+    List<BlacklistInfoDTO> getBlacklistGroupedByIp();
+
+    /**
+     * 删除指定 IP 的所有黑名单记录
+     *
+     * @param ip IP 地址
+     * @return 删除的记录数
+     */
+    int deleteAllBlacklistsByIp(String ip);
+
+    /**
+     * 更新黑名单过期时间（延长封禁时间）
+     *
+     * @param ip IP 地址
+     * @param extendSeconds 延长的秒数
+     */
+    void extendBlacklistExpireTime(String ip, Long extendSeconds);
+
+    /**
      * 清理过期的黑名单
      *
      * @return 清理的数量

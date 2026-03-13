@@ -39,6 +39,13 @@
         WHERE id = #{id}
     </select>
 
+    <update id="updateById" parameterType="com.network.monitor.entity.DefenseMonitorEntity">
+        UPDATE sys_defense_monitor
+        SET expire_time = #{expireTime},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
     <select id="selectByCondition" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM sys_defense_monitor
@@ -102,6 +109,26 @@
         ORDER BY time ASC
     </select>
 
+    <!-- 查询所有黑名单记录（包括已过期的） -->
+    <select id="selectAllBlacklists" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_monitor
+        WHERE defense_type = 'IP_BLOCK'
+        AND defense_action = 'ADD'
+        AND execute_status = 1
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 查询指定IP的所有黑名单记录 -->
+    <select id="selectBlacklistsByIp" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_monitor
+        WHERE defense_type = 'IP_BLOCK'
+        AND defense_target = #{ip}
+        AND execute_status = 1
+        ORDER BY create_time DESC
+    </select>
+
     <!-- 查询所有有效的黑名单记录 -->
     <select id="selectValidBlacklists" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
@@ -112,4 +139,11 @@
         AND (expire_time IS NULL OR expire_time &gt; NOW())
         ORDER BY create_time DESC
     </select>
+
+    <!-- 删除指定IP的所有黑名单记录 -->
+    <delete id="deleteAllBlacklistsByIp">
+        DELETE FROM sys_defense_monitor
+        WHERE defense_type = 'IP_BLOCK'
+        AND defense_target = #{ip}
+    </delete>
 </mapper>

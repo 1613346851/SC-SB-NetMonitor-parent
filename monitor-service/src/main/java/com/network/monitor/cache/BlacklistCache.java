@@ -36,8 +36,8 @@ public class BlacklistCache {
 
     private void loadFromDatabase() {
         try {
-            List<DefenseMonitorEntity> validBlacklists = defenseMonitorMapper.selectValidBlacklists();
-            for (DefenseMonitorEntity entity : validBlacklists) {
+            List<DefenseMonitorEntity> allBlacklists = defenseMonitorMapper.selectAllBlacklists();
+            for (DefenseMonitorEntity entity : allBlacklists) {
                 if (entity.getDefenseTarget() != null) {
                     BlacklistEntry entry = new BlacklistEntry(
                         entity.getId(),
@@ -53,7 +53,7 @@ public class BlacklistCache {
                     localCacheService.put(cacheKey, entry, -1);
                 }
             }
-            log.info("从数据库加载黑名单数据完成，共{}条", validBlacklists.size());
+            log.info("从数据库加载黑名单数据完成，共{}条", allBlacklists.size());
         } catch (Exception e) {
             log.error("从数据库加载黑名单数据失败", e);
         }
@@ -179,9 +179,30 @@ public class BlacklistCache {
             }
         }
 
-        if (entry.isExpired()) {
-            remove(ip);
+        return new BlacklistInfo(
+                entry.getId(),
+                entry.getIp(),
+                entry.getReason(),
+                entry.getExpireTime() != null ? entry.getExpireTime().format(TIME_FORMATTER) : null,
+                entry.getCreateTime() != null ? entry.getCreateTime().format(TIME_FORMATTER) : null,
+                entry.getOperator()
+        );
+    }
+
+    public BlacklistInfo getBlacklistInfoWithoutRemove(String ip) {
+        if (ip == null || ip.isEmpty()) {
             return null;
+        }
+
+        BlacklistEntry entry = blacklistMap.get(ip);
+        if (entry == null) {
+            String cacheKey = BLACKLIST_CACHE_PREFIX + ip;
+            entry = (BlacklistEntry) localCacheService.get(cacheKey);
+            if (entry != null) {
+                blacklistMap.put(ip, entry);
+            } else {
+                return null;
+            }
         }
 
         return new BlacklistInfo(
@@ -221,6 +242,20 @@ public class BlacklistCache {
     }
 
     public java.util.List<String> getAllIps() {
+        java.util.Set<String> allIps = new java.util.HashSet<>();
+        allIps.addAll(blacklistMap.keySet());
+        
+        java.util.List<DefenseMonitorEntity> allBlacklists = defenseMonitorMapper.selectAllBlacklists();
+        for (DefenseMonitorEntity entity : allBlacklists) {
+            if (entity.getDefenseTarget() != null) {
+                allIps.add(entity.getDefenseTarget());
+            }
+        }
+        
+        return new java.util.ArrayList<>(allIps);
+    }
+
+    public java.util.List<String> getAllIpsFromCache() {
         return new java.util.ArrayList<>(blacklistMap.keySet());
     }
 

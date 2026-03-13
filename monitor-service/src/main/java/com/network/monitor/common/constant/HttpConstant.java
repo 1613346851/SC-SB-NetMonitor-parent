@@ -78,10 +78,10 @@ public class HttpConstant {
     /**
      * 网关防御指令接收接口
      */
-    public static final String GATEWAY_DEFENSE_ENDPOINT = "/api/defense/command";
+    public static final String GATEWAY_DEFENSE_ENDPOINT = "/api/gateway/defense/command";
 
     /**
      * 网关日志同步接口
      */
-    public static final String GATEWAY_LOG_ENDPOINT = "/api/defense/log/sync";
+    public static final String GATEWAY_LOG_ENDPOINT = "/api/gateway/defense/log/sync";
 }

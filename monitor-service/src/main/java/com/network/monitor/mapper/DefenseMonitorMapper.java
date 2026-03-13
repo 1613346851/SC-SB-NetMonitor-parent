@@ -24,6 +24,11 @@ public interface DefenseMonitorMapper {
     DefenseMonitorEntity selectById(@Param("id") Long id);
 
     /**
+     * 根据 ID 更新防御日志
+     */
+    int updateById(DefenseMonitorEntity entity);
+
+    /**
      * 分页查询防御日志
      */
     List<DefenseMonitorEntity> selectByCondition(
@@ -59,6 +64,21 @@ public interface DefenseMonitorMapper {
      * 查询所有有效的黑名单记录
      */
     List<DefenseMonitorEntity> selectValidBlacklists();
+
+    /**
+     * 查询所有黑名单记录（包括已过期的）
+     */
+    List<DefenseMonitorEntity> selectAllBlacklists();
+
+    /**
+     * 查询指定IP的所有黑名单记录
+     */
+    List<DefenseMonitorEntity> selectBlacklistsByIp(@Param("ip") String ip);
+
+    /**
+     * 删除指定IP的所有黑名单记录
+     */
+    int deleteAllBlacklistsByIp(@Param("ip") String ip);
 
     /**
      * 防御趋势统计内部类

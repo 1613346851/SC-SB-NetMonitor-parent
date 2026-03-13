@@ -21,7 +21,7 @@ async function loadDefaultExpireTime() {
 }
 
 function updateExpireTimeHint() {
-    const hintElement = document.querySelector('#blacklistForm small');
+    const hintElement = document.getElementById('expireTimeHint');
     if (hintElement) {
         const hours = Math.floor(defaultExpireSeconds / 3600);
         const minutes = Math.floor((defaultExpireSeconds % 3600) / 60);
@@ -56,7 +56,7 @@ async function loadBlacklistData() {
 
         const result = await http.get('/blacklist/list', params);
         
-        renderBlacklistTable(result.list || result || []);
+        renderBlacklistTable(result.list || []);
         renderPagination(result.total || 0);
     } catch (error) {
         console.error('加载黑名单数据失败:', error);
@@ -67,20 +67,51 @@ function renderBlacklistTable(data) {
     const tbody = document.getElementById('blacklistTableBody');
     
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center">暂无数据</td></tr>';
         return;
     }
     
     tbody.innerHTML = data.map((item, index) => `
-        <tr>
+        <tr class="main-row" data-ip="${item.ip}">
             <td>${item.id || index + 1}</td>
-            <td>${item.ip || '-'}</td>
+            <td>
+                <span class="ip-link" onclick="toggleHistory('${item.ip}')" style="cursor: pointer; color: #1890ff; text-decoration: underline;">
+                    ${item.ip || '-'}
+                </span>
+            </td>
             <td>${item.reason || '-'}</td>
             <td>${item.expireTime ? dateFormat.format(item.expireTime) : '永久'}</td>
+            <td>${item.remainingTime || '-'}</td>
             <td>${renderStatus(item.status)}</td>
             <td>${item.createTime ? dateFormat.format(item.createTime) : '-'}</td>
             <td>
-                <button class="btn btn-danger btn-sm" onclick="removeFromBlacklist('${item.ip}')">移除</button>
+                <button class="btn btn-primary btn-sm" onclick="showExtendModal('${item.ip}')">延长</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteAllBlacklists('${item.ip}')">删除</button>
+            </td>
+        </tr>
+        <tr class="history-row" id="history-${item.ip.replace(/\./g, '-')}" style="display: none;">
+            <td colspan="8">
+                <div class="history-container" style="padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                    <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #666;">封禁历史记录</h4>
+                    <table class="history-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #e0e0e0;">
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">ID</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">拉黑原因</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">过期时间</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">状态</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">创建时间</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">操作人</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body-${item.ip.replace(/\./g, '-')}">
+                            <tr>
+                                <td colspan="8" class="text-center" style="padding: 10px;">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </td>
         </tr>
     `).join('');
@@ -299,5 +330,123 @@ async function cleanExpiredBlacklist() {
     } catch (error) {
         console.error('清理过期黑名单失败:', error);
         message.error(error.message || '清理失败');
+    }
+}
+
+async function toggleHistory(ip) {
+    const historyRow = document.getElementById(`history-${ip.replace(/\./g, '-')}`);
+    if (historyRow) {
+        const isVisible = historyRow.style.display !== 'none';
+        historyRow.style.display = isVisible ? 'none' : 'table-row';
+        
+        if (!isVisible) {
+            await loadHistory(ip);
+        }
+    }
+}
+
+async function loadHistory(ip) {
+    try {
+        const result = await http.get(`/blacklist/${ip}/history`);
+        const historyBody = document.getElementById(`history-body-${ip.replace(/\./g, '-')}`);
+        
+        if (historyBody && result.history) {
+            historyBody.innerHTML = result.history.map(item => `
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${item.id || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${item.reason || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${item.expireTime ? dateFormat.format(item.expireTime) : '永久'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${renderStatus(item.status)}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${item.createTime ? dateFormat.format(item.createTime) : '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${item.operator || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">
+                        <button class="btn btn-danger btn-sm" onclick="deleteSingleHistory('${ip}', ${item.id})">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('加载历史记录失败:', error);
+        message.error(error.message || '加载历史记录失败');
+    }
+}
+
+function showExtendModal(ip) {
+    document.getElementById('extendIpInput').value = ip;
+    document.getElementById('extendIpDisplay').value = ip;
+    document.getElementById('extendExpireYears').value = '';
+    document.getElementById('extendExpireMonths').value = '';
+    document.getElementById('extendExpireDays').value = '';
+    document.getElementById('extendExpireHours').value = '';
+    document.getElementById('extendExpireMinutes').value = '';
+    document.getElementById('extendExpireSeconds').value = '';
+    document.getElementById('extendModal').style.display = 'flex';
+}
+
+function closeExtendModal() {
+    document.getElementById('extendModal').style.display = 'none';
+}
+
+async function extendBlacklist() {
+    const ip = document.getElementById('extendIpInput').value;
+    const years = parseInt(document.getElementById('extendExpireYears').value) || 0;
+    const months = parseInt(document.getElementById('extendExpireMonths').value) || 0;
+    const days = parseInt(document.getElementById('extendExpireDays').value) || 0;
+    const hours = parseInt(document.getElementById('extendExpireHours').value) || 0;
+    const minutes = parseInt(document.getElementById('extendExpireMinutes').value) || 0;
+    const seconds = parseInt(document.getElementById('extendExpireSeconds').value) || 0;
+
+    const totalSeconds = 
+        years * 365 * 24 * 60 * 60 +
+        months * 30 * 24 * 60 * 60 +
+        days * 24 * 60 * 60 +
+        hours * 60 * 60 +
+        minutes * 60 +
+        seconds;
+
+    if (totalSeconds <= 0) {
+        message.error('请输入有效的延长时间');
+        return;
+    }
+
+    try {
+        await http.put(`/blacklist/${ip}/extend`, { expireSeconds: totalSeconds });
+        message.success('延长封禁时间成功');
+        closeExtendModal();
+        loadBlacklistData();
+    } catch (error) {
+        console.error('延长封禁时间失败:', error);
+        message.error(error.message || '延长失败');
+    }
+}
+
+async function deleteAllBlacklists(ip) {
+    if (!confirm(`确定要删除 IP ${ip} 的所有黑名单记录吗？此操作不可恢复！`)) {
+        return;
+    }
+
+    try {
+        const result = await http.delete(`/blacklist/${ip}/all`);
+        message.success(`删除成功，共删除 ${result.deletedCount} 条记录`);
+        loadBlacklistData();
+    } catch (error) {
+        console.error('删除黑名单记录失败:', error);
+        message.error(error.message || '删除失败');
+    }
+}
+
+async function deleteSingleHistory(ip, id) {
+    if (!confirm(`确定要删除这条封禁记录吗？`)) {
+        return;
+    }
+
+    try {
+        await http.delete(`/blacklist/${ip}`);
+        message.success('删除成功');
+        await loadHistory(ip);
+        loadBlacklistData();
+    } catch (error) {
+        console.error('删除封禁记录失败:', error);
+        message.error(error.message || '删除失败');
     }
 }

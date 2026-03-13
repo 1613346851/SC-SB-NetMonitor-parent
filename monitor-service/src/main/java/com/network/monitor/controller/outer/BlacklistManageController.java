@@ -36,13 +36,79 @@ public class BlacklistManageController {
      * 获取黑名单列表
      */
     @GetMapping("/list")
-    public ApiResponse<List<BlacklistInfoDTO>> getBlacklist() {
+    public ApiResponse<Map<String, Object>> getBlacklist(
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize) {
         try {
-            List<BlacklistInfoDTO> list = blacklistManageService.getBlacklist();
-            return ApiResponse.success(list);
+            List<BlacklistInfoDTO> list = blacklistManageService.getBlacklistGroupedByIp();
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("list", list);
+            result.put("total", list.size());
+            result.put("pageNum", pageNum);
+            result.put("pageSize", pageSize);
+            
+            return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("获取黑名单列表失败：", e);
             return ApiResponse.error("获取黑名单列表失败");
+        }
+    }
+
+    /**
+     * 获取黑名单详情（包含历史记录）
+     */
+    @GetMapping("/{ip}/history")
+    public ApiResponse<Map<String, Object>> getBlacklistHistory(@PathVariable String ip) {
+        try {
+            Map<String, Object> info = blacklistManageService.getBlacklistWithHistory(ip);
+            if (info.isEmpty()) {
+                return ApiResponse.notFound("IP 不在黑名单中");
+            }
+            return ApiResponse.success(info);
+        } catch (Exception e) {
+            log.error("获取黑名单详情失败：ip={}", ip, e);
+            return ApiResponse.error("获取黑名单详情失败");
+        }
+    }
+
+    /**
+     * 延长黑名单封禁时间
+     */
+    @PutMapping("/{ip}/extend")
+    public ApiResponse<Void> extendBlacklist(@PathVariable String ip, @RequestBody Map<String, Object> params) {
+        try {
+            Integer expireSeconds = (Integer) params.get("expireSeconds");
+            if (expireSeconds == null || expireSeconds <= 0) {
+                return ApiResponse.error("延长时间必须大于0");
+            }
+            
+            blacklistManageService.extendBlacklistExpireTime(ip, expireSeconds.longValue());
+            
+            log.info("延长黑名单封禁时间成功：ip={}, extendSeconds={}", ip, expireSeconds);
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("延长黑名单封禁时间失败：ip={}", ip, e);
+            return ApiResponse.error("延长封禁时间失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 删除 IP 的所有黑名单记录
+     */
+    @DeleteMapping("/{ip}/all")
+    public ApiResponse<Map<String, Object>> deleteAllBlacklists(@PathVariable String ip) {
+        try {
+            int count = blacklistManageService.deleteAllBlacklistsByIp(ip);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("deletedCount", count);
+            
+            log.info("删除 IP 的所有黑名单记录成功：ip={}, count={}", ip, count);
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("删除 IP 的所有黑名单记录失败：ip={}", ip, e);
+            return ApiResponse.error("删除黑名单记录失败：" + e.getMessage());
         }
     }
 
