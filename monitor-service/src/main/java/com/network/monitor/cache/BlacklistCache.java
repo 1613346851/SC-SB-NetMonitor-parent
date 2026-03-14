@@ -1,7 +1,7 @@
 package com.network.monitor.cache;
 
-import com.network.monitor.entity.DefenseMonitorEntity;
-import com.network.monitor.mapper.DefenseMonitorMapper;
+import com.network.monitor.entity.DefenseLogEntity;
+import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.service.LocalCacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +22,7 @@ public class BlacklistCache {
     private LocalCacheService localCacheService;
 
     @Autowired
-    private DefenseMonitorMapper defenseMonitorMapper;
+    private DefenseLogMapper defenseLogMapper;
 
     private static final String BLACKLIST_CACHE_PREFIX = "cache:blacklist:";
 
@@ -36,8 +36,8 @@ public class BlacklistCache {
 
     private void loadFromDatabase() {
         try {
-            List<DefenseMonitorEntity> allBlacklists = defenseMonitorMapper.selectAllBlacklists();
-            for (DefenseMonitorEntity entity : allBlacklists) {
+            List<DefenseLogEntity> allBlacklists = defenseLogMapper.selectAllBlacklists();
+            for (DefenseLogEntity entity : allBlacklists) {
                 if (entity.getDefenseTarget() != null) {
                     BlacklistEntry entry = new BlacklistEntry(
                         entity.getId(),
@@ -245,8 +245,8 @@ public class BlacklistCache {
         java.util.Set<String> allIps = new java.util.HashSet<>();
         allIps.addAll(blacklistMap.keySet());
         
-        java.util.List<DefenseMonitorEntity> allBlacklists = defenseMonitorMapper.selectAllBlacklists();
-        for (DefenseMonitorEntity entity : allBlacklists) {
+        List<DefenseLogEntity> allBlacklists = defenseLogMapper.selectAllBlacklists();
+        for (DefenseLogEntity entity : allBlacklists) {
             if (entity.getDefenseTarget() != null) {
                 allIps.add(entity.getDefenseTarget());
             }

@@ -11,8 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadDefaultExpireTime() {
     try {
         const result = await http.get('/config/value/blacklist.default.expire.seconds');
-        if (result && result.data) {
-            defaultExpireSeconds = parseInt(result.data);
+        if (result) {
+            defaultExpireSeconds = parseInt(result);
             updateExpireTimeHint();
         }
     } catch (error) {
@@ -67,7 +67,7 @@ function renderBlacklistTable(data) {
     const tbody = document.getElementById('blacklistTableBody');
     
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">暂无数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center">暂无数据</td></tr>';
         return;
     }
     
@@ -79,9 +79,10 @@ function renderBlacklistTable(data) {
                     ${item.ip || '-'}
                 </span>
             </td>
-            <td>${item.reason || '-'}</td>
-            <td>${item.expireTime ? dateFormat.format(item.expireTime) : '永久'}</td>
+            <td title="${item.reason || '-'}">${truncateText(item.reason || '-', 20)}</td>
+            <td>${item.expireTime ? dateFormat.format(item.expireTime) : '<span class="tag danger">永久</span>'}</td>
             <td>${item.remainingTime || '-'}</td>
+            <td>${item.totalBanCount || 0} 次</td>
             <td>${renderStatus(item.status)}</td>
             <td>${item.createTime ? dateFormat.format(item.createTime) : '-'}</td>
             <td>
@@ -90,7 +91,7 @@ function renderBlacklistTable(data) {
             </td>
         </tr>
         <tr class="history-row" id="history-${item.ip.replace(/\./g, '-')}" style="display: none;">
-            <td colspan="8">
+            <td colspan="9">
                 <div class="history-container" style="padding: 10px; background: #f5f5f5; border-radius: 4px;">
                     <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #666;">封禁历史记录</h4>
                     <table class="history-table" style="width: 100%; border-collapse: collapse;">
@@ -98,6 +99,7 @@ function renderBlacklistTable(data) {
                             <tr style="background: #e0e0e0;">
                                 <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">ID</th>
                                 <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">拉黑原因</th>
+                                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">封禁时长</th>
                                 <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">过期时间</th>
                                 <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">状态</th>
                                 <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">创建时间</th>
@@ -115,6 +117,12 @@ function renderBlacklistTable(data) {
             </td>
         </tr>
     `).join('');
+}
+
+function truncateText(text, maxLength) {
+    if (!text) return '-';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
 }
 
 function renderStatus(status) {
@@ -251,7 +259,13 @@ function validateExpireInputs() {
     return errors;
 }
 
+let isSavingBlacklist = false;
+
 async function saveBlacklist() {
+    if (isSavingBlacklist) {
+        return;
+    }
+    
     const ipAddress = document.getElementById('ipInput').value.trim();
     const reason = document.getElementById('reasonInput').value.trim();
     const isPermanent = document.getElementById('permanentBlacklist').checked;
@@ -275,20 +289,23 @@ async function saveBlacklist() {
         }
     }
 
+    isSavingBlacklist = true;
+    const saveBtn = document.querySelector('#blacklistModal .modal-footer .btn-primary');
+    const originalBtnText = saveBtn.textContent;
+    saveBtn.textContent = '保存中...';
+    saveBtn.disabled = true;
+
     try {
         const data = {
             ipAddress: ipAddress,
-            reason: reason || '手动添加'
+            reason: reason || '手动添加',
+            isPermanent: isPermanent
         };
 
-        if (isPermanent) {
-            data.expireSeconds = null;
-        } else {
+        if (!isPermanent) {
             const totalSeconds = convertToTotalSeconds();
             if (totalSeconds > 0) {
                 data.expireSeconds = totalSeconds;
-            } else {
-                data.expireSeconds = null;
             }
         }
 
@@ -300,6 +317,10 @@ async function saveBlacklist() {
     } catch (error) {
         console.error('添加黑名单失败:', error);
         message.error(error.message || '添加失败');
+    } finally {
+        isSavingBlacklist = false;
+        saveBtn.textContent = originalBtnText;
+        saveBtn.disabled = false;
     }
 }
 
@@ -355,6 +376,7 @@ async function loadHistory(ip) {
                 <tr>
                     <td style="padding: 8px; border: 1px solid #ddd;">${item.id || '-'}</td>
                     <td style="padding: 8px; border: 1px solid #ddd;">${item.reason || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${item.banDurationText || '永久'}</td>
                     <td style="padding: 8px; border: 1px solid #ddd;">${item.expireTime ? dateFormat.format(item.expireTime) : '永久'}</td>
                     <td style="padding: 8px; border: 1px solid #ddd;">${renderStatus(item.status)}</td>
                     <td style="padding: 8px; border: 1px solid #ddd;">${item.createTime ? dateFormat.format(item.createTime) : '-'}</td>
@@ -387,7 +409,13 @@ function closeExtendModal() {
     document.getElementById('extendModal').style.display = 'none';
 }
 
+let isExtendingBlacklist = false;
+
 async function extendBlacklist() {
+    if (isExtendingBlacklist) {
+        return;
+    }
+    
     const ip = document.getElementById('extendIpInput').value;
     const years = parseInt(document.getElementById('extendExpireYears').value) || 0;
     const months = parseInt(document.getElementById('extendExpireMonths').value) || 0;
@@ -409,6 +437,12 @@ async function extendBlacklist() {
         return;
     }
 
+    isExtendingBlacklist = true;
+    const extendBtn = document.querySelector('#extendModal .modal-footer .btn-primary');
+    const originalBtnText = extendBtn.textContent;
+    extendBtn.textContent = '处理中...';
+    extendBtn.disabled = true;
+
     try {
         await http.put(`/blacklist/${ip}/extend`, { expireSeconds: totalSeconds });
         message.success('延长封禁时间成功');
@@ -417,6 +451,10 @@ async function extendBlacklist() {
     } catch (error) {
         console.error('延长封禁时间失败:', error);
         message.error(error.message || '延长失败');
+    } finally {
+        isExtendingBlacklist = false;
+        extendBtn.textContent = originalBtnText;
+        extendBtn.disabled = false;
     }
 }
 

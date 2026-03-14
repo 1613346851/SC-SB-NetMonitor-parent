@@ -1,10 +1,16 @@
 -- ============================================================
--- 网络监测系统数据库初始化脚本
+-- 网络监测系统数据库完整初始化脚本
 -- Database Initialization Script for Network Monitor System
 -- 
 -- 数据库版本：MySQL 8.0
 -- 字符集：utf8mb4
 -- 排序规则：utf8mb4_unicode_ci
+-- 
+-- 包含内容：
+-- 1. 基础表结构（流量、攻击、漏洞、防御日志、规则）
+-- 2. 系统配置表
+-- 3. IP黑名单优化表结构（主表、历史表、全局防御日志表）
+-- 4. 初始化数据（规则、漏洞、系统配置）
 -- ============================================================
 
 -- 设置客户端字符集
@@ -121,34 +127,6 @@ CREATE TABLE `sys_vulnerability_monitor` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='漏洞监测表';
 
 -- ------------------------------------------------------------
--- 2.4 防御日志表 (sys_defense_monitor)
--- 存储所有防御操作日志
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS `sys_defense_monitor`;
-CREATE TABLE `sys_defense_monitor` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
-  `attack_id` BIGINT DEFAULT NULL COMMENT '关联攻击 ID',
-  `traffic_id` BIGINT DEFAULT NULL COMMENT '关联流量 ID',
-  `defense_type` VARCHAR(50) NOT NULL COMMENT '防御类型 (BLOCK_IP/RATE_LIMIT/BLOCK_REQUEST 等)',
-  `defense_action` VARCHAR(20) DEFAULT NULL COMMENT '防御动作 (ADD/REMOVE/UPDATE)',
-  `defense_target` VARCHAR(255) DEFAULT NULL COMMENT '防御对象 (IP 地址/规则 ID)',
-  `defense_reason` VARCHAR(512) DEFAULT NULL COMMENT '防御原因',
-  `expire_time` DATETIME DEFAULT NULL COMMENT '防御过期时间',
-  `execute_status` TINYINT NOT NULL DEFAULT 0 COMMENT '执行状态 (0-失败，1-成功)',
-  `execute_result` TEXT DEFAULT NULL COMMENT '执行结果信息',
-  `operator` VARCHAR(50) DEFAULT NULL COMMENT '操作人 (SYSTEM/MANUAL)',
-  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_attack_id` (`attack_id`),
-  KEY `idx_traffic_id` (`traffic_id`),
-  KEY `idx_defense_type` (`defense_type`),
-  KEY `idx_execute_status` (`execute_status`),
-  KEY `idx_operator` (`operator`),
-  KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='防御日志表';
-
--- ------------------------------------------------------------
 -- 2.5 攻击规则表 (sys_monitor_rule)
 -- 存储攻击检测规则
 -- ------------------------------------------------------------
@@ -173,8 +151,110 @@ CREATE TABLE `sys_monitor_rule` (
   KEY `idx_priority` (`priority`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='攻击规则表';
 
+-- ------------------------------------------------------------
+-- 2.6 系统配置表 (sys_config)
+-- 存储系统配置信息
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_config`;
+CREATE TABLE `sys_config` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
+  `config_key` VARCHAR(100) NOT NULL COMMENT '配置键',
+  `config_value` TEXT DEFAULT NULL COMMENT '配置值',
+  `description` VARCHAR(512) DEFAULT NULL COMMENT '配置描述',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_config_key` (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
+
+-- ------------------------------------------------------------
+-- 2.7 IP黑名单主表 (sys_ip_blacklist)
+-- 存储唯一IP地址信息，记录IP的当前最新状态
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_ip_blacklist`;
+CREATE TABLE `sys_ip_blacklist` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `ip_address` VARCHAR(128) NOT NULL COMMENT 'IP地址(支持IPv4/IPv6)',
+    `ip_location` VARCHAR(255) DEFAULT NULL COMMENT 'IP归属地(省市/国家)',
+    `current_expire_time` DATETIME DEFAULT NULL COMMENT '当前封禁过期时间(永久封禁时为NULL)',
+    `total_ban_count` INT DEFAULT 0 COMMENT '累计封禁次数',
+    `first_ban_time` DATETIME DEFAULT NULL COMMENT '首次封禁时间',
+    `last_ban_time` DATETIME DEFAULT NULL COMMENT '最近一次封禁时间',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `status` TINYINT DEFAULT 0 COMMENT '当前状态(0-正常，1-封禁中)',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ip_address` (`ip_address`),
+    KEY `idx_status` (`status`),
+    KEY `idx_current_expire_time` (`current_expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='IP黑名单主表';
+
+-- ------------------------------------------------------------
+-- 2.8 IP黑名单子表 (sys_ip_blacklist_history)
+-- 存储单个IP的所有封禁/解封历史记录
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_ip_blacklist_history`;
+CREATE TABLE `sys_ip_blacklist_history` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `blacklist_id` BIGINT NOT NULL COMMENT '关联黑名单主表ID',
+    `attack_id` BIGINT DEFAULT NULL COMMENT '关联攻击表ID(sys_attack_monitor)',
+    `traffic_id` BIGINT DEFAULT NULL COMMENT '关联流量表ID(sys_traffic_monitor)',
+    `rule_id` BIGINT DEFAULT NULL COMMENT '关联触发规则ID(sys_monitor_rule)',
+    `ban_type` VARCHAR(32) DEFAULT 'MANUAL' COMMENT '封禁类型(SYSTEM-自动封禁，MANUAL-人工封禁)',
+    `ban_reason` VARCHAR(500) DEFAULT NULL COMMENT '封禁原因(SQL注入/DDOS等)',
+    `ban_duration` BIGINT DEFAULT NULL COMMENT '封禁时长(秒，永久为NULL)',
+    `expire_time` DATETIME DEFAULT NULL COMMENT '封禁过期时间',
+    `process_status` TINYINT DEFAULT 1 COMMENT '处理状态(1-封禁中，2-已解封)',
+    `operator` VARCHAR(64) DEFAULT NULL COMMENT '操作人(SYSTEM/管理员账号)',
+    `ban_execute_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '封禁执行时间',
+    `unban_execute_time` DATETIME DEFAULT NULL COMMENT '解封执行时间',
+    `unban_reason` VARCHAR(255) DEFAULT NULL COMMENT '解封原因(误封/过期)',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_blacklist_id` (`blacklist_id`),
+    KEY `idx_attack_id` (`attack_id`),
+    KEY `idx_traffic_id` (`traffic_id`),
+    KEY `idx_rule_id` (`rule_id`),
+    KEY `idx_process_status` (`process_status`),
+    KEY `idx_expire_time` (`expire_time`),
+    KEY `idx_ban_execute_time` (`ban_execute_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='IP黑名单子表(封禁历史记录)';
+
+-- ------------------------------------------------------------
+-- 2.9 全局防御日志表 (sys_defense_log)
+-- 记录所有类型的防御操作，作为系统全局安全审计日志
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_defense_log`;
+CREATE TABLE `sys_defense_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `defense_type` VARCHAR(32) NOT NULL COMMENT '防御类型(BLOCK_IP-封禁IP，RATE_LIMIT-限流，BLOCK_REQUEST-拦截请求)',
+    `defense_action` VARCHAR(20) DEFAULT NULL COMMENT '防御动作(ADD-添加，REMOVE-移除，UPDATE-更新)',
+    `defense_target` VARCHAR(255) NOT NULL COMMENT '防御对象(IP/接口URI/规则ID)',
+    `attack_id` BIGINT DEFAULT NULL COMMENT '关联攻击表ID',
+    `traffic_id` BIGINT DEFAULT NULL COMMENT '关联流量表ID',
+    `rule_id` BIGINT DEFAULT NULL COMMENT '关联检测规则ID',
+    `defense_reason` VARCHAR(500) DEFAULT NULL COMMENT '防御原因',
+    `expire_time` DATETIME DEFAULT NULL COMMENT '防御过期时间(封禁IP时使用)',
+    `execute_status` TINYINT DEFAULT 0 COMMENT '执行状态(0-失败，1-成功)',
+    `execute_result` VARCHAR(500) DEFAULT NULL COMMENT '执行结果详情',
+    `operator` VARCHAR(64) DEFAULT NULL COMMENT '操作人(SYSTEM-自动，MANUAL-人工)',
+    `execute_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '防御执行时间',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_defense_type` (`defense_type`),
+    KEY `idx_defense_action` (`defense_action`),
+    KEY `idx_defense_target` (`defense_target`),
+    KEY `idx_attack_id` (`attack_id`),
+    KEY `idx_traffic_id` (`traffic_id`),
+    KEY `idx_rule_id` (`rule_id`),
+    KEY `idx_execute_status` (`execute_status`),
+    KEY `idx_operator` (`operator`),
+    KEY `idx_execute_time` (`execute_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='全局防御日志表';
+
 -- ============================================================
--- 3. 创建视图（可选）
+-- 3. 创建视图
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -206,7 +286,7 @@ SELECT
     d.operator
 FROM sys_attack_monitor a
 LEFT JOIN sys_traffic_monitor t ON a.traffic_id = t.id
-LEFT JOIN sys_defense_monitor d ON a.id = d.attack_id;
+LEFT JOIN sys_defense_log d ON a.id = d.attack_id;
 
 -- ------------------------------------------------------------
 -- 3.2 漏洞攻击统计视图 (v_vulnerability_stat)
@@ -277,7 +357,7 @@ INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `des
 -- 文件包含检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
 ('文件包含 - PHP include', 'FILE_INCLUSION', '(?i)\\b(include|require|include_once|require_once)\\b\\s*\\(', '检测 PHP 文件包含函数', 'HIGH', 1, 10),
-('文件 包含 - data 协议', 'FILE_INCLUSION', '(?i)data://', '检测 data 协议文件包含', 'HIGH', 1, 10),
+('文件包含 - data 协议', 'FILE_INCLUSION', '(?i)data://', '检测 data 协议文件包含', 'HIGH', 1, 10),
 ('文件包含 - php://协议', 'FILE_INCLUSION', '(?i)php://', '检测 php:// 协议', 'HIGH', 1, 10),
 ('文件包含 - file://协议', 'FILE_INCLUSION', '(?i)file://', '检测 file:// 协议', 'HIGH', 1, 10);
 
@@ -322,101 +402,23 @@ INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`,
  '限制协议类型（仅允许 HTTP/HTTPS）；禁用重定向；使用白名单验证目标地址');
 
 -- ------------------------------------------------------------
--- 4.3 初始化系统配置（可选）
+-- 4.3 初始化系统配置
 -- ------------------------------------------------------------
--- 如需添加系统配置表，可取消以下注释
-/*
-DROP TABLE IF EXISTS `sys_config`;
-CREATE TABLE `sys_config` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
-  `config_key` VARCHAR(100) NOT NULL COMMENT '配置键',
-  `config_value` TEXT DEFAULT NULL COMMENT '配置值',
-  `description` VARCHAR(512) DEFAULT NULL COMMENT '配置描述',
-  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_config_key` (`config_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
-
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('ddos.threshold', '100', 'DDoS 检测阈值（次/分钟）'),
 ('blacklist.default.expire.seconds', '86400', '黑名单默认过期时间（秒）'),
 ('alert.enabled', 'true', '是否启用告警通知'),
 ('alert.push.interval', '5000', '告警推送间隔（毫秒）'),
 ('alert.heartbeat.interval', '10000', '告警心跳间隔（毫秒）');
-*/
 
 -- ============================================================
--- 5. 创建触发器（可选）
--- ============================================================
-
--- ------------------------------------------------------------
--- 5.1 攻击记录自动更新漏洞统计触发器
--- ------------------------------------------------------------
-DROP TRIGGER IF EXISTS `trg_update_vuln_stat_after_attack`;
-DELIMITER $$
-CREATE TRIGGER `trg_update_vuln_stat_after_attack`
-AFTER INSERT ON `sys_attack_monitor`
-FOR EACH ROW
-BEGIN
-    DECLARE v_vuln_path VARCHAR(1024);
-    
-    -- 查找匹配的预设漏洞
-    SELECT vuln_path INTO v_vuln_path
-    FROM sys_vulnerability_monitor
-    WHERE NEW.target_uri LIKE CONCAT('%', vuln_path, '%')
-    LIMIT 1;
-    
-    -- 如果找到匹配的漏洞，更新统计信息
-    IF v_vuln_path IS NOT NULL THEN
-        UPDATE sys_vulnerability_monitor
-        SET attack_count = attack_count + 1,
-            first_attack_time = COALESCE(first_attack_time, NEW.create_time),
-            last_attack_time = NEW.create_time,
-            verify_status = CASE WHEN attack_count >= 1 THEN 1 ELSE verify_status END
-        WHERE vuln_path = v_vuln_path;
-    END IF;
-END$$
-DELIMITER ;
-
--- ============================================================
--- 6. 恢复外键检查
+-- 5. 完成提示
 -- ============================================================
 SET FOREIGN_KEY_CHECKS = 1;
 
--- ============================================================
--- 7. 数据验证查询（可选）
--- ============================================================
-
--- 验证表创建情况
-SELECT 
-    TABLE_NAME,
-    TABLE_COMMENT,
-    TABLE_ROWS,
-    CREATE_TIME
-FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = 'network_monitor'
-ORDER BY TABLE_NAME;
-
--- 验证规则初始化情况
-SELECT 
-    attack_type,
-    COUNT(*) AS rule_count,
-    SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) AS enabled_count
-FROM sys_monitor_rule
-GROUP BY attack_type;
-
--- 验证漏洞初始化情况
-SELECT 
-    vuln_level,
-    COUNT(*) AS vuln_count
-FROM sys_vulnerability_monitor
-GROUP BY vuln_level;
-
--- ============================================================
--- 数据库初始化完成
--- ============================================================
-SELECT '数据库初始化完成！' AS status;
+SELECT '========================================' AS '';
+SELECT '数据库初始化完成！' AS '提示';
+SELECT '========================================' AS '';
 SELECT CONCAT('数据库：', DATABASE()) AS database_info;
 SELECT CONCAT('表数量：', COUNT(*)) AS table_count 
 FROM information_schema.TABLES 

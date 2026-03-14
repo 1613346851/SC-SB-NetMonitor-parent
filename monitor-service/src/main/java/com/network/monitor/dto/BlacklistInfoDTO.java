@@ -23,10 +23,9 @@ public class BlacklistInfoDTO {
      */
     private Long remainingSeconds;
     
-    /**
-     * 剩余时间描述（如：2天3小时15分）
-     */
     private String remainingTime;
+
+    private Integer totalBanCount;
     
     /**
      * 封禁历史记录DTO

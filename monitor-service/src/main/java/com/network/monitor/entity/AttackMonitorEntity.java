@@ -96,7 +96,7 @@ public class AttackMonitorEntity {
     /**
      * 关联的防御日志列表
      */
-    private java.util.List<DefenseMonitorEntity> defenseLogs;
+    private java.util.List<DefenseLogEntity> defenseLogs;
 
     // ==================== 辅助方法 ====================
 

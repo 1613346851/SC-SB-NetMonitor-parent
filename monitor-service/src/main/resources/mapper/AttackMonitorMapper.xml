@@ -137,11 +137,16 @@
 
     <select id="countAttackTrend" resultType="com.network.monitor.mapper.AttackMonitorMapper$TrendStat">
         SELECT 
-            DATE_FORMAT(create_time, '%Y-%m-%d %H:00:00') AS time,
-            COUNT(*) AS count
-        FROM sys_attack_monitor
-        WHERE create_time &gt;= #{startTime} AND create_time &lt;= #{endTime}
-        GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d %H:00:00')
+            STR_TO_DATE(time_str, '%Y-%m-%d %H:%i:%s') AS time,
+            count
+        FROM (
+            SELECT 
+                DATE_FORMAT(create_time, '%Y-%m-%d %H:00:00') AS time_str,
+                COUNT(*) AS count
+            FROM sys_attack_monitor
+            WHERE create_time &gt;= #{startTime} AND create_time &lt;= #{endTime}
+            GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d %H:00:00')
+        ) t
         ORDER BY time ASC
     </select>
 </mapper>

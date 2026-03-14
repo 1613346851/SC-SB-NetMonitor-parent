@@ -64,8 +64,8 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
                 boolean success = gatewayApiClient.pushDefenseCommand(commandDTO);
                 
                 if (success) {
-                    log.info("生成并推送防御决策成功：attackId={}, defenseType={}, target={}", 
-                        attackDTO.getTrafficId(), commandDTO.getDefenseType(), commandDTO.getDefenseTarget());
+                    log.info("生成并推送防御决策成功：attackId={}, defenseType={}, sourceIp={}", 
+                        attackDTO.getTrafficId(), commandDTO.getDefenseType(), commandDTO.getSourceIp());
                 } else {
                     log.error("推送防御指令失败：attackId={}", attackDTO.getTrafficId());
                 }
@@ -83,14 +83,18 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
         try {
             DefenseCommandDTO commandDTO = new DefenseCommandDTO();
             
-            commandDTO.setDefenseType(defenseType);
-            commandDTO.setDefenseAction("ADD");
-            commandDTO.setDefenseTarget(target);
-            commandDTO.setDefenseReason(reason);
-            commandDTO.setExpireTime(calculateExpireTime(120)); // 手动操作默认 2 小时
+            commandDTO.setSourceIp(target);
+            commandDTO.setDefenseType("BLACKLIST".equals(defenseType) ? "BLACKLIST" : defenseType);
             commandDTO.setRiskLevel(RiskLevelConstant.HIGH);
+            commandDTO.setDescription(reason);
+            
+            LocalDateTime expireTime = LocalDateTime.now().plusMinutes(120);
+            commandDTO.setExpireTimestamp(
+                expireTime.atZone(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+            );
 
-            // 推送至网关执行
             gatewayApiClient.pushDefenseCommand(commandDTO);
 
             log.info("生成手动防御决策：type={}, target={}, reason={}", defenseType, target, reason);
@@ -102,9 +106,6 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
         }
     }
 
-    /**
-     * 构建防御指令 DTO
-     */
     private DefenseCommandDTO buildDefenseCommand(AttackMonitorDTO attackDTO,
                                                    String defenseType,
                                                    String action,
@@ -113,14 +114,24 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
                                                    String expireTime) {
         DefenseCommandDTO dto = new DefenseCommandDTO();
         
-        dto.setAttackId(attackDTO.getTrafficId());
-        dto.setTrafficId(attackDTO.getTrafficId());
-        dto.setDefenseType(defenseType);
-        dto.setDefenseAction(action);
-        dto.setDefenseTarget(target);
-        dto.setDefenseReason(reason);
-        dto.setExpireTime(expireTime);
+        dto.setSourceIp(target);
+        dto.setDefenseType("BLACKLIST".equals(defenseType) ? "BLACKLIST" : defenseType);
         dto.setRiskLevel(attackDTO.getRiskLevel());
+        dto.setDescription(reason);
+        dto.setEventId(String.valueOf(attackDTO.getTrafficId()));
+        
+        if (expireTime != null) {
+            try {
+                LocalDateTime exp = LocalDateTime.parse(expireTime, TIME_FORMATTER);
+                dto.setExpireTimestamp(
+                    exp.atZone(java.time.ZoneId.systemDefault())
+                        .toInstant()
+                        .toEpochMilli()
+                );
+            } catch (Exception e) {
+                log.warn("解析过期时间失败：{}", expireTime);
+            }
+        }
         
         return dto;
     }

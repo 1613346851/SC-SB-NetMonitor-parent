@@ -4,21 +4,21 @@ import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.dto.BlacklistAddDTO;
 import com.network.monitor.dto.BlacklistInfoDTO;
+import com.network.monitor.entity.IpBlacklistEntity;
+import com.network.monitor.entity.IpBlacklistHistoryEntity;
 import com.network.monitor.service.BlacklistManageService;
+import com.network.monitor.service.IpBlacklistService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 黑名单管理控制器（对外前端业务接口）
- * 支持前端页面手动添加/解除黑名单，自定义过期时间
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/blacklist")
@@ -28,19 +28,36 @@ public class BlacklistManageController {
     private BlacklistManageService blacklistManageService;
 
     @Autowired
+    private IpBlacklistService ipBlacklistService;
+
+    @Autowired
     private SysConfigCache sysConfigCache;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    /**
-     * 获取黑名单列表
-     */
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getBlacklist(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
         try {
-            List<BlacklistInfoDTO> list = blacklistManageService.getBlacklistGroupedByIp();
+            List<IpBlacklistEntity> entities = ipBlacklistService.getAllBlacklists();
+            
+            List<BlacklistInfoDTO> list = new ArrayList<>();
+            for (IpBlacklistEntity entity : entities) {
+                BlacklistInfoDTO dto = new BlacklistInfoDTO();
+                dto.setId(entity.getId());
+                dto.setIp(entity.getIpAddress());
+                dto.setReason(getLatestBanReason(entity.getId()));
+                dto.setExpireTime(entity.getCurrentExpireTime() != null ? 
+                    entity.getCurrentExpireTime().format(TIME_FORMATTER) : null);
+                dto.setCreateTime(entity.getCreateTime() != null ? 
+                    entity.getCreateTime().format(TIME_FORMATTER) : null);
+                dto.setStatus(entity.isBanned() && !entity.isExpired() ? 1 : 2);
+                dto.setRemainingSeconds(calculateRemainingSeconds(entity.getCurrentExpireTime()));
+                dto.setRemainingTime(formatRemainingTime(entity.getCurrentExpireTime()));
+                dto.setTotalBanCount(entity.getTotalBanCount() != null ? entity.getTotalBanCount() : 0);
+                list.add(dto);
+            }
             
             Map<String, Object> result = new HashMap<>();
             result.put("list", list);
@@ -55,26 +72,66 @@ public class BlacklistManageController {
         }
     }
 
-    /**
-     * 获取黑名单详情（包含历史记录）
-     */
+    private String getLatestBanReason(Long blacklistId) {
+        try {
+            List<IpBlacklistHistoryEntity> historyList = ipBlacklistService.getHistoryByIp(
+                ipBlacklistService.getBlacklistByIp(null) != null ? 
+                    ipBlacklistService.getBlacklistByIp(null).getIpAddress() : null);
+            if (historyList != null && !historyList.isEmpty()) {
+                return historyList.get(0).getBanReason();
+            }
+        } catch (Exception e) {
+            log.warn("获取封禁原因失败", e);
+        }
+        return "手动添加";
+    }
+
     @GetMapping("/{ip}/history")
     public ApiResponse<Map<String, Object>> getBlacklistHistory(@PathVariable String ip) {
         try {
-            Map<String, Object> info = blacklistManageService.getBlacklistWithHistory(ip);
-            if (info.isEmpty()) {
+            IpBlacklistEntity entity = ipBlacklistService.getBlacklistByIp(ip);
+            if (entity == null) {
                 return ApiResponse.notFound("IP 不在黑名单中");
             }
-            return ApiResponse.success(info);
+
+            List<IpBlacklistHistoryEntity> historyList = ipBlacklistService.getHistoryByIp(ip);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", entity.getId());
+            result.put("ip", entity.getIpAddress());
+            result.put("expireTime", entity.getCurrentExpireTime() != null ? 
+                entity.getCurrentExpireTime().format(TIME_FORMATTER) : null);
+            result.put("createTime", entity.getCreateTime() != null ? 
+                entity.getCreateTime().format(TIME_FORMATTER) : null);
+            result.put("status", entity.isBanned() && !entity.isExpired() ? 1 : 2);
+            result.put("totalBanCount", entity.getTotalBanCount());
+
+            List<Map<String, Object>> historyResult = new ArrayList<>();
+            if (historyList != null) {
+                for (IpBlacklistHistoryEntity history : historyList) {
+                    Map<String, Object> historyMap = new HashMap<>();
+                    historyMap.put("id", history.getId());
+                    historyMap.put("reason", history.getBanReason());
+                    historyMap.put("expireTime", history.getExpireTime() != null ? 
+                        history.getExpireTime().format(TIME_FORMATTER) : null);
+                    historyMap.put("createTime", history.getBanExecuteTime() != null ? 
+                        history.getBanExecuteTime().format(TIME_FORMATTER) : null);
+                    historyMap.put("operator", history.getOperator());
+                    historyMap.put("status", history.isBanning() && !history.isExpired() ? 1 : 2);
+                    historyMap.put("banDuration", history.getBanDuration());
+                    historyMap.put("banDurationText", formatBanDuration(history.getBanDuration()));
+                    historyResult.add(historyMap);
+                }
+            }
+            result.put("history", historyResult);
+
+            return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("获取黑名单详情失败：ip={}", ip, e);
             return ApiResponse.error("获取黑名单详情失败");
         }
     }
 
-    /**
-     * 延长黑名单封禁时间
-     */
     @PutMapping("/{ip}/extend")
     public ApiResponse<Void> extendBlacklist(@PathVariable String ip, @RequestBody Map<String, Object> params) {
         try {
@@ -83,7 +140,7 @@ public class BlacklistManageController {
                 return ApiResponse.error("延长时间必须大于0");
             }
             
-            blacklistManageService.extendBlacklistExpireTime(ip, expireSeconds.longValue());
+            ipBlacklistService.extendBlacklist(ip, expireSeconds.longValue(), "admin");
             
             log.info("延长黑名单封禁时间成功：ip={}, extendSeconds={}", ip, expireSeconds);
             return ApiResponse.success();
@@ -93,18 +150,15 @@ public class BlacklistManageController {
         }
     }
 
-    /**
-     * 删除 IP 的所有黑名单记录
-     */
     @DeleteMapping("/{ip}/all")
     public ApiResponse<Map<String, Object>> deleteAllBlacklists(@PathVariable String ip) {
         try {
-            int count = blacklistManageService.deleteAllBlacklistsByIp(ip);
+            ipBlacklistService.removeFromBlacklist(ip, "删除所有封禁记录", "admin");
             
             Map<String, Object> result = new HashMap<>();
-            result.put("deletedCount", count);
+            result.put("deletedCount", 1);
             
-            log.info("删除 IP 的所有黑名单记录成功：ip={}, count={}", ip, count);
+            log.info("删除 IP 的所有黑名单记录成功：ip={}", ip);
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("删除 IP 的所有黑名单记录失败：ip={}", ip, e);
@@ -112,9 +166,6 @@ public class BlacklistManageController {
         }
     }
 
-    /**
-     * 添加 IP 到黑名单
-     */
     @PostMapping
     public ApiResponse<Void> addToBlacklist(@RequestBody BlacklistAddDTO dto) {
         try {
@@ -122,26 +173,26 @@ public class BlacklistManageController {
             String reason = dto.getReason();
             Integer expireSeconds = dto.getExpireSeconds();
             String operator = dto.getOperator();
+            Boolean isPermanent = dto.getIsPermanent();
 
-            // 计算过期时间
             LocalDateTime expireTime;
-            if (expireSeconds != null && expireSeconds > 0) {
+            if (Boolean.TRUE.equals(isPermanent)) {
+                expireTime = null;
+            } else if (expireSeconds != null && expireSeconds > 0) {
                 expireTime = LocalDateTime.now().plusSeconds(expireSeconds);
             } else {
-                // 从配置缓存获取默认过期时间（秒）
                 int defaultExpireSeconds = sysConfigCache.getIntValue("blacklist.default.expire.seconds", 86400);
                 expireTime = LocalDateTime.now().plusSeconds(defaultExpireSeconds);
             }
 
-            // 操作人默认为"admin"
             if (operator == null || operator.isEmpty()) {
                 operator = "admin";
             }
 
-            blacklistManageService.addToBlacklist(ip, reason, expireTime, operator);
+            ipBlacklistService.addToBlacklist(ip, reason, expireTime, operator, "MANUAL", null, null, null);
 
             log.info("手动添加黑名单成功：ip={}, reason={}, expireTime={}, operator={}", 
-                    ip, reason, expireTime.format(TIME_FORMATTER), operator);
+                    ip, reason, expireTime != null ? expireTime.format(TIME_FORMATTER) : "永久", operator);
 
             return ApiResponse.success();
         } catch (Exception e) {
@@ -150,13 +201,10 @@ public class BlacklistManageController {
         }
     }
 
-    /**
-     * 从黑名单移除 IP
-     */
     @DeleteMapping("/{ip}")
     public ApiResponse<Void> removeFromBlacklist(@PathVariable String ip) {
         try {
-            blacklistManageService.removeFromBlacklist(ip);
+            ipBlacklistService.removeFromBlacklist(ip, "手动移除黑名单", "admin");
 
             log.info("从黑名单移除 IP 成功：ip={}", ip);
 
@@ -167,20 +215,23 @@ public class BlacklistManageController {
         }
     }
 
-    /**
-     * 检查 IP 是否在黑名单中
-     */
     @GetMapping("/check/{ip}")
     public ApiResponse<Map<String, Object>> checkIp(@PathVariable String ip) {
         try {
             Map<String, Object> result = new HashMap<>();
-            boolean inBlacklist = blacklistManageService.isInBlacklist(ip);
+            boolean inBlacklist = ipBlacklistService.isInBlacklist(ip);
             result.put("ip", ip);
             result.put("inBlacklist", inBlacklist);
 
             if (inBlacklist) {
-                Map<String, Object> info = blacklistManageService.getBlacklistInfo(ip);
-                result.putAll(info);
+                IpBlacklistEntity entity = ipBlacklistService.getBlacklistByIp(ip);
+                if (entity != null) {
+                    result.put("expireTime", entity.getCurrentExpireTime() != null ? 
+                        entity.getCurrentExpireTime().format(TIME_FORMATTER) : null);
+                    result.put("createTime", entity.getCreateTime() != null ? 
+                        entity.getCreateTime().format(TIME_FORMATTER) : null);
+                    result.put("status", entity.isBanned() && !entity.isExpired() ? 1 : 2);
+                }
             }
 
             return ApiResponse.success(result);
@@ -190,30 +241,35 @@ public class BlacklistManageController {
         }
     }
 
-    /**
-     * 获取黑名单详情
-     */
     @GetMapping("/{ip}")
     public ApiResponse<Map<String, Object>> getBlacklistDetail(@PathVariable String ip) {
         try {
-            Map<String, Object> info = blacklistManageService.getBlacklistInfo(ip);
-            if (info.isEmpty()) {
+            IpBlacklistEntity entity = ipBlacklistService.getBlacklistByIp(ip);
+            if (entity == null) {
                 return ApiResponse.notFound("IP 不在黑名单中");
             }
-            return ApiResponse.success(info);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", entity.getId());
+            result.put("ip", entity.getIpAddress());
+            result.put("expireTime", entity.getCurrentExpireTime() != null ? 
+                entity.getCurrentExpireTime().format(TIME_FORMATTER) : null);
+            result.put("createTime", entity.getCreateTime() != null ? 
+                entity.getCreateTime().format(TIME_FORMATTER) : null);
+            result.put("status", entity.isBanned() && !entity.isExpired() ? 1 : 2);
+            result.put("totalBanCount", entity.getTotalBanCount());
+
+            return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("获取黑名单详情失败：ip={}", ip, e);
             return ApiResponse.error("获取黑名单详情失败");
         }
     }
 
-    /**
-     * 清理过期黑名单
-     */
     @PostMapping("/clean-expired")
     public ApiResponse<Map<String, Object>> cleanExpired() {
         try {
-            int count = blacklistManageService.cleanExpiredBlacklist();
+            int count = ipBlacklistService.cleanExpiredBlacklists();
 
             Map<String, Object> result = new HashMap<>();
             result.put("cleanedCount", count);
@@ -227,13 +283,10 @@ public class BlacklistManageController {
         }
     }
 
-    /**
-     * 清空所有黑名单
-     */
     @PostMapping("/clear")
     public ApiResponse<Void> clear() {
         try {
-            blacklistManageService.clear();
+            ipBlacklistService.clear();
 
             log.info("清空所有黑名单完成");
 
@@ -244,19 +297,89 @@ public class BlacklistManageController {
         }
     }
 
-    /**
-     * 获取黑名单统计信息
-     */
     @GetMapping("/stats")
     public ApiResponse<Map<String, Object>> getStats() {
         try {
             Map<String, Object> stats = new HashMap<>();
-            stats.put("totalCount", blacklistManageService.getSize());
+            stats.put("totalCount", ipBlacklistService.getTotalCount());
+            stats.put("banningCount", ipBlacklistService.getBanningCount());
 
             return ApiResponse.success(stats);
         } catch (Exception e) {
             log.error("获取黑名单统计信息失败：", e);
             return ApiResponse.error("获取统计信息失败");
         }
+    }
+
+    private Long calculateRemainingSeconds(LocalDateTime expireTime) {
+        if (expireTime == null) {
+            return null;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isAfter(expireTime)) {
+            return 0L;
+        }
+        return java.time.Duration.between(now, expireTime).getSeconds();
+    }
+
+    private String formatRemainingTime(LocalDateTime expireTime) {
+        Long remainingSeconds = calculateRemainingSeconds(expireTime);
+        if (remainingSeconds == null) {
+            return "永久";
+        }
+        if (remainingSeconds <= 0) {
+            return "已过期";
+        }
+        
+        long days = remainingSeconds / (24 * 3600);
+        long hours = (remainingSeconds % (24 * 3600)) / 3600;
+        long minutes = (remainingSeconds % 3600) / 60;
+        long seconds = remainingSeconds % 60;
+        
+        StringBuilder sb = new StringBuilder();
+        if (days > 0) {
+            sb.append(days).append("天");
+        }
+        if (hours > 0) {
+            sb.append(hours).append("小时");
+        }
+        if (minutes > 0) {
+            sb.append(minutes).append("分");
+        }
+        if (seconds > 0 || sb.length() == 0) {
+            sb.append(seconds).append("秒");
+        }
+        
+        return sb.toString();
+    }
+
+    private String formatBanDuration(Long banDuration) {
+        if (banDuration == null) {
+            return "永久";
+        }
+        if (banDuration <= 0) {
+            return "-";
+        }
+        
+        long days = banDuration / (24 * 3600);
+        long hours = (banDuration % (24 * 3600)) / 3600;
+        long minutes = (banDuration % 3600) / 60;
+        long seconds = banDuration % 60;
+        
+        StringBuilder sb = new StringBuilder();
+        if (days > 0) {
+            sb.append(days).append("天");
+        }
+        if (hours > 0) {
+            sb.append(hours).append("小时");
+        }
+        if (minutes > 0) {
+            sb.append(minutes).append("分");
+        }
+        if (seconds > 0 || sb.length() == 0) {
+            sb.append(seconds).append("秒");
+        }
+        
+        return sb.toString();
     }
 }

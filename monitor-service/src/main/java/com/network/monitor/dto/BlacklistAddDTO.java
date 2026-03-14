@@ -8,4 +8,5 @@ public class BlacklistAddDTO {
     private String reason;
     private Integer expireSeconds;
     private String operator;
+    private Boolean isPermanent;
 }

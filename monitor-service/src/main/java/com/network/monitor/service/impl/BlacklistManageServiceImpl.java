@@ -5,8 +5,8 @@ import com.network.monitor.client.GatewayApiClient;
 import com.network.monitor.common.constant.DefenseTypeConstant;
 import com.network.monitor.dto.BlacklistInfoDTO;
 import com.network.monitor.dto.DefenseCommandDTO;
-import com.network.monitor.entity.DefenseMonitorEntity;
-import com.network.monitor.mapper.DefenseMonitorMapper;
+import com.network.monitor.entity.DefenseLogEntity;
+import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.service.BlacklistManageService;
 import com.network.monitor.service.DefenseLogService;
 import lombok.extern.slf4j.Slf4j;
@@ -34,7 +34,7 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
     private DefenseLogService defenseLogService;
 
     @Autowired
-    private DefenseMonitorMapper defenseMonitorMapper;
+    private DefenseLogMapper defenseLogMapper;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -45,38 +45,63 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         }
 
         try {
-            BlacklistCache.BlacklistInfo info = blacklistCache.getBlacklistInfoWithoutRemove(ip);
-            
-            if (info != null && !info.isExpired()) {
-                LocalDateTime currentExpireTime = info.getExpireTime() != null ? 
-                    LocalDateTime.parse(info.getExpireTime(), TIME_FORMATTER) : null;
-                
-                if (currentExpireTime == null) {
-                    log.warn("IP 已永久封禁，无需延长：ip={}", ip);
-                    return;
+            if (expireTime == null) {
+                List<DefenseLogEntity> historyRecords = defenseLogMapper.selectBlacklistsByIp(ip);
+                if (historyRecords != null && !historyRecords.isEmpty()) {
+                    for (DefenseLogEntity record : historyRecords) {
+                        if (record.getExpireTime() == null) {
+                            log.warn("IP 已永久封禁，无需重复添加：ip={}", ip);
+                            return;
+                        }
+                    }
                 }
                 
-                long extendSeconds = java.time.Duration.between(LocalDateTime.now(), expireTime).getSeconds();
-                if (extendSeconds <= 0) {
-                    log.warn("延长时间无效，跳过：ip={}, extendSeconds={}", ip, extendSeconds);
-                    return;
-                }
-                
-                log.info("IP 已在黑名单中且生效中，延长封禁时间：ip={}, extendSeconds={}", ip, extendSeconds);
-                
-                extendBlacklistExpireTime(ip, extendSeconds);
-                recordDefenseLog(ip, "UPDATE", "延长封禁时间（添加时触发）", operator, expireTime);
+                blacklistCache.add(ip, reason, null, operator);
+                syncToGateway(ip, "ADD");
+                recordDefenseLog(ip, "ADD", reason, operator, null);
+                log.info("添加 IP 到黑名单成功（永久封禁）：ip={}, reason={}, operator={}", ip, reason, operator);
                 return;
             }
+            
+            List<DefenseLogEntity> historyRecords = defenseLogMapper.selectBlacklistsByIp(ip);
+            
+            LocalDateTime baseTime = LocalDateTime.now();
+            boolean hasActiveRecord = false;
+            
+            if (historyRecords != null && !historyRecords.isEmpty()) {
+                for (DefenseLogEntity record : historyRecords) {
+                    if (record.getExpireTime() == null) {
+                        log.warn("IP 已永久封禁，无需延长：ip={}", ip);
+                        return;
+                    }
+                    if (record.getExpireTime().isAfter(LocalDateTime.now())) {
+                        hasActiveRecord = true;
+                        if (record.getExpireTime().isAfter(baseTime)) {
+                            baseTime = record.getExpireTime();
+                        }
+                    }
+                }
+            }
+            
+            LocalDateTime finalExpireTime;
+            if (hasActiveRecord) {
+                long extendSeconds = java.time.Duration.between(LocalDateTime.now(), expireTime).getSeconds();
+                finalExpireTime = baseTime.plusSeconds(extendSeconds);
+                log.info("IP 存在生效中的封禁记录，延长封禁时间：ip={}, baseTime={}, extendSeconds={}, finalExpireTime={}", 
+                    ip, baseTime.format(TIME_FORMATTER), extendSeconds, finalExpireTime.format(TIME_FORMATTER));
+            } else {
+                finalExpireTime = expireTime;
+                log.info("IP 无生效中的封禁记录，创建新封禁记录：ip={}, expireTime={}", ip, finalExpireTime.format(TIME_FORMATTER));
+            }
 
-            blacklistCache.add(ip, reason, expireTime, operator);
+            blacklistCache.add(ip, reason, finalExpireTime, operator);
 
             syncToGateway(ip, "ADD");
 
-            recordDefenseLog(ip, "ADD", reason, operator, expireTime);
+            recordDefenseLog(ip, "ADD", reason, operator, finalExpireTime);
 
             log.info("添加 IP 到黑名单成功：ip={}, reason={}, expireTime={}, operator={}", 
-                    ip, reason, expireTime != null ? expireTime.format(TIME_FORMATTER) : "永久", operator);
+                    ip, reason, finalExpireTime.format(TIME_FORMATTER), operator);
         } catch (Exception e) {
             log.error("添加 IP 到黑名单失败：ip={}", ip, e);
             throw new RuntimeException("添加黑名单失败：" + e.getMessage(), e);
@@ -90,33 +115,51 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         }
 
         try {
-            List<DefenseMonitorEntity> historyRecords = defenseMonitorMapper.selectBlacklistsByIp(ip);
+            List<DefenseLogEntity> historyRecords = defenseLogMapper.selectBlacklistsByIp(ip);
+            
+            LocalDateTime baseTime = LocalDateTime.now();
+            String reason = "延长封禁时间";
+            String operator = "MANUAL";
+            
             if (historyRecords != null && !historyRecords.isEmpty()) {
-                DefenseMonitorEntity latestRecord = historyRecords.get(0);
-                
-                LocalDateTime currentExpireTime = latestRecord.getExpireTime();
-                if (currentExpireTime == null) {
-                    throw new RuntimeException("永久封禁的IP无法延长");
+                for (DefenseLogEntity record : historyRecords) {
+                    if (record.getExpireTime() == null) {
+                        throw new RuntimeException("永久封禁的IP无法延长");
+                    }
+                    if (record.getExpireTime().isAfter(LocalDateTime.now()) && record.getExpireTime().isAfter(baseTime)) {
+                        baseTime = record.getExpireTime();
+                    }
+                    if (record.getDefenseReason() != null) {
+                        reason = record.getDefenseReason();
+                    }
+                    if (record.getOperator() != null) {
+                        operator = record.getOperator();
+                    }
                 }
-                
-                LocalDateTime newExpireTime = currentExpireTime.plusSeconds(extendSeconds);
-                
-                latestRecord.setExpireTime(newExpireTime);
-                latestRecord.setUpdateTime(LocalDateTime.now());
-                defenseMonitorMapper.updateById(latestRecord);
-                
-                BlacklistCache.BlacklistInfo info = blacklistCache.getBlacklistInfoWithoutRemove(ip);
-                if (info != null) {
-                    blacklistCache.add(ip, info.getReason(), newExpireTime, info.getOperator());
-                }
-                
-                syncToGateway(ip, "ADD");
-                
-                log.info("延长黑名单过期时间成功：ip={}, currentExpireTime={}, extendSeconds={}, newExpireTime={}", 
-                    ip, currentExpireTime.format(TIME_FORMATTER), extendSeconds, newExpireTime.format(TIME_FORMATTER));
-            } else {
-                throw new RuntimeException("IP 不在黑名单中");
             }
+            
+            LocalDateTime newExpireTime = baseTime.plusSeconds(extendSeconds);
+            
+            DefenseLogEntity newRecord = new DefenseLogEntity();
+            newRecord.setDefenseType(DefenseTypeConstant.BLOCK_IP);
+            newRecord.setDefenseAction("UPDATE");
+            newRecord.setDefenseTarget(ip);
+            newRecord.setDefenseReason("延长封禁时间（原原因：" + reason + "）");
+            newRecord.setExpireTime(newExpireTime);
+            newRecord.setExecuteStatus(1);
+            newRecord.setExecuteResult("延长封禁时间成功");
+            newRecord.setOperator(operator);
+            newRecord.setExecuteTime(LocalDateTime.now());
+            newRecord.setCreateTime(LocalDateTime.now());
+            newRecord.setUpdateTime(LocalDateTime.now());
+            defenseLogService.saveDefenseLog(newRecord);
+            
+            blacklistCache.add(ip, reason, newExpireTime, operator);
+            
+            syncToGateway(ip, "ADD");
+            
+            log.info("延长黑名单过期时间成功：ip={}, baseTime={}, extendSeconds={}, newExpireTime={}", 
+                ip, baseTime.format(TIME_FORMATTER), extendSeconds, newExpireTime.format(TIME_FORMATTER));
         } catch (Exception e) {
             log.error("延长黑名单过期时间失败：ip={}", ip, e);
             throw new RuntimeException("延长黑名单过期时间失败：" + e.getMessage(), e);
@@ -130,7 +173,7 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         }
 
         try {
-            int count = defenseMonitorMapper.deleteAllBlacklistsByIp(ip);
+            int count = defenseLogMapper.deleteAllBlacklistsByIp(ip);
             
             blacklistCache.remove(ip);
             syncToGateway(ip, "REMOVE");
@@ -234,9 +277,9 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
 
         Map<String, Object> result = new HashMap<>();
         try {
-            List<DefenseMonitorEntity> historyRecords = defenseMonitorMapper.selectBlacklistsByIp(ip);
+            List<DefenseLogEntity> historyRecords = defenseLogMapper.selectBlacklistsByIp(ip);
             if (historyRecords != null && !historyRecords.isEmpty()) {
-                DefenseMonitorEntity latestRecord = historyRecords.get(0);
+                DefenseLogEntity latestRecord = historyRecords.get(0);
                 
                 result.put("id", latestRecord.getId());
                 result.put("ip", ip);
@@ -255,7 +298,7 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
                 result.put("remainingTime", formatRemainingTime(latestRecord.getExpireTime()));
                 
                 List<BlacklistInfoDTO.BlacklistHistoryDTO> historyList = new ArrayList<>();
-                for (DefenseMonitorEntity record : historyRecords) {
+                for (DefenseLogEntity record : historyRecords) {
                     BlacklistInfoDTO.BlacklistHistoryDTO historyDTO = new BlacklistInfoDTO.BlacklistHistoryDTO();
                     historyDTO.setId(record.getId());
                     historyDTO.setReason(record.getDefenseReason());
@@ -382,17 +425,23 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
 
         try {
             DefenseCommandDTO commandDTO = new DefenseCommandDTO();
-            commandDTO.setDefenseType(DefenseTypeConstant.IP_BLOCK);
-            commandDTO.setDefenseAction(action);
-            commandDTO.setDefenseTarget(ip);
-            commandDTO.setDefenseReason("黑名单同步");
+            commandDTO.setSourceIp(ip);
+            commandDTO.setDefenseType("BLACKLIST");
             commandDTO.setRiskLevel("HIGH");
 
             if ("ADD".equals(action)) {
                 BlacklistCache.BlacklistInfo info = blacklistCache.getBlacklistInfo(ip);
-                if (info != null) {
-                    commandDTO.setExpireTime(info.getExpireTime());
+                if (info != null && info.getExpireTime() != null) {
+                    LocalDateTime expireTime = LocalDateTime.parse(info.getExpireTime(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    commandDTO.setExpireTimestamp(
+                        expireTime.atZone(java.time.ZoneId.systemDefault())
+                            .toInstant()
+                            .toEpochMilli()
+                    );
                 }
+                commandDTO.setDescription("IP黑名单添加：" + ip);
+            } else {
+                commandDTO.setDescription("IP黑名单移除：" + ip);
             }
 
             gatewayApiClient.pushDefenseCommand(commandDTO);
@@ -434,10 +483,10 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
 
     private void recordDefenseLog(String ip, String action, String reason, String operator, LocalDateTime expireTime) {
         try {
-            DefenseMonitorEntity defenseLog = new DefenseMonitorEntity();
+            DefenseLogEntity defenseLog = new DefenseLogEntity();
             defenseLog.setAttackId(null);
             defenseLog.setTrafficId(null);
-            defenseLog.setDefenseType(DefenseTypeConstant.IP_BLOCK);
+            defenseLog.setDefenseType(DefenseTypeConstant.BLOCK_IP);
             defenseLog.setDefenseAction(action);
             defenseLog.setDefenseTarget(ip);
             defenseLog.setDefenseReason(reason);
@@ -445,6 +494,7 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
             defenseLog.setExecuteStatus(1);
             defenseLog.setExecuteResult("黑名单" + ("ADD".equals(action) ? "添加" : "移除") + "成功");
             defenseLog.setOperator(operator);
+            defenseLog.setExecuteTime(LocalDateTime.now());
             defenseLog.setCreateTime(LocalDateTime.now());
             defenseLog.setUpdateTime(LocalDateTime.now());
 

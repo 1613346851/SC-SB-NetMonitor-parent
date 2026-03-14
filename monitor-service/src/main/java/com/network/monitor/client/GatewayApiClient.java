@@ -77,8 +77,8 @@ public class GatewayApiClient {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             
             if (response.getStatusCode().is2xxSuccessful()) {
-                log.info("推送防御指令到网关成功：defenseType={}, target={}", 
-                    commandDTO.getDefenseType(), commandDTO.getDefenseTarget());
+                log.info("推送防御指令到网关成功：defenseType={}, sourceIp={}", 
+                    commandDTO.getDefenseType(), commandDTO.getSourceIp());
                 return true;
             } else {
                 log.error("推送防御指令到网关失败：statusCode={}", response.getStatusCode());
@@ -108,8 +108,8 @@ public class GatewayApiClient {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
             
             if (response.getStatusCode().is2xxSuccessful()) {
-                log.info("推送防御指令到网关成功：defenseType={}, target={}", 
-                    commandDTO.getDefenseType(), commandDTO.getDefenseTarget());
+                log.info("推送防御指令到网关成功：defenseType={}, sourceIp={}", 
+                    commandDTO.getDefenseType(), commandDTO.getSourceIp());
                 return true;
             } else {
                 log.error("推送防御指令到网关失败：statusCode={}", response.getStatusCode());

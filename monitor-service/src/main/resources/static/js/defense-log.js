@@ -35,7 +35,7 @@ function renderDefenseTable(data) {
     const tbody = document.getElementById('defenseTableBody');
     
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">暂无数据</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center">暂无数据</td></tr>';
         return;
     }
     
@@ -43,25 +43,58 @@ function renderDefenseTable(data) {
         <tr>
             <td>${item.id || '-'}</td>
             <td>${dateFormat.format(item.createTime)}</td>
-            <td>${item.defenseTarget || '-'}</td>
             <td>${renderDefenseType(item.defenseType)}</td>
-            <td>${item.attackId || '-'}</td>
+            <td>${renderDefenseAction(item.defenseAction)}</td>
+            <td title="${item.defenseTarget || '-'}">${truncateText(item.defenseTarget || '-', 20)}</td>
+            <td title="${item.defenseReason || '-'}">${truncateText(item.defenseReason || '-', 15)}</td>
+            <td>${item.expireTime ? dateFormat.format(item.expireTime) : (item.defenseType === 'BLOCK_IP' ? '永久' : '-')}</td>
+            <td>${item.attackId ? `<a href="/attack?id=${item.attackId}" style="color: #1890ff;">${item.attackId}</a>` : '-'}</td>
             <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
-            <td>${item.operator || '-'}</td>
-            <td>${item.executeResult || item.defenseReason || '-'}</td>
+            <td>${renderOperator(item.operator)}</td>
         </tr>
     `).join('');
 }
 
+function renderOperator(operator) {
+    if (!operator) return '-';
+    if (operator === 'SYSTEM' || operator === 'AUTO') {
+        return '<span class="tag info">系统自动</span>';
+    }
+    return `<span class="tag primary">${operator}</span>`;
+}
+
 function renderDefenseType(type) {
     const typeMap = {
-        'IP_BLOCK': { text: '封禁 IP', class: 'danger' },
+        'BLOCK_IP': { text: '封禁 IP', class: 'danger' },
         'RATE_LIMIT': { text: '限流', class: 'warning' },
+        'BLOCK_REQUEST': { text: '拦截请求', class: 'primary' },
+        'IP_BLOCK': { text: '封禁 IP', class: 'danger' },
         'MALICIOUS_REQUEST': { text: '拦截请求', class: 'primary' },
     };
     
-    const config = typeMap[type] || { text: type, class: 'info' };
+    const config = typeMap[type] || { text: type || '未知', class: 'info' };
     return `<span class="tag ${config.class}">${config.text}</span>`;
+}
+
+function renderDefenseAction(action) {
+    const actionMap = {
+        'ADD': { text: '添加', class: 'danger' },
+        'REMOVE': { text: '移除', class: 'success' },
+        'UPDATE': { text: '更新', class: 'warning' },
+    };
+    
+    if (!action) {
+        return '<span class="tag info">-</span>';
+    }
+    
+    const config = actionMap[action] || { text: action, class: 'info' };
+    return `<span class="tag ${config.class}">${config.text}</span>`;
+}
+
+function truncateText(text, maxLength) {
+    if (!text) return '-';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
 }
 
 function renderPagination(total) {

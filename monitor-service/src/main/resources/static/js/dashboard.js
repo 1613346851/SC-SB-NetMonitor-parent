@@ -82,6 +82,34 @@ async function loadDashboardStats() {
                 trafficChangeEl.textContent = `↓ ${Math.abs(stats.trafficChange)}%`;
             }
         }
+        
+        if (stats.attackChange !== undefined) {
+            const attackChangeEl = document.getElementById('attackChange');
+            if (stats.attackChange >= 0) {
+                attackChangeEl.className = 'stat-change up';
+                attackChangeEl.textContent = `↑ ${stats.attackChange}%`;
+            } else {
+                attackChangeEl.className = 'stat-change down';
+                attackChangeEl.textContent = `↓ ${Math.abs(stats.attackChange)}%`;
+            }
+        }
+        
+        if (stats.defenseChange !== undefined) {
+            const defenseChangeEl = document.getElementById('defenseChange');
+            if (stats.defenseChange >= 0) {
+                defenseChangeEl.className = 'stat-change up';
+                defenseChangeEl.textContent = `↑ ${stats.defenseChange}%`;
+            } else {
+                defenseChangeEl.className = 'stat-change down';
+                defenseChangeEl.textContent = `↓ ${Math.abs(stats.defenseChange)}%`;
+            }
+        }
+        
+        if (stats.vulnerabilityChange !== undefined) {
+            const vulnerabilityChangeEl = document.getElementById('vulnerabilityChange');
+            vulnerabilityChangeEl.className = 'stat-change';
+            vulnerabilityChangeEl.textContent = `${stats.vulnerabilityChange} 个`;
+        }
     } catch (error) {
         console.error('加载统计数据失败:', error);
     }
@@ -96,18 +124,13 @@ async function loadTrafficTrend() {
         
         const chartDom = document.getElementById('trafficTrendChart');
         const emptyStateDom = document.getElementById('trafficTrendEmpty');
+        const emptyTextDom = document.getElementById('trafficTrendEmptyText');
         
         if (!chartDom) {
             return;
         }
         
         const chartData = await http.get(`/dashboard/traffic-trend?timeRange=${timeRange}&interval=${interval}&includeAttacks=true&includeDefenses=true`);
-        
-        if (!chartData || chartData.length === 0) {
-            if (emptyStateDom) emptyStateDom.style.display = 'flex';
-            chartDom.style.pointerEvents = 'none';
-            return;
-        }
         
         if (emptyStateDom) emptyStateDom.style.display = 'none';
         chartDom.style.pointerEvents = 'auto';
@@ -117,11 +140,16 @@ async function loadTrafficTrend() {
             return;
         }
         
-        const dates = chartData.map(item => item.time);
+        let finalData = chartData;
+        if (!chartData || chartData.length === 0) {
+            finalData = generateEmptyTimeSeries(timeRange, interval);
+        }
+        
+        const dates = finalData.map(item => item.time);
         
         const series = [];
         
-        const trafficValues = chartData.map(item => item.traffic);
+        const trafficValues = finalData.map(item => item.traffic || 0);
         series.push({
             name: '流量',
             type: 'line',
@@ -135,37 +163,33 @@ async function loadTrafficTrend() {
             }
         });
         
-        if (chartData[0]?.attacks !== undefined) {
-            const attackValues = chartData.map(item => item.attacks || 0);
-            series.push({
-                name: '攻击次数',
-                type: 'line',
-                smooth: true,
-                data: attackValues,
-                areaStyle: {
-                    color: 'rgba(245, 34, 45, 0.1)'
-                },
-                itemStyle: {
-                    color: '#f5222d'
-                }
-            });
-        }
+        const attackValues = finalData.map(item => item.attacks || 0);
+        series.push({
+            name: '攻击次数',
+            type: 'line',
+            smooth: true,
+            data: attackValues,
+            areaStyle: {
+                color: 'rgba(245, 34, 45, 0.1)'
+            },
+            itemStyle: {
+                color: '#f5222d'
+            }
+        });
         
-        if (chartData[0]?.defenses !== undefined) {
-            const defenseValues = chartData.map(item => item.defenses || 0);
-            series.push({
-                name: '防御次数',
-                type: 'line',
-                smooth: true,
-                data: defenseValues,
-                areaStyle: {
-                    color: 'rgba(82, 196, 26, 0.1)'
-                },
-                itemStyle: {
-                    color: '#52c41a'
-                }
-            });
-        }
+        const defenseValues = finalData.map(item => item.defenses || 0);
+        series.push({
+            name: '防御次数',
+            type: 'line',
+            smooth: true,
+            data: defenseValues,
+            areaStyle: {
+                color: 'rgba(82, 196, 26, 0.1)'
+            },
+            itemStyle: {
+                color: '#52c41a'
+            }
+        });
         
         const xAxisInterval = calculateXAxisInterval(dates.length);
         
@@ -214,8 +238,57 @@ async function loadTrafficTrend() {
     } catch (error) {
         console.error('加载流量趋势失败:', error);
         const emptyStateDom = document.getElementById('trafficTrendEmpty');
-        if (emptyStateDom) emptyStateDom.style.display = 'flex';
+        const emptyTextDom = document.getElementById('trafficTrendEmptyText');
+        if (emptyStateDom) {
+            emptyStateDom.style.display = 'flex';
+            if (emptyTextDom) {
+                emptyTextDom.textContent = '数据获取异常';
+            }
+        }
     }
+}
+
+function generateEmptyTimeSeries(timeRange, interval) {
+    const data = [];
+    const now = new Date();
+    
+    let totalPoints = 24;
+    let intervalMs = 60 * 60 * 1000;
+    
+    const rangeMatch = timeRange.match(/^(\d+)([hd])$/);
+    if (rangeMatch) {
+        const amount = parseInt(rangeMatch[1]);
+        const unit = rangeMatch[2];
+        if (unit === 'h') {
+            totalPoints = amount;
+            intervalMs = 60 * 60 * 1000;
+        } else if (unit === 'd') {
+            totalPoints = amount * 24;
+            intervalMs = 60 * 60 * 1000;
+        }
+    }
+    
+    for (let i = totalPoints - 1; i >= 0; i--) {
+        const time = new Date(now.getTime() - i * intervalMs);
+        const timeStr = formatTimeForChart(time);
+        data.push({
+            time: timeStr,
+            traffic: 0,
+            attacks: 0,
+            defenses: 0
+        });
+    }
+    
+    return data;
+}
+
+function formatTimeForChart(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
 function calculateXAxisInterval(dataLength) {
