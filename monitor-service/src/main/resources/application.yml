@@ -92,3 +92,8 @@ blacklist:
   deep:
     clean:
       cron: "0 0 3 * * ?"  # 每天凌晨 3 点深度清理
+
+# JWT 配置
+jwt:
+  secret: NetworkMonitor2026SecretKeyForJwtTokenGenerationMustBeLongEnough
+  expiration: 86400000  # Token 有效期：24小时（毫秒）

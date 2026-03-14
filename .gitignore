@@ -51,16 +51,6 @@ build/
 /.idea/vcs.xml
 /logs/gateway-service.log.2026-03-03.0.gz
 /.idea/workspace.xml
-/靶场服务访问性能优化说明.md
-/三服务显示与访问问题诊断修复报告.md
-/流量数据丢失修复验证报告.md
-/网关与监测服务流量数据丢失问题修复总结.md
-/网关与监测服务流量数据丢失问题诊断报告.md
-/网关服务与监测服务优化总结.md
-/网关服务与监测服务接口对接验证报告.md
-/网关服务优化总结.md
-/网关服务实现评估报告.md
-/JSON 反序列化错误修复说明.md
 logs/gateway-service.log.2026-03-08.0.gz
 /gateway-service/logs/gateway-service.log.2026-03-08.0.gz
 /.idea/dataSources/9af1906e-7250-41f7-8dde-d1412c9e5604/storage_v2/_src_/schema/information_schema.FNRwLQ.meta
@@ -79,3 +69,4 @@ logs/gateway-service.log.2026-03-08.0.gz
 /gateway-service/logs/gateway-service.log.2026-03-02.0.gz
 /logs/gateway-service.log.2026-03-06.0.gz
 /logs/gateway-service.log.2026-03-09.0.gz
+logs/gateway-service.log.2026-03-14.0.gz

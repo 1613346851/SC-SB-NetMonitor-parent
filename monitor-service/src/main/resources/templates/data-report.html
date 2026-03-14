@@ -10,70 +10,19 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- 侧边栏 -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-logo"></div>
-                <h1 class="sidebar-title">网络监测系统</h1>
-            </div>
-            <nav class="sidebar-menu">
-                <a href="/" class="menu-item">
-                    <span class="menu-icon">📊</span>
-                    <span>仪表盘</span>
-                </a>
-                <a href="/traffic" class="menu-item">
-                    <span class="menu-icon">🌐</span>
-                    <span>流量列表</span>
-                </a>
-                <a href="/attack" class="menu-item">
-                    <span class="menu-icon">⚠️</span>
-                    <span>攻击监测</span>
-                </a>
-                <a href="/vulnerability" class="menu-item">
-                    <span class="menu-icon">🔓</span>
-                    <span>漏洞监测</span>
-                </a>
-                <a href="/defense" class="menu-item">
-                    <span class="menu-icon">🛡️</span>
-                    <span>防御日志</span>
-                </a>
-                <a href="/rule" class="menu-item">
-                    <span class="menu-icon">📋</span>
-                    <span>规则管理</span>
-                </a>
-                <a href="/blacklist" class="menu-item">
-                    <span class="menu-icon">🚫</span>
-                    <span>黑名单管理</span>
-                </a>
-                <a href="/config" class="menu-item">
-                    <span class="menu-icon">⚙️</span>
-                    <span>系统配置</span>
-                </a>
-                <a href="/report" class="menu-item active">
-                    <span class="menu-icon">📈</span>
-                    <span>数据报表</span>
-                </a>
-            </nav>
-        </aside>
+        <div th:replace="~{fragments/common :: sidebar}"></div>
 
-        <!-- 主内容区 -->
         <div class="main-container">
-            <!-- 顶部导航 -->
             <header class="header">
                 <div class="header-left">
                     <h2>数据报表</h2>
                 </div>
                 <div class="header-right">
-                    <div class="user-info">
-                        <div class="user-avatar">A</div>
-                        <span>管理员</span>
-                    </div>
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                 </div>
             </header>
 
-            <!-- 内容区域 -->
             <main class="content">
-                <!-- 日期筛选 -->
                 <div class="filter-bar">
                     <div class="form-inline">
                         <div class="form-group">
@@ -90,7 +39,6 @@
                     </div>
                 </div>
 
-                <!-- 统计摘要 -->
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">统计摘要</h3>
@@ -117,9 +65,7 @@
                     </div>
                 </div>
 
-                <!-- 图表区域 -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-                    <!-- 流量趋势图 -->
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">流量趋势</h3>
@@ -147,7 +93,6 @@
                         </div>
                     </div>
 
-                    <!-- 攻击趋势图 -->
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">攻击趋势</h3>
@@ -177,7 +122,6 @@
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
-                    <!-- 攻击类型分布 -->
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">攻击类型分布</h3>
@@ -187,7 +131,6 @@
                         </div>
                     </div>
 
-                    <!-- 风险等级分布 -->
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">风险等级分布</h3>
@@ -198,7 +141,6 @@
                     </div>
                 </div>
 
-                <!-- TOP 攻击源 IP -->
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">TOP 10 攻击源 IP</h3>
@@ -227,7 +169,25 @@
         </div>
     </div>
 
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/components/chart.js}"></script>
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/data-report.js}"></script>
+    <script>
+        PageInit.init({
+            requireAuth: true,
+            highlightMenu: true
+        });
+    </script>
 </body>
 </html>

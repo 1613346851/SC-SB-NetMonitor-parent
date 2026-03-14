@@ -253,6 +253,148 @@ CREATE TABLE `sys_defense_log` (
     KEY `idx_execute_time` (`execute_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='全局防御日志表';
 
+-- ------------------------------------------------------------
+-- 2.10 系统用户表 (sys_user)
+-- 存储系统管理员账号信息
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_user`;
+CREATE TABLE `sys_user` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+    `username` VARCHAR(50) NOT NULL COMMENT '登录账号',
+    `password` VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密存储)',
+    `nickname` VARCHAR(50) DEFAULT NULL COMMENT '用户昵称',
+    `phone` VARCHAR(20) DEFAULT NULL COMMENT '手机号码',
+    `email` VARCHAR(100) DEFAULT NULL COMMENT '邮箱地址',
+    `avatar` VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '账号状态(0-正常，1-禁用，2-锁定)',
+    `login_fail_count` INT NOT NULL DEFAULT 0 COMMENT '连续登录失败次数',
+    `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
+    `last_login_ip` VARCHAR(50) DEFAULT NULL COMMENT '最后登录IP',
+    `password_update_time` DATETIME DEFAULT NULL COMMENT '密码更新时间',
+    `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标记(0-正常，1-已删除)',
+    `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` VARCHAR(50) DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_username` (`username`),
+    KEY `idx_status` (`status`),
+    KEY `idx_del_flag` (`del_flag`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表';
+
+-- ------------------------------------------------------------
+-- 2.11 角色表 (sys_role)
+-- 存储系统角色信息
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_role`;
+CREATE TABLE `sys_role` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '角色ID',
+    `role_name` VARCHAR(50) NOT NULL COMMENT '角色名称',
+    `role_code` VARCHAR(50) NOT NULL COMMENT '角色编码',
+    `role_desc` VARCHAR(255) DEFAULT NULL COMMENT '角色描述',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '角色状态(0-正常，1-禁用)',
+    `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标记(0-正常，1-已删除)',
+    `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` VARCHAR(50) DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_role_code` (`role_code`),
+    KEY `idx_status` (`status`),
+    KEY `idx_del_flag` (`del_flag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
+
+-- ------------------------------------------------------------
+-- 2.12 菜单权限表 (sys_menu)
+-- 存储系统菜单和权限信息
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_menu`;
+CREATE TABLE `sys_menu` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '权限ID',
+    `parent_id` BIGINT DEFAULT 0 COMMENT '父权限ID',
+    `menu_name` VARCHAR(50) NOT NULL COMMENT '菜单/权限名称',
+    `menu_type` TINYINT NOT NULL DEFAULT 0 COMMENT '类型(0-目录，1-菜单，2-按钮)',
+    `permission` VARCHAR(100) DEFAULT NULL COMMENT '权限标识',
+    `path` VARCHAR(255) DEFAULT NULL COMMENT '路由路径',
+    `component` VARCHAR(255) DEFAULT NULL COMMENT '组件路径',
+    `icon` VARCHAR(100) DEFAULT NULL COMMENT '菜单图标',
+    `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序序号',
+    `visible` TINYINT NOT NULL DEFAULT 0 COMMENT '是否可见(0-显示，1-隐藏)',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '菜单状态(0-正常，1-禁用)',
+    `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标记(0-正常，1-已删除)',
+    `create_by` VARCHAR(50) DEFAULT NULL COMMENT '创建人',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` VARCHAR(50) DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    KEY `idx_parent_id` (`parent_id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_del_flag` (`del_flag`),
+    KEY `idx_sort_order` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='菜单权限表';
+
+-- ------------------------------------------------------------
+-- 2.13 用户-角色关联表 (sys_user_role)
+-- 存储用户与角色的关联关系
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_user_role`;
+CREATE TABLE `sys_user_role` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `role_id` BIGINT NOT NULL COMMENT '角色ID',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_role` (`user_id`, `role_id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_role_id` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户-角色关联表';
+
+-- ------------------------------------------------------------
+-- 2.14 角色-菜单关联表 (sys_role_menu)
+-- 存储角色与菜单权限的关联关系
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_role_menu`;
+CREATE TABLE `sys_role_menu` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `role_id` BIGINT NOT NULL COMMENT '角色ID',
+    `menu_id` BIGINT NOT NULL COMMENT '菜单ID',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_role_menu` (`role_id`, `menu_id`),
+    KEY `idx_role_id` (`role_id`),
+    KEY `idx_menu_id` (`menu_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色-菜单关联表';
+
+-- ------------------------------------------------------------
+-- 2.15 系统操作日志表 (sys_oper_log)
+-- 存储系统操作日志
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_oper_log`;
+CREATE TABLE `sys_oper_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    `username` VARCHAR(50) DEFAULT NULL COMMENT '操作账号',
+    `oper_type` VARCHAR(50) NOT NULL COMMENT '操作类型(LOGIN/LOGOUT/INSERT/UPDATE/DELETE/EXPORT等)',
+    `oper_module` VARCHAR(100) DEFAULT NULL COMMENT '操作模块',
+    `oper_content` VARCHAR(2000) DEFAULT NULL COMMENT '操作内容',
+    `oper_method` VARCHAR(200) DEFAULT NULL COMMENT '操作方法',
+    `oper_url` VARCHAR(500) DEFAULT NULL COMMENT '请求URL',
+    `oper_ip` VARCHAR(50) DEFAULT NULL COMMENT '操作IP',
+    `oper_location` VARCHAR(255) DEFAULT NULL COMMENT '操作地点',
+    `oper_status` TINYINT NOT NULL DEFAULT 0 COMMENT '操作状态(0-成功，1-失败)',
+    `error_msg` VARCHAR(2000) DEFAULT NULL COMMENT '错误信息',
+    `oper_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+    `cost_time` BIGINT DEFAULT NULL COMMENT '耗时(毫秒)',
+    PRIMARY KEY (`id`),
+    KEY `idx_username` (`username`),
+    KEY `idx_oper_type` (`oper_type`),
+    KEY `idx_oper_status` (`oper_status`),
+    KEY `idx_oper_time` (`oper_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统操作日志表';
+
 -- ============================================================
 -- 3. 创建视图
 -- ============================================================
@@ -410,6 +552,113 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('alert.enabled', 'true', '是否启用告警通知'),
 ('alert.push.interval', '5000', '告警推送间隔（毫秒）'),
 ('alert.heartbeat.interval', '10000', '告警心跳间隔（毫秒）');
+
+-- ------------------------------------------------------------
+-- 4.4 初始化角色数据
+-- 内置三个默认角色：超级管理员、安全管理员、审计管理员
+-- ------------------------------------------------------------
+INSERT INTO `sys_role` (`role_name`, `role_code`, `role_desc`, `status`, `create_by`, `remark`) VALUES
+('超级管理员', 'SUPER_ADMIN', '拥有系统所有权限', 0, 'system', '系统内置角色，不可删除'),
+('安全管理员', 'SECURITY_ADMIN', '负责安全监控和防御操作', 0, 'system', '系统内置角色，不可删除'),
+('审计管理员', 'AUDIT_ADMIN', '仅拥有日志查看权限', 0, 'system', '系统内置角色，不可删除');
+
+-- ------------------------------------------------------------
+-- 4.5 初始化菜单权限数据
+-- ------------------------------------------------------------
+-- 一级菜单
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(1, 0, '系统概览', 1, 'dashboard', '/', '/dashboard', 'dashboard', 1, 0, 0, 'system'),
+(2, 0, '流量监测', 0, 'traffic', '/traffic', NULL, 'monitor', 2, 0, 0, 'system'),
+(3, 0, '攻击监测', 0, 'attack', '/attack', NULL, 'warning', 3, 0, 0, 'system'),
+(4, 0, '防御管理', 0, 'defense', '/defense', NULL, 'security', 4, 0, 0, 'system'),
+(5, 0, '漏洞监测', 1, 'vulnerability', '/vulnerability', '/vulnerability', 'bug', 5, 0, 0, 'system'),
+(6, 0, '数据报表', 1, 'report', '/report', '/report', 'chart', 6, 0, 0, 'system'),
+(7, 0, '系统管理', 0, 'system', '/system', NULL, 'setting', 7, 0, 0, 'system');
+
+-- 二级菜单 - 流量监测
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(21, 2, '流量列表', 1, 'traffic:list', '/traffic/list', '/traffic-list', 'list', 1, 0, 0, 'system');
+
+-- 二级菜单 - 攻击监测
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(31, 3, '攻击列表', 1, 'attack:list', '/attack/list', '/attack-list', 'list', 1, 0, 0, 'system');
+
+-- 二级菜单 - 防御管理
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(41, 4, '黑名单管理', 1, 'blacklist:list', '/defense/blacklist', '/blacklist-manage', 'lock', 1, 0, 0, 'system'),
+(42, 4, '防御日志', 1, 'defense:log', '/defense/log', '/defense-log', 'file-text', 2, 0, 0, 'system'),
+(43, 4, '规则管理', 1, 'rule:list', '/defense/rule', '/rule-manage', 'tool', 3, 0, 0, 'system');
+
+-- 二级菜单 - 系统管理
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(71, 7, '系统配置', 1, 'config:list', '/system/config', '/sys-config', 'setting', 1, 0, 0, 'system'),
+(72, 7, '用户管理', 1, 'user:list', '/system/user', '/user-manage', 'user', 2, 0, 0, 'system'),
+(73, 7, '角色管理', 1, 'role:list', '/system/role', '/role-manage', 'team', 3, 0, 0, 'system'),
+(74, 7, '菜单管理', 1, 'menu:list', '/system/menu', '/menu-manage', 'menu', 4, 0, 0, 'system'),
+(75, 7, '操作日志', 1, 'operlog:list', '/system/log', '/oper-log', 'history', 5, 0, 0, 'system');
+
+-- 按钮权限 - 黑名单管理
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(411, 41, '新增黑名单', 2, 'blacklist:add', NULL, 1, 0, 0, 'system'),
+(412, 41, '编辑黑名单', 2, 'blacklist:edit', NULL, 2, 0, 0, 'system'),
+(413, 41, '删除黑名单', 2, 'blacklist:delete', NULL, 3, 0, 0, 'system'),
+(414, 41, '解封IP', 2, 'blacklist:unblock', NULL, 4, 0, 0, 'system');
+
+-- 按钮权限 - 规则管理
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(431, 43, '新增规则', 2, 'rule:add', NULL, 1, 0, 0, 'system'),
+(432, 43, '编辑规则', 2, 'rule:edit', NULL, 2, 0, 0, 'system'),
+(433, 43, '删除规则', 2, 'rule:delete', NULL, 3, 0, 0, 'system'),
+(434, 43, '启用/禁用规则', 2, 'rule:toggle', NULL, 4, 0, 0, 'system');
+
+-- 按钮权限 - 用户管理
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(721, 72, '新增用户', 2, 'user:add', NULL, 1, 0, 0, 'system'),
+(722, 72, '编辑用户', 2, 'user:edit', NULL, 2, 0, 0, 'system'),
+(723, 72, '删除用户', 2, 'user:delete', NULL, 3, 0, 0, 'system'),
+(724, 72, '重置密码', 2, 'user:resetPwd', NULL, 4, 0, 0, 'system'),
+(725, 72, '分配角色', 2, 'user:assignRole', NULL, 5, 0, 0, 'system');
+
+-- 按钮权限 - 角色管理
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(731, 73, '新增角色', 2, 'role:add', NULL, 1, 0, 0, 'system'),
+(732, 73, '编辑角色', 2, 'role:edit', NULL, 2, 0, 0, 'system'),
+(733, 73, '删除角色', 2, 'role:delete', NULL, 3, 0, 0, 'system'),
+(734, 73, '分配权限', 2, 'role:assignPerm', NULL, 4, 0, 0, 'system');
+
+-- ------------------------------------------------------------
+-- 4.6 初始化角色权限关联
+-- 超级管理员拥有所有权限
+-- ------------------------------------------------------------
+INSERT INTO `sys_role_menu` (`role_id`, `menu_id`)
+SELECT 1, id FROM `sys_menu` WHERE del_flag = 0;
+
+-- 安全管理员权限（监控、防御操作）
+INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
+(2, 1), (2, 2), (2, 21), (2, 3), (2, 31), (2, 4), (2, 41), (2, 42), (2, 43),
+(2, 411), (2, 412), (2, 413), (2, 414), (2, 431), (2, 432), (2, 433), (2, 434),
+(2, 5), (2, 6);
+
+-- 审计管理员权限（仅查看）
+INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
+(3, 1), (3, 2), (3, 21), (3, 3), (3, 31), (3, 4), (3, 41), (3, 42), (3, 43),
+(3, 5), (3, 6), (3, 75);
+
+-- ------------------------------------------------------------
+-- 4.7 管理员账号初始化说明
+-- 
+-- 管理员账号由应用程序在首次启动时自动创建：
+-- 1. 如果配置了 admin.init.password，则使用配置的密码
+-- 2. 如果未配置，则自动生成12位随机密码并打印到启动日志
+-- 
+-- 配置方式（application.yml）：
+-- admin:
+--   init:
+--     password: your-secure-password
+-- 
+-- 首次启动后请查看应用日志获取初始密码
+-- 生产环境请务必在首次登录后修改密码
+-- ------------------------------------------------------------
 
 -- ============================================================
 -- 5. 完成提示

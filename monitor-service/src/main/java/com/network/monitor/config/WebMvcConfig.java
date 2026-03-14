@@ -1,16 +1,25 @@
 package com.network.monitor.config;
 
+import com.network.monitor.interceptor.AuthInterceptor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * Web MVC 配置类
- */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
-
-    /**
-     * 配置内容解析器
-     * 已在 application.yml 中配置 Thymeleaf，此处无需重复配置
-     */
+    
+    @Autowired
+    private AuthInterceptor authInterceptor;
+    
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(authInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                        "/api/auth/login",
+                        "/api/auth/logout",
+                        "/api/config/public/**"
+                );
+    }
 }

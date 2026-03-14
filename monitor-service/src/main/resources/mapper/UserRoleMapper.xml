@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.UserRoleMapper">
+    
+    <select id="selectRoleIdsByUserId" resultType="java.lang.Long">
+        SELECT role_id FROM sys_user_role WHERE user_id = #{userId}
+    </select>
+    
+    <select id="selectUserIdsByRoleId" resultType="java.lang.Long">
+        SELECT user_id FROM sys_user_role WHERE role_id = #{roleId}
+    </select>
+    
+    <insert id="insert">
+        INSERT INTO sys_user_role (user_id, role_id) VALUES (#{userId}, #{roleId})
+    </insert>
+    
+    <delete id="deleteByUserId">
+        DELETE FROM sys_user_role WHERE user_id = #{userId}
+    </delete>
+    
+    <delete id="deleteByRoleId">
+        DELETE FROM sys_user_role WHERE role_id = #{roleId}
+    </delete>
+    
+    <delete id="deleteByUserIdAndRoleId">
+        DELETE FROM sys_user_role WHERE user_id = #{userId} AND role_id = #{roleId}
+    </delete>
+    
+</mapper>

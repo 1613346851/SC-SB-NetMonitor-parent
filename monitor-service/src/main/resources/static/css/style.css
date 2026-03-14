@@ -116,6 +116,20 @@ body {
     margin-right: 10px;
 }
 
+.menu-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 12px 24px;
+}
+
+.menu-group-title {
+    padding: 8px 24px;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
 /* 主内容区 */
 .main-container {
     flex: 1;
@@ -837,4 +851,290 @@ body {
 
 .hidden {
     display: none;
+}
+
+/* ==================== 登录页面样式 ==================== */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+}
+
+.login-box {
+    background: var(--bg-white);
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+}
+
+.login-header {
+    padding: 40px 40px 30px;
+    text-align: center;
+    background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+    color: #fff;
+}
+
+.login-logo {
+    width: 64px;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 32px;
+}
+
+.login-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.login-subtitle {
+    font-size: 14px;
+    opacity: 0.8;
+    margin-top: 8px;
+}
+
+.login-form {
+    padding: 40px;
+}
+
+.login-form .form-group {
+    margin-bottom: 24px;
+}
+
+.login-form .form-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    display: block;
+}
+
+.login-form .form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.login-form .form-control:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.login-form .form-control::placeholder {
+    color: #bfbfbf;
+}
+
+.login-form .input-group {
+    position: relative;
+}
+
+.login-form .input-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #bfbfbf;
+    font-size: 16px;
+}
+
+.login-form .input-group .form-control {
+    padding-left: 40px;
+}
+
+.login-form .input-group .password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #bfbfbf;
+    font-size: 16px;
+    user-select: none;
+}
+
+.login-form .input-group .password-toggle:hover {
+    color: var(--primary-color);
+}
+
+.login-form .form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.login-form .remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.login-form .remember-me input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.login-form .forgot-password {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.login-form .forgot-password:hover {
+    text-decoration: underline;
+}
+
+.login-form .btn-login {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.login-form .login-error {
+    background: #fff2f0;
+    border: 1px solid #ffccc7;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    color: var(--danger-color);
+    font-size: 14px;
+    display: none;
+}
+
+.login-form .login-error.show {
+    display: block;
+}
+
+.login-footer {
+    padding: 20px 40px;
+    text-align: center;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* ==================== 动画效果 ==================== */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.3s ease;
+}
+
+.animate-shake {
+    animation: shake 0.5s ease;
+}
+
+/* ==================== 加载状态 ==================== */
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    margin-left: -8px;
+    margin-top: -8px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ==================== 用户下拉菜单 ==================== */
+.user-dropdown {
+    position: relative;
+}
+
+.user-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 160px;
+    background: var(--bg-white);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 8px 0;
+    display: none;
+    z-index: 100;
+}
+
+.user-dropdown:hover .user-dropdown-menu {
+    display: block;
+}
+
+.user-dropdown-item {
+    display: block;
+    padding: 8px 16px;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.user-dropdown-item:hover {
+    background: #f5f5f5;
+    color: var(--primary-color);
+}
+
+.user-dropdown-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 8px 0;
 }

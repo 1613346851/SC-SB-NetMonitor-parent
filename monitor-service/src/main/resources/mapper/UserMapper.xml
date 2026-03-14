@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.UserMapper">
+    
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.UserEntity">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="password" property="password"/>
+        <result column="nickname" property="nickname"/>
+        <result column="phone" property="phone"/>
+        <result column="email" property="email"/>
+        <result column="avatar" property="avatar"/>
+        <result column="status" property="status"/>
+        <result column="login_fail_count" property="loginFailCount"/>
+        <result column="last_login_time" property="lastLoginTime"/>
+        <result column="last_login_ip" property="lastLoginIp"/>
+        <result column="password_update_time" property="passwordUpdateTime"/>
+        <result column="del_flag" property="delFlag"/>
+        <result column="create_by" property="createBy"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_by" property="updateBy"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="remark" property="remark"/>
+    </resultMap>
+    
+    <sql id="Base_Column_List">
+        id, username, password, nickname, phone, email, avatar, status, login_fail_count,
+        last_login_time, last_login_ip, password_update_time, del_flag, create_by, create_time, update_by, update_time, remark
+    </sql>
+    
+    <select id="selectByUsername" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_user
+        WHERE username = #{username} AND del_flag = 0
+    </select>
+    
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_user
+        WHERE id = #{id} AND del_flag = 0
+    </select>
+    
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_user
+        WHERE del_flag = #{delFlag}
+        <if test="username != null and username != ''">
+            AND username LIKE CONCAT('%', #{username}, '%')
+        </if>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY create_time DESC
+    </select>
+    
+    <select id="countByUsername" resultType="int">
+        SELECT COUNT(*)
+        FROM sys_user
+        WHERE username = #{username} AND del_flag = 0
+    </select>
+    
+    <insert id="insert" parameterType="com.network.monitor.entity.UserEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_user (username, password, nickname, phone, email, avatar, status, 
+                              login_fail_count, del_flag, create_by, remark)
+        VALUES (#{username}, #{password}, #{nickname}, #{phone}, #{email}, #{avatar}, #{status},
+                #{loginFailCount}, #{delFlag}, #{createBy}, #{remark})
+    </insert>
+    
+    <update id="update" parameterType="com.network.monitor.entity.UserEntity">
+        UPDATE sys_user
+        <set>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="avatar != null">avatar = #{avatar},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="loginFailCount != null">login_fail_count = #{loginFailCount},</if>
+            <if test="delFlag != null">del_flag = #{delFlag},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <update id="deleteById">
+        UPDATE sys_user SET del_flag = 1 WHERE id = #{id}
+    </update>
+    
+    <update id="updateLoginInfo">
+        UPDATE sys_user
+        SET last_login_time = #{lastLoginTime}, last_login_ip = #{lastLoginIp}
+        WHERE id = #{id}
+    </update>
+    
+    <update id="updatePassword">
+        UPDATE sys_user
+        SET password = #{password}, password_update_time = #{passwordUpdateTime}
+        WHERE id = #{id}
+    </update>
+    
+    <update id="updateStatus">
+        UPDATE sys_user SET status = #{status} WHERE id = #{id}
+    </update>
+    
+    <update id="updateLoginFailCount">
+        UPDATE sys_user SET login_fail_count = #{loginFailCount} WHERE id = #{id}
+    </update>
+    
+    <update id="resetLoginFailCount">
+        UPDATE sys_user SET login_fail_count = 0, status = 0 WHERE id = #{id}
+    </update>
+    
+</mapper>
