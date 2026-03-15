@@ -114,9 +114,8 @@ public class DataExportController {
         LocalDateTime startDateTime = parseDateTime(startTime);
         LocalDateTime endDateTime = parseDateTime(endTime);
 
-        // 查询前 10000 条数据
         return trafficMonitorMapper.selectByCondition(
-                sourceIp, requestUri, startDateTime, endDateTime, 0, 10000
+                sourceIp, null, null, requestUri, startDateTime, endDateTime, 0, 10000, "id DESC"
         );
     }
 
@@ -128,9 +127,8 @@ public class DataExportController {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime thirtyDaysAgo = now.minusDays(30);
 
-        // 查询前 10000 条数据
         return attackMonitorMapper.selectByCondition(
-                attackType, riskLevel, sourceIp, handled, thirtyDaysAgo, now, 0, 10000
+                attackType, riskLevel, sourceIp, handled, thirtyDaysAgo, now, 0, 10000, "id DESC"
         );
     }
 

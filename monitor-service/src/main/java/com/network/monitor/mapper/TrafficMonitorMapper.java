@@ -28,11 +28,14 @@ public interface TrafficMonitorMapper {
      */
     List<TrafficMonitorEntity> selectByCondition(
             @Param("sourceIp") String sourceIp,
+            @Param("targetIp") String targetIp,
+            @Param("httpMethod") String httpMethod,
             @Param("requestUri") String requestUri,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
             @Param("offset") Integer offset,
-            @Param("limit") Integer limit
+            @Param("limit") Integer limit,
+            @Param("orderBy") String orderBy
     );
 
     /**
@@ -40,6 +43,8 @@ public interface TrafficMonitorMapper {
      */
     long countByCondition(
             @Param("sourceIp") String sourceIp,
+            @Param("targetIp") String targetIp,
+            @Param("httpMethod") String httpMethod,
             @Param("requestUri") String requestUri,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime

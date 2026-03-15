@@ -41,7 +41,7 @@ function renderRuleTable(data) {
             <td>${item.id || '-'}</td>
             <td>${item.ruleName || '-'}</td>
             <td>${tableRenderer.renderAttackType(item.attackType)}</td>
-            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${item.ruleExpression || '-'}</td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${item.ruleContent || '-'}</td>
             <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
             <td>${item.enabled === 1 ? '<span class="tag success">启用</span>' : '<span class="tag info">禁用</span>'}</td>
             <td>
@@ -135,7 +135,7 @@ async function editRule(id) {
         document.getElementById('ruleId').value = rule.id;
         document.getElementById('ruleNameInput').value = rule.ruleName;
         document.getElementById('attackTypeInput').value = rule.attackType;
-        document.getElementById('ruleExpressionInput').value = rule.ruleExpression;
+        document.getElementById('ruleExpressionInput').value = rule.ruleContent || '';
         document.getElementById('riskLevelInput').value = rule.riskLevel;
         document.getElementById('confidenceThresholdInput').value = rule.confidenceThreshold || 60;
         document.getElementById('enabledInput').value = rule.enabled;
@@ -155,23 +155,23 @@ async function saveRule() {
     const ruleData = {
         ruleName: document.getElementById('ruleNameInput').value,
         attackType: document.getElementById('attackTypeInput').value,
-        ruleExpression: document.getElementById('ruleExpressionInput').value,
+        ruleContent: document.getElementById('ruleExpressionInput').value,
         riskLevel: document.getElementById('riskLevelInput').value,
-        confidenceThreshold: parseInt(document.getElementById('confidenceThresholdInput').value),
         enabled: parseInt(document.getElementById('enabledInput').value)
     };
 
-    if (!ruleData.ruleName || !ruleData.attackType || !ruleData.ruleExpression || !ruleData.riskLevel) {
+    if (!ruleData.ruleName || !ruleData.attackType || !ruleData.ruleContent || !ruleData.riskLevel) {
         message.error('请填写所有必填字段');
         return;
     }
 
     try {
         if (ruleId) {
-            await http.put(`/rule/${ruleId}`, ruleData);
+            ruleData.id = parseInt(ruleId);
+            await http.post('/rule/update', ruleData);
             message.success('更新成功');
         } else {
-            await http.post('/rule', ruleData);
+            await http.post('/rule/add', ruleData);
             message.success('创建成功');
         }
         

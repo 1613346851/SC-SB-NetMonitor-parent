@@ -64,7 +64,14 @@
                 AND create_time &lt;= #{endTime}
             </if>
         </where>
-        ORDER BY create_time DESC
+        <choose>
+            <when test="orderBy != null and orderBy != ''">
+                ORDER BY ${orderBy}
+            </when>
+            <otherwise>
+                ORDER BY id DESC
+            </otherwise>
+        </choose>
         LIMIT #{offset}, #{limit}
     </select>
 

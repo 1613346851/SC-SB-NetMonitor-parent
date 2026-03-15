@@ -57,6 +57,12 @@
             <if test="sourceIp != null and sourceIp != ''">
                 AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
             </if>
+            <if test="targetIp != null and targetIp != ''">
+                AND target_ip LIKE CONCAT('%', #{targetIp}, '%')
+            </if>
+            <if test="httpMethod != null and httpMethod != ''">
+                AND http_method = #{httpMethod}
+            </if>
             <if test="requestUri != null and requestUri != ''">
                 AND request_uri LIKE CONCAT('%', #{requestUri}, '%')
             </if>
@@ -67,7 +73,14 @@
                 AND request_time &lt;= #{endTime}
             </if>
         </where>
-        ORDER BY request_time DESC
+        <choose>
+            <when test="orderBy != null and orderBy != ''">
+                ORDER BY ${orderBy}
+            </when>
+            <otherwise>
+                ORDER BY id DESC
+            </otherwise>
+        </choose>
         LIMIT #{offset}, #{limit}
     </select>
 
@@ -77,6 +90,12 @@
         <where>
             <if test="sourceIp != null and sourceIp != ''">
                 AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
+            </if>
+            <if test="targetIp != null and targetIp != ''">
+                AND target_ip LIKE CONCAT('%', #{targetIp}, '%')
+            </if>
+            <if test="httpMethod != null and httpMethod != ''">
+                AND http_method = #{httpMethod}
             </if>
             <if test="requestUri != null and requestUri != ''">
                 AND request_uri LIKE CONCAT('%', #{requestUri}, '%')

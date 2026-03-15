@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -29,11 +32,15 @@ public class TrafficManageController {
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getTrafficList(
             @RequestParam(required = false) String sourceIp,
+            @RequestParam(required = false) String targetIp,
+            @RequestParam(required = false) String httpMethod,
             @RequestParam(required = false) String requestUri,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime,
             @RequestParam(defaultValue = "1") int pageNum,
-            @RequestParam(defaultValue = "10") int pageSize) {
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(defaultValue = "id") String sortField,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
 
         try {
             int offset = (pageNum - 1) * pageSize;
@@ -41,12 +48,14 @@ public class TrafficManageController {
             LocalDateTime startDateTime = parseDateTime(startTime);
             LocalDateTime endDateTime = parseDateTime(endTime);
             
+            String orderBy = buildOrderBy(sortField, sortOrder);
+            
             List<TrafficMonitorEntity> list = trafficMonitorMapper.selectByCondition(
-                sourceIp, requestUri, startDateTime, endDateTime, offset, pageSize
+                sourceIp, targetIp, httpMethod, requestUri, startDateTime, endDateTime, offset, pageSize, orderBy
             );
             
             long total = trafficMonitorMapper.countByCondition(
-                sourceIp, requestUri, startDateTime, endDateTime
+                sourceIp, targetIp, httpMethod, requestUri, startDateTime, endDateTime
             );
 
             Map<String, Object> result = new HashMap<>();
@@ -94,6 +103,59 @@ public class TrafficManageController {
     }
 
     /**
+     * 导出流量数据为CSV
+     */
+    @GetMapping("/export")
+    public void exportTraffic(
+            @RequestParam(required = false) String sourceIp,
+            @RequestParam(required = false) String targetIp,
+            @RequestParam(required = false) String httpMethod,
+            @RequestParam(required = false) String requestUri,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime,
+            @RequestParam(defaultValue = "id") String sortField,
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            HttpServletResponse response) {
+        
+        try {
+            LocalDateTime startDateTime = parseDateTime(startTime);
+            LocalDateTime endDateTime = parseDateTime(endTime);
+            String orderBy = buildOrderBy(sortField, sortOrder);
+            
+            List<TrafficMonitorEntity> list = trafficMonitorMapper.selectByCondition(
+                sourceIp, targetIp, httpMethod, requestUri, startDateTime, endDateTime, 0, 10000, orderBy
+            );
+            
+            response.setContentType("text/csv;charset=UTF-8");
+            response.setHeader("Content-Disposition", "attachment;filename=traffic_export.csv");
+            
+            PrintWriter writer = response.getWriter();
+            writer.write("\uFEFF");
+            writer.println("ID,流量ID,请求时间,源IP,目标IP,源端口,目标端口,HTTP方法,请求URI,响应状态,响应时间(ms)");
+            
+            for (TrafficMonitorEntity item : list) {
+                writer.println(String.format("%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+                    item.getId(),
+                    escapeCsv(item.getTrafficId()),
+                    item.getRequestTime(),
+                    escapeCsv(item.getSourceIp()),
+                    escapeCsv(item.getTargetIp()),
+                    item.getSourcePort(),
+                    item.getTargetPort(),
+                    escapeCsv(item.getHttpMethod()),
+                    escapeCsv(item.getRequestUri()),
+                    item.getResponseStatus(),
+                    item.getResponseTime()
+                ));
+            }
+            
+            writer.flush();
+        } catch (IOException e) {
+            log.error("导出流量数据失败：", e);
+        }
+    }
+
+    /**
      * 解析日期时间字符串
      */
     private LocalDateTime parseDateTime(String dateTimeStr) {
@@ -105,5 +167,40 @@ public class TrafficManageController {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * 构建排序语句
+     */
+    private String buildOrderBy(String sortField, String sortOrder) {
+        String field = mapSortField(sortField);
+        String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        return field + " " + order;
+    }
+
+    /**
+     * 映射排序字段（防止SQL注入）
+     */
+    private String mapSortField(String sortField) {
+        switch (sortField) {
+            case "id": return "id";
+            case "requestTime": return "request_time";
+            case "sourceIp": return "source_ip";
+            case "targetIp": return "target_ip";
+            case "responseStatus": return "response_status";
+            case "responseTime": return "response_time";
+            default: return "id";
+        }
+    }
+
+    /**
+     * CSV字段转义
+     */
+    private String escapeCsv(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }

@@ -38,6 +38,24 @@ public interface MonitorRuleMapper {
     List<MonitorRuleEntity> selectByAttackType(@Param("attackType") String attackType);
 
     /**
+     * 根据条件分页查询规则
+     */
+    List<MonitorRuleEntity> selectByCondition(
+            @Param("ruleName") String ruleName,
+            @Param("attackType") String attackType,
+            @Param("enabled") Integer enabled,
+            @Param("offset") int offset,
+            @Param("limit") int limit);
+
+    /**
+     * 根据条件统计规则数量
+     */
+    long countByCondition(
+            @Param("ruleName") String ruleName,
+            @Param("attackType") String attackType,
+            @Param("enabled") Integer enabled);
+
+    /**
      * 更新规则
      */
     int update(MonitorRuleEntity entity);

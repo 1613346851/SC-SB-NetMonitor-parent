@@ -2,6 +2,7 @@ package com.network.gateway.client;
 
 import com.network.gateway.constant.GatewayHttpConstant;
 import com.network.gateway.dto.TrafficMonitorDTO;
+import com.network.gateway.util.CrossServiceSecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
 
 /**
  * 监控服务流量推送客户端
@@ -32,14 +35,14 @@ public class MonitorServiceTrafficClient {
     private RestTemplate restTemplate;
 
     /**
-     * 跨服务鉴权 Token（从配置文件读取）
+     * 跨服务安全密钥（从配置文件读取，需与监测服务一致）
      */
-    @Value("${cross-service.auth.monitor-token:MonitorSecureToken456}")
-    private String monitorAuthToken;
+    @Value("${cross-service.security.secret-key:DefaultSecretKeyPleaseChangeInProduction123456}")
+    private String secretKey;
 
     /**
      * 推送流量数据到监控服务
-     * 添加跨服务鉴权头，确保调用安全性
+     * 使用时间戳+签名进行安全验证
      *
      * @param trafficDTO 流量监控 DTO
      * @throws RestClientException 网络异常
@@ -51,18 +54,18 @@ public class MonitorServiceTrafficClient {
         }
 
         try {
-            // 构建请求头
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("X-Gateway-Timestamp", String.valueOf(System.currentTimeMillis()));
-            headers.set("X-Request-ID", trafficDTO.getRequestId());
-            // 添加跨服务鉴权头
-            headers.set("X-Auth-Token", monitorAuthToken);
 
-            // 构建请求实体
+            Map<String, String> securityHeaders = CrossServiceSecurityUtil.generateSecurityHeaders(
+                trafficDTO.getRequestId(), secretKey
+            );
+            securityHeaders.forEach(headers::set);
+
+            headers.set("X-Gateway-Timestamp", String.valueOf(System.currentTimeMillis()));
+
             HttpEntity<TrafficMonitorDTO> requestEntity = new HttpEntity<>(trafficDTO, headers);
 
-            // 发送 POST 请求
             String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
                     url,
@@ -70,7 +73,6 @@ public class MonitorServiceTrafficClient {
                     String.class
             );
 
-            // 检查响应状态
             if (response.getStatusCode().is2xxSuccessful()) {
                 logger.debug("流量数据推送成功: 请求ID[{}] 状态码[{}]", 
                            trafficDTO.getRequestId(), response.getStatusCode());

@@ -24,13 +24,48 @@ public class RuleManageController {
     private MonitorRuleMapper monitorRuleMapper;
 
     /**
-     * 查询所有规则
+     * 根据 ID 查询规则
+     */
+    @GetMapping("/{id}")
+    public ApiResponse<MonitorRuleEntity> getRuleById(@PathVariable Long id) {
+        try {
+            MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
+            if (rule == null) {
+                return ApiResponse.notFound("规则不存在");
+            }
+            return ApiResponse.success(rule);
+        } catch (Exception e) {
+            log.error("查询规则详情失败：", e);
+            return ApiResponse.error("查询失败");
+        }
+    }
+
+    /**
+     * 分页查询规则列表
      */
     @GetMapping("/list")
-    public ApiResponse<List<MonitorRuleEntity>> getAllRules() {
+    public ApiResponse<Map<String, Object>> getRuleList(
+            @RequestParam(required = false) String ruleName,
+            @RequestParam(required = false) String attackType,
+            @RequestParam(required = false) Integer enabled,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size) {
         try {
-            List<MonitorRuleEntity> list = monitorRuleMapper.selectAll();
-            return ApiResponse.success(list);
+            int offset = (page - 1) * size;
+            
+            List<MonitorRuleEntity> list = monitorRuleMapper.selectByCondition(
+                ruleName, attackType, enabled, offset, size
+            );
+            
+            long total = monitorRuleMapper.countByCondition(ruleName, attackType, enabled);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("list", list);
+            result.put("total", total);
+            result.put("page", page);
+            result.put("size", size);
+
+            return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询规则列表失败：", e);
             return ApiResponse.error("查询失败");
@@ -102,8 +137,8 @@ public class RuleManageController {
     /**
      * 切换规则启用状态
      */
-    @PostMapping("/toggle/{id}")
-    public ApiResponse<Void> toggleRule(@PathVariable Long id) {
+    @PutMapping("/{id}/toggle")
+    public ApiResponse<Void> toggleRule(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         try {
             MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
             if (rule == null) {

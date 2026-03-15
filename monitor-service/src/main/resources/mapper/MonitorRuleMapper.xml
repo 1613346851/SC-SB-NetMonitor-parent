@@ -58,6 +58,40 @@
         ORDER BY priority ASC
     </select>
 
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_monitor_rule
+        <where>
+            <if test="ruleName != null and ruleName != ''">
+                AND rule_name LIKE CONCAT('%', #{ruleName}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+        ORDER BY priority ASC, create_time DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_monitor_rule
+        <where>
+            <if test="ruleName != null and ruleName != ''">
+                AND rule_name LIKE CONCAT('%', #{ruleName}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+    </select>
+
     <update id="update" parameterType="com.network.monitor.entity.MonitorRuleEntity">
         UPDATE sys_monitor_rule
         SET rule_name = #{ruleName},

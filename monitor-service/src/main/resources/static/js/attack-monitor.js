@@ -1,128 +1,75 @@
 /**
  * 攻击监测页面 JavaScript
- * 负责攻击数据加载、筛选、分页、详情查看、处理等功能
+ * 使用 TableUtils 通用组件
  */
 
-let currentPage = 1;
-const pageSize = 10;
-let searchParams = {};
+let attackTable;
 let currentAttackId = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     
-    loadAttackData();
+    initAttackTable();
     
     setInterval(() => {
-        if (!searchParams.handled || searchParams.handled === '0') {
-            loadAttackData();
+        const handledSelect = document.getElementById('handled');
+        if (!handledSelect || handledSelect.value === '' || handledSelect.value === '0') {
+            attackTable.loadData();
         }
     }, 5000);
 });
 
-async function loadAttackData() {
-    try {
-        const params = {
-            page: currentPage,
-            size: pageSize,
-            ...searchParams
-        };
-
-        const result = await http.get('/attack/list', params);
-        
-        renderAttackTable(result.list || []);
-        renderPagination(result.total || 0);
-    } catch (error) {
-        console.error('加载攻击数据失败:', error);
-    }
-}
-
-function renderAttackTable(data) {
-    const tbody = document.getElementById('attackTableBody');
-    
-    if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center">暂无数据</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = data.map(item => `
-        <tr>
-            <td>${item.id || '-'}</td>
-            <td>${dateFormat.format(item.attackTime)}</td>
-            <td>${item.sourceIp || '-'}</td>
-            <td>${item.targetIp || '-'}</td>
-            <td>${tableRenderer.renderAttackType(item.attackType)}</td>
-            <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
-            <td>${item.confidence ? item.confidence + '%' : '-'}</td>
-            <td>${tableRenderer.renderStatus(item.handled)}</td>
-            <td>
-                <button class="btn btn-primary btn-sm" onclick="viewAttackDetail(${item.id})">详情</button>
-                ${item.handled === 0 ? `<button class="btn btn-success btn-sm" onclick="handleAttackDirect(${item.id})">处理</button>` : ''}
-            </td>
-        </tr>
-    `).join('');
-}
-
-function renderPagination(total) {
-    const totalPages = Math.ceil(total / pageSize);
-    const paginationEl = document.getElementById('pagination');
-    
-    let html = `
-        <span class="pagination-item ${currentPage === 1 ? 'disabled' : ''}" 
-              onclick="goPage(${currentPage - 1})">上一页</span>
-    `;
-    
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-            html += `
-                <span class="pagination-item ${i === currentPage ? 'active' : ''}" 
-                      onclick="goPage(${i})">${i}</span>
+function initAttackTable() {
+    attackTable = TableUtils.createInstance({
+        instanceName: 'attackTable',
+        apiUrl: '/attack/list',
+        pageSize: 10,
+        defaultSortField: 'id',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'attackTableBody',
+        paginationEl: 'pagination',
+        colspan: 9,
+        renderRow: function(item) {
+            return `
+                <tr>
+                    <td><a href="javascript:void(0)" onclick="attackTable.sort('id')">${item.id || '-'}</a></td>
+                    <td><a href="javascript:void(0)" onclick="attackTable.sort('createTime')">${dateFormat.format(item.createTime)}</a></td>
+                    <td>${item.sourceIp || '-'}</td>
+                    <td>${item.targetUri || '-'}</td>
+                    <td>${tableRenderer.renderAttackType(item.attackType)}</td>
+                    <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
+                    <td>${item.confidence ? item.confidence + '%' : '-'}</td>
+                    <td>${tableRenderer.renderStatus(item.handled)}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="viewAttackDetail(${item.id})">详情</button>
+                        ${item.handled === 0 ? `<button class="btn btn-success btn-sm" onclick="handleAttackDirect(${item.id})">处理</button>` : ''}
+                    </td>
+                </tr>
             `;
-        } else if (i === currentPage - 2 || i === currentPage + 2) {
-            html += `<span class="pagination-item">...</span>`;
         }
-    }
+    });
     
-    html += `
-        <span class="pagination-item ${currentPage === totalPages ? 'disabled' : ''}" 
-              onclick="goPage(${currentPage + 1})">下一页</span>
-        <span class="pagination-item">共 ${total} 条</span>
-    `;
-    
-    paginationEl.innerHTML = html;
-}
-
-function goPage(page) {
-    const totalPages = Math.ceil((searchParams.total || 10) / pageSize);
-    
-    if (page < 1 || page > totalPages || page === currentPage) {
-        return;
-    }
-    
-    currentPage = page;
-    loadAttackData();
+    window.attackTable = attackTable;
+    attackTable.loadData();
 }
 
 function searchAttacks() {
-    const sourceIp = document.getElementById('sourceIp').value.trim();
-    const attackType = document.getElementById('attackType').value;
-    const riskLevel = document.getElementById('riskLevel').value;
-    const handled = document.getElementById('handled').value;
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
+    const sourceIp = attackTable.getSearchValue('sourceIp');
+    const attackType = attackTable.getSearchSelectValue('attackType');
+    const riskLevel = attackTable.getSearchSelectValue('riskLevel');
+    const handled = attackTable.getSearchSelectValue('handled');
+    const dateRange = attackTable.getDateRangeValue('startDate', 'endDate');
     
-    searchParams = {};
+    const params = {};
+    if (sourceIp) params.sourceIp = sourceIp;
+    if (attackType) params.attackType = attackType;
+    if (riskLevel) params.riskLevel = riskLevel;
+    if (handled !== '') params.handled = handled;
+    if (dateRange.startTime) params.startTime = dateRange.startTime;
+    if (dateRange.endTime) params.endTime = dateRange.endTime;
     
-    if (sourceIp) searchParams.sourceIp = sourceIp;
-    if (attackType) searchParams.attackType = attackType;
-    if (riskLevel) searchParams.riskLevel = riskLevel;
-    if (handled !== '') searchParams.handled = handled;
-    if (startDate) searchParams.startDate = startDate + ' 00:00:00';
-    if (endDate) searchParams.endDate = endDate + ' 23:59:59';
-    
-    currentPage = 1;
-    loadAttackData();
+    attackTable.search(params);
 }
 
 function resetSearch() {
@@ -133,9 +80,11 @@ function resetSearch() {
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     
-    searchParams = {};
-    currentPage = 1;
-    loadAttackData();
+    attackTable.resetSearch();
+}
+
+function exportAttacks() {
+    attackTable.exportCSV('/attack/export', 'attack_export.csv');
 }
 
 async function viewAttackDetail(id) {
@@ -147,9 +96,9 @@ async function viewAttackDetail(id) {
         content.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div>
-                    <p><strong>攻击时间:</strong> ${dateFormat.format(detail.attackTime)}</p>
+                    <p><strong>攻击时间:</strong> ${dateFormat.format(detail.createTime)}</p>
                     <p><strong>源 IP:</strong> ${detail.sourceIp}</p>
-                    <p><strong>目标 IP:</strong> ${detail.targetIp}</p>
+                    <p><strong>目标 URI:</strong> ${detail.targetUri || '-'}</p>
                     <p><strong>攻击类型:</strong> ${tableRenderer.renderAttackType(detail.attackType)}</p>
                     <p><strong>风险等级:</strong> ${tableRenderer.renderRiskLevel(detail.riskLevel)}</p>
                 </div>
@@ -188,7 +137,7 @@ async function handleAttackDirect(id) {
         });
         
         message.success('处理成功');
-        loadAttackData();
+        attackTable.loadData();
     } catch (error) {
         console.error('处理攻击失败:', error);
     }
@@ -204,7 +153,7 @@ async function handleAttack() {
         
         message.success('处理成功');
         closeAttackDetail();
-        loadAttackData();
+        attackTable.loadData();
     } catch (error) {
         console.error('处理攻击失败:', error);
     }

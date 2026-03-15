@@ -49,8 +49,8 @@ function updateExpireTimeHint() {
 async function loadBlacklistData() {
     try {
         const params = {
-            page: currentPage,
-            size: pageSize,
+            pageNum: currentPage,
+            pageSize: pageSize,
             ...searchParams
         };
 

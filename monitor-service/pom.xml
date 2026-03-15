@@ -47,12 +47,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- 分页插件（版本由父工程补充的dependencyManagement管控） -->
-        <dependency>
-            <groupId>com.github.pagehelper</groupId>
-            <artifactId>pagehelper-spring-boot-starter</artifactId>
-        </dependency>
-
         <!-- Lombok（版本由父工程管控） -->
         <dependency>
             <groupId>org.projectlombok</groupId>

@@ -1,121 +1,87 @@
 /**
  * 流量列表页面 JavaScript
- * 负责流量数据加载、筛选、分页、详情查看等功能
+ * 使用 TableUtils 通用组件
  */
 
-let currentPage = 1;
-const pageSize = 10;
-let searchParams = {};
+let trafficTable;
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     
-    loadTrafficData();
+    initTrafficTable();
 });
 
-async function loadTrafficData() {
-    try {
-        const params = {
-            page: currentPage,
-            size: pageSize,
-            ...searchParams
-        };
-
-        const result = await http.get('/traffic/list', params);
-        
-        renderTrafficTable(result.list || []);
-        renderPagination(result.total || 0);
-    } catch (error) {
-        console.error('加载流量数据失败:', error);
-    }
-}
-
-function renderTrafficTable(data) {
-    const tbody = document.getElementById('trafficTableBody');
-    
-    if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center">暂无数据</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = data.map(item => `
-        <tr>
-            <td>${item.id || '-'}</td>
-            <td>${item.trafficId || '-'}</td>
-            <td>${dateFormat.format(item.requestTime)}</td>
-            <td>${item.sourceIp || '-'}</td>
-            <td>${item.targetIp || '-'}</td>
-            <td>${item.sourcePort || '-'}</td>
-            <td>${item.targetPort || '-'}</td>
-            <td>${item.httpMethod || '-'}</td>
-            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${item.requestUri || '-'}</td>
-            <td>${item.responseStatus || '-'}</td>
-            <td>${item.responseTime || '-'}</td>
-            <td>
-                <button class="btn btn-primary btn-sm" onclick="viewTrafficDetail(${item.id})">详情</button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function renderPagination(total) {
-    const totalPages = Math.ceil(total / pageSize);
-    const paginationEl = document.getElementById('pagination');
-    
-    let html = `
-        <span class="pagination-item ${currentPage === 1 ? 'disabled' : ''}" 
-              onclick="goPage(${currentPage - 1})">上一页</span>
-    `;
-    
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-            html += `
-                <span class="pagination-item ${i === currentPage ? 'active' : ''}" 
-                      onclick="goPage(${i})">${i}</span>
+function initTrafficTable() {
+    trafficTable = TableUtils.createInstance({
+        instanceName: 'trafficTable',
+        apiUrl: '/traffic/list',
+        pageSize: 10,
+        defaultSortField: 'id',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'trafficTableBody',
+        paginationEl: 'pagination',
+        colspan: 12,
+        renderRow: function(item) {
+            return `
+                <tr>
+                    <td><a href="javascript:void(0)" onclick="trafficTable.sort('id')">${item.id || '-'}</a></td>
+                    <td>${item.trafficId || '-'}</td>
+                    <td><a href="javascript:void(0)" onclick="trafficTable.sort('requestTime')">${dateFormat.format(item.requestTime)}</a></td>
+                    <td>${item.sourceIp || '-'}</td>
+                    <td>${item.targetIp || '-'}</td>
+                    <td>${item.sourcePort || '-'}</td>
+                    <td>${item.targetPort || '-'}</td>
+                    <td><span class="badge badge-${getHttpMethodBadge(item.httpMethod)}">${item.httpMethod || '-'}</span></td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${item.requestUri || ''}">${item.requestUri || '-'}</td>
+                    <td><span class="badge badge-${getStatusBadge(item.responseStatus)}">${item.responseStatus || '-'}</span></td>
+                    <td>${item.responseTime || '-'}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="viewTrafficDetail(${item.id})">详情</button>
+                    </td>
+                </tr>
             `;
-        } else if (i === currentPage - 2 || i === currentPage + 2) {
-            html += `<span class="pagination-item">...</span>`;
         }
-    }
+    });
     
-    html += `
-        <span class="pagination-item ${currentPage === totalPages ? 'disabled' : ''}" 
-              onclick="goPage(${currentPage + 1})">下一页</span>
-        <span class="pagination-item">共 ${total} 条</span>
-    `;
-    
-    paginationEl.innerHTML = html;
+    window.trafficTable = trafficTable;
+    trafficTable.loadData();
 }
 
-function goPage(page) {
-    const totalPages = Math.ceil((searchParams.total || 10) / pageSize);
-    
-    if (page < 1 || page > totalPages || page === currentPage) {
-        return;
-    }
-    
-    currentPage = page;
-    loadTrafficData();
+function getHttpMethodBadge(method) {
+    const badges = {
+        'GET': 'success',
+        'POST': 'primary',
+        'PUT': 'warning',
+        'DELETE': 'danger',
+        'PATCH': 'info'
+    };
+    return badges[method] || 'default';
+}
+
+function getStatusBadge(status) {
+    if (!status) return 'default';
+    if (status >= 200 && status < 300) return 'success';
+    if (status >= 300 && status < 400) return 'info';
+    if (status >= 400 && status < 500) return 'warning';
+    if (status >= 500) return 'danger';
+    return 'default';
 }
 
 function searchTraffic() {
-    const sourceIp = document.getElementById('sourceIp').value.trim();
-    const targetIp = document.getElementById('targetIp').value.trim();
-    const httpMethod = document.getElementById('httpMethod').value;
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
+    const sourceIp = trafficTable.getSearchValue('sourceIp');
+    const targetIp = trafficTable.getSearchValue('targetIp');
+    const httpMethod = trafficTable.getSearchSelectValue('httpMethod');
+    const dateRange = trafficTable.getDateRangeValue('startDate', 'endDate');
     
-    searchParams = {};
+    const params = {};
+    if (sourceIp) params.sourceIp = sourceIp;
+    if (targetIp) params.targetIp = targetIp;
+    if (httpMethod) params.httpMethod = httpMethod;
+    if (dateRange.startTime) params.startTime = dateRange.startTime;
+    if (dateRange.endTime) params.endTime = dateRange.endTime;
     
-    if (sourceIp) searchParams.sourceIp = sourceIp;
-    if (targetIp) searchParams.targetIp = targetIp;
-    if (httpMethod) searchParams.httpMethod = httpMethod;
-    if (startDate) searchParams.startDate = startDate + ' 00:00:00';
-    if (endDate) searchParams.endDate = endDate + ' 23:59:59';
-    
-    currentPage = 1;
-    loadTrafficData();
+    trafficTable.search(params);
 }
 
 function resetSearch() {
@@ -125,18 +91,11 @@ function resetSearch() {
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     
-    searchParams = {};
-    currentPage = 1;
-    loadTrafficData();
+    trafficTable.resetSearch();
 }
 
 function exportTraffic() {
-    const params = new URLSearchParams({
-        ...searchParams,
-        export: 'true'
-    });
-    
-    window.location.href = `/api/traffic/export?${params.toString()}`;
+    trafficTable.exportCSV('/traffic/export', 'traffic_export.csv');
 }
 
 async function viewTrafficDetail(id) {
