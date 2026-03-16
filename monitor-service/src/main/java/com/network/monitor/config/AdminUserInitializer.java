@@ -8,12 +8,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
 
 @Component
+@Order(1)
 public class AdminUserInitializer implements CommandLineRunner {
     
     private static final Logger log = LoggerFactory.getLogger(AdminUserInitializer.class);
@@ -34,6 +36,12 @@ public class AdminUserInitializer implements CommandLineRunner {
     
     private final SecureRandom random = new SecureRandom();
     
+    private static String generatedPassword = null;
+    
+    public static String getGeneratedPassword() {
+        return generatedPassword;
+    }
+    
     @Override
     public void run(String... args) throws Exception {
         String defaultUsername = "admin";
@@ -53,12 +61,8 @@ public class AdminUserInitializer implements CommandLineRunner {
             log.info("使用配置文件中的初始密码创建管理员账号");
         } else {
             initialPassword = generateSecurePassword(12);
-            log.warn("========================================");
-            log.warn("【重要】首次启动，已自动生成管理员密码");
-            log.warn("用户名: {}", defaultUsername);
-            log.warn("密码: {}", initialPassword);
-            log.warn("请立即登录并修改密码！");
-            log.warn("========================================");
+            generatedPassword = initialPassword;
+            log.warn("首次启动，已自动生成管理员密码，将在启动成功后显示");
         }
         
         UserEntity newUser = new UserEntity();

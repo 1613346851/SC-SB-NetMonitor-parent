@@ -11,6 +11,13 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadProfile() {
     try {
         const user = await http.get('/auth/me');
+        console.log('用户信息:', user);
+        
+        if (!user) {
+            message.error('获取用户信息失败');
+            return;
+        }
+        
         currentUserId = user.id;
         
         document.getElementById('username').value = user.username || '';
@@ -19,7 +26,7 @@ async function loadProfile() {
         document.getElementById('email').value = user.email || '';
         
         const userAvatar = document.querySelector('.user-avatar');
-        if (user.nickname) {
+        if (userAvatar && user.nickname) {
             userAvatar.textContent = user.nickname.charAt(0).toUpperCase();
         }
         
@@ -29,7 +36,7 @@ async function loadProfile() {
         }
     } catch (error) {
         console.error('加载用户信息失败:', error);
-        message.error('加载用户信息失败');
+        message.error(error.message || '加载用户信息失败');
     }
 }
 

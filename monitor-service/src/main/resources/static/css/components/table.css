@@ -1,0 +1,95 @@
+/**
+ * 表格组件
+ */
+
+/* ==================== 表格容器 ==================== */
+.table-container {
+    background: var(--bg-white);
+    border-radius: var(--radius-base);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table-title {
+    font-size: var(--font-size-md);
+    font-weight: 600;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+/* ==================== 数据表格 ==================== */
+.table,
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--spacing-lg);
+}
+
+.table thead,
+.data-table thead {
+    background: var(--bg-light);
+}
+
+.table th,
+.table td,
+.data-table th,
+.data-table td {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.table th,
+.data-table th {
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.table tbody tr:hover,
+.data-table tbody tr:hover {
+    background: var(--bg-light);
+}
+
+.table .action-btns,
+.data-table .action-btns {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* ==================== 筛选栏 ==================== */
+.filter-bar {
+    background: var(--bg-white);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    border-radius: var(--radius-base);
+    box-shadow: var(--shadow-card);
+}
+
+.filter-item {
+    display: inline-block;
+    margin-right: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.filter-label {
+    margin-right: var(--spacing-sm);
+    font-weight: 500;
+}
+
+/* ==================== 分页容器 ==================== */
+.pagination-container {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    display: flex;
+    justify-content: center;
+}

@@ -91,6 +91,31 @@ public class AuthController {
         List<String> permissions = authService.getCurrentUserPermissions();
         return ApiResponse.success(permissions);
     }
+    
+    @PostMapping("/changePassword")
+    public ApiResponse<Void> changePassword(@RequestBody Map<String, String> passwordForm,
+                                             HttpServletRequest request) {
+        String currentPassword = passwordForm.get("currentPassword");
+        String newPassword = passwordForm.get("newPassword");
+        
+        if (currentPassword == null || currentPassword.isEmpty()) {
+            return ApiResponse.badRequest("当前密码不能为空");
+        }
+        if (newPassword == null || newPassword.isEmpty()) {
+            return ApiResponse.badRequest("新密码不能为空");
+        }
+        if (newPassword.length() < 6) {
+            return ApiResponse.badRequest("新密码长度不能少于6位");
+        }
+        
+        String clientIp = getClientIp(request);
+        boolean success = authService.changePassword(currentPassword, newPassword, clientIp);
+        
+        if (success) {
+            return ApiResponse.success();
+        }
+        return ApiResponse.error("当前密码错误");
+    }
 
     private Map<String, Object> buildUserInfo(UserEntity user) {
         Map<String, Object> userInfo = new HashMap<>();

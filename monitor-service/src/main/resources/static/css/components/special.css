@@ -1,0 +1,80 @@
+/**
+ * 特殊组件样式
+ * 包括：菜单树、详情网格等
+ */
+
+/* ==================== 菜单树 ==================== */
+.menu-tree {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-base);
+    padding: var(--spacing-md);
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--bg-white);
+}
+
+.menu-tree .menu-item {
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-sm) 0;
+    color: var(--text-primary);
+}
+
+.menu-tree .menu-item:hover {
+    background: transparent;
+}
+
+.menu-tree .menu-children {
+    margin-left: var(--spacing-xl);
+    padding-left: var(--spacing-md);
+    border-left: 2px solid var(--border-color);
+}
+
+.menu-tree .checkbox-label {
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+}
+
+/* ==================== 详情网格 ==================== */
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-lg);
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.detail-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.detail-item label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.detail-item span {
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    word-break: break-all;
+}
+
+/* ==================== 响应式 ==================== */
+@media (max-width: 768px) {
+    .search-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .search-bar .form-control {
+        min-width: 100%;
+    }
+    
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+}

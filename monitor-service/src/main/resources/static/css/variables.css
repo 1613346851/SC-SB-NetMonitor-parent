@@ -1,0 +1,74 @@
+/**
+ * CSS 变量定义
+ * 集中管理所有设计系统变量
+ */
+
+:root {
+    /* 颜色系统 */
+    --primary-color: #1890ff;
+    --success-color: #52c41a;
+    --warning-color: #faad14;
+    --danger-color: #f5222d;
+    --error-color: #ff4d4f;
+    --info-color: #1890ff;
+    
+    /* 文字颜色 */
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --text-disabled: #999999;
+    
+    /* 背景颜色 */
+    --bg-body: #f0f2f5;
+    --bg-white: #ffffff;
+    --bg-dark: #001529;
+    --bg-light: #fafafa;
+    
+    /* 边框和阴影 */
+    --border-color: #e8e8e8;
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.09);
+    --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.15);
+    
+    /* 尺寸变量 */
+    --sidebar-width: 256px;
+    --header-height: 64px;
+    
+    /* 间距变量 */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 24px;
+    --spacing-xxl: 32px;
+    
+    /* 字体大小 */
+    --font-size-xs: 12px;
+    --font-size-sm: 13px;
+    --font-size-base: 14px;
+    --font-size-md: 16px;
+    --font-size-lg: 18px;
+    --font-size-xl: 20px;
+    --font-size-xxl: 24px;
+    --font-size-xxxl: 30px;
+    
+    /* 圆角 */
+    --radius-sm: 2px;
+    --radius-base: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-round: 50%;
+    
+    /* 过渡 */
+    --transition-fast: 0.2s;
+    --transition-base: 0.3s;
+    --transition-slow: 0.5s;
+    
+    /* 层级 */
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-fixed: 300;
+    --z-modal-backdrop: 1000;
+    --z-modal: 1001;
+    --z-popover: 1002;
+    --z-tooltip: 1003;
+}

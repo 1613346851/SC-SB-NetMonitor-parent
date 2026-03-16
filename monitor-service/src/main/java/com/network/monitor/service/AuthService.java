@@ -22,4 +22,6 @@ public interface AuthService {
     boolean hasPermission(String permission);
     
     void logout(String clientIp);
+    
+    boolean changePassword(String currentPassword, String newPassword, String clientIp);
 }

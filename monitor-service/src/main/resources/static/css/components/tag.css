@@ -1,0 +1,41 @@
+/**
+ * 标签组件
+ */
+
+.tag {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-base);
+    font-size: var(--font-size-xs);
+    border: 1px solid;
+}
+
+.tag.primary {
+    background: rgba(24, 144, 255, 0.1);
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.tag.success {
+    background: rgba(82, 196, 26, 0.1);
+    border-color: var(--success-color);
+    color: var(--success-color);
+}
+
+.tag.warning {
+    background: rgba(250, 173, 20, 0.1);
+    border-color: var(--warning-color);
+    color: var(--warning-color);
+}
+
+.tag.danger {
+    background: rgba(245, 34, 45, 0.1);
+    border-color: var(--danger-color);
+    color: var(--danger-color);
+}
+
+.tag.info {
+    background: rgba(24, 144, 255, 0.1);
+    border-color: var(--info-color);
+    color: var(--info-color);
+}

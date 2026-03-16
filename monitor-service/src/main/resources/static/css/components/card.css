@@ -1,0 +1,149 @@
+/**
+ * 卡片组件
+ */
+
+/* ==================== 基础卡片 ==================== */
+.card {
+    background: var(--bg-white);
+    border-radius: var(--radius-base);
+    box-shadow: var(--shadow-card);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    transition: box-shadow var(--transition-base);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-hover);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-title {
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.card-body {
+    color: var(--text-secondary);
+}
+
+/* ==================== 统计卡片 ==================== */
+.stat-card {
+    background: var(--bg-white);
+    border-radius: var(--radius-base);
+    box-shadow: var(--shadow-card);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+}
+
+.stat-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.stat-card-title {
+    font-size: var(--font-size-base);
+    color: var(--text-secondary);
+}
+
+.stat-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-xxl);
+}
+
+.stat-card-icon.primary {
+    background: rgba(24, 144, 255, 0.1);
+    color: var(--primary-color);
+}
+
+.stat-card-icon.success {
+    background: rgba(82, 196, 26, 0.1);
+    color: var(--success-color);
+}
+
+.stat-card-icon.warning {
+    background: rgba(250, 173, 20, 0.1);
+    color: var(--warning-color);
+}
+
+.stat-card-icon.danger {
+    background: rgba(245, 34, 45, 0.1);
+    color: var(--danger-color);
+}
+
+.stat-card-value {
+    font-size: var(--font-size-xxxl);
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.stat-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+}
+
+.stat-change {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.stat-change.up {
+    color: var(--success-color);
+}
+
+.stat-change.down {
+    color: var(--danger-color);
+}
+
+/* ==================== 统计卡片网格 ==================== */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+}
+
+@media (max-width: 1200px) {
+    .stat-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .stat-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .col-md-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    
+    .stat-card {
+        padding: var(--spacing-lg);
+    }
+    
+    .stat-card-value {
+        font-size: var(--font-size-xxl);
+    }
+}

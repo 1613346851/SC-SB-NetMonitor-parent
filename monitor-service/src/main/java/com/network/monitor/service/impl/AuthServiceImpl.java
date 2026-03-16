@@ -158,6 +158,39 @@ public class AuthServiceImpl implements AuthService {
         }
     }
     
+    @Override
+    public boolean changePassword(String currentPassword, String newPassword, String clientIp) {
+        Long userId = currentUserId.get();
+        String username = currentUsername.get();
+        
+        if (userId == null) {
+            log.warn("修改密码失败：用户未登录");
+            return false;
+        }
+        
+        UserEntity user = userMapper.selectById(userId);
+        if (user == null) {
+            log.warn("修改密码失败：用户不存在，userId={}", userId);
+            return false;
+        }
+        
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            log.warn("修改密码失败：当前密码错误，username={}", username);
+            operLogService.logOperation(username, "UPDATE", "个人中心", 
+                "修改密码失败：当前密码错误", "changePassword", "/api/auth/changePassword", clientIp, 1);
+            return false;
+        }
+        
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        userMapper.updatePassword(userId, encodedPassword, java.time.LocalDateTime.now());
+        
+        log.info("用户修改密码成功：username={}, ip={}", username, clientIp);
+        operLogService.logOperation(username, "UPDATE", "个人中心", 
+            "修改密码成功", "changePassword", "/api/auth/changePassword", clientIp, 0);
+        
+        return true;
+    }
+    
     public static void setCurrentUser(Long userId, String username) {
         currentUserId.set(userId);
         currentUsername.set(username);
