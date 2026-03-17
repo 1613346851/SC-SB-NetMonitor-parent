@@ -2,6 +2,7 @@ package com.network.monitor.service.impl;
 
 import com.network.monitor.entity.SysConfigEntity;
 import com.network.monitor.event.ConfigRefreshEvent;
+import com.network.monitor.event.ConfigUpdateEvent;
 import com.network.monitor.loader.ConfigLoader;
 import com.network.monitor.mapper.SysConfigMapper;
 import com.network.monitor.service.SysConfigService;
@@ -75,6 +76,7 @@ public class SysConfigServiceImpl implements SysConfigService, ConfigLoader {
             config.setUpdateTime(LocalDateTime.now());
             int result = sysConfigMapper.updateById(config);
             if (result > 0) {
+                eventPublisher.publishEvent(new ConfigUpdateEvent(this, config.getConfigKey(), config.getConfigValue()));
                 log.info("更新配置成功：configKey={}", config.getConfigKey());
             } else {
                 log.warn("更新配置失败，未找到记录：configKey={}", config.getConfigKey());
@@ -90,6 +92,7 @@ public class SysConfigServiceImpl implements SysConfigService, ConfigLoader {
         try {
             int result = sysConfigMapper.updateByKey(configKey, configValue);
             if (result > 0) {
+                eventPublisher.publishEvent(new ConfigUpdateEvent(this, configKey, configValue));
                 log.info("更新配置值成功：configKey={}, configValue={}", configKey, configValue);
             } else {
                 log.warn("更新配置值失败，未找到记录：configKey={}", configKey);

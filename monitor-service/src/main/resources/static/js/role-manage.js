@@ -87,7 +87,7 @@ function showAddModal() {
     document.getElementById('roleForm').reset();
     document.getElementById('roleId').value = '';
     document.getElementById('formRoleCode').readOnly = false;
-    renderMenuTree([]);
+    renderMenuTree([], true);
     document.getElementById('roleModal').style.display = 'flex';
 }
 
@@ -110,12 +110,12 @@ async function editRole(id) {
     }
 }
 
-function renderMenuTree(selectedMenuIds) {
+function renderMenuTree(selectedMenuIds, collapsed = false) {
     const container = document.getElementById('menuTree');
     
     const menuTree = buildMenuTree(allMenus, 0);
     
-    container.innerHTML = menuTree.map(menu => renderMenuItem(menu, selectedMenuIds)).join('');
+    container.innerHTML = menuTree.map(menu => renderMenuItem(menu, selectedMenuIds, 0, collapsed)).join('');
 }
 
 function buildMenuTree(menus, parentId) {
@@ -127,27 +127,86 @@ function buildMenuTree(menus, parentId) {
         }));
 }
 
-function renderMenuItem(menu, selectedMenuIds) {
+function renderMenuItem(menu, selectedMenuIds, level = 0, defaultCollapsed = false) {
     const checked = selectedMenuIds.includes(menu.id) ? 'checked' : '';
     const hasChildren = menu.children && menu.children.length > 0;
+    const menuId = `menu-${menu.id}`;
+    const isExpanded = hasChildren && !defaultCollapsed ? 'expanded' : '';
+    const childrenDisplay = defaultCollapsed ? 'none' : 'block';
     
     let html = `
-        <div class="menu-item">
-            <label class="checkbox-label">
-                <input type="checkbox" value="${menu.id}" ${checked} onchange="handleMenuCheck(this, ${menu.id})">
-                ${menu.menuName}
-            </label>
+        <div class="menu-tree-node ${level === 0 ? 'root-node' : ''}">
+            <div class="menu-tree-node-content">
+                ${hasChildren ? `
+                    <span class="menu-toggle ${isExpanded}" onclick="toggleMenuNode(this)">
+                        <svg viewBox="0 0 24 24" width="14" height="14">
+                            <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+                        </svg>
+                    </span>
+                ` : '<span class="menu-toggle-placeholder"></span>'}
+                <label class="checkbox-label">
+                    <input type="checkbox" value="${menu.id}" ${checked} onchange="handleMenuCheck(this, ${menu.id})">
+                    <span class="menu-name">${menu.menuName}</span>
+                </label>
+            </div>
     `;
     
     if (hasChildren) {
-        html += `<div class="menu-children">${menu.children.map(child => renderMenuItem(child, selectedMenuIds)).join('')}</div>`;
+        html += `<div class="menu-children" style="display: ${childrenDisplay};">${menu.children.map(child => renderMenuItem(child, selectedMenuIds, level + 1, defaultCollapsed)).join('')}</div>`;
     }
     
     html += '</div>';
     return html;
 }
 
+function toggleMenuNode(toggleBtn) {
+    const node = toggleBtn.closest('.menu-tree-node');
+    const children = node.querySelector('.menu-children');
+    if (children) {
+        const isExpanded = toggleBtn.classList.contains('expanded');
+        toggleBtn.classList.toggle('expanded');
+        children.style.display = isExpanded ? 'none' : 'block';
+    }
+}
+
 function handleMenuCheck(checkbox, menuId) {
+    const node = checkbox.closest('.menu-tree-node');
+    const children = node.querySelectorAll('.menu-children input[type="checkbox"]');
+    children.forEach(child => {
+        child.checked = checkbox.checked;
+    });
+    
+    if (checkbox.checked) {
+        let parent = node.parentElement;
+        while (parent) {
+            if (parent.classList.contains('menu-tree-node')) {
+                const parentCheckbox = parent.querySelector(':scope > .menu-tree-node-content input[type="checkbox"]');
+                if (parentCheckbox && !parentCheckbox.checked) {
+                    parentCheckbox.checked = true;
+                }
+            }
+            parent = parent.parentElement;
+        }
+    } else {
+        updateParentCheckboxState(node);
+    }
+}
+
+function updateParentCheckboxState(node) {
+    let parent = node.parentElement;
+    while (parent) {
+        if (parent.classList.contains('menu-tree-node')) {
+            const parentCheckbox = parent.querySelector(':scope > .menu-tree-node-content input[type="checkbox"]');
+            const siblingCheckboxes = parent.querySelectorAll(':scope > .menu-children > .menu-tree-node > .menu-tree-node-content input[type="checkbox"]');
+            if (parentCheckbox && siblingCheckboxes.length > 0) {
+                const allUnchecked = Array.from(siblingCheckboxes).every(cb => !cb.checked);
+                if (allUnchecked) {
+                    parentCheckbox.checked = false;
+                }
+            }
+        }
+        parent = parent.parentElement;
+    }
 }
 
 function closeModal() {

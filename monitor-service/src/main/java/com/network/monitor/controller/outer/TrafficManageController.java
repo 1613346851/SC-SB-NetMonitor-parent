@@ -3,10 +3,13 @@ package com.network.monitor.controller.outer;
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.entity.TrafficMonitorEntity;
 import com.network.monitor.mapper.TrafficMonitorMapper;
+import com.network.monitor.service.AuthService;
+import com.network.monitor.service.OperLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -25,6 +28,12 @@ public class TrafficManageController {
 
     @Autowired
     private TrafficMonitorMapper trafficMonitorMapper;
+
+    @Autowired
+    private AuthService authService;
+
+    @Autowired
+    private OperLogService operLogService;
 
     /**
      * 分页查询流量记录
@@ -92,9 +101,11 @@ public class TrafficManageController {
      * 删除流量记录
      */
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteTraffic(@PathVariable Long id) {
+    public ApiResponse<Void> deleteTraffic(@PathVariable Long id, HttpServletRequest request) {
         try {
             trafficMonitorMapper.deleteById(id);
+            operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "流量管理", 
+                "删除流量记录ID：" + id, "delete", "/api/traffic/" + id, getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("删除流量记录失败：", e);
@@ -115,6 +126,7 @@ public class TrafficManageController {
             @RequestParam(required = false) String endTime,
             @RequestParam(defaultValue = "id") String sortField,
             @RequestParam(defaultValue = "desc") String sortOrder,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) {
         
         try {
@@ -125,6 +137,9 @@ public class TrafficManageController {
             List<TrafficMonitorEntity> list = trafficMonitorMapper.selectByCondition(
                 sourceIp, targetIp, httpMethod, requestUri, startDateTime, endDateTime, 0, 10000, orderBy
             );
+            
+            operLogService.logOperation(authService.getCurrentUsername(), "EXPORT", "流量管理", 
+                "导出流量数据，共" + list.size() + "条", "export", "/api/traffic/export", getClientIp(httpRequest), 0);
             
             response.setContentType("text/csv;charset=UTF-8");
             response.setHeader("Content-Disposition", "attachment;filename=traffic_export.csv");
@@ -202,5 +217,16 @@ public class TrafficManageController {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

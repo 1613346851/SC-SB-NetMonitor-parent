@@ -55,7 +55,7 @@ public class UserController {
         String phone = (String) params.get("phone");
         String email = (String) params.get("email");
         String remark = (String) params.get("remark");
-        List<Long> roleIds = (List<Long>) params.get("roleIds");
+        List<Long> roleIds = convertToLongList(params.get("roleIds"));
         
         if (username == null || username.trim().isEmpty()) {
             return ApiResponse.badRequest("用户名不能为空");
@@ -93,7 +93,7 @@ public class UserController {
         String phone = (String) params.get("phone");
         String email = (String) params.get("email");
         String remark = (String) params.get("remark");
-        List<Long> roleIds = (List<Long>) params.get("roleIds");
+        List<Long> roleIds = convertToLongList(params.get("roleIds"));
         
         UserEntity user = new UserEntity();
         user.setId(id);
@@ -170,5 +170,24 @@ public class UserController {
             ip = ip.split(",")[0].trim();
         }
         return ip;
+    }
+    
+    @SuppressWarnings("unchecked")
+    private List<Long> convertToLongList(Object obj) {
+        if (obj == null) {
+            return null;
+        }
+        if (obj instanceof List) {
+            List<?> list = (List<?>) obj;
+            return list.stream()
+                    .map(item -> {
+                        if (item instanceof Number) {
+                            return ((Number) item).longValue();
+                        }
+                        return Long.valueOf(item.toString());
+                    })
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        return null;
     }
 }

@@ -22,4 +22,14 @@ public class ConfigRefreshEventListener {
             log.error("配置缓存刷新失败", e);
         }
     }
+
+    @EventListener
+    public void onConfigUpdate(ConfigUpdateEvent event) {
+        try {
+            sysConfigCache.updateConfig(event.getConfigKey(), event.getConfigValue());
+            log.info("配置缓存更新成功：configKey={}", event.getConfigKey());
+        } catch (Exception e) {
+            log.error("配置缓存更新失败：configKey={}", event.getConfigKey(), e);
+        }
+    }
 }

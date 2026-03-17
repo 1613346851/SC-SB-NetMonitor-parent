@@ -3,10 +3,13 @@ package com.network.monitor.controller.outer;
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.entity.MonitorRuleEntity;
 import com.network.monitor.mapper.MonitorRuleMapper;
+import com.network.monitor.service.AuthService;
+import com.network.monitor.service.OperLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +25,12 @@ public class RuleManageController {
 
     @Autowired
     private MonitorRuleMapper monitorRuleMapper;
+
+    @Autowired
+    private AuthService authService;
+
+    @Autowired
+    private OperLogService operLogService;
 
     /**
      * 根据 ID 查询规则
@@ -90,7 +99,7 @@ public class RuleManageController {
      * 新增规则
      */
     @PostMapping("/add")
-    public ApiResponse<Void> addRule(@RequestBody MonitorRuleEntity rule) {
+    public ApiResponse<Void> addRule(@RequestBody MonitorRuleEntity rule, HttpServletRequest request) {
         try {
             rule.setCreateTime(LocalDateTime.now());
             rule.setUpdateTime(LocalDateTime.now());
@@ -98,6 +107,8 @@ public class RuleManageController {
                 rule.setEnabled(1);
             }
             monitorRuleMapper.insert(rule);
+            operLogService.logOperation(authService.getCurrentUsername(), "INSERT", "规则管理", 
+                "新增规则：" + rule.getRuleName(), "add", "/api/rule/add", getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("新增规则失败：", e);
@@ -109,10 +120,12 @@ public class RuleManageController {
      * 更新规则
      */
     @PostMapping("/update")
-    public ApiResponse<Void> updateRule(@RequestBody MonitorRuleEntity rule) {
+    public ApiResponse<Void> updateRule(@RequestBody MonitorRuleEntity rule, HttpServletRequest request) {
         try {
             rule.setUpdateTime(LocalDateTime.now());
             monitorRuleMapper.update(rule);
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理", 
+                "更新规则ID：" + rule.getId(), "update", "/api/rule/update", getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("更新规则失败：", e);
@@ -124,9 +137,11 @@ public class RuleManageController {
      * 删除规则
      */
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteRule(@PathVariable Long id) {
+    public ApiResponse<Void> deleteRule(@PathVariable Long id, HttpServletRequest request) {
         try {
             monitorRuleMapper.deleteById(id);
+            operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "规则管理", 
+                "删除规则ID：" + id, "delete", "/api/rule/" + id, getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("删除规则失败：", e);
@@ -138,7 +153,7 @@ public class RuleManageController {
      * 切换规则启用状态
      */
     @PutMapping("/{id}/toggle")
-    public ApiResponse<Void> toggleRule(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
+    public ApiResponse<Void> toggleRule(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body, HttpServletRequest request) {
         try {
             MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
             if (rule == null) {
@@ -146,10 +161,24 @@ public class RuleManageController {
             }
             int newEnabled = rule.getEnabled() == 1 ? 0 : 1;
             monitorRuleMapper.updateEnabled(id, newEnabled);
+            String action = newEnabled == 1 ? "启用" : "禁用";
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理", 
+                action + "规则ID：" + id, "toggle", "/api/rule/" + id + "/toggle", getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("切换规则状态失败：", e);
             return ApiResponse.error("操作失败");
         }
+    }
+    
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

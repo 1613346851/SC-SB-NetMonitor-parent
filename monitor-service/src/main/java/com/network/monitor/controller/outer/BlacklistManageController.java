@@ -6,12 +6,15 @@ import com.network.monitor.dto.BlacklistAddDTO;
 import com.network.monitor.dto.BlacklistInfoDTO;
 import com.network.monitor.entity.IpBlacklistEntity;
 import com.network.monitor.entity.IpBlacklistHistoryEntity;
+import com.network.monitor.service.AuthService;
 import com.network.monitor.service.BlacklistManageService;
 import com.network.monitor.service.IpBlacklistService;
+import com.network.monitor.service.OperLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -32,6 +35,12 @@ public class BlacklistManageController {
 
     @Autowired
     private SysConfigCache sysConfigCache;
+
+    @Autowired
+    private AuthService authService;
+
+    @Autowired
+    private OperLogService operLogService;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -133,16 +142,20 @@ public class BlacklistManageController {
     }
 
     @PutMapping("/{ip}/extend")
-    public ApiResponse<Void> extendBlacklist(@PathVariable String ip, @RequestBody Map<String, Object> params) {
+    public ApiResponse<Void> extendBlacklist(@PathVariable String ip, @RequestBody Map<String, Object> params, HttpServletRequest request) {
         try {
             Integer expireSeconds = (Integer) params.get("expireSeconds");
             if (expireSeconds == null || expireSeconds <= 0) {
                 return ApiResponse.error("延长时间必须大于0");
             }
             
-            ipBlacklistService.extendBlacklist(ip, expireSeconds.longValue(), "admin");
+            ipBlacklistService.extendBlacklist(ip, expireSeconds.longValue(), authService.getCurrentUsername());
             
             log.info("延长黑名单封禁时间成功：ip={}, extendSeconds={}", ip, expireSeconds);
+            
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "黑名单管理", 
+                "延长黑名单时间：IP=" + ip + "，延长时间=" + formatBanDuration(expireSeconds.longValue()), "extend", "/api/blacklist/" + ip + "/extend", getClientIp(request), 0);
+            
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("延长黑名单封禁时间失败：ip={}", ip, e);
@@ -167,7 +180,7 @@ public class BlacklistManageController {
     }
 
     @PostMapping
-    public ApiResponse<Void> addToBlacklist(@RequestBody BlacklistAddDTO dto) {
+    public ApiResponse<Void> addToBlacklist(@RequestBody BlacklistAddDTO dto, HttpServletRequest request) {
         try {
             String ip = dto.getIpAddress();
             String reason = dto.getReason();
@@ -186,13 +199,16 @@ public class BlacklistManageController {
             }
 
             if (operator == null || operator.isEmpty()) {
-                operator = "admin";
+                operator = authService.getCurrentUsername();
             }
 
             ipBlacklistService.addToBlacklist(ip, reason, expireTime, operator, "MANUAL", null, null, null);
 
             log.info("手动添加黑名单成功：ip={}, reason={}, expireTime={}, operator={}", 
                     ip, reason, expireTime != null ? expireTime.format(TIME_FORMATTER) : "永久", operator);
+
+            operLogService.logOperation(authService.getCurrentUsername(), "INSERT", "黑名单管理", 
+                "添加黑名单IP：" + ip, "add", "/api/blacklist", getClientIp(request), 0);
 
             return ApiResponse.success();
         } catch (Exception e) {
@@ -202,11 +218,14 @@ public class BlacklistManageController {
     }
 
     @DeleteMapping("/{ip}")
-    public ApiResponse<Void> removeFromBlacklist(@PathVariable String ip) {
+    public ApiResponse<Void> removeFromBlacklist(@PathVariable String ip, HttpServletRequest request) {
         try {
-            ipBlacklistService.removeFromBlacklist(ip, "手动移除黑名单", "admin");
+            ipBlacklistService.removeFromBlacklist(ip, "手动移除黑名单", authService.getCurrentUsername());
 
             log.info("从黑名单移除 IP 成功：ip={}", ip);
+
+            operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "黑名单管理", 
+                "移除黑名单IP：" + ip, "remove", "/api/blacklist/" + ip, getClientIp(request), 0);
 
             return ApiResponse.success();
         } catch (Exception e) {
@@ -381,5 +400,16 @@ public class BlacklistManageController {
         }
         
         return sb.toString();
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

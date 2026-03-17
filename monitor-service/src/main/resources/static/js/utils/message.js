@@ -11,7 +11,7 @@ const MessageUtil = {
         
         this._container = document.createElement('div');
         this._container.className = 'message-container';
-        this._container.style.cssText = 'position: fixed; top: 24px; left: 50%; transform: translateX(-50%); z-index: 10000;';
+        this._container.style.cssText = 'position: fixed; top: 24px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; z-index: 10000; pointer-events: none;';
         document.body.appendChild(this._container);
     },
     
@@ -26,8 +26,9 @@ const MessageUtil = {
             padding: 12px 24px;
             border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            animation: messageSlideIn 0.3s ease;
+            animation: messageFadeIn 0.3s ease forwards;
             white-space: nowrap;
+            pointer-events: auto;
         `;
         
         const colors = {
@@ -42,7 +43,7 @@ const MessageUtil = {
         this._container.appendChild(messageEl);
         
         setTimeout(() => {
-            messageEl.style.animation = 'messageSlideOut 0.3s ease forwards';
+            messageEl.style.animation = 'messageFadeOut 0.3s ease forwards';
             setTimeout(() => messageEl.remove(), 300);
         }, duration);
         
@@ -68,13 +69,25 @@ const MessageUtil = {
 
 const style = document.createElement('style');
 style.textContent = `
-    @keyframes messageSlideIn {
-        from { opacity: 0; transform: translateY(-20px); }
-        to { opacity: 1; transform: translateY(0); }
+    @keyframes messageFadeIn {
+        from { 
+            opacity: 0; 
+            transform: scale(0.8);
+        }
+        to { 
+            opacity: 1; 
+            transform: scale(1);
+        }
     }
-    @keyframes messageSlideOut {
-        from { opacity: 1; transform: translateY(0); }
-        to { opacity: 0; transform: translateY(-20px); }
+    @keyframes messageFadeOut {
+        from { 
+            opacity: 1; 
+            transform: scale(1);
+        }
+        to { 
+            opacity: 0; 
+            transform: scale(0.8);
+        }
     }
 `;
 document.head.appendChild(style);

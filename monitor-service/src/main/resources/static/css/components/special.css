@@ -13,6 +13,82 @@
     background: var(--bg-white);
 }
 
+.menu-tree-node {
+    margin-bottom: var(--spacing-xs);
+}
+
+.menu-tree-node-content {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-xs) 0;
+    border-radius: var(--radius-sm);
+}
+
+.menu-tree-node-content:hover {
+    background: var(--bg-light);
+}
+
+.menu-tree-node.root-node > .menu-tree-node-content {
+    font-weight: 500;
+}
+
+.menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: transform var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.menu-toggle:hover {
+    color: var(--primary-color);
+}
+
+.menu-toggle.expanded {
+    transform: rotate(0deg);
+}
+
+.menu-toggle:not(.expanded) {
+    transform: rotate(-90deg);
+}
+
+.menu-toggle svg {
+    display: block;
+}
+
+.menu-toggle-placeholder {
+    width: 20px;
+    flex-shrink: 0;
+}
+
+.menu-tree .checkbox-label {
+    display: flex;
+    align-items: center;
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    cursor: pointer;
+    margin: 0;
+    flex: 1;
+}
+
+.menu-tree .checkbox-label input[type="checkbox"] {
+    margin-right: var(--spacing-sm);
+}
+
+.menu-name {
+    flex: 1;
+}
+
+.menu-tree .menu-children {
+    margin-left: var(--spacing-lg);
+    padding-left: var(--spacing-sm);
+    border-left: 2px solid var(--border-color);
+}
+
 .menu-tree .menu-item {
     margin-bottom: var(--spacing-sm);
     padding: var(--spacing-sm) 0;
@@ -21,17 +97,6 @@
 
 .menu-tree .menu-item:hover {
     background: transparent;
-}
-
-.menu-tree .menu-children {
-    margin-left: var(--spacing-xl);
-    padding-left: var(--spacing-md);
-    border-left: 2px solid var(--border-color);
-}
-
-.menu-tree .checkbox-label {
-    color: var(--text-primary);
-    font-size: var(--font-size-base);
 }
 
 /* ==================== 详情网格 ==================== */

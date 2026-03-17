@@ -2,7 +2,49 @@
  * 模态框组件
  */
 
-/* ==================== 模态框遮罩 ==================== */
+/* ==================== 模态框遮罩层 ==================== */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal-backdrop);
+}
+
+.modal.show {
+    display: flex;
+}
+
+/* ==================== 模态框内容容器 ==================== */
+.modal-content {
+    position: relative;
+    background: var(--bg-white);
+    border-radius: var(--radius-base);
+    width: 600px;
+    max-width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: modalSlideUp 0.3s ease;
+}
+
+@keyframes modalSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ==================== 模态框遮罩(.modal-overlay) ==================== */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -16,20 +58,23 @@
     z-index: var(--z-modal-backdrop);
 }
 
-/* ==================== 模态框 ==================== */
-.modal {
+/* ==================== .modal-overlay 内的 .modal 作为内容容器 ==================== */
+.modal-overlay > .modal {
     position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    bottom: auto;
     background: var(--bg-white);
+    display: block;
     border-radius: var(--radius-base);
     width: 600px;
     max-width: 90%;
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.modal.show {
-    display: block;
+    animation: modalSlideUp 0.3s ease;
+    z-index: auto;
 }
 
 /* ==================== 模态框头部 ==================== */
