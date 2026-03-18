@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">CSRF跨站请求伪造漏洞测试平台</title>
+    <link rel="stylesheet" th:href="@{/css/csrf-vuln.css}">
+    <link href="https://cdn.staticfile.org/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid vh-100 p-0">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm sticky-top" th:replace="~{fragments/navbar :: navbar('CSRF跨站请求伪造')}"></nav>
+
+    <div class="row g-0 h-100">
+        <div class="col-md-4 col-lg-3 sidebar sidebar-panel">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white d-flex align-items-center">
+                    <i class="fas fa-cog me-2"></i>
+                    <h5 class="mb-0 fw-bold">用户信息控制台</h5>
+                </div>
+                <div class="card-body">
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-info-circle me-2"></i>漏洞原理
+                        </h6>
+                        <div class="info-section">
+                            <div class="info-item">
+                                <span class="badge bg-danger">漏洞类型</span>
+                                <span class="ms-3 text-dark">Cross-Site Request Forgery</span>
+                            </div>
+                            <div class="info-item mt-2">
+                                <span class="badge bg-warning">攻击方式</span>
+                                <span class="ms-3 text-dark">伪造用户请求</span>
+                            </div>
+                            <div class="info-item mt-2">
+                                <span class="badge bg-info">危害等级</span>
+                                <span class="ms-3 text-dark">中危（账户劫持）</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-user me-2"></i>当前用户信息
+                        </h6>
+                        <div id="userInfoPanel" class="user-info-panel">
+                            <small class="text-muted">点击下方按钮获取用户信息</small>
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm mt-2 w-100" onclick="getUserInfo()">
+                            <i class="fas fa-sync me-1"></i>刷新用户信息
+                        </button>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-check-circle me-2 text-success"></i>正常修改昵称
+                        </h6>
+                        <div class="mb-3">
+                            <label for="nicknameInput" class="form-label fw-medium">
+                                <i class="fas fa-edit me-1"></i>新昵称:
+                            </label>
+                            <input type="text" class="form-control" id="nicknameInput"
+                                   placeholder="输入新昵称..." value="">
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-danger" type="button" id="vulnUpdateBtn">
+                                <i class="fas fa-skull me-2"></i>漏洞修改（无Token）
+                            </button>
+                            <button class="btn btn-success" type="button" id="safeUpdateBtn">
+                                <i class="fas fa-shield-alt me-2"></i>安全修改（带Token）
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-bug me-2 text-danger"></i>CSRF攻击演示
+                        </h6>
+                        <div class="alert alert-warning small">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            点击下方按钮将打开攻击演示页面，模拟真实CSRF攻击场景
+                        </div>
+                        <button class="btn btn-outline-danger btn-sm w-100" onclick="openAttackPage()">
+                            <i class="fas fa-external-link-alt me-1"></i>打开攻击演示页面
+                        </button>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-key me-2"></i>CSRF Token
+                        </h6>
+                        <div id="tokenPanel" class="token-panel">
+                            <small class="text-muted">点击获取Token</small>
+                        </div>
+                        <button class="btn btn-outline-info btn-sm mt-2 w-100" onclick="getCsrfToken()">
+                            <i class="fas fa-key me-1"></i>获取Token
+                        </button>
+                    </div>
+
+                    <div class="section">
+                        <button class="btn btn-outline-secondary w-100 py-2" onclick="clearOutput()">
+                            <i class="fas fa-trash-alt me-2"></i>清空结果
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8 col-lg-9 main-content main-panel">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-scroll me-2"></i>
+                        <h5 class="mb-0 fw-bold">操作结果展示</h5>
+                    </div>
+                    <div>
+                        <span id="statusIndicator" class="badge bg-secondary">
+                            <i class="fas fa-circle-notch fa-spin me-1"></i>就绪
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="outputContainer" class="output-container">
+                        <div class="welcome-message text-center text-muted d-flex flex-column justify-content-center align-items-center h-100">
+                            <i class="fas fa-user-shield fa-4x mb-4 text-primary"></i>
+                            <h4 class="fw-bold text-dark">欢迎使用CSRF漏洞测试平台</h4>
+                            <p class="mb-0 lead">请先获取用户信息，然后测试昵称修改功能</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">处理中...</span>
+    </div>
+    <p class="mt-3 text-white fw-medium">请求处理中，请稍候...</p>
+</div>
+
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/csrf-vuln.js}"></script>
+<script src="https://lib.baomitu.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

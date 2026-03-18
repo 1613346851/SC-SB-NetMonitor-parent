@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">安全测试靶场</title>
+    <link rel="stylesheet" th:href="@{/css/index.css}">
+    <link href="https://cdn.staticfile.org/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm sticky-top">
+    <div class="container-fluid">
+        <a class="navbar-brand d-flex align-items-center" href="/target/page/index">
+            <i class="fas fa-shield-alt me-2"></i>
+            <span class="fw-bold">安全测试靶场</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                        <i class="fas fa-fire me-1"></i>基础漏洞
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/target/page/cmd-vuln"><i class="fas fa-terminal text-danger me-2"></i>CMD命令注入</a></li>
+                        <li><a class="dropdown-item" href="/target/page/sql-vuln"><i class="fas fa-database text-danger me-2"></i>SQL注入</a></li>
+                        <li><a class="dropdown-item" href="/target/page/xss-vuln"><i class="fas fa-bug text-warning me-2"></i>XSS跨站脚本</a></li>
+                        <li><a class="dropdown-item" href="/target/page/ddos-vuln"><i class="fas fa-bolt text-info me-2"></i>DDoS攻击模拟</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                        <i class="fas fa-folder-open me-1"></i>文件漏洞
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/target/page/path-traversal-vuln"><i class="fas fa-folder-open text-danger me-2"></i>路径遍历</a></li>
+                        <li><a class="dropdown-item" href="/target/page/file-include-vuln"><i class="fas fa-file-import text-danger me-2"></i>文件包含</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                        <i class="fas fa-server me-1"></i>服务漏洞
+                    </a>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/target/page/ssrf-vuln"><i class="fas fa-network-wired text-danger me-2"></i>SSRF服务端请求伪造</a></li>
+                        <li><a class="dropdown-item" href="/target/page/xxe-vuln"><i class="fas fa-code text-danger me-2"></i>XXE外部实体注入</a></li>
+                        <li><a class="dropdown-item" href="/target/page/deserial-vuln"><i class="fas fa-exchange-alt text-danger me-2"></i>Java反序列化</a></li>
+                        <li><a class="dropdown-item" href="/target/page/csrf-vuln"><i class="fas fa-user-shield text-warning me-2"></i>CSRF跨站请求伪造</a></li>
+                    </ul>
+                </li>
+            </ul>
+            <span class="navbar-text text-warning">
+                <i class="fas fa-exclamation-triangle me-1"></i>仅用于授权安全测试
+            </span>
+        </div>
+    </div>
+</nav>
+
+<section class="hero-section">
+    <div class="hero-content">
+        <div class="hero-icon">
+            <i class="fas fa-shield-alt"></i>
+        </div>
+        <h1 class="hero-title">Web安全漏洞测试靶场</h1>
+        <p class="hero-subtitle">覆盖OWASP Top 10核心漏洞，提供漏洞演示与安全防护对比学习</p>
+        <div class="hero-stats">
+            <div class="stat-item">
+                <span class="stat-number">10</span>
+                <span class="stat-label">漏洞模块</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number">7</span>
+                <span class="stat-label">高危漏洞</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number">3</span>
+                <span class="stat-label">中危漏洞</span>
+            </div>
+        </div>
+        <a href="#vuln-section" class="btn btn-light btn-lg hero-btn">
+            <i class="fas fa-arrow-down me-2"></i>开始测试
+        </a>
+    </div>
+    <div class="hero-decoration">
+        <div class="floating-icon icon-1"><i class="fas fa-bug"></i></div>
+        <div class="floating-icon icon-2"><i class="fas fa-terminal"></i></div>
+        <div class="floating-icon icon-3"><i class="fas fa-database"></i></div>
+        <div class="floating-icon icon-4"><i class="fas fa-code"></i></div>
+        <div class="floating-icon icon-5"><i class="fas fa-network-wired"></i></div>
+    </div>
+</section>
+
+<section id="vuln-section" class="vuln-section py-5">
+    <div class="container">
+        <div class="section-header text-center mb-5">
+            <h2 class="section-title">
+                <i class="fas fa-bug text-primary me-2"></i>漏洞测试模块
+            </h2>
+            <p class="section-subtitle text-muted">选择漏洞类型开始安全测试</p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-12">
+                <h5 class="category-title">
+                    <i class="fas fa-fire text-danger me-2"></i>基础高危漏洞
+                </h5>
+            </div>
+            
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-danger" onclick="location.href='/target/page/cmd-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-terminal"></i>
+                        </div>
+                        <h5 class="vuln-title">CMD命令注入</h5>
+                        <p class="vuln-desc">Command Injection</p>
+                        <span class="vuln-badge badge-danger">高危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-danger" onclick="location.href='/target/page/sql-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <h5 class="vuln-title">SQL注入</h5>
+                        <p class="vuln-desc">SQL Injection</p>
+                        <span class="vuln-badge badge-danger">高危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-warning" onclick="location.href='/target/page/xss-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-bug"></i>
+                        </div>
+                        <h5 class="vuln-title">XSS跨站脚本</h5>
+                        <p class="vuln-desc">Cross-Site Scripting</p>
+                        <span class="vuln-badge badge-warning">中危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-info" onclick="location.href='/target/page/ddos-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h5 class="vuln-title">DDoS攻击模拟</h5>
+                        <p class="vuln-desc">Distributed Denial of Service</p>
+                        <span class="vuln-badge badge-info">中危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mt-2">
+            <div class="col-12">
+                <h5 class="category-title">
+                    <i class="fas fa-folder-open text-primary me-2"></i>文件操作漏洞
+                </h5>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-danger" onclick="location.href='/target/page/path-traversal-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <h5 class="vuln-title">路径遍历</h5>
+                        <p class="vuln-desc">Path Traversal</p>
+                        <span class="vuln-badge badge-danger">高危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-danger" onclick="location.href='/target/page/file-include-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-file-import"></i>
+                        </div>
+                        <h5 class="vuln-title">文件包含</h5>
+                        <p class="vuln-desc">File Inclusion</p>
+                        <span class="vuln-badge badge-danger">高危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mt-2">
+            <div class="col-12">
+                <h5 class="category-title">
+                    <i class="fas fa-server text-success me-2"></i>服务/解析漏洞
+                </h5>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-danger" onclick="location.href='/target/page/ssrf-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-network-wired"></i>
+                        </div>
+                        <h5 class="vuln-title">SSRF服务端请求伪造</h5>
+                        <p class="vuln-desc">Server-Side Request Forgery</p>
+                        <span class="vuln-badge badge-danger">高危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-danger" onclick="location.href='/target/page/xxe-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <h5 class="vuln-title">XXE外部实体注入</h5>
+                        <p class="vuln-desc">XML External Entity</p>
+                        <span class="vuln-badge badge-danger">高危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-danger" onclick="location.href='/target/page/deserial-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <h5 class="vuln-title">Java反序列化</h5>
+                        <p class="vuln-desc">Insecure Deserialization</p>
+                        <span class="vuln-badge badge-danger">高危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="vuln-card vuln-card-warning" onclick="location.href='/target/page/csrf-vuln'">
+                    <div class="vuln-card-body">
+                        <div class="vuln-icon">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <h5 class="vuln-title">CSRF跨站请求伪造</h5>
+                        <p class="vuln-desc">Cross-Site Request Forgery</p>
+                        <span class="vuln-badge badge-warning">中危</span>
+                    </div>
+                    <div class="vuln-card-footer">
+                        <span class="vuln-action"><i class="fas fa-arrow-right me-1"></i>进入测试</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="info-section py-4">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4 mb-3 mb-md-0">
+                <div class="info-card">
+                    <i class="fas fa-cogs fa-2x text-primary mb-2"></i>
+                    <h6>技术栈</h6>
+                    <p class="text-muted small mb-0">Spring Boot + Thymeleaf + Bootstrap 5 + MySQL</p>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3 mb-md-0">
+                <div class="info-card">
+                    <i class="fas fa-list-check fa-2x text-success mb-2"></i>
+                    <h6>漏洞覆盖</h6>
+                    <p class="text-muted small mb-0">10个漏洞模块，覆盖OWASP Top 10</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="info-card">
+                    <i class="fas fa-server fa-2x text-info mb-2"></i>
+                    <h6>服务端口</h6>
+                    <p class="text-muted small mb-0">9001（根路径：/target）</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="footer py-4">
+    <div class="container text-center">
+        <p class="mb-0">
+            <i class="fas fa-shield-alt me-2"></i>
+            安全测试靶场 v1.0 | 仅用于授权安全测试
+        </p>
+    </div>
+</footer>
+
+<script src="https://lib.baomitu.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

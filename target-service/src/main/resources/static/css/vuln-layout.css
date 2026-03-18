@@ -1,0 +1,90 @@
+/* 漏洞测试平台 - 布局样式 */
+
+/* 全局样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    overflow-x: hidden;
+}
+
+/* 主布局优化 */
+.container-fluid {
+    padding: 0;
+}
+
+.row {
+    margin: 0;
+    height: calc(100vh - 56px);
+}
+
+/* 左侧控制面板 */
+.sidebar-panel {
+    padding: 15px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-right: 1px solid #dee2e6;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.col-md-4.col-lg-3 {
+    flex: 0 0 380px;
+    max-width: 380px;
+}
+
+/* 右侧输出区域 */
+.main-panel {
+    padding: 15px;
+    height: 100%;
+}
+
+.col-md-8.col-lg-9 {
+    flex: 1;
+}
+
+/* 主内容区域优化 */
+.main-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content .card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 侧边栏滚动优化 */
+.sidebar {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f8f9fa;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #f8f9fa;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
