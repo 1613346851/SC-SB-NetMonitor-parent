@@ -1,0 +1,55 @@
+/**
+ * 网络监测系统 - 全局样式
+ * 基于现代化设计风格的响应式布局
+ * 
+ * 文件结构说明：
+ * - variables.css: CSS变量定义
+ * - reset.css: 基础样式重置
+ * - layout.css: 布局组件（侧边栏、顶部导航等）
+ * - components/: 组件样式
+ *   - button.css: 按钮组件
+ *   - form.css: 表单组件
+ *   - table.css: 表格组件
+ *   - modal.css: 模态框组件
+ *   - card.css: 卡片组件
+ *   - tag.css: 标签组件
+ *   - pagination.css: 分页组件
+ *   - message.css: 消息提示组件
+ *   - dropdown.css: 下拉菜单组件
+ *   - special.css: 特殊组件（菜单树、详情网格等）
+ * - pages/: 页面特定样式
+ *   - login.css: 登录页面
+ * - utilities/: 工具类
+ *   - helpers.css: 通用工具类
+ *   - animations.css: 动画效果
+ */
+
+/* ==================== 导入所有样式文件 ==================== */
+
+/* CSS变量 */
+@import url('variables.css');
+
+/* 基础样式重置 */
+@import url('reset.css');
+
+/* 布局组件 */
+@import url('layout.css');
+
+/* 组件样式 */
+@import url('components/button.css');
+@import url('components/form.css');
+@import url('components/table.css');
+@import url('components/modal.css');
+@import url('components/card.css');
+@import url('components/tag.css');
+@import url('components/pagination.css');
+@import url('components/message.css');
+@import url('components/dropdown.css');
+@import url('components/special.css');
+
+/* 页面样式 */
+@import url('pages/login.css');
+
+/* 工具类 */
+@import url('utilities/helpers.css');
+@import url('utilities/animations.css');

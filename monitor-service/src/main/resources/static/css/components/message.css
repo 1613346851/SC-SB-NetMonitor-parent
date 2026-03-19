@@ -1,0 +1,35 @@
+/**
+ * 消息提示组件
+ */
+
+.message {
+    position: fixed;
+    top: var(--spacing-xl);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: var(--spacing-md) var(--spacing-xl);
+    border-radius: var(--radius-base);
+    box-shadow: var(--shadow-hover);
+    z-index: var(--z-popover);
+    animation: slideDown var(--transition-base) ease;
+}
+
+.message.success {
+    background: var(--success-color);
+    color: #fff;
+}
+
+.message.error {
+    background: var(--danger-color);
+    color: #fff;
+}
+
+.message.warning {
+    background: var(--warning-color);
+    color: #fff;
+}
+
+.message.info {
+    background: var(--info-color);
+    color: #fff;
+}

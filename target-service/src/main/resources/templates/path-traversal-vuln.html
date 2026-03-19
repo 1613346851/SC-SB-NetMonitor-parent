@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">路径遍历漏洞测试平台</title>
+    <link rel="stylesheet" th:href="@{/css/path-traversal-vuln.css}">
+    <link href="https://cdn.staticfile.org/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid vh-100 p-0">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm sticky-top" th:replace="~{fragments/navbar :: navbar('路径遍历')}"></nav>
+
+    <div class="row g-0 h-100">
+        <div class="col-md-4 col-lg-3 sidebar sidebar-panel">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white d-flex align-items-center">
+                    <i class="fas fa-cog me-2"></i>
+                    <h5 class="mb-0 fw-bold">文件读取控制台</h5>
+                </div>
+                <div class="card-body">
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-info-circle me-2"></i>漏洞原理
+                        </h6>
+                        <div class="info-section">
+                            <div class="info-item">
+                                <span class="badge bg-danger">漏洞类型</span>
+                                <span class="ms-3 text-dark">Path Traversal</span>
+                            </div>
+                            <div class="info-item mt-2">
+                                <span class="badge bg-warning">攻击方式</span>
+                                <span class="ms-3 text-dark">使用 ../ 读取任意文件</span>
+                            </div>
+                            <div class="info-item mt-2">
+                                <span class="badge bg-info">危害等级</span>
+                                <span class="ms-3 text-dark">高危（敏感文件泄露）</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-check-circle me-2 text-success"></i>基础功能验证
+                        </h6>
+                        <div class="test-cases-grid">
+                            <button class="btn btn-outline-primary btn-sm" onclick="readFile('test.txt')">
+                                <i class="fas fa-file-alt me-1"></i>读取test.txt
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="readFile('config/test.properties')">
+                                <i class="fas fa-cog me-1"></i>读取配置文件
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-bug me-2 text-danger"></i>路径遍历攻击
+                        </h6>
+                        <div class="test-cases-grid">
+                            <button class="btn btn-outline-danger btn-sm" onclick="readFile('../../application.yml')">
+                                <i class="fas fa-arrow-up me-1"></i>读取application.yml
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="readFile('../../../../../pom.xml')">
+                                <i class="fas fa-file-code me-1"></i>读取pom.xml
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="readFile('../../../../../../pom.xml')">
+                                <i class="fas fa-file-code me-1"></i>读取根目录pom.xml
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="readFile('../../../../../../database/README.md')">
+                                <i class="fas fa-book me-1"></i>读取README.md
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-shield-alt me-2 text-success"></i>安全防护测试
+                        </h6>
+                        <div class="test-cases-grid">
+                            <button class="btn btn-outline-success btn-sm" onclick="safeReadFile('test.txt')">
+                                <i class="fas fa-lock me-1"></i>安全读取test.txt
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm" onclick="safeReadFile('../../application.yml')">
+                                <i class="fas fa-ban me-1"></i>测试拦截
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-list me-2"></i>允许的文件列表
+                        </h6>
+                        <div id="allowedFilesList" class="allowed-files-list">
+                            <small class="text-muted">点击下方按钮获取文件列表</small>
+                        </div>
+                        <button class="btn btn-outline-info btn-sm mt-2 w-100" onclick="listAllowedFiles()">
+                            <i class="fas fa-sync me-1"></i>获取文件列表
+                        </button>
+                    </div>
+
+                    <div class="section mb-3">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-keyboard me-2"></i>自定义文件名
+                        </h6>
+                        <div class="mb-3">
+                            <label for="filenameInput" class="form-label fw-medium">
+                                <i class="fas fa-file me-1"></i>文件名:
+                            </label>
+                            <input type="text" class="form-control" id="filenameInput"
+                                   placeholder="输入文件名或路径..." value="test.txt">
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-danger" type="button" id="vulnReadBtn">
+                                <i class="fas fa-skull me-2"></i>漏洞读取
+                            </button>
+                            <button class="btn btn-success" type="button" id="safeReadBtn">
+                                <i class="fas fa-shield-alt me-2"></i>安全读取
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <button class="btn btn-outline-secondary w-100 py-2" onclick="clearOutput()">
+                            <i class="fas fa-trash-alt me-2"></i>清空结果
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8 col-lg-9 main-content main-panel">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-scroll me-2"></i>
+                        <h5 class="mb-0 fw-bold">文件内容展示</h5>
+                    </div>
+                    <div>
+                        <span id="statusIndicator" class="badge bg-secondary">
+                            <i class="fas fa-circle-notch fa-spin me-1"></i>就绪
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="outputContainer" class="output-container">
+                        <div class="welcome-message text-center text-muted d-flex flex-column justify-content-center align-items-center h-100">
+                            <i class="fas fa-folder-open fa-4x mb-4 text-primary"></i>
+                            <h4 class="fw-bold text-dark">欢迎使用路径遍历漏洞测试平台</h4>
+                            <p class="mb-0 lead">请输入文件名或点击测试用例开始文件读取测试</p>
+                            <div class="mt-4">
+                                <i class="fas fa-mouse-pointer text-muted"></i>
+                                <small class="ms-2">支持正常读取和路径遍历攻击测试</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">读取中...</span>
+    </div>
+    <p class="mt-3 text-white fw-medium">文件读取中，请稍候...</p>
+</div>
+
+<script th:src="@{/js/common.js}"></script>
+<script th:src="@{/js/path-traversal-vuln.js}"></script>
+<script src="https://lib.baomitu.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

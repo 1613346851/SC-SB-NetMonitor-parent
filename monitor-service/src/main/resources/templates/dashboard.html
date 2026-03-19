@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仪表盘 - 网络监测系统</title>
+    <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <h2>仪表盘</h2>
+                </div>
+                <div class="header-right">
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+
+            <!-- 内容区域 -->
+            <main class="content">
+                <!-- 统计卡片 -->
+                <div class="stat-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">总流量数</div>
+                            <div class="stat-card-icon primary">🌐</div>
+                        </div>
+                        <div class="stat-card-value" id="totalTraffic">0</div>
+                        <div class="stat-card-footer">
+                            <span>今日</span>
+                            <span class="stat-change up" id="trafficChange">
+                                ↑ 0%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">攻击次数</div>
+                            <div class="stat-card-icon danger">⚠️</div>
+                        </div>
+                        <div class="stat-card-value" id="totalAttack">0</div>
+                        <div class="stat-card-footer">
+                            <span>今日</span>
+                            <span class="stat-change down" id="attackChange">
+                                ↓ 0%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">高危漏洞</div>
+                            <div class="stat-card-icon warning">🔓</div>
+                        </div>
+                        <div class="stat-card-value" id="totalVulnerability">0</div>
+                        <div class="stat-card-footer">
+                            <span>已验证</span>
+                            <span class="stat-change up" id="vulnerabilityChange">
+                                ↑ 0%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">防御操作</div>
+                            <div class="stat-card-icon success">🛡️</div>
+                        </div>
+                        <div class="stat-card-value" id="totalDefense">0</div>
+                        <div class="stat-card-footer">
+                            <span>今日</span>
+                            <span class="stat-change up" id="defenseChange">
+                                ↑ 0%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图表区域 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">流量趋势</h3>
+                        <div class="chart-controls">
+                            <select id="trafficTimeRange" class="time-range-select" onchange="onTimeRangeChange()">
+                                <option value="1h">最近 1 小时</option>
+                                <option value="6h">最近 6 小时</option>
+                                <option value="12h">最近 12 小时</option>
+                                <option value="24h" selected>最近 24 小时</option>
+                                <option value="3d">最近 3 天</option>
+                                <option value="7d">最近 7 天</option>
+                                <option value="14d">最近 14 天</option>
+                                <option value="30d">最近 30 天</option>
+                            </select>
+                            <span id="trafficIntervalDisplay" class="interval-display">统计精度：30 分钟</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="trafficTrendChart" style="width: 100%; height: 400px; position: relative;">
+                            <div class="chart-empty-state" id="trafficTrendEmpty" style="display: none;">
+                                <div class="chart-empty-state-icon">📈</div>
+                                <div class="chart-empty-state-text" id="trafficTrendEmptyText">暂无流量数据</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                    <!-- 攻击类型分布 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">攻击类型分布</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="attackTypeChart" style="width: 100%; height: 300px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 漏洞等级分布 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">漏洞等级分布</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="vulnerabilityLevelChart" style="width: 100%; height: 300px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 最新告警 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">最新告警</h3>
+                        <a href="/attack" class="btn btn-primary btn-sm">查看全部</a>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>源 IP</th>
+                                        <th>攻击类型</th>
+                                        <th>风险等级</th>
+                                        <th>状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentAttacks">
+                                    <tr>
+                                        <td colspan="5" class="text-center">暂无数据</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/components/chart.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/dashboard.js}"></script>
+    <script>
+        PageInit.init({
+            requireAuth: true,
+            highlightMenu: true
+        });
+    </script>
+</body>
+</html>

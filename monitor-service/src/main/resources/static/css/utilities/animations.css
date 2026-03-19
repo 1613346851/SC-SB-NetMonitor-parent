@@ -1,0 +1,93 @@
+/**
+ * 动画效果
+ */
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideLeft {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideRight {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-20px); }
+    60% { transform: translateY(-10px); }
+}
+
+/* ==================== 动画类 ==================== */
+.animate-fade-in {
+    animation: fadeIn var(--transition-base) ease;
+}
+
+.animate-fade-out {
+    animation: fadeOut var(--transition-base) ease;
+}
+
+.animate-slide-up {
+    animation: slideUp var(--transition-base) ease;
+}
+
+.animate-slide-down {
+    animation: slideDown var(--transition-base) ease;
+}
+
+.animate-slide-left {
+    animation: slideLeft var(--transition-base) ease;
+}
+
+.animate-slide-right {
+    animation: slideRight var(--transition-base) ease;
+}
+
+.animate-shake {
+    animation: shake 0.5s ease;
+}
+
+.animate-pulse {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-bounce {
+    animation: bounce 1s ease infinite;
+}

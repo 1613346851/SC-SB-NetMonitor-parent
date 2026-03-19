@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据报表 - 网络监测系统</title>
+    <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <h2>数据报表</h2>
+                </div>
+                <div class="header-right">
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+
+            <main class="content">
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">开始日期</label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">结束日期</label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="onQueryReport()">查询</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">统计摘要</h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;">
+                            <div class="text-center">
+                                <div style="font-size: 32px; font-weight: 600; color: var(--primary-color);" id="totalTrafficReport">0</div>
+                                <div style="color: var(--text-secondary); margin-top: 8px;">总流量数</div>
+                            </div>
+                            <div class="text-center">
+                                <div style="font-size: 32px; font-weight: 600; color: var(--danger-color);" id="totalAttacksReport">0</div>
+                                <div style="color: var(--text-secondary); margin-top: 8px;">攻击总数</div>
+                            </div>
+                            <div class="text-center">
+                                <div style="font-size: 32px; font-weight: 600; color: var(--warning-color);" id="totalVulnsReport">0</div>
+                                <div style="color: var(--text-secondary); margin-top: 8px;">漏洞数量</div>
+                            </div>
+                            <div class="text-center">
+                                <div style="font-size: 32px; font-weight: 600; color: var(--success-color);" id="totalDefensesReport">0</div>
+                                <div style="color: var(--text-secondary); margin-top: 8px;">防御次数</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">流量趋势</h3>
+                            <div class="chart-controls">
+                                <select id="trafficTimeRangeReport" class="time-range-select" onchange="onReportTimeRangeChange('traffic')">
+                                    <option value="1h">最近 1 小时</option>
+                                    <option value="6h">最近 6 小时</option>
+                                    <option value="12h">最近 12 小时</option>
+                                    <option value="24h" selected>最近 24 小时</option>
+                                    <option value="3d">最近 3 天</option>
+                                    <option value="7d">最近 7 天</option>
+                                    <option value="14d">最近 14 天</option>
+                                    <option value="30d">最近 30 天</option>
+                                </select>
+                                <span id="trafficIntervalDisplayReport" class="interval-display">统计精度：30 分钟</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="trafficTrendReportChart" style="width: 100%; height: 300px; position: relative;">
+                                <div class="chart-empty-state" id="trafficTrendReportEmpty" style="display: none;">
+                                    <div class="chart-empty-state-icon">📈</div>
+                                    <div class="chart-empty-state-text">暂无流量趋势数据</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">攻击趋势</h3>
+                            <div class="chart-controls">
+                                <select id="attackTimeRangeReport" class="time-range-select" onchange="onReportTimeRangeChange('attack')">
+                                    <option value="1h">最近 1 小时</option>
+                                    <option value="6h">最近 6 小时</option>
+                                    <option value="12h">最近 12 小时</option>
+                                    <option value="24h" selected>最近 24 小时</option>
+                                    <option value="3d">最近 3 天</option>
+                                    <option value="7d">最近 7 天</option>
+                                    <option value="14d">最近 14 天</option>
+                                    <option value="30d">最近 30 天</option>
+                                </select>
+                                <span id="attackIntervalDisplayReport" class="interval-display">统计精度：30 分钟</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="attackTrendReportChart" style="width: 100%; height: 300px; position: relative;">
+                                <div class="chart-empty-state" id="attackTrendReportEmpty" style="display: none;">
+                                    <div class="chart-empty-state-icon">⚠️</div>
+                                    <div class="chart-empty-state-text">暂无攻击趋势数据</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">攻击类型分布</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="attackTypeReportChart" style="width: 100%; height: 300px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">风险等级分布</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="riskLevelReportChart" style="width: 100%; height: 300px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">TOP 10 攻击源 IP</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>排名</th>
+                                        <th>源 IP</th>
+                                        <th>攻击次数</th>
+                                        <th>风险等级</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="topAttackersBody">
+                                    <tr>
+                                        <td colspan="4" class="text-center">暂无数据</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/components/chart.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/data-report.js}"></script>
+    <script>
+        PageInit.init({
+            requireAuth: true,
+            highlightMenu: true
+        });
+    </script>
+</body>
+</html>

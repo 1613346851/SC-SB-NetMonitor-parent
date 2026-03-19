@@ -27,21 +27,25 @@ public class TrafficPreProcessUtil {
             throw new IllegalArgumentException("无效的流量数据");
         }
 
-        // 创建流量监控DTO
+        // 创建流量监控 DTO
         TrafficMonitorDTO monitorDTO = new TrafficMonitorDTO(
                 rawTraffic.getRequestId(),
                 rawTraffic.getSourceIp(),
                 rawTraffic.getMethod(),
                 rawTraffic.getUri(),
-                rawTraffic.getRequestTimestamp()
+                rawTraffic.getRequestTime()
         );
 
         // 设置基本信息
         monitorDTO.setTargetIp(rawTraffic.getTargetIp());
         monitorDTO.setQueryParams(rawTraffic.getQueryParams());
         monitorDTO.setRequestBody(rawTraffic.getRequestBody());
-        monitorDTO.setHeaders(rawTraffic.getHeaders());
+        monitorDTO.setRequestHeaders(rawTraffic.getHeaders());
         monitorDTO.setUserAgent(rawTraffic.getUserAgent());
+        monitorDTO.setProtocol(rawTraffic.getProtocol());
+        monitorDTO.setSourcePort(rawTraffic.getSourcePort());
+        monitorDTO.setTargetPort(rawTraffic.getTargetPort());
+        monitorDTO.setContentType(rawTraffic.getContentType());
 
         // 进行异常检测
         performAbnormalDetection(rawTraffic, monitorDTO);
@@ -139,7 +143,7 @@ public class TrafficPreProcessUtil {
 
         // 处理请求头 - 清理敏感头部
         Map<String, String> cleanHeaders = cleanSensitiveHeaders(rawTraffic.getHeaders());
-        monitorDTO.setHeaders(cleanHeaders);
+        monitorDTO.setRequestHeaders(cleanHeaders);
     }
 
     /**

@@ -10,20 +10,25 @@ import com.network.gateway.util.ServerWebExchangeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * 恶意请求拦截过滤器
  * 检测并拦截已知的恶意请求模式
+ * 支持从配置文件读取恶意模式（评估报告 B03 优化项）
  *
  * @author network-monitor
  * @since 1.0.0
@@ -37,17 +42,29 @@ public class MaliciousRequestBlockFilter implements GlobalFilter, Ordered {
     private MonitorServiceDefenseClient defenseClient;
 
     /**
+     * 配置的恶意用户代理列表（从配置文件中读取，逗号分隔）
+     */
+    @Value("${gateway.defense.malicious.user-agents:sqlmap,nessus,nmap,burp suite,zaproxy,nikto,w3af,arachni,skipfish,wvs,dirb,gobuster,ffuf,hydra,medusa}")
+    private String configuredMaliciousUserAgents;
+
+    /**
+     * 配置的恶意 URI 模式列表（从配置文件中读取，逗号分隔）
+     */
+    @Value("${gateway.defense.malicious.uri-patterns:/admin,/manager,/console,/wp-admin,/phpmyadmin,/mysql,/dbadmin,/webdav,/.git/config,/.env,/config/database.yml,/backup,/dump,/export,/download}")
+    private String configuredMaliciousUriPatterns;
+
+    /**
      * 已知的恶意用户代理集合
      */
     private final Set<String> maliciousUserAgents = ConcurrentHashMap.newKeySet();
 
     /**
-     * 已知的恶意IP集合（可动态更新）
+     * 已知的恶意 IP 集合（可动态更新）
      */
     private final Set<String> maliciousIps = ConcurrentHashMap.newKeySet();
 
     /**
-     * 恶意URI模式集合
+     * 恶意 URI 模式集合
      */
     private final Set<String> maliciousUriPatterns = ConcurrentHashMap.newKeySet();
 
@@ -60,22 +77,45 @@ public class MaliciousRequestBlockFilter implements GlobalFilter, Ordered {
 
     /**
      * 初始化已知的恶意请求模式
+     * 从配置文件读取并解析恶意模式列表
      */
     private void initializeMaliciousPatterns() {
-        // 恶意用户代理
-        maliciousUserAgents.addAll(Set.of(
-                "sqlmap", "nessus", "nmap", "burp suite", "zaproxy",
-                "nikto", "w3af", "arachni", "skipfish", "wvs",
-                "dirb", "gobuster", "ffuf", "hydra", "medusa"
-        ));
+        // 从配置加载恶意用户代理
+        loadMaliciousUserAgentsFromConfig();
+        
+        // 从配置加载恶意 URI 模式
+        loadMaliciousUriPatternsFromConfig();
+        
+        logger.info("恶意请求拦截器初始化完成 - 用户代理：{}个，URI 模式：{}个", 
+                   maliciousUserAgents.size(), maliciousUriPatterns.size());
+    }
 
-        // 恶意URI模式
-        maliciousUriPatterns.addAll(Set.of(
-                "/admin", "/manager", "/console", "/wp-admin",
-                "/phpmyadmin", "/mysql", "/dbadmin", "/webdav",
-                "/.git/config", "/.env", "/config/database.yml",
-                "/backup", "/dump", "/export", "/download"
-        ));
+    /**
+     * 从配置文件加载恶意用户代理
+     */
+    private void loadMaliciousUserAgentsFromConfig() {
+        if (StringUtils.hasText(configuredMaliciousUserAgents)) {
+            maliciousUserAgents.clear();
+            Arrays.stream(configuredMaliciousUserAgents.split(","))
+                  .map(String::trim)
+                  .map(String::toLowerCase)
+                  .filter(StringUtils::hasText)
+                  .forEach(maliciousUserAgents::add);
+        }
+    }
+
+    /**
+     * 从配置文件加载恶意 URI 模式
+     */
+    private void loadMaliciousUriPatternsFromConfig() {
+        if (StringUtils.hasText(configuredMaliciousUriPatterns)) {
+            maliciousUriPatterns.clear();
+            Arrays.stream(configuredMaliciousUriPatterns.split(","))
+                  .map(String::trim)
+                  .map(String::toLowerCase)
+                  .filter(StringUtils::hasText)
+                  .forEach(maliciousUriPatterns::add);
+        }
     }
 
     /**

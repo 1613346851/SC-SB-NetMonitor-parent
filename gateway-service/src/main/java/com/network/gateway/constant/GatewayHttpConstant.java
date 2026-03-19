@@ -69,12 +69,14 @@ public class GatewayHttpConstant {
      * 监控服务相关配置
      */
     public static class MonitorService {
+        /** 监控服务基础地址 */
+        public static final String BASE_URL = "http://localhost:9002";
         /** 流量监控接口路径 */
-        public static final String TRAFFIC_MONITOR_ENDPOINT = "http://localhost:9002/api/monitor/traffic";
+        public static final String TRAFFIC_MONITOR_ENDPOINT = "/api/inner/traffic/receive";
         /** 防御日志接口路径 */
-        public static final String DEFENSE_LOG_ENDPOINT = "http://localhost:9002/api/monitor/defense/log";
+        public static final String DEFENSE_LOG_ENDPOINT = "/api/monitor/defense/log";
         /** 防御指令接口路径 */
-        public static final String DEFENSE_COMMAND_ENDPOINT = "http://localhost:9002/api/monitor/defense/command";
+        public static final String DEFENSE_COMMAND_ENDPOINT = "/api/monitor/defense/command";
         
         /** 连接超时时间（毫秒） */
         public static final int CONNECT_TIMEOUT = 5000;

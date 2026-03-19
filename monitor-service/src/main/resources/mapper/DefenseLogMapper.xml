@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.DefenseLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.DefenseLogEntity">
+        <id column="id" property="id"/>
+        <result column="defense_type" property="defenseType"/>
+        <result column="defense_action" property="defenseAction"/>
+        <result column="defense_target" property="defenseTarget"/>
+        <result column="attack_id" property="attackId"/>
+        <result column="traffic_id" property="trafficId"/>
+        <result column="rule_id" property="ruleId"/>
+        <result column="defense_reason" property="defenseReason"/>
+        <result column="expire_time" property="expireTime"/>
+        <result column="execute_status" property="executeStatus"/>
+        <result column="execute_result" property="executeResult"/>
+        <result column="operator" property="operator"/>
+        <result column="execute_time" property="executeTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="TrendStatResultMap" type="com.network.monitor.mapper.DefenseLogMapper$TrendStat">
+        <result column="time" property="time"/>
+        <result column="count" property="count"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, defense_type, defense_action, defense_target, attack_id, traffic_id, rule_id, defense_reason,
+        expire_time, execute_status, execute_result, operator, execute_time, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.DefenseLogEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_defense_log (
+            defense_type, defense_action, defense_target, attack_id, traffic_id, rule_id, defense_reason,
+            expire_time, execute_status, execute_result, operator, execute_time, create_time, update_time
+        ) VALUES (
+            #{defenseType}, #{defenseAction}, #{defenseTarget}, #{attackId}, #{trafficId}, #{ruleId}, #{defenseReason},
+            #{expireTime}, #{executeStatus}, #{executeResult}, #{operator}, #{executeTime}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_log
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_log
+        <where>
+            <if test="defenseType != null and defenseType != ''">
+                AND defense_type = #{defenseType}
+            </if>
+            <if test="defenseTarget != null and defenseTarget != ''">
+                AND defense_target = #{defenseTarget}
+            </if>
+            <if test="startTime != null">
+                AND execute_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND execute_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY execute_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_defense_log
+        <where>
+            <if test="defenseType != null and defenseType != ''">
+                AND defense_type = #{defenseType}
+            </if>
+            <if test="defenseTarget != null and defenseTarget != ''">
+                AND defense_target = #{defenseTarget}
+            </if>
+            <if test="startTime != null">
+                AND execute_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND execute_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM sys_defense_log WHERE id = #{id}
+    </delete>
+
+    <select id="countAll" resultType="long">
+        SELECT COUNT(*) FROM sys_defense_log
+    </select>
+
+    <select id="selectValidBlacklists" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_log
+        WHERE defense_type = 'BLOCK_IP'
+          AND defense_action = 'ADD'
+          AND execute_status = 1
+          AND (expire_time IS NULL OR expire_time &gt; NOW())
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectAllBlacklists" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_log
+        WHERE defense_type = 'BLOCK_IP'
+          AND defense_action = 'ADD'
+          AND execute_status = 1
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectBlacklistsByIp" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_log
+        WHERE defense_type = 'BLOCK_IP'
+          AND defense_action = 'ADD'
+          AND defense_target = #{ip}
+        ORDER BY create_time DESC
+    </select>
+
+    <delete id="deleteAllBlacklistsByIp">
+        DELETE FROM sys_defense_log
+        WHERE defense_type = 'BLOCK_IP'
+          AND defense_action = 'ADD'
+          AND defense_target = #{ip}
+    </delete>
+
+    <select id="countDefenseTrend" resultMap="TrendStatResultMap">
+        SELECT 
+            STR_TO_DATE(time_str, '%Y-%m-%d %H:%i:%s') AS time,
+            count
+        FROM (
+            SELECT 
+                DATE_FORMAT(execute_time, '%Y-%m-%d %H:%i:00') AS time_str,
+                COUNT(*) AS count
+            FROM sys_defense_log
+            WHERE execute_time &gt;= #{startTime}
+              AND execute_time &lt;= #{endTime}
+            GROUP BY DATE_FORMAT(execute_time, '%Y-%m-%d %H:%i:00')
+        ) t
+        ORDER BY time
+    </select>
+</mapper>

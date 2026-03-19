@@ -6,6 +6,19 @@ server:
   servlet:
     context-path: /
 
+# 跨服务安全配置
+cross-service:
+  security:
+    # 签名密钥（必须与监测服务一致，生产环境请修改）
+    secret-key: "NetMonitor2026CrossServiceSecretKey!@#$%"
+  auth:
+    # 调用监测服务的 Token
+    monitor-token: MonitorSecureToken456
+    # 接收监测服务指令的验证 Token
+    verify-token: NetMonitor2026SecureToken
+    # 监测服务 IP 地址（用于日志记录）
+    monitor-ip: 127.0.0.1
+
 # 微服务基础配置
 spring:
   application:
@@ -24,7 +37,16 @@ spring:
       
       # 路由配置
       routes:
-        # 靶场服务路由
+        # 靶场服务页面路由（支持 /target/sql-vuln 等直接访问）
+        - id: target_page_route
+          uri: http://localhost:9001
+          predicates:
+            - Path=/target/*-vuln
+          filters:
+            - RewritePath=/target/(?<segment>.*),/target/page/${segment}
+            - AddResponseHeader=X-Gateway-Version, 1.0.0
+        
+        # 靶场服务 API 路由
         - id: target_service_route
           uri: http://localhost:9001
           predicates:
@@ -143,6 +165,20 @@ gateway:
   
   # 防御配置
   defense:
+    # 鉴权配置（评估报告 O01 优化项）
+    auth:
+      # 授权 Token（生产环境应使用更复杂的 Token）
+      token: NetMonitor2026SecureToken
+      # 允许的监控服务 IP 地址列表（逗号分隔）
+      allowed-ips: 127.0.0.1,localhost
+    
+    # 恶意请求模式配置（评估报告 B03 优化项）
+    malicious:
+      # 恶意用户代理列表（逗号分隔，小写）
+      user-agents: sqlmap,nessus,nmap,burp suite,zaproxy,nikto,w3af,arachni,skipfish,wvs,dirb,gobuster,ffuf,hydra,medusa
+      # 恶意 URI 模式列表（逗号分隔，小写）
+      uri-patterns: /admin,/manager,/console,/wp-admin,/phpmyadmin,/mysql,/dbadmin,/webdav,/.git/config,/.env,/config/database.yml,/backup,/dump,/export,/download
+    
     blacklist:
       enabled: true
       default-expire-minutes: 10

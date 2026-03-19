@@ -1,0 +1,305 @@
+.hero-section {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 50%, #084298 100%);
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-content {
+    text-align: center;
+    color: white;
+    z-index: 2;
+    padding: 2rem;
+}
+
+.hero-icon {
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    backdrop-filter: blur(10px);
+}
+
+.hero-icon i {
+    font-size: 3rem;
+}
+
+.hero-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.hero-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin-bottom: 2rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    margin-bottom: 2rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    display: block;
+    font-size: 2.5rem;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.hero-btn {
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+}
+
+.hero-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.hero-decoration {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.floating-icon {
+    position: absolute;
+    font-size: 2rem;
+    color: rgba(255, 255, 255, 0.1);
+    animation: float 6s ease-in-out infinite;
+}
+
+.icon-1 { top: 15%; left: 10%; animation-delay: 0s; }
+.icon-2 { top: 25%; right: 15%; animation-delay: 1s; }
+.icon-3 { bottom: 30%; left: 20%; animation-delay: 2s; }
+.icon-4 { bottom: 20%; right: 10%; animation-delay: 3s; }
+.icon-5 { top: 50%; left: 5%; animation-delay: 4s; }
+
+@keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(10deg); }
+}
+
+.vuln-section {
+    background: #f8f9fa;
+}
+
+.section-title {
+    font-weight: 700;
+    color: #333;
+}
+
+.section-subtitle {
+    font-size: 1rem;
+}
+
+.category-title {
+    color: #495057;
+    font-weight: 600;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 1rem;
+}
+
+.vuln-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+}
+
+.vuln-card:hover {
+    transform: translateY(-5px) translateZ(0);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.vuln-card-body {
+    padding: 1.5rem;
+    text-align: center;
+    flex: 1;
+}
+
+.vuln-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    font-size: 1.5rem;
+}
+
+.vuln-card-danger .vuln-icon {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.vuln-card-warning .vuln-icon {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.vuln-card-info .vuln-icon {
+    background: rgba(13, 202, 240, 0.1);
+    color: #0dcaf0;
+}
+
+.vuln-title {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.25rem;
+}
+
+.vuln-desc {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 0.75rem;
+}
+
+.vuln-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-danger {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.badge-warning {
+    background: rgba(255, 193, 7, 0.1);
+    color: #d39e00;
+}
+
+.badge-info {
+    background: rgba(13, 202, 240, 0.1);
+    color: #0aa2c0;
+}
+
+.vuln-card-footer {
+    padding: 0.75rem 1.5rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+}
+
+.vuln-action {
+    color: #6c757d;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.vuln-card:hover .vuln-action {
+    color: #0d6efd;
+}
+
+.vuln-card-danger:hover {
+    border-top: 3px solid #dc3545;
+}
+
+.vuln-card-warning:hover {
+    border-top: 3px solid #ffc107;
+}
+
+.vuln-card-info:hover {
+    border-top: 3px solid #0dcaf0;
+}
+
+.info-section {
+    background: white;
+}
+
+.info-card {
+    text-align: center;
+    padding: 1.5rem;
+}
+
+.info-card h6 {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.footer {
+    background: #212529;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.navbar {
+    padding: 0.75rem 1rem;
+}
+
+.navbar-brand {
+    font-size: 1.1rem;
+}
+
+.dropdown-menu {
+    border: none;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.dropdown-item:hover {
+    background: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 1.8rem;
+    }
+    
+    .hero-stats {
+        gap: 1.5rem;
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+    }
+    
+    .hero-section {
+        min-height: 50vh;
+    }
+}

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head></head>
+<body>
+    <th:block th:fragment="sidebar">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo"></div>
+                <h1 class="sidebar-title">网络监测系统</h1>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="/" class="menu-item">
+                    <span class="menu-icon">📊</span>
+                    <span>仪表盘</span>
+                </a>
+                <a href="/traffic" class="menu-item">
+                    <span class="menu-icon">🌐</span>
+                    <span>流量列表</span>
+                </a>
+                <a href="/attack" class="menu-item">
+                    <span class="menu-icon">⚠️</span>
+                    <span>攻击监测</span>
+                </a>
+                <a href="/vulnerability" class="menu-item">
+                    <span class="menu-icon">🔓</span>
+                    <span>漏洞监测</span>
+                </a>
+                <a href="/defense" class="menu-item">
+                    <span class="menu-icon">🛡️</span>
+                    <span>防御日志</span>
+                </a>
+                <a href="/rule" class="menu-item">
+                    <span class="menu-icon">📋</span>
+                    <span>规则管理</span>
+                </a>
+                <a href="/blacklist" class="menu-item">
+                    <span class="menu-icon">🚫</span>
+                    <span>黑名单管理</span>
+                </a>
+                <a href="/report" class="menu-item">
+                    <span class="menu-icon">📈</span>
+                    <span>数据报表</span>
+                </a>
+                <a href="/config" class="menu-item">
+                    <span class="menu-icon">⚙️</span>
+                    <span>系统配置</span>
+                </a>
+                <div class="menu-divider"></div>
+                <div class="menu-group-title">系统管理</div>
+                <a href="/system/user" class="menu-item">
+                    <span class="menu-icon">👥</span>
+                    <span>用户管理</span>
+                </a>
+                <a href="/system/role" class="menu-item">
+                    <span class="menu-icon">🔑</span>
+                    <span>角色管理</span>
+                </a>
+                <a href="/system/log" class="menu-item">
+                    <span class="menu-icon">📝</span>
+                    <span>操作日志</span>
+                </a>
+            </nav>
+        </aside>
+    </th:block>
+    
+    <th:block th:fragment="userDropdown">
+        <div class="user-info user-dropdown">
+            <div class="user-avatar">A</div>
+            <span class="user-name">管理员</span>
+            <div class="user-dropdown-menu">
+                <a class="user-dropdown-item" href="/profile">
+                    <span>👤 个人中心</span>
+                </a>
+                <div class="user-dropdown-divider"></div>
+                <a class="user-dropdown-item logout-btn">
+                    <span>🚪 退出登录</span>
+                </a>
+            </div>
+        </div>
+    </th:block>
+</body>
+</html>

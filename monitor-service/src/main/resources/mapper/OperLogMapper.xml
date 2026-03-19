@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.OperLogMapper">
+    
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.OperLogEntity">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="oper_type" property="operType"/>
+        <result column="oper_module" property="operModule"/>
+        <result column="oper_content" property="operContent"/>
+        <result column="oper_method" property="operMethod"/>
+        <result column="oper_url" property="operUrl"/>
+        <result column="oper_ip" property="operIp"/>
+        <result column="oper_location" property="operLocation"/>
+        <result column="oper_status" property="operStatus"/>
+        <result column="error_msg" property="errorMsg"/>
+        <result column="oper_time" property="operTime"/>
+        <result column="cost_time" property="costTime"/>
+    </resultMap>
+    
+    <sql id="Base_Column_List">
+        id, username, oper_type, oper_module, oper_content, oper_method, oper_url, oper_ip, 
+        oper_location, oper_status, error_msg, oper_time, cost_time
+    </sql>
+    
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_oper_log
+        WHERE id = #{id}
+    </select>
+    
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_oper_log
+        <where>
+            <if test="username != null and username != ''">
+                AND username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="operType != null and operType != ''">
+                AND oper_type = #{operType}
+            </if>
+            <if test="operStatus != null">
+                AND oper_status = #{operStatus}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND oper_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND oper_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY oper_time DESC
+    </select>
+    
+    <insert id="insert" parameterType="com.network.monitor.entity.OperLogEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_oper_log (username, oper_type, oper_module, oper_content, oper_method, oper_url, 
+                                  oper_ip, oper_location, oper_status, error_msg, cost_time)
+        VALUES (#{username}, #{operType}, #{operModule}, #{operContent}, #{operMethod}, #{operUrl},
+                #{operIp}, #{operLocation}, #{operStatus}, #{errorMsg}, #{costTime})
+    </insert>
+    
+    <delete id="deleteById">
+        DELETE FROM sys_oper_log WHERE id = #{id}
+    </delete>
+    
+    <delete id="clearLogs">
+        DELETE FROM sys_oper_log WHERE oper_time &lt; #{beforeTime}
+    </delete>
+    
+</mapper>

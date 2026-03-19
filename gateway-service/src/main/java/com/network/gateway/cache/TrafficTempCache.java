@@ -179,7 +179,17 @@ public class TrafficTempCache {
      */
     public java.util.List<TrafficMonitorDTO> getRecentTraffics(int limit) {
         return trafficCache.values().stream()
-                .sorted((t1, t2) -> Long.compare(t2.getRequestTimestamp(), t1.getRequestTimestamp()))
+                .sorted((t1, t2) -> {
+                    try {
+                        // 将 requestTime 字符串解析为 LocalDateTime 进行比较
+                        java.time.LocalDateTime time1 = java.time.LocalDateTime.parse(t1.getRequestTime());
+                        java.time.LocalDateTime time2 = java.time.LocalDateTime.parse(t2.getRequestTime());
+                        return time2.compareTo(time1);
+                    } catch (Exception e) {
+                        // 解析失败时返回 0
+                        return 0;
+                    }
+                })
                 .limit(limit)
                 .toList();
     }
@@ -209,7 +219,19 @@ public class TrafficTempCache {
         int successfulRequests = 0;
 
         for (TrafficMonitorDTO traffic : trafficCache.values()) {
-            long requestTime = traffic.getRequestTimestamp();
+            // 解析 requestTime 字符串为时间戳
+            long requestTime = 0;
+            try {
+                if (traffic.getRequestTime() != null) {
+                    requestTime = java.time.LocalDateTime.parse(traffic.getRequestTime())
+                            .atZone(java.time.ZoneId.systemDefault())
+                            .toInstant()
+                            .toEpochMilli();
+                }
+            } catch (Exception e) {
+                // 解析失败时使用 0
+            }
+            
             if (requestTime >= startTime && requestTime <= endTime) {
                 totalRequests++;
                 
@@ -217,8 +239,8 @@ public class TrafficTempCache {
                     abnormalRequests++;
                 }
                 
-                if (traffic.getProcessingTime() != null) {
-                    totalProcessingTime += traffic.getProcessingTime();
+                if (traffic.getResponseTime() != null) {
+                    totalProcessingTime += traffic.getResponseTime();
                 }
                 
                 if (Boolean.TRUE.equals(traffic.getSuccess())) {

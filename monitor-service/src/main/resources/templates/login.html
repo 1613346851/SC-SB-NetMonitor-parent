@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 网络监测系统</title>
+    <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box animate-slide-up">
+            <div class="login-header">
+                <div class="login-logo">🛡️</div>
+                <h1 class="login-title">网络监测系统</h1>
+                <p class="login-subtitle">Network Monitor System</p>
+            </div>
+            
+            <form class="login-form" id="loginForm" onsubmit="return handleLogin(event)">
+                <div class="login-error" id="loginError"></div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="username">用户名</label>
+                    <div class="input-group">
+                        <span class="input-icon">👤</span>
+                        <input type="text" 
+                               class="form-control" 
+                               id="username" 
+                               name="username" 
+                               placeholder="请输入用户名"
+                               autocomplete="username"
+                               required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="password">密码</label>
+                    <div class="input-group">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" 
+                               class="form-control" 
+                               id="password" 
+                               name="password" 
+                               placeholder="请输入密码"
+                               autocomplete="current-password"
+                               required>
+                        <span class="password-toggle" onclick="togglePassword()">👁️</span>
+                    </div>
+                </div>
+                
+                <div class="form-options">
+                    <label class="remember-me">
+                        <input type="checkbox" id="rememberMe" name="rememberMe">
+                        <span>记住我</span>
+                    </label>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-login" id="loginBtn">
+                    登 录
+                </button>
+            </form>
+            
+            <div class="login-footer">
+                <p>© 2026 网络监测系统 · 安全防护平台</p>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/login.js}"></script>
+</body>
+</html>

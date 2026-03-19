@@ -1,0 +1,48 @@
+/* XXE漏洞测试平台特有样式文件 */
+@import url('./vuln-common.css');
+
+/* XXE特有样式 */
+.xml-input-display {
+    font-family: 'Consolas', 'Courier New', monospace;
+    background-color: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.xml-result {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.entity-highlight {
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+/* 移动端优化 */
+@media (max-width: 575px) {
+    .xml-input-display {
+        font-size: 11px;
+        padding: 8px;
+    }
+    
+    .xml-result {
+        padding: 10px;
+        font-size: 12px;
+        max-height: 200px;
+    }
+}

@@ -37,14 +37,14 @@ public class TrafficMonitorDTO implements Serializable {
     private String targetIp;
 
     /**
-     * 请求方法 (GET/POST/PUT/DELETE等)
+     * HTTP 方法
      */
-    private String method;
+    private String httpMethod;
 
     /**
-     * 请求URI
+     * 请求 URI
      */
-    private String uri;
+    private String requestUri;
 
     /**
      * 查询参数
@@ -59,7 +59,7 @@ public class TrafficMonitorDTO implements Serializable {
     /**
      * 请求头信息
      */
-    private Map<String, String> headers;
+    private Map<String, String> requestHeaders;
 
     /**
      * 用户代理信息
@@ -67,24 +67,49 @@ public class TrafficMonitorDTO implements Serializable {
     private String userAgent;
 
     /**
-     * 请求时间戳
+     * 请求时间
      */
-    private Long requestTimestamp;
-
-    /**
-     * 响应时间戳
-     */
-    private Long responseTimestamp;
+    private String requestTime;
 
     /**
      * 响应状态码
      */
-    private Integer statusCode;
+    private Integer responseStatus;
 
     /**
-     * 响应体大小（字节）
+     * 响应体
      */
-    private Long responseBodySize;
+    private String responseBody;
+
+    /**
+     * 响应时间（毫秒）
+     */
+    private Long responseTime;
+
+    /**
+     * 内容类型
+     */
+    private String contentType;
+
+    /**
+     * Cookie 信息
+     */
+    private String cookie;
+
+    /**
+     * 协议类型
+     */
+    private String protocol;
+
+    /**
+     * 源端口
+     */
+    private Integer sourcePort;
+
+    /**
+     * 目标端口
+     */
+    private Integer targetPort;
 
     /**
      * 是否为异常流量
@@ -114,34 +139,33 @@ public class TrafficMonitorDTO implements Serializable {
     /**
      * 构造函数（用于创建新的流量监控记录）
      *
-     * @param requestId 请求ID
-     * @param sourceIp 源IP
-     * @param method 请求方法
-     * @param uri 请求URI
-     * @param requestTimestamp 请求时间戳
+     * @param requestId 请求 ID
+     * @param sourceIp 源 IP
+     * @param httpMethod 请求方法
+     * @param requestUri 请求 URI
+     * @param requestTime 请求时间
      */
-    public TrafficMonitorDTO(String requestId, String sourceIp, String method, 
-                           String uri, Long requestTimestamp) {
+    public TrafficMonitorDTO(String requestId, String sourceIp, String httpMethod, 
+                           String requestUri, String requestTime) {
         this.requestId = requestId;
         this.sourceIp = sourceIp;
-        this.method = method;
-        this.uri = uri;
-        this.requestTimestamp = requestTimestamp;
+        this.httpMethod = httpMethod;
+        this.requestUri = requestUri;
+        this.requestTime = requestTime;
         this.success = true; // 默认成功
     }
 
     /**
      * 设置响应相关信息
      *
-     * @param responseTimestamp 响应时间戳
-     * @param statusCode 状态码
-     * @param responseBodySize 响应体大小
+     * @param responseStatus 状态码
+     * @param responseBody 响应体
+     * @param responseTime 响应时间
      */
-    public void setResponseInfo(Long responseTimestamp, Integer statusCode, Long responseBodySize) {
-        this.responseTimestamp = responseTimestamp;
-        this.statusCode = statusCode;
-        this.responseBodySize = responseBodySize;
-        this.processingTime = responseTimestamp - this.requestTimestamp;
+    public void setResponseInfo(Integer responseStatus, String responseBody, Long responseTime) {
+        this.responseStatus = responseStatus;
+        this.responseBody = responseBody;
+        this.responseTime = responseTime;
     }
 
     /**

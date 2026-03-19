@@ -1,0 +1,101 @@
+server:
+  port: 9002  # 监测服务端口，与网关、靶场端口规划一致
+  servlet:
+    context-path: /
+
+# 跨服务安全配置
+cross-service:
+  security:
+    enabled: true
+    # 签名密钥（必须与网关服务一致，生产环境请修改）
+    secret-key: "NetMonitor2026CrossServiceSecretKey!@#$%"
+    # IP白名单（逗号分隔，支持CIDR格式）
+    ip-whitelist: "127.0.0.1,::1,0:0:0:0:0:0:0:1,192.168.0.0/16,10.0.0.0/8"
+    # 时间戳容忍范围（毫秒），默认5分钟
+    timestamp-tolerance: 300000
+  auth:
+    # 调用网关服务的 Token（必须与 gateway-service 的 gateway.defense.auth.token 一致）
+    gateway-token: NetMonitor2026SecureToken
+    # 接收网关推送的验证 Token
+    verify-token: MonitorSecureToken456
+    # 网关服务 IP 地址（用于日志记录）
+    gateway-ip: 127.0.0.1
+
+spring:
+  application:
+    name: monitor-service
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/network_monitor?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      connection-test-query: SELECT 1
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: false
+  mvc:
+    static-path-pattern: /**
+  web:
+    resources:
+      static-locations: classpath:/static/
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.network.monitor.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+logging:
+  level:
+    root: INFO
+    com.network.monitor: DEBUG
+    com.network.monitor.mapper: DEBUG
+
+# DDoS 检测配置
+ddos:
+  threshold: 100  # 每分钟请求数阈值
+  counter:
+    clean:
+      cron: "0 * * * * ?"  # 每分钟清理计数器
+
+# 缓存清理配置
+cache:
+  clean:
+    cron: "0 */10 * * * ?"  # 每 10 分钟清理过期缓存
+  deep:
+    clean:
+      cron: "0 0 2 * * ?"  # 每天凌晨 2 点深度清理
+
+# 漏洞统计同步配置
+vuln:
+  stat:
+    sync:
+      cron: "0 */5 * * * ?"  # 每 5 分钟同步一次到数据库
+  cache:
+    refresh:
+      cron: "0 0 4 * * ?"  # 每天凌晨 4 点刷新缓存
+
+# 黑名单清理配置
+blacklist:
+  clean:
+    cron: "0 */5 * * * ?"  # 每 5 分钟清理过期黑名单
+  deep:
+    clean:
+      cron: "0 0 3 * * ?"  # 每天凌晨 3 点深度清理
+
+# JWT 配置
+jwt:
+  secret: NetworkMonitor2026SecretKeyForJwtTokenGenerationMustBeLongEnough
+  expiration: 86400000  # Token 有效期：24小时（毫秒）

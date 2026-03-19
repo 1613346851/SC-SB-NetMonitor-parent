@@ -1,0 +1,180 @@
+/**
+ * 登录页面样式
+ */
+
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: var(--spacing-lg);
+}
+
+.login-box {
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+}
+
+.login-header {
+    padding: 40px 40px 30px;
+    text-align: center;
+    background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+    color: #fff;
+}
+
+.login-logo {
+    width: 64px;
+    height: 64px;
+    background: rgba(255,255, 255, 0.2);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto var(--spacing-md);
+    font-size: var(--font-size-xxl);
+}
+
+.login-title {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    margin: 0;
+}
+
+.login-subtitle {
+    font-size: var(--font-size-base);
+    opacity: 0.8;
+    margin-top: var(--spacing-sm);
+}
+
+.login-form {
+    padding: 40px;
+}
+
+.login-form .form-group {
+    margin-bottom: var(--spacing-xl);
+}
+
+.login-form .form-label {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-sm);
+    display: block;
+}
+
+.login-form .form-control {
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-base);
+    font-size: var(--font-size-base);
+    transition: all var(--transition-base);
+}
+
+.login-form .form-control:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.login-form .form-control::placeholder {
+    color: #bfbfbf;
+}
+
+.login-form .input-group {
+    position: relative;
+}
+
+.login-form .input-icon {
+    position: absolute;
+    left: var(--spacing-md);
+    top: 50%;
+    transform: translateY(-50%);
+    color: #bfbfbf;
+    font-size: var(--font-size-md);
+}
+
+.login-form .input-group .form-control {
+    padding-left: 40px;
+}
+
+.login-form .input-group .password-toggle {
+    position: absolute;
+    right: var(--spacing-md);
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #bfbfbf;
+    font-size: var(--font-size-md);
+    user-select: none;
+}
+
+.login-form .input-group .password-toggle:hover {
+    color: var(--primary-color);
+}
+
+.login-form .form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xl);
+}
+
+.login-form .remember-me {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    user-select: none;
+}
+
+.login-form .remember-me input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.login-form .forgot-password {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: var(--font-size-base);
+}
+
+.login-form .forgot-password:hover {
+    text-decoration: underline;
+}
+
+.login-form .btn-login {
+    width: 100%;
+    padding: var(--spacing-md);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+}
+
+.login-form .login-error {
+    background: #fff2f0;
+    border: 1px solid #ffccc7;
+    border-radius: var(--radius-base);
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    color: var(--danger-color);
+    font-size: var(--font-size-base);
+    display: none;
+}
+
+.login-form .login-error.show {
+    display: block;
+}
+
+.login-footer {
+    padding: var(--spacing-lg) 40px;
+    text-align: center;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+}

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>操作日志 - 网络监测系统</title>
+    <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+        
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <h2>操作日志</h2>
+                </div>
+                <div class="header-right">
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+            
+            <main class="content">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="search-bar">
+                            <input type="text" id="searchUsername" class="form-control" placeholder="操作账号">
+                            <select id="searchOperType" class="form-control">
+                                <option value="">全部类型</option>
+                                <option value="LOGIN">登录</option>
+                                <option value="LOGOUT">登出</option>
+                                <option value="INSERT">新增</option>
+                                <option value="UPDATE">修改</option>
+                                <option value="DELETE">删除</option>
+                                <option value="EXPORT">导出</option>
+                            </select>
+                            <select id="searchOperStatus" class="form-control">
+                                <option value="">全部状态</option>
+                                <option value="0">成功</option>
+                                <option value="1">失败</option>
+                            </select>
+                            <input type="date" id="searchStartDate" class="form-control">
+                            <input type="date" id="searchEndDate" class="form-control">
+                            <button class="btn btn-primary" onclick="searchLogs()">搜索</button>
+                            <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                        </div>
+                    </div>
+                    
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>操作账号</th>
+                                <th>操作类型</th>
+                                <th>操作模块</th>
+                                <th>操作内容</th>
+                                <th>操作IP</th>
+                                <th>状态</th>
+                                <th>操作时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTableBody">
+                            <tr><td colspan="9" class="text-center">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <div class="modal" id="detailModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">日志详情</h3>
+                <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="logDetailContent">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeDetailModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/oper-log.js}"></script>
+    <script>
+        PageInit.init({
+            requireAuth: true,
+            highlightMenu: true
+        });
+    </script>
+</body>
+</html>

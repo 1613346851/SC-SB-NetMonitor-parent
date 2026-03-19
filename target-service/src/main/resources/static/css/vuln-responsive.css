@@ -1,0 +1,246 @@
+/* 漏洞测试平台 - 响应式样式 */
+
+/* 大屏幕优化 */
+@media (min-width: 1400px) {
+    .col-md-4.col-lg-3 {
+        flex: 0 0 400px;
+        max-width: 400px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+    }
+}
+
+/* 中等大屏幕 */
+@media (min-width: 1200px) and (max-width: 1399px) {
+    .col-md-4.col-lg-3 {
+        flex: 0 0 360px;
+        max-width: 360px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 10px;
+    }
+}
+
+/* 普通桌面 */
+@media (min-width: 992px) and (max-width: 1199px) {
+    .col-md-4.col-lg-3 {
+        flex: 0 0 320px;
+        max-width: 320px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 8px;
+    }
+}
+
+/* 小桌面/大平板 */
+@media (min-width: 768px) and (max-width: 991px) {
+    .col-md-4.col-lg-3 {
+        flex: 0 0 280px;
+        max-width: 280px;
+    }
+    
+    .card-body {
+        padding: 15px;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 8px;
+    }
+    
+    .section h6 {
+        font-size: 1rem;
+    }
+}
+
+/* 平板横屏适配 */
+@media (min-width: 576px) and (max-width: 767px) {
+    .sidebar-panel .card {
+        min-height: 45vh;
+    }
+    
+    .main-panel .card {
+        min-height: 55vh;
+    }
+    
+    .output-container {
+        min-height: 350px;
+    }
+    
+    .row {
+        flex-direction: row;
+        height: calc(100vh - 56px);
+    }
+    
+    .col-md-4.col-lg-3 {
+        flex: 0 0 48%;
+        max-width: 48%;
+        max-height: 100%;
+        border-right: 1px solid #dee2e6;
+        border-bottom: none;
+    }
+    
+    .col-md-8.col-lg-9 {
+        flex: 0 0 52%;
+        max-width: 52%;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .card-body {
+        padding: 12px;
+    }
+    
+    .output-container {
+        padding: 20px;
+    }
+}
+
+/* 手机竖屏 */
+@media (max-width: 575px) {
+    .row {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+    }
+    
+    .col-md-4.col-lg-3,
+    .col-md-8.col-lg-9 {
+        flex: 1;
+        max-width: 100%;
+    }
+    
+    .col-md-4.col-lg-3 {
+        max-height: 45vh;
+        border-right: none;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .col-md-8.col-lg-9 {
+        max-height: 55vh;
+    }
+    
+    .test-cases-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    
+    .card-header {
+        padding: 12px 15px;
+        font-size: 1.1rem;
+    }
+    
+    .card-body {
+        padding: 12px;
+    }
+    
+    .output-container {
+        padding: 15px;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    
+    .section h6 {
+        font-size: 0.95rem;
+        padding-left: 20px;
+    }
+    
+    .info-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .badge {
+        min-width: auto;
+        align-self: flex-start;
+    }
+    
+    .navbar-brand {
+        font-size: 1.1rem;
+    }
+    
+    .card {
+        border-radius: 8px;
+        height: 100%;
+    }
+    
+    .card-header {
+        border-radius: 8px 8px 0 0 !important;
+    }
+    
+    .sidebar-panel .card {
+        min-height: 45vh;
+    }
+    
+    .main-panel .card {
+        min-height: 55vh;
+    }
+    
+    .card-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .form-control {
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+    
+    .btn {
+        font-size: 14px;
+        padding: 6px 12px;
+    }
+    
+    .btn-lg {
+        padding: 8px 16px;
+        font-size: 15px;
+    }
+    
+    .sidebar-panel {
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .main-panel .card-body {
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .btn:hover {
+        transform: none;
+    }
+    
+    .test-cases-grid .btn:active {
+        transform: scale(0.95);
+        transition: transform 0.1s ease;
+    }
+    
+    .command-output,
+    .query-result,
+    .attack-log-entry {
+        padding: 15px 15px 15px 20px;
+        margin-bottom: 15px;
+    }
+    
+    .command-result,
+    .query-sql {
+        padding: 10px;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    
+    .result-card {
+        padding: 15px;
+        margin-bottom: 12px;
+    }
+}

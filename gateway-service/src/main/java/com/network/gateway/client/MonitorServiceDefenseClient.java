@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,9 +32,16 @@ public class MonitorServiceDefenseClient {
     private RestTemplate restTemplate;
 
     /**
+     * 跨服务鉴权 Token（从配置文件读取）
+     */
+    @Value("${cross-service.auth.monitor-token:MonitorSecureToken456}")
+    private String monitorAuthToken;
+
+    /**
      * 推送防御日志到监控服务
+     * 添加跨服务鉴权头，确保调用安全性
      *
-     * @param defenseLogDTO 防御日志DTO
+     * @param defenseLogDTO 防御日志 DTO
      * @throws RestClientException 网络异常
      */
     public void pushDefenseLog(DefenseLogDTO defenseLogDTO) throws RestClientException {
@@ -49,13 +57,16 @@ public class MonitorServiceDefenseClient {
             headers.set("X-Gateway-Timestamp", String.valueOf(System.currentTimeMillis()));
             headers.set("X-Defense-Log-ID", defenseLogDTO.getLogId());
             headers.set("X-Defense-Type", defenseLogDTO.getDefenseType().name());
+            // 添加跨服务鉴权头
+            headers.set("X-Auth-Token", monitorAuthToken);
 
             // 构建请求实体
             HttpEntity<DefenseLogDTO> requestEntity = new HttpEntity<>(defenseLogDTO, headers);
 
-            // 发送POST请求
+            // 发送 POST 请求
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT,
+                    url,
                     requestEntity,
                     String.class
             );
@@ -180,8 +191,9 @@ public class MonitorServiceDefenseClient {
 
             HttpEntity<DefenseLogDTO> requestEntity = new HttpEntity<>(defenseLogDTO, headers);
 
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT,
+                    url,
                     requestEntity,
                     String.class
             );
@@ -212,16 +224,17 @@ public class MonitorServiceDefenseClient {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> entity = new HttpEntity<>("{}", headers);
-
+    
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT,
+                    url,
                     entity,
                     String.class
             );
-
+    
             return response.getStatusCode().is2xxSuccessful();
         } catch (Exception e) {
-            logger.debug("监控服务防御日志接口连通性检查失败: {}", e.getMessage());
+            logger.debug("监控服务防御日志接口连通性检查失败：{}", e.getMessage());
             return false;
         }
     }
@@ -233,6 +246,6 @@ public class MonitorServiceDefenseClient {
      */
     public String getStatistics() {
         // 这里可以添加更详细的统计信息收集
-        return "防御日志推送客户端 - 配置端点: " + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
+        return "防御日志推送客户端 - 配置端点：" + GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
     }
 }

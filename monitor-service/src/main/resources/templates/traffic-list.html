@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流量列表 - 网络监测系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <h2>流量列表</h2>
+                </div>
+                <div class="header-right">
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+
+            <main class="content">
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">源 IP</label>
+                            <input type="text" class="form-control" id="sourceIp" placeholder="请输入源 IP">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">目标 IP</label>
+                            <input type="text" class="form-control" id="targetIp" placeholder="请输入目标 IP">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">HTTP 方法</label>
+                            <select class="form-control" id="httpMethod">
+                                <option value="">全部</option>
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">开始日期</label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">结束日期</label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="searchTraffic()">查询</button>
+                            <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                            <button class="btn btn-success" onclick="exportTraffic()">导出 CSV</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3 class="table-title">流量数据</h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>流量 ID</th>
+                                    <th>请求时间</th>
+                                    <th>源 IP</th>
+                                    <th>目标 IP</th>
+                                    <th>源端口</th>
+                                    <th>目标端口</th>
+                                    <th>HTTP 方法</th>
+                                    <th>请求 URI</th>
+                                    <th>响应状态</th>
+                                    <th>响应时间 (ms)</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trafficTableBody">
+                                <tr>
+                                    <td colspan="12" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-container" style="padding: 16px 24px;">
+                        <div class="pagination" id="pagination"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="trafficDetailModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 800px;">
+            <div class="modal-header">
+                <h3 class="modal-title">流量详情</h3>
+                <span class="modal-close" onclick="closeTrafficDetail()">&times;</span>
+            </div>
+            <div class="modal-body" id="trafficDetailContent">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeTrafficDetail()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/traffic-list.js}"></script>
+    <script>
+        PageInit.init({
+            requireAuth: true,
+            highlightMenu: true
+        });
+    </script>
+</body>
+</html>

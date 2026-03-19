@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.SysConfigMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.SysConfigEntity">
+        <id column="id" property="id"/>
+        <result column="config_key" property="configKey"/>
+        <result column="config_value" property="configValue" jdbcType="VARCHAR"/>
+        <result column="description" property="description"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, config_key, config_value, description, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.SysConfigEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_config (
+            config_key, config_value, description, create_time, update_time
+        ) VALUES (
+            #{configKey}, #{configValue}, #{description}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_config
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByKey" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_config
+        WHERE config_key = #{configKey}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_config
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectAllKeys" resultType="java.lang.String">
+        SELECT config_key
+        FROM sys_config
+        ORDER BY id ASC
+    </select>
+
+    <update id="updateById" parameterType="com.network.monitor.entity.SysConfigEntity">
+        UPDATE sys_config
+        SET config_key = #{configKey},
+            config_value = #{configValue},
+            description = #{description},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateByKey">
+        UPDATE sys_config
+        SET config_value = #{configValue},
+            update_time = NOW()
+        WHERE config_key = #{configKey}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_config
+        WHERE id = #{id}
+    </delete>
+
+</mapper>

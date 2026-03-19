@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.IpBlacklistHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.IpBlacklistHistoryEntity">
+        <id column="id" property="id"/>
+        <result column="blacklist_id" property="blacklistId"/>
+        <result column="attack_id" property="attackId"/>
+        <result column="traffic_id" property="trafficId"/>
+        <result column="rule_id" property="ruleId"/>
+        <result column="ban_type" property="banType"/>
+        <result column="ban_reason" property="banReason"/>
+        <result column="ban_duration" property="banDuration"/>
+        <result column="expire_time" property="expireTime"/>
+        <result column="process_status" property="processStatus"/>
+        <result column="operator" property="operator"/>
+        <result column="ban_execute_time" property="banExecuteTime"/>
+        <result column="unban_execute_time" property="unbanExecuteTime"/>
+        <result column="unban_reason" property="unbanReason"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, blacklist_id, attack_id, traffic_id, rule_id, ban_type, ban_reason, ban_duration,
+        expire_time, process_status, operator, ban_execute_time, unban_execute_time, unban_reason, create_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.IpBlacklistHistoryEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_ip_blacklist_history (
+            blacklist_id, attack_id, traffic_id, rule_id, ban_type, ban_reason, ban_duration,
+            expire_time, process_status, operator, ban_execute_time, unban_execute_time, unban_reason, create_time
+        ) VALUES (
+            #{blacklistId}, #{attackId}, #{trafficId}, #{ruleId}, #{banType}, #{banReason}, #{banDuration},
+            #{expireTime}, #{processStatus}, #{operator}, #{banExecuteTime}, #{unbanExecuteTime}, #{unbanReason}, #{createTime}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_ip_blacklist_history
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByBlacklistId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_ip_blacklist_history
+        WHERE blacklist_id = #{blacklistId}
+        ORDER BY ban_execute_time DESC
+    </select>
+
+    <select id="selectBanningByBlacklistId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_ip_blacklist_history
+        WHERE blacklist_id = #{blacklistId}
+        AND process_status = 1
+        AND (expire_time IS NULL OR expire_time &gt; NOW())
+        ORDER BY ban_execute_time DESC
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_ip_blacklist_history
+        ORDER BY ban_execute_time DESC
+    </select>
+
+    <update id="updateById" parameterType="com.network.monitor.entity.IpBlacklistHistoryEntity">
+        UPDATE sys_ip_blacklist_history
+        SET process_status = #{processStatus},
+            unban_execute_time = #{unbanExecuteTime},
+            unban_reason = #{unbanReason}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateProcessStatusById">
+        UPDATE sys_ip_blacklist_history
+        SET process_status = #{processStatus},
+            unban_execute_time = NOW(),
+            unban_reason = #{unbanReason}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_ip_blacklist_history WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByBlacklistId">
+        DELETE FROM sys_ip_blacklist_history WHERE blacklist_id = #{blacklistId}
+    </delete>
+
+    <select id="countByBlacklistId" resultType="long">
+        SELECT COUNT(*) FROM sys_ip_blacklist_history WHERE blacklist_id = #{blacklistId}
+    </select>
+</mapper>
