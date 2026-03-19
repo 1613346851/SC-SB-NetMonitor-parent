@@ -31,8 +31,14 @@ public class PageController {
         return "vulnerability-monitor";
     }
 
+    @GetMapping("/scan")
+    public String vulnerabilityScan() {
+        return "vuln-scan";
+    }
+
     @GetMapping("/defense")
     public String defenseLog() {
+
         return "defense-log";
     }
 

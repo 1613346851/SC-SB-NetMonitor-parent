@@ -44,14 +44,21 @@ const AppConfig = {
         DDOS: { text: 'DDoS 攻击', class: 'danger' },
         PATH_TRAVERSAL: { text: '路径遍历', class: 'warning' },
         FILE_INCLUSION: { text: '文件包含', class: 'warning' },
+        SSRF: { text: 'SSRF', class: 'warning' },
+        XXE: { text: 'XXE', class: 'danger' },
+        DESERIALIZATION: { text: '反序列化', class: 'danger' },
+        CSRF: { text: 'CSRF', class: 'info' },
         BRUTE_FORCE: { text: '暴力破解', class: 'warning' }
     },
     
     DEFENSE_TYPES: {
+        BLACKLIST: { text: '封禁IP', class: 'danger' },
         BLOCK_IP: { text: '封禁IP', class: 'danger' },
         RATE_LIMIT: { text: '限流', class: 'warning' },
+        BLOCK: { text: '拦截请求', class: 'info' },
         BLOCK_REQUEST: { text: '拦截请求', class: 'info' }
     },
+
     
     STATUS: {
         HANDLED: { text: '已处理', class: 'success', value: 1 },

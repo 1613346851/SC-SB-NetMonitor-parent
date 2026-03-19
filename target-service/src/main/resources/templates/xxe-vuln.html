@@ -57,13 +57,13 @@
                         </h6>
                         <div class="test-cases-grid">
                             <button class="btn btn-outline-danger btn-sm" onclick="loadTestCase('xxe_file_read')">
-                                <i class="fas fa-file me-1"></i>读取/etc/passwd
+                                <i class="fas fa-file me-1"></i>读取test.txt
                             </button>
-                            <button class="btn btn-outline-danger btn-sm" onclick="loadTestCase('xxe_windows')">
-                                <i class="fas fa-windows me-1"></i>读取win.ini
+                            <button class="btn btn-outline-danger btn-sm" onclick="loadTestCase('xxe_project_config')">
+                                <i class="fas fa-folder-tree me-1"></i>读取项目配置文件
                             </button>
                             <button class="btn btn-outline-danger btn-sm" onclick="loadTestCase('xxe_project_file')">
-                                <i class="fas fa-file-code me-1"></i>读取项目文件
+                                <i class="fas fa-file-code me-1"></i>读取pom.xml
                             </button>
                         </div>
                     </div>
@@ -86,6 +86,23 @@
                             <button class="btn btn-success" type="button" id="safeParseBtn">
                                 <i class="fas fa-shield-alt me-2"></i>安全解析
                             </button>
+                        </div>
+                    </div>
+
+                    <div class="section mb-4">
+                        <h6 class="text-muted fw-semibold mb-3">
+                            <i class="fas fa-database me-2 text-info"></i>数据库操作
+                        </h6>
+                        <div class="test-cases-grid">
+                            <button class="btn btn-outline-info btn-sm" onclick="getXxeLogs()">
+                                <i class="fas fa-list me-1"></i>查看解析日志
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm" onclick="resetDatabase()">
+                                <i class="fas fa-sync me-1"></i>重置数据表
+                            </button>
+                        </div>
+                        <div id="dbStatus" class="mt-2">
+                            <small class="text-muted">日志数量: <span id="logCount">0</span></small>
                         </div>
                     </div>
 

@@ -74,7 +74,7 @@ public class GatewayHttpConstant {
         /** 流量监控接口路径 */
         public static final String TRAFFIC_MONITOR_ENDPOINT = "/api/inner/traffic/receive";
         /** 防御日志接口路径 */
-        public static final String DEFENSE_LOG_ENDPOINT = "/api/monitor/defense/log";
+        public static final String DEFENSE_LOG_ENDPOINT = "/api/inner/defense/log/sync";
         /** 防御指令接口路径 */
         public static final String DEFENSE_COMMAND_ENDPOINT = "/api/monitor/defense/command";
         

@@ -140,4 +140,23 @@ public class TrafficReceiveController {
             throw new RuntimeException("处理流量数据失败", e);
         }
     }
+
+    private boolean isActiveScanTraffic(TrafficMonitorDTO trafficDTO) {
+        if (trafficDTO == null) {
+            return false;
+        }
+
+        if (trafficDTO.getUserAgent() != null && trafficDTO.getUserAgent().contains("NetworkMonitorActiveScanner")) {
+            return true;
+        }
+
+        if (trafficDTO.getRequestHeaders() == null || trafficDTO.getRequestHeaders().isEmpty()) {
+            return false;
+        }
+
+        return trafficDTO.getRequestHeaders().entrySet().stream()
+                .anyMatch(entry -> "X-Scan-Source".equalsIgnoreCase(entry.getKey())
+                        && "active-vuln-scan".equalsIgnoreCase(entry.getValue()));
+    }
 }
+

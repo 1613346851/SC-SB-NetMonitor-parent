@@ -1,9 +1,12 @@
 package com.network.target.controller;
 
 import com.network.target.common.ApiResponse;
+import com.network.target.entity.SsrfLogEntity;
+import com.network.target.repository.SsrfLogRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,23 +16,18 @@ import org.springframework.web.client.RestTemplate;
 import java.net.URI;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
-/**
- * SSRF服务端请求伪造漏洞测试接口
- * 核心：模拟URL链接预览功能，服务器代用户发起HTTP请求
- */
 @RestController
 @RequestMapping("/target/ssrf")
 @Slf4j
 public class SsrfController {
 
     private final RestTemplate restTemplate;
+    private final SsrfLogRepository ssrfLogRepository;
 
     private static final List<String> ALLOWED_DOMAINS = Arrays.asList(
             "localhost",
@@ -48,14 +46,11 @@ public class SsrfController {
 
     private static final int TARGET_PORT = 9001;
 
-    public SsrfController() {
+    public SsrfController(SsrfLogRepository ssrfLogRepository) {
         this.restTemplate = new RestTemplate();
+        this.ssrfLogRepository = ssrfLogRepository;
     }
 
-    /**
-     * 漏洞接口：无限制发起任意URL请求
-     * 攻击场景：用户可以请求内网服务、云元数据等
-     */
     @GetMapping("/request")
     public ApiResponse makeRequestVulnerable(@RequestParam("url") String targetUrl) {
         try {
@@ -70,16 +65,39 @@ public class SsrfController {
 
             log.warn("【SSRF漏洞触发】成功请求URL：{}, 状态码：{}", targetUrl, response.getStatusCode());
 
+            SsrfLogEntity logEntity = new SsrfLogEntity();
+            logEntity.setRequestUrl(targetUrl);
+            logEntity.setRequestMethod("GET");
+            logEntity.setResponseCode(response.getStatusCode().value());
+            String responseBody = response.getBody();
+            if (responseBody != null && responseBody.length() > 5000) {
+                responseBody = responseBody.substring(0, 5000) + "...(已截断)";
+            }
+            logEntity.setResponseBody(responseBody);
+            logEntity.setSourceIp("127.0.0.1");
+            ssrfLogRepository.save(logEntity);
+            log.info("【数据库存储】已将SSRF请求日志存储到数据库");
+
             return ApiResponse.success()
                     .message("请求成功（漏洞接口）")
                     .data("target_url", targetUrl)
                     .data("status_code", response.getStatusCode().value())
                     .data("response_body", response.getBody())
                     .data("response_headers", response.getHeaders().toSingleValueMap())
+                    .data("db_stored", true)
                     .data("warning", "SSRF漏洞：未对请求URL进行任何限制，可访问内网服务！");
 
         } catch (Exception e) {
             log.error("SSRF请求异常", e);
+            
+            SsrfLogEntity logEntity = new SsrfLogEntity();
+            logEntity.setRequestUrl(targetUrl);
+            logEntity.setRequestMethod("GET");
+            logEntity.setResponseCode(0);
+            logEntity.setResponseBody("请求失败：" + e.getMessage());
+            logEntity.setSourceIp("127.0.0.1");
+            ssrfLogRepository.save(logEntity);
+            
             return ApiResponse.error()
                     .message("请求失败：" + e.getMessage())
                     .data("target_url", targetUrl)
@@ -87,14 +105,6 @@ public class SsrfController {
         }
     }
 
-    /**
-     * 安全接口：白名单限制仅本地/靶场内部地址
-     * 防护措施：
-     * 1. URL格式校验
-     * 2. 域名/IP白名单
-     * 3. 内网IP段拦截
-     * 4. 协议限制（仅HTTP/HTTPS）
-     */
     @GetMapping("/safe-request")
     public ApiResponse makeRequestSafe(@RequestParam("url") String targetUrl) {
         try {
@@ -177,9 +187,6 @@ public class SsrfController {
         }
     }
 
-    /**
-     * 获取允许请求的URL列表
-     */
     @GetMapping("/list-allowed")
     public ApiResponse listAllowedUrls() {
         List<Map<String, String>> allowedUrls = Arrays.asList(
@@ -193,6 +200,31 @@ public class SsrfController {
                 .data("allowed_urls", allowedUrls)
                 .data("allowed_domains", ALLOWED_DOMAINS)
                 .data("target_port", TARGET_PORT);
+    }
+
+    @GetMapping("/logs")
+    public ApiResponse getSsrfLogs() {
+        List<SsrfLogEntity> logs = ssrfLogRepository.findAll();
+        return ApiResponse.success()
+                .message("获取SSRF日志成功")
+                .data("logs", logs)
+                .data("total", logs.size());
+    }
+
+    @DeleteMapping("/logs")
+    public ApiResponse clearSsrfLogs() {
+        int deleted = ssrfLogRepository.deleteAll();
+        return ApiResponse.success()
+                .message("已清空SSRF日志")
+                .data("deleted_count", deleted);
+    }
+
+    @GetMapping("/logs/count")
+    public ApiResponse getSsrfLogsCount() {
+        long count = ssrfLogRepository.count();
+        return ApiResponse.success()
+                .message("获取SSRF日志数量成功")
+                .data("count", count);
     }
 
     private String resolveHost(String host) {

@@ -4,16 +4,16 @@ import com.network.target.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -28,10 +28,8 @@ public class CsrfController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private final Map<String, String> csrfTokens = new ConcurrentHashMap<>();
-    
     private final Map<Integer, Map<String, Object>> userSession = new ConcurrentHashMap<>();
-    
+
     {
         Map<String, Object> adminSession = new HashMap<>();
         adminSession.put("userId", 1);
@@ -43,7 +41,6 @@ public class CsrfController {
 
     /**
      * 漏洞接口：无CSRF防护的昵称修改
-     * 攻击场景：攻击者可构造恶意页面，诱导用户点击后自动提交修改请求
      */
     @PostMapping("/update-name")
     public ApiResponse updateNicknameVulnerable(
@@ -54,7 +51,7 @@ public class CsrfController {
 
             Map<String, Object> user = userSession.getOrDefault(userId, new HashMap<>());
             String oldNickname = (String) user.getOrDefault("nickname", "未知用户");
-            
+
             user.put("userId", userId);
             user.put("nickname", nickname);
             userSession.put(userId, user);
@@ -83,37 +80,22 @@ public class CsrfController {
     }
 
     /**
-     * 安全接口：携带Token校验
-     * 防护措施：
-     * 1. 生成并验证CSRF Token
-     * 2. Token与用户会话绑定
-     * 3. Token一次性使用或有效期限制
+     * 安全接口：使用 Spring Security CSRF Token 防护
      */
     @PostMapping("/safe-update-name")
     public ApiResponse updateNicknameSafe(
             @RequestParam("userId") Integer userId,
             @RequestParam("nickname") String nickname,
-            @RequestParam("token") String token) {
+            @RequestHeader(value = "X-CSRF-TOKEN", required = false) String csrfToken) {
         try {
             log.info("【安全接口】尝试修改用户昵称 - userId: {}, nickname: {}", userId, nickname);
 
-            String expectedToken = csrfTokens.get(String.valueOf(userId));
-            
-            if (expectedToken == null || !expectedToken.equals(token)) {
-                log.warn("【安全拦截】CSRF Token验证失败 - userId: {}, token: {}", userId, token);
-                return ApiResponse.error()
-                        .message("CSRF Token验证失败")
-                        .data("blocked_reason", "Token无效或已过期，请刷新页面获取新Token");
-            }
-
             Map<String, Object> user = userSession.getOrDefault(userId, new HashMap<>());
             String oldNickname = (String) user.getOrDefault("nickname", "未知用户");
-            
+
             user.put("userId", userId);
             user.put("nickname", nickname);
             userSession.put(userId, user);
-
-            csrfTokens.remove(String.valueOf(userId));
 
             log.info("【安全接口】昵称修改成功 - userId: {}, old: {}, new: {}", userId, oldNickname, nickname);
 
@@ -122,7 +104,9 @@ public class CsrfController {
                     .data("user_id", userId)
                     .data("old_nickname", oldNickname)
                     .data("new_nickname", nickname)
-                    .data("security_note", "已通过CSRF Token校验");
+                    .data("token_header", "X-CSRF-TOKEN")
+                    .data("token_preview", csrfToken != null && csrfToken.length() > 12 ? csrfToken.substring(0, 12) + "..." : csrfToken)
+                    .data("security_note", "已通过 Spring Security CSRF Token 校验");
 
         } catch (Exception e) {
             log.error("安全CSRF昵称修改异常", e);
@@ -132,19 +116,19 @@ public class CsrfController {
     }
 
     /**
-     * 获取CSRF Token
+     * 获取 Spring Security 生成的 CSRF Token
      */
     @GetMapping("/get-token")
-    public ApiResponse getCsrfToken(@RequestParam("userId") Integer userId) {
-        String token = UUID.randomUUID().toString().replace("-", "");
-        csrfTokens.put(String.valueOf(userId), token);
-        
-        log.info("生成CSRF Token - userId: {}, token: {}", userId, token);
+    public ApiResponse getCsrfToken(@RequestParam(value = "userId", defaultValue = "1") Integer userId,
+                                    CsrfToken csrfToken) {
+        log.info("生成Spring Security CSRF Token - userId: {}", userId);
 
         return ApiResponse.success()
-                .message("获取Token成功")
+                .message("获取Spring Security CSRF Token成功")
                 .data("user_id", userId)
-                .data("csrf_token", token);
+                .data("csrf_token", csrfToken.getToken())
+                .data("header_name", csrfToken.getHeaderName())
+                .data("parameter_name", csrfToken.getParameterName());
     }
 
     /**
@@ -153,7 +137,7 @@ public class CsrfController {
     @GetMapping("/user-info")
     public ApiResponse getUserInfo(@RequestParam(value = "userId", defaultValue = "1") Integer userId) {
         Map<String, Object> user = userSession.getOrDefault(userId, new HashMap<>());
-        
+
         if (user.isEmpty()) {
             user.put("userId", userId);
             user.put("username", "user_" + userId);

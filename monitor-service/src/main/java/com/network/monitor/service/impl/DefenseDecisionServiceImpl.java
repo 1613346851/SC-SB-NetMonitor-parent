@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -19,6 +20,8 @@ import java.time.format.DateTimeFormatter;
 @Slf4j
 @Service
 public class DefenseDecisionServiceImpl implements DefenseDecisionService {
+
+    private static final int DEFAULT_RATE_LIMIT_THRESHOLD = 5;
 
     @Autowired
     private GatewayApiClient gatewayApiClient;
@@ -35,37 +38,34 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
             String riskLevel = attackDTO.getRiskLevel();
             DefenseCommandDTO commandDTO = null;
 
-            // 按风险等级分级处置
             if (RiskLevelConstant.HIGH.equals(riskLevel) || RiskLevelConstant.CRITICAL.equals(riskLevel)) {
-                // 高风险：触发 IP 临时拉黑 + 恶意请求拦截
                 commandDTO = buildDefenseCommand(
-                    attackDTO,
-                    DefenseTypeConstant.IP_BLOCK,
-                    "ADD",
-                    attackDTO.getSourceIp(),
-                    "检测到高风险攻击：" + attackDTO.getAttackType(),
-                    calculateExpireTime(30) // 30 分钟后过期
+                        attackDTO,
+                        DefenseTypeConstant.BLACKLIST,
+                        "ADD",
+                        attackDTO.getSourceIp(),
+                        "检测到高风险攻击：" + attackDTO.getAttackType(),
+                        calculateExpireTime(30)
                 );
             } else if (RiskLevelConstant.MEDIUM.equals(riskLevel)) {
-                // 中风险：触发请求限流
                 commandDTO = buildDefenseCommand(
-                    attackDTO,
-                    DefenseTypeConstant.RATE_LIMIT,
-                    "ADD",
-                    attackDTO.getSourceIp(),
-                    "检测到中风险攻击：" + attackDTO.getAttackType(),
-                    calculateExpireTime(60) // 60 分钟后过期
+                        attackDTO,
+                        DefenseTypeConstant.RATE_LIMIT,
+                        "ADD",
+                        attackDTO.getSourceIp(),
+                        "检测到中风险攻击：" + attackDTO.getAttackType(),
+                        calculateExpireTime(60)
                 );
+                if (commandDTO != null) {
+                    commandDTO.setRateLimitThreshold(DEFAULT_RATE_LIMIT_THRESHOLD);
+                }
             }
-            // 低风险仅记录告警，不触发防御
 
-            // 推送防御指令到网关
             if (commandDTO != null) {
                 boolean success = gatewayApiClient.pushDefenseCommand(commandDTO);
-                
                 if (success) {
-                    log.info("生成并推送防御决策成功：attackId={}, defenseType={}, sourceIp={}", 
-                        attackDTO.getTrafficId(), commandDTO.getDefenseType(), commandDTO.getSourceIp());
+                    log.info("生成并推送防御决策成功：attackId={}, defenseType={}, sourceIp={}",
+                            attackDTO.getTrafficId(), commandDTO.getDefenseType(), commandDTO.getSourceIp());
                 } else {
                     log.error("推送防御指令失败：attackId={}", attackDTO.getTrafficId());
                 }
@@ -82,23 +82,23 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
     public DefenseCommandDTO generateManualDefense(String defenseType, String target, String reason) {
         try {
             DefenseCommandDTO commandDTO = new DefenseCommandDTO();
-            
             commandDTO.setSourceIp(target);
-            commandDTO.setDefenseType("BLACKLIST".equals(defenseType) ? "BLACKLIST" : defenseType);
+            commandDTO.setDefenseType(normalizeDefenseType(defenseType));
             commandDTO.setRiskLevel(RiskLevelConstant.HIGH);
             commandDTO.setDescription(reason);
-            
+
+            if (DefenseTypeConstant.RATE_LIMIT.equals(commandDTO.getDefenseType())) {
+                commandDTO.setRateLimitThreshold(DEFAULT_RATE_LIMIT_THRESHOLD);
+            }
+
             LocalDateTime expireTime = LocalDateTime.now().plusMinutes(120);
             commandDTO.setExpireTimestamp(
-                expireTime.atZone(java.time.ZoneId.systemDefault())
-                    .toInstant()
-                    .toEpochMilli()
+                    expireTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             );
 
             gatewayApiClient.pushDefenseCommand(commandDTO);
 
             log.info("生成手动防御决策：type={}, target={}, reason={}", defenseType, target, reason);
-            
             return commandDTO;
         } catch (Exception e) {
             log.error("生成手动防御决策失败：", e);
@@ -107,40 +107,46 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
     }
 
     private DefenseCommandDTO buildDefenseCommand(AttackMonitorDTO attackDTO,
-                                                   String defenseType,
-                                                   String action,
-                                                   String target,
-                                                   String reason,
-                                                   String expireTime) {
+                                                  String defenseType,
+                                                  String action,
+                                                  String target,
+                                                  String reason,
+                                                  String expireTime) {
         DefenseCommandDTO dto = new DefenseCommandDTO();
-        
         dto.setSourceIp(target);
-        dto.setDefenseType("BLACKLIST".equals(defenseType) ? "BLACKLIST" : defenseType);
+        dto.setDefenseType(normalizeDefenseType(defenseType));
         dto.setRiskLevel(attackDTO.getRiskLevel());
         dto.setDescription(reason);
         dto.setEventId(String.valueOf(attackDTO.getTrafficId()));
-        
+
         if (expireTime != null) {
             try {
                 LocalDateTime exp = LocalDateTime.parse(expireTime, TIME_FORMATTER);
                 dto.setExpireTimestamp(
-                    exp.atZone(java.time.ZoneId.systemDefault())
-                        .toInstant()
-                        .toEpochMilli()
+                        exp.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 );
             } catch (Exception e) {
                 log.warn("解析过期时间失败：{}", expireTime);
             }
         }
-        
+
         return dto;
+    }
+
+    private String normalizeDefenseType(String defenseType) {
+        if (defenseType == null || defenseType.isBlank()) {
+            return DefenseTypeConstant.BLACKLIST;
+        }
+        return switch (defenseType.toUpperCase()) {
+            case "BLACKLIST", "BLOCK_IP", "IP_BLOCK" -> DefenseTypeConstant.BLACKLIST;
+            case "RATE_LIMIT" -> DefenseTypeConstant.RATE_LIMIT;
+            case "BLOCK", "BLOCK_REQUEST", "MALICIOUS_REQUEST" -> DefenseTypeConstant.BLOCK;
+            default -> defenseType;
+        };
     }
 
     /**
      * 计算过期时间
-     *
-     * @param minutes 多少分钟后
-     * @return 格式化后的过期时间字符串
      */
     private String calculateExpireTime(int minutes) {
         return LocalDateTime.now().plusMinutes(minutes).format(TIME_FORMATTER);

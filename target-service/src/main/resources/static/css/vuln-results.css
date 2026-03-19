@@ -13,9 +13,9 @@
     border-radius: 8px;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
     overflow-y: auto;
-    min-height: 250px;
-    max-height: calc(100vh - 180px);
-    height: 0;
+    overflow-x: hidden;
+    min-height: 0;
+    height: 100%;
 }
 
 .main-content .output-container {
@@ -49,6 +49,8 @@
     border-left: 5px solid;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     transition: all 0.3s ease;
+    overflow: hidden;
+    word-wrap: break-word;
 }
 
 .result-card:hover {
@@ -88,6 +90,15 @@
 
 .result-body {
     padding: 0;
+}
+
+.result-body pre {
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 0;
 }
 
 /* 命令/查询输出项样式 - 统一 */

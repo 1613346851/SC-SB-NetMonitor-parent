@@ -50,7 +50,14 @@
 			<artifactId>spring-boot-starter-thymeleaf</artifactId>
 		</dependency>
 
+		<!-- Spring Security（用于 CSRF Token 防护示例） -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
 	</dependencies>
+
 
 	<!-- 构建插件（继承父工程配置） -->
 	<build>

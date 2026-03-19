@@ -86,6 +86,11 @@ vuln:
   cache:
     refresh:
       cron: "0 0 4 * * ?"  # 每天凌晨 4 点刷新缓存
+  scan:
+    gateway-base-url: http://localhost:9000
+    target-display-url: http://127.0.0.1:9001
+    history-size: 10
+
 
 # 黑名单清理配置
 blacklist:

@@ -73,7 +73,8 @@ public class HttpConstant {
     /**
      * 网关服务 API 基础路径
      */
-    public static final String GATEWAY_API_BASE_URL = "http://localhost:8080";
+    public static final String GATEWAY_API_BASE_URL = "http://localhost:9000";
+
 
     /**
      * 网关防御指令接收接口

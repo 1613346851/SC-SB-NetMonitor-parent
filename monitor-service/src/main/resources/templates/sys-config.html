@@ -16,29 +16,109 @@
                     <h2>系统配置</h2>
                 </div>
                 <div class="header-right">
-                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                     <button class="btn btn-default" onclick="refreshConfig()">刷新缓存</button>
-                    <button class="btn btn-primary" onclick="showAddConfigModal()">+ 添加配置</button>
+                    <button class="btn btn-primary" onclick="showAddConfigModal()">新增配置</button>
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                 </div>
             </header>
 
             <main class="content">
+                <section class="config-overview">
+                    <div class="card config-hero">
+                        <div class="config-hero__eyebrow">GLOBAL CONFIG CENTER</div>
+                        <h3 class="config-hero__title">统一管理系统配置与 AI 预留参数</h3>
+                        <p class="config-hero__desc">沿用现有配置 CRUD 机制，在当前页面直接完成全局 AI 配置、缓存刷新与快速检索，供漏洞扫描与后续智能分析统一复用。</p>
+                        <div class="config-hero__meta">
+                            <span class="config-meta-chip">监测服务配置中心</span>
+                            <span class="config-meta-chip">支持 AI 全局预留</span>
+                            <span class="config-meta-chip">配置变更即时刷新</span>
+                        </div>
+                    </div>
+                    <div class="config-overview-grid">
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <div class="stat-card-title">配置总数</div>
+                                <div class="stat-card-icon primary">N</div>
+                            </div>
+                            <div class="stat-card-value" id="configTotalCount">0</div>
+                            <div class="stat-card-footer">
+                                <span>AI 相关</span>
+                                <span id="configAiCount">0</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <div class="stat-card-title">最近更新时间</div>
+                                <div class="stat-card-icon success">T</div>
+                            </div>
+                            <div class="stat-card-value stat-card-value--sm" id="configLastUpdated">--</div>
+                            <div class="stat-card-footer">
+                                <span>当前筛选结果</span>
+                                <span id="configFilteredCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="ai-config-panel">
+                    <div class="card ai-config-card">
+                        <div class="ai-config-card__head">
+                            <div>
+                                <div class="ai-config-card__title">AI 模型接口地址</div>
+                                <div class="ai-config-card__key">ai.model.url</div>
+                            </div>
+                            <span class="ai-badge">AI</span>
+                        </div>
+                        <div id="aiModelUrlValue" class="ai-config-card__value empty">未配置</div>
+                        <div class="ai-config-card__footer">
+                            <div class="ai-config-card__desc">漏洞扫描、攻击分析与后续智能研判共用该模型接入地址。</div>
+                            <div class="ai-card-actions">
+                                <button class="btn btn-default btn-sm" onclick="filterAiConfigs()">定位</button>
+                                <button class="btn btn-primary btn-sm" onclick="editAiConfig('ai.model.url')">编辑</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card ai-config-card">
+                        <div class="ai-config-card__head">
+                            <div>
+                                <div class="ai-config-card__title">AI 模型 API Key</div>
+                                <div class="ai-config-card__key">ai.model.apiKey</div>
+                            </div>
+                            <span class="ai-badge">AI</span>
+                        </div>
+                        <div id="aiModelApiKeyValue" class="ai-config-card__value empty">未配置</div>
+                        <div class="ai-config-card__footer">
+                            <div class="ai-config-card__desc">页面将对密钥做掩码展示，保存后由各模块统一按需读取。</div>
+                            <div class="ai-card-actions">
+                                <button class="btn btn-default btn-sm" onclick="filterAiConfigs()">定位</button>
+                                <button class="btn btn-primary btn-sm" onclick="editAiConfig('ai.model.apiKey')">编辑</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <div class="filter-bar">
                     <div class="form-inline">
                         <div class="form-group">
                             <label class="form-label">配置键</label>
-                            <input type="text" class="form-control" id="configKey" placeholder="请输入配置键">
+                            <input type="text" class="form-control" id="configKey" placeholder="支持按配置键模糊检索">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group config-inline-actions">
                             <button class="btn btn-primary" onclick="searchConfig()">查询</button>
                             <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                            <button class="btn btn-default" onclick="filterAiConfigs()">仅看 AI 配置</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="table-container">
+                <div class="config-tip">提示：`ai.model.url` 与 `ai.model.apiKey` 已作为全局 AI 预留配置接入，后续漏洞扫描与告警研判可直接复用。</div>
+
+                <div class="table-container" style="margin-top: 24px;">
                     <div class="table-header">
-                        <h3 class="table-title">系统配置列表</h3>
+                        <div>
+                            <h3 class="table-title">系统配置列表</h3>
+                            <div class="scan-section-desc">支持普通配置与 AI 配置统一维护，编辑后可直接刷新缓存生效。</div>
+                        </div>
                     </div>
                     <div class="table-wrapper">
                         <table class="data-table">
@@ -77,7 +157,7 @@
                     <div class="form-group">
                         <label class="form-label">配置键 <span style="color: red;">*</span></label>
                         <input type="text" class="form-control" id="configKeyInput" required placeholder="请输入配置键，如：ddos.threshold">
-                        <small style="color: var(--text-secondary);">配置键唯一，用于标识配置项</small>
+                        <small style="color: var(--text-secondary);">配置键唯一，用于标识配置项；AI 配置推荐使用 ai.model.url / ai.model.apiKey</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">配置值 <span style="color: red;">*</span></label>

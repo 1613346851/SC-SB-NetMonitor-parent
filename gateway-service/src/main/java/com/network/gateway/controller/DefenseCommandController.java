@@ -222,12 +222,14 @@ public class DefenseCommandController {
                 yield added;
             }
             case RATE_LIMIT -> {
-                // 请求限流通常通过缓存自动处理，这里可以更新限流阈值
-                int threshold = commandDTO.getRateLimitThreshold() != null ? 
-                              commandDTO.getRateLimitThreshold() : 5; // 默认 5 次/秒
-                logger.info("更新 IP[{}] 的限流阈值为{}次/秒", sourceIp, threshold);
-                yield true; // 限流配置更新成功
+                int threshold = commandDTO.getRateLimitThreshold() != null ?
+                        commandDTO.getRateLimitThreshold() : 5;
+                rateLimitCache.setCustomThreshold(sourceIp, threshold, expireTime);
+                rateLimitCache.resetRequestCount(sourceIp);
+                logger.info("更新 IP[{}] 的限流阈值为{}次/秒，expireTime={}", sourceIp, threshold, expireTime);
+                yield true;
             }
+
             case BLOCK -> {
                 maliciousRequestFilter.addMaliciousIp(sourceIp);
                 yield true;
@@ -255,8 +257,11 @@ public class DefenseCommandController {
             status.put("rateLimitFilter", Map.of(
                     "enabled", true,
                     "activeIpCount", rateLimitFilter.getActiveIpCount(),
+                    "defaultThreshold", rateLimitFilter.getDefaultThreshold(),
+                    "customThresholdCount", rateLimitCache.getCustomThresholdCount(),
                     "statistics", rateLimitFilter.getStatistics()
             ));
+
             
             status.put("maliciousRequestFilter", Map.of(
                     "enabled", true,

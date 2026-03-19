@@ -1,8 +1,12 @@
 package com.network.target.controller;
 
 import com.network.target.common.ApiResponse;
+import com.network.target.entity.SerializedObjectEntity;
+import com.network.target.repository.SerializedObjectRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,17 +21,17 @@ import java.io.Serializable;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-/**
- * Java反序列化漏洞测试接口
- * 核心：模拟对象序列化/反序列化功能，直接解析用户上传的序列化数据
- */
 @RestController
 @RequestMapping("/target/deserial")
 @Slf4j
 public class DeserialController {
+
+    private final SerializedObjectRepository serializedObjectRepository;
 
     private static final Set<String> ALLOWED_CLASSES = new HashSet<>();
     
@@ -39,6 +43,10 @@ public class DeserialController {
         ALLOWED_CLASSES.add("java.lang.Long");
         ALLOWED_CLASSES.add("java.util.HashMap");
         ALLOWED_CLASSES.add("java.util.ArrayList");
+    }
+
+    public DeserialController(SerializedObjectRepository serializedObjectRepository) {
+        this.serializedObjectRepository = serializedObjectRepository;
     }
 
     public static class TestUser implements Serializable {
@@ -96,10 +104,6 @@ public class DeserialController {
         }
     }
 
-    /**
-     * 漏洞接口：无校验反序列化
-     * 攻击场景：攻击者可构造恶意序列化数据进行攻击
-     */
     @PostMapping("/parse")
     public ApiResponse parseSerializedVulnerable(@RequestBody String serializedData) {
         try {
@@ -114,9 +118,17 @@ public class DeserialController {
 
             log.warn("【反序列化漏洞触发】成功反序列化对象：{}", obj.getClass().getName());
 
+            SerializedObjectEntity entity = new SerializedObjectEntity();
+            entity.setObjectName(obj.toString());
+            entity.setObjectType(obj.getClass().getName());
+            entity.setSerializedData(data);
+            serializedObjectRepository.save(entity);
+            log.info("【数据库存储】已将序列化对象存储到数据库，ID：{}", entity.getId());
+
             Map<String, Object> result = new HashMap<>();
             result.put("class_name", obj.getClass().getName());
             result.put("to_string", obj.toString());
+            result.put("db_id", entity.getId());
             
             if (obj instanceof TestUser) {
                 TestUser user = (TestUser) obj;
@@ -133,6 +145,7 @@ public class DeserialController {
             return ApiResponse.success()
                     .message("反序列化成功（漏洞接口）")
                     .data("deserialized_object", result)
+                    .data("db_stored", true)
                     .data("warning", "反序列化漏洞：未对类进行白名单校验，可能导致远程代码执行！");
 
         } catch (ClassNotFoundException e) {
@@ -153,12 +166,6 @@ public class DeserialController {
         }
     }
 
-    /**
-     * 安全接口：类白名单校验
-     * 防护措施：
-     * 1. 自定义ObjectInputStream，重写resolveClass方法
-     * 2. 仅允许白名单内的类进行反序列化
-     */
     @PostMapping("/safe-parse")
     public ApiResponse parseSerializedSafe(@RequestBody String serializedData) {
         try {
@@ -221,9 +228,6 @@ public class DeserialController {
         }
     }
 
-    /**
-     * 生成测试序列化数据
-     */
     @GetMapping("/generate-test-data")
     public ApiResponse generateTestData() {
         try {
@@ -251,13 +255,81 @@ public class DeserialController {
         }
     }
 
-    /**
-     * 获取允许的类列表
-     */
     @GetMapping("/allowed-classes")
     public ApiResponse getAllowedClasses() {
         return ApiResponse.success()
                 .message("获取允许类列表成功")
                 .data("allowed_classes", ALLOWED_CLASSES);
+    }
+
+    @GetMapping("/stored-objects")
+    public ApiResponse getStoredObjects() {
+        List<SerializedObjectEntity> objects = serializedObjectRepository.findAll();
+        List<Map<String, Object>> result = objects.stream().map(obj -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", obj.getId());
+            map.put("object_name", obj.getObjectName());
+            map.put("object_type", obj.getObjectType());
+            map.put("create_time", obj.getCreateTime().toString());
+            map.put("data_size", obj.getSerializedData() != null ? obj.getSerializedData().length : 0);
+            return map;
+        }).collect(Collectors.toList());
+
+        return ApiResponse.success()
+                .message("获取存储对象列表成功")
+                .data("objects", result)
+                .data("total", result.size());
+    }
+
+    @GetMapping("/stored-objects/{id}")
+    public ApiResponse getStoredObjectById(@PathVariable Integer id) {
+        SerializedObjectEntity entity = serializedObjectRepository.findById(id);
+        if (entity == null) {
+            return ApiResponse.error().message("对象不存在");
+        }
+
+        try {
+            ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(entity.getSerializedData()));
+            Object obj = ois.readObject();
+            ois.close();
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", entity.getId());
+            result.put("class_name", obj.getClass().getName());
+            result.put("to_string", obj.toString());
+            result.put("create_time", entity.getCreateTime().toString());
+
+            return ApiResponse.success()
+                    .message("对象读取成功")
+                    .data("object", result);
+        } catch (Exception e) {
+            log.error("读取存储对象失败", e);
+            return ApiResponse.error().message("对象读取失败：" + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/stored-objects/{id}")
+    public ApiResponse deleteStoredObject(@PathVariable Integer id) {
+        int deleted = serializedObjectRepository.deleteById(id);
+        if (deleted > 0) {
+            return ApiResponse.success().message("对象删除成功");
+        }
+        return ApiResponse.error().message("对象不存在或删除失败");
+    }
+
+    @DeleteMapping("/stored-objects")
+    public ApiResponse deleteAllStoredObjects() {
+        int deleted = serializedObjectRepository.deleteAll();
+        return ApiResponse.success()
+                .message("已清空所有存储对象")
+                .data("deleted_count", deleted);
+    }
+
+    @GetMapping("/stored-objects/count")
+    public ApiResponse getStoredObjectsCount() {
+        long count = serializedObjectRepository.count();
+        return ApiResponse.success()
+                .message("获取存储对象数量成功")
+                .data("count", count);
     }
 }

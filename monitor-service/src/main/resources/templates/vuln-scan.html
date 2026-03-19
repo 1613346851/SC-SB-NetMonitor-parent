@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漏洞扫描 - 网络监测系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <h2>漏洞扫描</h2>
+                </div>
+                <div class="header-right">
+                    <button class="btn btn-default" id="syncScanBtn" onclick="manualSync()">同步结果</button>
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+
+            <main class="content">
+                <section class="scan-hero card">
+                    <div class="scan-hero__content">
+                        <div>
+                            <div class="scan-hero__eyebrow">ACTIVE SECURITY</div>
+                            <h3 class="scan-hero__title">主动漏洞扫描 MVP</h3>
+                            <p class="scan-hero__desc">通过监测服务发起扫描，经由网关统一转发到靶场服务，自动识别高风险 Web 漏洞并同步入库。</p>
+                        </div>
+                        <div class="scan-status-card">
+                            <div class="scan-status-card__label">当前任务状态</div>
+                            <div id="scanStatusText" class="scan-status-card__value status-idle">空闲</div>
+                            <div id="scanLastMessage" class="scan-status-card__hint">暂无扫描任务</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card scan-config-card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">扫描配置</div>
+                            <div class="scan-section-desc">固定扫描目标为靶场服务，扫描请求统一经由网关流转。</div>
+                        </div>
+                        <div class="scan-actions">
+                            <button class="btn btn-primary" id="startScanBtn" onclick="startScan()">开始扫描</button>
+                            <button class="btn btn-warning" id="pauseScanBtn" onclick="controlScan('PAUSE')">暂停</button>
+                            <button class="btn btn-success" id="resumeScanBtn" onclick="controlScan('RESUME')">继续</button>
+                            <button class="btn btn-danger" id="terminateScanBtn" onclick="controlScan('TERMINATE')">终止</button>
+                        </div>
+                    </div>
+                    <div class="scan-config-grid">
+                        <div class="scan-config-item">
+                            <label class="form-label">扫描目标</label>
+                            <input type="text" id="scanTarget" class="form-control" value="127.0.0.1:9001" readonly>
+                        </div>
+                        <div class="scan-config-item">
+                            <label class="form-label">扫描模式</label>
+                            <div class="scan-mode-group">
+                                <label class="scan-mode-option active">
+                                    <input type="radio" name="scanType" value="QUICK" checked>
+                                    <span>快速扫描</span>
+                                    <small>核心漏洞接口</small>
+                                </label>
+                                <label class="scan-mode-option">
+                                    <input type="radio" name="scanType" value="FULL">
+                                    <span>全量扫描</span>
+                                    <small>扩展链路验证</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="scan-config-item scan-config-item--wide">
+                            <label class="form-label">本次扫描接口范围</label>
+                            <div id="interfaceTagList" class="interface-tag-list"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">扫描进度</div>
+                            <div class="stat-card-icon primary">%</div>
+                        </div>
+                        <div id="progressPercentValue" class="stat-card-value">0%</div>
+                        <div class="stat-card-footer">
+                            <span>已完成接口</span>
+                            <span id="progressCountValue">0 / 0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">发现漏洞</div>
+                            <div class="stat-card-icon danger">V</div>
+                        </div>
+                        <div id="discoveredCountValue" class="stat-card-value">0</div>
+                        <div class="stat-card-footer">
+                            <span>自动同步到漏洞库</span>
+                            <span id="syncedCountValue">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">任务开始时间</div>
+                            <div class="stat-card-icon info">T</div>
+                        </div>
+                        <div id="scanStartTimeValue" class="stat-card-value stat-card-value--sm">--</div>
+                        <div class="stat-card-footer">
+                            <span>结束时间</span>
+                            <span id="scanEndTimeValue">--</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-header">
+                            <div class="stat-card-title">执行耗时</div>
+                            <div class="stat-card-icon success">S</div>
+                        </div>
+                        <div id="scanDurationValue" class="stat-card-value">0s</div>
+                        <div class="stat-card-footer">
+                            <span>当前步骤</span>
+                            <span id="scanCurrentStep">等待启动</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card progress-card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">实时进度</div>
+                            <div class="scan-section-desc">轮询扫描任务进度，支持暂停、继续与终止控制。</div>
+                        </div>
+                    </div>
+                    <div class="progress-track">
+                        <div id="scanProgressBar" class="progress-track__bar" style="width: 0%;"></div>
+                    </div>
+                    <div class="progress-meta">
+                        <span id="scanProgressText">0%</span>
+                        <span id="scanSummaryText">等待启动</span>
+                    </div>
+                    <div id="scanWarnings" class="scan-warning-list"></div>
+                </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">本次扫描结果</div>
+                            <div class="scan-section-desc">扫描结果已自动接入现有漏洞管理体系，可在漏洞监测页面继续查看与管理。</div>
+                        </div>
+                        <a href="/vulnerability" class="btn btn-default">查看漏洞监测</a>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>漏洞名称</th>
+                                    <th>类型</th>
+                                    <th>等级</th>
+                                    <th>路径</th>
+                                    <th>Payload</th>
+                                    <th>同步状态</th>
+                                    <th>发现时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scanResultTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center">暂无结果</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">最近扫描历史</div>
+                            <div class="scan-section-desc">保留最近执行的任务摘要，便于回顾扫描模式、进度与发现数量。</div>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>任务ID</th>
+                                    <th>模式</th>
+                                    <th>状态</th>
+                                    <th>发现数量</th>
+                                    <th>已完成接口</th>
+                                    <th>开始时间</th>
+                                    <th>结束时间</th>
+                                    <th>摘要</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scanHistoryTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center">暂无历史记录</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <div id="scanResultDetailModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 860px;">
+            <div class="modal-header">
+                <h3 class="modal-title">扫描结果详情</h3>
+                <span class="modal-close" onclick="closeScanResultDetail()">&times;</span>
+            </div>
+            <div class="modal-body" id="scanResultDetailContent"></div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeScanResultDetail()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/vuln-scan.js}"></script>
+    <script>
+        PageInit.init({
+            requireAuth: true,
+            highlightMenu: true
+        });
+    </script>
+</body>
+</html>
