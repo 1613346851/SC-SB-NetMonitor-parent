@@ -1,31 +1,55 @@
-/**
- * 用户管理页面 JavaScript
- */
-
+let userTable;
 let allRoles = [];
 let isEdit = false;
 
 document.addEventListener('DOMContentLoaded', function() {
-    loadUsers();
+    initUserTable();
     loadRoles();
 });
 
-async function loadUsers() {
-    try {
-        const username = document.getElementById('searchUsername').value;
-        const status = document.getElementById('searchStatus').value;
-        
-        const params = {};
-        if (username) params.username = username;
-        if (status !== '') params.status = status;
-        
-        const users = await http.get('/system/user/list', params);
-        renderUserTable(users);
-    } catch (error) {
-        console.error('加载用户列表失败:', error);
-        document.getElementById('userTableBody').innerHTML = 
-            '<tr><td colspan="8" class="text-center text-danger">加载失败</td></tr>';
-    }
+function initUserTable() {
+    userTable = TableUtils.createInstance({
+        instanceName: 'userTable',
+        apiUrl: '/system/user/list',
+        pageSize: 10,
+        defaultSortField: 'id',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'userTableBody',
+        paginationEl: 'pagination',
+        colspan: 8,
+        renderRow: function(user) {
+            const actions = [
+                { text: '编辑', class: 'btn-primary', onClick: `editUser(${user.id})` },
+                { text: '重置密码', class: 'btn-warning', onClick: `showResetPwdModal(${user.id})` }
+            ];
+            
+            if (user.status === 0) {
+                actions.push({ text: '禁用', class: 'btn-default', onClick: `changeStatus(${user.id}, 1)` });
+            } else if (user.status === 1) {
+                actions.push({ text: '启用', class: 'btn-success', onClick: `changeStatus(${user.id}, 0)` });
+            } else {
+                actions.push({ text: '解锁', class: 'btn-success', onClick: `changeStatus(${user.id}, 0)` });
+            }
+            
+            actions.push({ text: '删除', class: 'btn-danger', onClick: `deleteUser(${user.id})` });
+            
+            return `
+                <tr>
+                    <td>${user.id || '-'}</td>
+                    <td>${tableRenderer.renderText(user.username)}</td>
+                    <td>${tableRenderer.renderText(user.nickname)}</td>
+                    <td>${tableRenderer.renderText(user.phone)}</td>
+                    <td>${tableRenderer.renderText(user.email)}</td>
+                    <td>${renderStatus(user.status)}</td>
+                    <td>${tableRenderer.renderDateTime(user.createTime)}</td>
+                    <td class="action-btns">${tableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
+                </tr>
+            `;
+        }
+    });
+    
+    window.userTable = userTable;
+    userTable.loadData();
 }
 
 async function loadRoles() {
@@ -34,39 +58,6 @@ async function loadRoles() {
     } catch (error) {
         console.error('加载角色列表失败:', error);
     }
-}
-
-function renderUserTable(users) {
-    const tbody = document.getElementById('userTableBody');
-    
-    if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">暂无数据</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = users.map(user => `
-        <tr>
-            <td>${user.id}</td>
-            <td>${user.username || '-'}</td>
-            <td>${user.nickname || '-'}</td>
-            <td>${user.phone || '-'}</td>
-            <td>${user.email || '-'}</td>
-            <td>${renderStatus(user.status)}</td>
-            <td>${dateFormat.format(user.createTime)}</td>
-            <td class="action-btns">
-                <button class="btn btn-primary btn-sm" onclick="editUser(${user.id})">编辑</button>
-                <button class="btn btn-warning btn-sm" onclick="showResetPwdModal(${user.id})">重置密码</button>
-                ${user.status === 0 ? 
-                    `<button class="btn btn-default btn-sm" onclick="changeStatus(${user.id}, 1)">禁用</button>` : 
-                    (user.status === 1 ? 
-                        `<button class="btn btn-success btn-sm" onclick="changeStatus(${user.id}, 0)">启用</button>` :
-                        `<button class="btn btn-success btn-sm" onclick="changeStatus(${user.id}, 0)">解锁</button>`
-                    )
-                }
-                <button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">删除</button>
-            </td>
-        </tr>
-    `).join('');
 }
 
 function renderStatus(status) {
@@ -79,13 +70,20 @@ function renderStatus(status) {
 }
 
 function searchUsers() {
-    loadUsers();
+    const username = userTable.getSearchValue('searchUsername');
+    const status = userTable.getSearchSelectValue('searchStatus');
+    
+    const params = {};
+    if (username) params.username = username;
+    if (status !== '') params.status = status;
+    
+    userTable.search(params);
 }
 
 function resetSearch() {
     document.getElementById('searchUsername').value = '';
     document.getElementById('searchStatus').value = '';
-    loadUsers();
+    userTable.resetSearch();
 }
 
 function showAddModal() {
@@ -182,7 +180,7 @@ async function saveUser() {
             message.success('创建成功');
         }
         closeModal();
-        loadUsers();
+        userTable.loadData();
     } catch (error) {
         console.error('保存用户失败:', error);
         message.error(error.message || '保存失败');
@@ -199,7 +197,7 @@ async function changeStatus(id, status) {
     try {
         await http.put(`/system/user/status/${id}?status=${status}`);
         message.success(`${action}成功`);
-        loadUsers();
+        userTable.loadData();
     } catch (error) {
         console.error('操作失败:', error);
         message.error('操作失败');
@@ -214,7 +212,7 @@ async function deleteUser(id) {
     try {
         await http.delete(`/system/user/${id}`);
         message.success('删除成功');
-        loadUsers();
+        userTable.loadData();
     } catch (error) {
         console.error('删除失败:', error);
         message.error('删除失败');

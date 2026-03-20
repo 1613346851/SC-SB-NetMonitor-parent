@@ -1,31 +1,47 @@
-/**
- * 角色管理页面 JavaScript
- */
-
+let roleTable;
 let allMenus = [];
 let isEdit = false;
 
 document.addEventListener('DOMContentLoaded', function() {
-    loadRoles();
+    initRoleTable();
     loadMenus();
 });
 
-async function loadRoles() {
-    try {
-        const roleName = document.getElementById('searchRoleName').value;
-        const status = document.getElementById('searchStatus').value;
-        
-        const params = {};
-        if (roleName) params.roleName = roleName;
-        if (status !== '') params.status = status;
-        
-        const roles = await http.get('/system/role/list', params);
-        renderRoleTable(roles);
-    } catch (error) {
-        console.error('加载角色列表失败:', error);
-        document.getElementById('roleTableBody').innerHTML = 
-            '<tr><td colspan="7" class="text-center text-danger">加载失败</td></tr>';
-    }
+function initRoleTable() {
+    roleTable = TableUtils.createInstance({
+        instanceName: 'roleTable',
+        apiUrl: '/system/role/list',
+        pageSize: 10,
+        defaultSortField: 'id',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'roleTableBody',
+        paginationEl: 'pagination',
+        colspan: 7,
+        renderRow: function(role) {
+            const actions = [
+                { text: '编辑', class: 'btn-primary', onClick: `editRole(${role.id})` }
+            ];
+            
+            if (role.roleCode !== 'SUPER_ADMIN') {
+                actions.push({ text: '删除', class: 'btn-danger', onClick: `deleteRole(${role.id})` });
+            }
+            
+            return `
+                <tr>
+                    <td>${role.id || '-'}</td>
+                    <td>${tableRenderer.renderText(role.roleName)}</td>
+                    <td><code>${tableRenderer.renderText(role.roleCode)}</code></td>
+                    <td>${tableRenderer.renderText(role.roleDesc)}</td>
+                    <td>${renderStatus(role.status)}</td>
+                    <td>${tableRenderer.renderDateTime(role.createTime)}</td>
+                    <td class="action-btns">${tableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
+                </tr>
+            `;
+        }
+    });
+    
+    window.roleTable = roleTable;
+    roleTable.loadData();
 }
 
 async function loadMenus() {
@@ -34,33 +50,6 @@ async function loadMenus() {
     } catch (error) {
         console.error('加载菜单列表失败:', error);
     }
-}
-
-function renderRoleTable(roles) {
-    const tbody = document.getElementById('roleTableBody');
-    
-    if (!roles || roles.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = roles.map(role => `
-        <tr>
-            <td>${role.id}</td>
-            <td>${role.roleName || '-'}</td>
-            <td><code>${role.roleCode || '-'}</code></td>
-            <td>${role.roleDesc || '-'}</td>
-            <td>${renderStatus(role.status)}</td>
-            <td>${dateFormat.format(role.createTime)}</td>
-            <td class="action-btns">
-                <button class="btn btn-primary btn-sm" onclick="editRole(${role.id})">编辑</button>
-                ${role.roleCode !== 'SUPER_ADMIN' ? 
-                    `<button class="btn btn-danger btn-sm" onclick="deleteRole(${role.id})">删除</button>` : 
-                    ''
-                }
-            </td>
-        </tr>
-    `).join('');
 }
 
 function renderStatus(status) {
@@ -72,13 +61,20 @@ function renderStatus(status) {
 }
 
 function searchRoles() {
-    loadRoles();
+    const roleName = roleTable.getSearchValue('searchRoleName');
+    const status = roleTable.getSearchSelectValue('searchStatus');
+    
+    const params = {};
+    if (roleName) params.roleName = roleName;
+    if (status !== '') params.status = status;
+    
+    roleTable.search(params);
 }
 
 function resetSearch() {
     document.getElementById('searchRoleName').value = '';
     document.getElementById('searchStatus').value = '';
-    loadRoles();
+    roleTable.resetSearch();
 }
 
 function showAddModal() {
@@ -251,7 +247,7 @@ async function saveRole() {
             message.success('创建成功');
         }
         closeModal();
-        loadRoles();
+        roleTable.loadData();
     } catch (error) {
         console.error('保存角色失败:', error);
         message.error(error.message || '保存失败');
@@ -266,7 +262,7 @@ async function deleteRole(id) {
     try {
         await http.delete(`/system/role/${id}`);
         message.success('删除成功');
-        loadRoles();
+        roleTable.loadData();
     } catch (error) {
         console.error('删除失败:', error);
         message.error('删除失败');

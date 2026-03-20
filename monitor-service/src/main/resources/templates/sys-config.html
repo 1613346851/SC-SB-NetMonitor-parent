@@ -26,11 +26,11 @@
                 <section class="config-overview">
                     <div class="card config-hero">
                         <div class="config-hero__eyebrow">GLOBAL CONFIG CENTER</div>
-                        <h3 class="config-hero__title">统一管理系统配置与 AI 预留参数</h3>
-                        <p class="config-hero__desc">沿用现有配置 CRUD 机制，在当前页面直接完成全局 AI 配置、缓存刷新与快速检索，供漏洞扫描与后续智能分析统一复用。</p>
+                        <h3 class="config-hero__title">统一系统配置管理</h3>
+                        <p class="config-hero__desc">管理系统配置项，支持配置的新增、编辑、删除和查询，配置变更后可刷新缓存即时生效。</p>
                         <div class="config-hero__meta">
                             <span class="config-meta-chip">监测服务配置中心</span>
-                            <span class="config-meta-chip">支持 AI 全局预留</span>
+                            <span class="config-meta-chip">支持 AI 模型配置</span>
                             <span class="config-meta-chip">配置变更即时刷新</span>
                         </div>
                     </div>
@@ -71,7 +71,7 @@
                         </div>
                         <div id="aiModelUrlValue" class="ai-config-card__value empty">未配置</div>
                         <div class="ai-config-card__footer">
-                            <div class="ai-config-card__desc">漏洞扫描、攻击分析与后续智能研判共用该模型接入地址。</div>
+                            <div class="ai-config-card__desc">漏洞扫描、攻击分析与智能研判等场景共用该模型接入地址。</div>
                             <div class="ai-card-actions">
                                 <button class="btn btn-default btn-sm" onclick="filterAiConfigs()">定位</button>
                                 <button class="btn btn-primary btn-sm" onclick="editAiConfig('ai.model.url')">编辑</button>
@@ -111,13 +111,13 @@
                     </div>
                 </div>
 
-                <div class="config-tip">提示：`ai.model.url` 与 `ai.model.apiKey` 已作为全局 AI 预留配置接入，后续漏洞扫描与告警研判可直接复用。</div>
+                <div class="config-tip">提示：`ai.model.url` 与 `ai.model.apiKey` 已作为全局 AI 配置接入，主要用于漏洞扫描与告警研判等场景。</div>
 
                 <div class="table-container" style="margin-top: 24px;">
                     <div class="table-header">
                         <div>
                             <h3 class="table-title">系统配置列表</h3>
-                            <div class="scan-section-desc">支持普通配置与 AI 配置统一维护，编辑后可直接刷新缓存生效。</div>
+                            <div class="scan-section-desc">系统配置统一维护，编辑后刷新缓存使配置生效。</div>
                         </div>
                     </div>
                     <div class="table-wrapper">

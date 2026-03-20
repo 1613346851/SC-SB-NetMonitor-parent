@@ -25,11 +25,8 @@ public class DefenseCommandDTO implements Serializable {
 
     /**
      * 防御类型
-     * BLACKLIST: IP黑名单
-     * RATE_LIMIT: 请求限流
-     * BLOCK: 恶意请求拦截
      */
-    private String defenseType;
+    private DefenseType defenseType;
 
     /**
      * 防御过期时间戳（毫秒）
@@ -42,9 +39,9 @@ public class DefenseCommandDTO implements Serializable {
     private String eventId;
 
     /**
-     * 风险等级（LOW/MEDIUM/HIGH/CRITICAL）
+     * 风险等级
      */
-    private String riskLevel;
+    private RiskLevel riskLevel;
 
     /**
      * 指令描述
@@ -61,12 +58,39 @@ public class DefenseCommandDTO implements Serializable {
      */
     private Integer rateLimitThreshold;
 
+    /**
+     * 防御类型枚举
+     */
+    public enum DefenseType {
+        /** IP黑名单 */
+        BLACKLIST,
+        /** 请求限流 */
+        RATE_LIMIT,
+        /** 恶意请求拦截 */
+        BLOCK
+    }
+
+    /**
+     * 风险等级枚举
+     */
+    public enum RiskLevel {
+        /** 低风险 */
+        LOW,
+        /** 中风险 */
+        MEDIUM,
+        /** 高风险 */
+        HIGH,
+        /** 严重风险 */
+        CRITICAL
+    }
+
     public DefenseCommandDTO() {
         this.commandId = generateCommandId();
         this.issueTimestamp = System.currentTimeMillis();
     }
 
-    public DefenseCommandDTO(String sourceIp, String defenseType, Long expireTimestamp, String eventId, String riskLevel) {
+    public DefenseCommandDTO(String sourceIp, DefenseType defenseType, Long expireTimestamp, 
+                            String eventId, RiskLevel riskLevel) {
         this.commandId = generateCommandId();
         this.sourceIp = sourceIp;
         this.defenseType = defenseType;
@@ -82,26 +106,25 @@ public class DefenseCommandDTO implements Serializable {
                String.valueOf((int)(Math.random() * 10000));
     }
 
-    private String buildDescription(String defenseType, String riskLevel) {
+    private String buildDescription(DefenseType defenseType, RiskLevel riskLevel) {
         StringBuilder sb = new StringBuilder();
         sb.append("针对IP[").append(this.sourceIp).append("]的");
         
-        if ("CRITICAL".equals(riskLevel)) {
-            sb.append("严重");
-        } else if ("HIGH".equals(riskLevel)) {
-            sb.append("高");
-        } else if ("MEDIUM".equals(riskLevel)) {
-            sb.append("中");
-        } else {
-            sb.append("低");
+        if (riskLevel != null) {
+            switch (riskLevel) {
+                case CRITICAL -> sb.append("严重");
+                case HIGH -> sb.append("高");
+                case MEDIUM -> sb.append("中");
+                case LOW -> sb.append("低");
+            }
         }
         
-        if ("BLACKLIST".equals(defenseType)) {
-            sb.append("风险IP黑名单防御");
-        } else if ("RATE_LIMIT".equals(defenseType)) {
-            sb.append("风险请求限流防御");
-        } else if ("BLOCK".equals(defenseType)) {
-            sb.append("恶意请求拦截防御");
+        if (defenseType != null) {
+            switch (defenseType) {
+                case BLACKLIST -> sb.append("风险IP黑名单防御");
+                case RATE_LIMIT -> sb.append("风险请求限流防御");
+                case BLOCK -> sb.append("恶意请求拦截防御");
+            }
         }
         
         return sb.toString();

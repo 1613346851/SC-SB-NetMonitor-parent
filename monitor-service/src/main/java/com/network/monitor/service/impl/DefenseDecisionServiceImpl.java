@@ -1,8 +1,6 @@
 package com.network.monitor.service.impl;
 
 import com.network.monitor.client.GatewayApiClient;
-import com.network.monitor.common.constant.DefenseTypeConstant;
-import com.network.monitor.common.constant.RiskLevelConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.service.DefenseDecisionService;
@@ -35,23 +33,23 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
         }
 
         try {
-            String riskLevel = attackDTO.getRiskLevel();
+            String riskLevelStr = attackDTO.getRiskLevel();
             DefenseCommandDTO commandDTO = null;
 
-            if (RiskLevelConstant.HIGH.equals(riskLevel) || RiskLevelConstant.CRITICAL.equals(riskLevel)) {
+            DefenseCommandDTO.RiskLevel riskLevel = parseRiskLevel(riskLevelStr);
+
+            if (riskLevel == DefenseCommandDTO.RiskLevel.HIGH || riskLevel == DefenseCommandDTO.RiskLevel.CRITICAL) {
                 commandDTO = buildDefenseCommand(
                         attackDTO,
-                        DefenseTypeConstant.BLACKLIST,
-                        "ADD",
+                        DefenseCommandDTO.DefenseType.BLACKLIST,
                         attackDTO.getSourceIp(),
                         "检测到高风险攻击：" + attackDTO.getAttackType(),
                         calculateExpireTime(30)
                 );
-            } else if (RiskLevelConstant.MEDIUM.equals(riskLevel)) {
+            } else if (riskLevel == DefenseCommandDTO.RiskLevel.MEDIUM) {
                 commandDTO = buildDefenseCommand(
                         attackDTO,
-                        DefenseTypeConstant.RATE_LIMIT,
-                        "ADD",
+                        DefenseCommandDTO.DefenseType.RATE_LIMIT,
                         attackDTO.getSourceIp(),
                         "检测到中风险攻击：" + attackDTO.getAttackType(),
                         calculateExpireTime(60)
@@ -83,11 +81,11 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
         try {
             DefenseCommandDTO commandDTO = new DefenseCommandDTO();
             commandDTO.setSourceIp(target);
-            commandDTO.setDefenseType(normalizeDefenseType(defenseType));
-            commandDTO.setRiskLevel(RiskLevelConstant.HIGH);
+            commandDTO.setDefenseType(parseDefenseType(defenseType));
+            commandDTO.setRiskLevel(DefenseCommandDTO.RiskLevel.HIGH);
             commandDTO.setDescription(reason);
 
-            if (DefenseTypeConstant.RATE_LIMIT.equals(commandDTO.getDefenseType())) {
+            if (commandDTO.getDefenseType() == DefenseCommandDTO.DefenseType.RATE_LIMIT) {
                 commandDTO.setRateLimitThreshold(DEFAULT_RATE_LIMIT_THRESHOLD);
             }
 
@@ -107,15 +105,14 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
     }
 
     private DefenseCommandDTO buildDefenseCommand(AttackMonitorDTO attackDTO,
-                                                  String defenseType,
-                                                  String action,
+                                                  DefenseCommandDTO.DefenseType defenseType,
                                                   String target,
                                                   String reason,
                                                   String expireTime) {
         DefenseCommandDTO dto = new DefenseCommandDTO();
         dto.setSourceIp(target);
-        dto.setDefenseType(normalizeDefenseType(defenseType));
-        dto.setRiskLevel(attackDTO.getRiskLevel());
+        dto.setDefenseType(defenseType);
+        dto.setRiskLevel(parseRiskLevel(attackDTO.getRiskLevel()));
         dto.setDescription(reason);
         dto.setEventId(String.valueOf(attackDTO.getTrafficId()));
 
@@ -133,21 +130,31 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
         return dto;
     }
 
-    private String normalizeDefenseType(String defenseType) {
+    private DefenseCommandDTO.DefenseType parseDefenseType(String defenseType) {
         if (defenseType == null || defenseType.isBlank()) {
-            return DefenseTypeConstant.BLACKLIST;
+            return DefenseCommandDTO.DefenseType.BLACKLIST;
         }
         return switch (defenseType.toUpperCase()) {
-            case "BLACKLIST", "BLOCK_IP", "IP_BLOCK" -> DefenseTypeConstant.BLACKLIST;
-            case "RATE_LIMIT" -> DefenseTypeConstant.RATE_LIMIT;
-            case "BLOCK", "BLOCK_REQUEST", "MALICIOUS_REQUEST" -> DefenseTypeConstant.BLOCK;
-            default -> defenseType;
+            case "BLACKLIST", "BLOCK_IP", "IP_BLOCK" -> DefenseCommandDTO.DefenseType.BLACKLIST;
+            case "RATE_LIMIT" -> DefenseCommandDTO.DefenseType.RATE_LIMIT;
+            case "BLOCK", "BLOCK_REQUEST", "MALICIOUS_REQUEST" -> DefenseCommandDTO.DefenseType.BLOCK;
+            default -> DefenseCommandDTO.DefenseType.BLACKLIST;
         };
     }
 
-    /**
-     * 计算过期时间
-     */
+    private DefenseCommandDTO.RiskLevel parseRiskLevel(String riskLevel) {
+        if (riskLevel == null) {
+            return DefenseCommandDTO.RiskLevel.LOW;
+        }
+        return switch (riskLevel.toUpperCase()) {
+            case "CRITICAL" -> DefenseCommandDTO.RiskLevel.CRITICAL;
+            case "HIGH" -> DefenseCommandDTO.RiskLevel.HIGH;
+            case "MEDIUM" -> DefenseCommandDTO.RiskLevel.MEDIUM;
+            case "LOW" -> DefenseCommandDTO.RiskLevel.LOW;
+            default -> DefenseCommandDTO.RiskLevel.LOW;
+        };
+    }
+
     private String calculateExpireTime(int minutes) {
         return LocalDateTime.now().plusMinutes(minutes).format(TIME_FORMATTER);
     }

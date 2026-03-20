@@ -16,8 +16,8 @@
                     <h2>规则管理</h2>
                 </div>
                 <div class="header-right">
-                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                     <button class="btn btn-primary" onclick="showAddRuleModal()">+ 新增规则</button>
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                 </div>
             </header>
 
@@ -63,12 +63,12 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>规则名称</th>
-                                    <th>攻击类型</th>
+                                    <th data-sort="id">ID</th>
+                                    <th data-sort="ruleName">规则名称</th>
+                                    <th data-sort="attackType">攻击类型</th>
                                     <th>规则表达式</th>
-                                    <th>风险等级</th>
-                                    <th>启用状态</th>
+                                    <th data-sort="riskLevel">风险等级</th>
+                                    <th data-sort="enabled">启用状态</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -155,6 +155,7 @@
     <script th:src="@{/js/core/page-init.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/pagination.js}"></script>
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/rule-manage.js}"></script>

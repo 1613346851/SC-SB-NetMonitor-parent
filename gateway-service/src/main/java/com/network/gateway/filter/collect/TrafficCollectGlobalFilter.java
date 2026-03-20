@@ -106,13 +106,8 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
             return true;
         }
 
-        // 可以添加更多的跳过条件
-        String path = exchange.getRequest().getURI().getPath();
-        
         // 跳过静态资源请求
-        if (path.endsWith(".css") || path.endsWith(".js") || 
-            path.endsWith(".png") || path.endsWith(".jpg") || 
-            path.endsWith(".ico")) {
+        if (ServerWebExchangeUtil.isStaticResource(exchange)) {
             return true;
         }
 

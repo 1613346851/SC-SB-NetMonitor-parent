@@ -36,7 +36,7 @@
                 success: 'background: #52c41a; color: #fff;',
                 error: 'background: #f5222d; color: #fff;',
                 warning: 'background: #faad14; color: #fff;',
-                info: 'background: #1890ff; color: #fff;'
+                info: 'background: #3b82f6; color: #fff;'
             };
             
             messageEl.style.cssText += colors[type] || colors.info;

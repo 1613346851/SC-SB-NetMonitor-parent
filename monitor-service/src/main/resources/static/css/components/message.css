@@ -4,32 +4,50 @@
 
 .message {
     position: fixed;
-    top: var(--spacing-xl);
+    top: 32px;
     left: 50%;
     transform: translateX(-50%);
-    padding: var(--spacing-md) var(--spacing-xl);
+    padding: 12px 24px;
     border-radius: var(--radius-base);
-    box-shadow: var(--shadow-hover);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     z-index: var(--z-popover);
-    animation: slideDown var(--transition-base) ease;
+    animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    background: #fff;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
 }
 
 .message.success {
-    background: var(--success-color);
-    color: #fff;
+    border-left: 4px solid var(--success-color);
+    color: var(--text-primary);
 }
 
 .message.error {
-    background: var(--danger-color);
-    color: #fff;
+    border-left: 4px solid var(--danger-color);
+    color: var(--text-primary);
 }
 
 .message.warning {
-    background: var(--warning-color);
-    color: #fff;
+    border-left: 4px solid var(--warning-color);
+    color: var(--text-primary);
 }
 
 .message.info {
-    background: var(--info-color);
-    color: #fff;
+    border-left: 4px solid var(--info-color);
+    color: var(--text-primary);
 }

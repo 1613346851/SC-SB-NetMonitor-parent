@@ -2,14 +2,15 @@ package com.network.monitor.service.impl;
 
 import com.network.monitor.dto.DefenseLogDTO;
 import com.network.monitor.entity.DefenseLogEntity;
+import com.network.monitor.event.BlacklistSyncEvent;
 import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.service.DefenseLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Service
@@ -18,7 +19,8 @@ public class DefenseLogServiceImpl implements DefenseLogService {
     @Autowired
     private DefenseLogMapper defenseLogMapper;
 
-    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public void receiveDefenseLog(DefenseLogDTO logDTO) {
@@ -31,10 +33,64 @@ public class DefenseLogServiceImpl implements DefenseLogService {
             
             defenseLogMapper.insert(entity);
             
-            log.info("接收并保存防御日志成功：attackId={}, defenseType={}, defenseAction={}, executeStatus={}", 
-                logDTO.getAttackId(), logDTO.getDefenseType(), logDTO.getDefenseAction(), logDTO.getExecuteStatus());
+            log.info("接收并保存防御日志成功：defenseType={}, defenseTarget={}, defenseAction={}, executeStatus={}", 
+                logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getDefenseAction(), logDTO.getExecuteStatus());
+
+            if (logDTO.getExecuteStatus() != null && logDTO.getExecuteStatus() == 1) {
+                publishBlacklistSyncEvent(logDTO);
+            }
+            
         } catch (Exception e) {
             log.error("接收防御日志失败：", e);
+        }
+    }
+
+    private void publishBlacklistSyncEvent(DefenseLogDTO logDTO) {
+        String defenseType = logDTO.getDefenseType();
+        String defenseAction = logDTO.getDefenseAction();
+        String targetIp = logDTO.getDefenseTarget();
+
+        if (targetIp == null || targetIp.isEmpty()) {
+            return;
+        }
+
+        boolean isBlacklistAction = "ADD_BLACKLIST".equals(defenseAction) || 
+                                    "BLACKLIST".equals(defenseAction) ||
+                                    "BLOCK_IP".equals(defenseType) ||
+                                    "BLACKLIST".equals(defenseType);
+        
+        boolean isRemoveAction = "REMOVE".equals(defenseAction) || 
+                                "REMOVE_BLACKLIST".equals(defenseAction);
+
+        if (isBlacklistAction) {
+            LocalDateTime expireTime = parseExpireTime(logDTO.getExpireTime());
+            String reason = logDTO.getDefenseReason() != null ? logDTO.getDefenseReason() : "网关防御自动添加";
+            String operator = logDTO.getOperator() != null ? logDTO.getOperator() : "GATEWAY";
+
+            BlacklistSyncEvent event = BlacklistSyncEvent.add(this, targetIp, reason, expireTime, operator);
+            eventPublisher.publishEvent(event);
+            log.info("发布黑名单添加事件：ip={}, reason={}", targetIp, reason);
+
+        } else if (isRemoveAction) {
+            BlacklistSyncEvent event = BlacklistSyncEvent.remove(this, targetIp);
+            eventPublisher.publishEvent(event);
+            log.info("发布黑名单移除事件：ip={}", targetIp);
+        }
+    }
+
+    private LocalDateTime parseExpireTime(String expireTimeStr) {
+        if (expireTimeStr == null || expireTimeStr.isEmpty()) {
+            return null;
+        }
+        try {
+            if (expireTimeStr.contains("T")) {
+                return LocalDateTime.parse(expireTimeStr.substring(0, 19));
+            } else {
+                return LocalDateTime.parse(expireTimeStr.replace(" ", "T").substring(0, 19));
+            }
+        } catch (Exception e) {
+            log.warn("解析过期时间失败：{}", expireTimeStr);
+            return null;
         }
     }
 
@@ -65,13 +121,7 @@ public class DefenseLogServiceImpl implements DefenseLogService {
         entity.setExecuteResult(dto.getExecuteResult());
         entity.setOperator(dto.getOperator() != null ? dto.getOperator() : "SYSTEM");
         
-        if (dto.getExpireTime() != null && !dto.getExpireTime().isEmpty()) {
-            try {
-                entity.setExpireTime(LocalDateTime.parse(dto.getExpireTime().replace(" ", "T").substring(0, 19)));
-            } catch (Exception e) {
-                log.warn("解析过期时间失败：{}", dto.getExpireTime());
-            }
-        }
+        entity.setExpireTime(parseExpireTime(dto.getExpireTime()));
         
         LocalDateTime now = LocalDateTime.now();
         entity.setExecuteTime(now);
@@ -86,17 +136,11 @@ public class DefenseLogServiceImpl implements DefenseLogService {
             return "BLOCK_IP";
         }
         
-        switch (originalType.toUpperCase()) {
-            case "IP_BLOCK":
-            case "BLACKLIST":
-                return "BLOCK_IP";
-            case "RATE_LIMIT":
-                return "RATE_LIMIT";
-            case "MALICIOUS_REQUEST":
-            case "BLOCK":
-                return "BLOCK_REQUEST";
-            default:
-                return originalType.toUpperCase();
-        }
+        return switch (originalType.toUpperCase()) {
+            case "IP_BLOCK", "BLACKLIST" -> "BLOCK_IP";
+            case "RATE_LIMIT" -> "RATE_LIMIT";
+            case "MALICIOUS_REQUEST", "BLOCK" -> "BLOCK_REQUEST";
+            default -> originalType.toUpperCase();
+        };
     }
 }

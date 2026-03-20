@@ -16,6 +16,7 @@
                     <h2>流量列表</h2>
                 </div>
                 <div class="header-right">
+                    <button class="btn btn-success" onclick="exportTraffic()">导出数据</button>
                     <div th:replace="~{fragments/common :: userDropdown}"></div>
                 </div>
             </header>
@@ -53,7 +54,6 @@
                         <div class="form-group">
                             <button class="btn btn-primary" onclick="searchTraffic()">查询</button>
                             <button class="btn btn-default" onclick="resetSearch()">重置</button>
-                            <button class="btn btn-success" onclick="exportTraffic()">导出 CSV</button>
                         </div>
                     </div>
                 </div>

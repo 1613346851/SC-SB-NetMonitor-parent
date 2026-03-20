@@ -58,6 +58,8 @@ async function loadBlacklistData() {
         
         renderBlacklistTable(result.list || []);
         renderPagination(result.total || 0);
+        
+        TableUtils.initTableEnhancements('.data-table');
     } catch (error) {
         console.error('加载黑名单数据失败:', error);
     }
@@ -75,7 +77,7 @@ function renderBlacklistTable(data) {
         <tr class="main-row" data-ip="${item.ip}">
             <td>${item.id || index + 1}</td>
             <td>
-                <span class="ip-link" onclick="toggleHistory('${item.ip}')" style="cursor: pointer; color: #1890ff; text-decoration: underline;">
+                <span class="ip-link" onclick="toggleHistory('${item.ip}')" style="cursor: pointer; color: #4f46e5; text-decoration: underline;">
                     ${item.ip || '-'}
                 </span>
             </td>

@@ -3,134 +3,161 @@
  * 提供统一的页面初始化、侧边栏高亮、用户信息显示等功能
  */
 
-const PageInit = {
-    init(options = {}) {
-        const {
-            requireAuth = true,
-            onPageLoad = () => {},
-            highlightMenu = true
-        } = options;
-        
-        if (requireAuth && !AuthGuard.init()) {
-            return;
-        }
-        
-        if (highlightMenu) {
-            this.highlightCurrentMenu();
-        }
-        
-        this.initUserInfo();
-        this.initLogout();
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            onPageLoad();
-        });
-    },
-    
-    highlightCurrentMenu() {
-        const currentPath = window.location.pathname;
-        const menuItems = document.querySelectorAll('.menu-item');
-        
-        menuItems.forEach(item => {
-            const href = item.getAttribute('href');
-            if (href === currentPath || (currentPath.startsWith(href) && href !== '/')) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
-    },
-    
-    initUserInfo() {
-        const user = AuthService.getUser();
-        if (user) {
-            const avatarEl = document.querySelector('.user-avatar');
-            const nameEl = document.querySelector('.user-name');
+(function() {
+    const PageInit = {
+        init(options = {}) {
+            const {
+                requireAuth = true,
+                onPageLoad = () => {},
+                highlightMenu = true
+            } = options;
             
-            if (avatarEl) {
-                avatarEl.textContent = (user.username || user.realName || 'A').charAt(0).toUpperCase();
+            if (requireAuth && !AuthGuard.init()) {
+                return;
             }
-            if (nameEl) {
-                nameEl.textContent = user.realName || user.username || '管理员';
+            
+            if (highlightMenu) {
+                this.highlightCurrentMenu();
             }
-        }
-    },
-    
-    initLogout() {
-        const logoutBtn = document.querySelector('.logout-btn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', async (e) => {
-                e.preventDefault();
-                
-                ModalUtil.confirm({
-                    title: '退出确认',
-                    message: '确定要退出登录吗？',
-                    confirmText: '确定',
-                    cancelText: '取消',
-                    type: 'default',
-                    onConfirm: async () => {
-                        await AuthService.logout();
-                    }
-                });
+            
+            this.initUserInfo();
+            this.initLogout();
+            this.initLogoRipple();
+            
+            document.addEventListener('DOMContentLoaded', () => {
+                onPageLoad();
             });
-        }
-    },
-    
-    showLoading() {
-        let loadingEl = document.getElementById('pageLoading');
-        if (!loadingEl) {
-            loadingEl = document.createElement('div');
-            loadingEl.id = 'pageLoading';
-            loadingEl.innerHTML = `
-                <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center;">
-                    <div style="text-align: center;">
-                        <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #e8e8e8; border-top-color: #1890ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto;"></div>
-                        <div style="margin-top: 12px; color: #666;">加载中...</div>
+        },
+        
+        initLogoRipple() {
+            const logo = document.getElementById('sidebarLogo');
+            if (logo) {
+                logo.addEventListener('click', (e) => {
+                    const rect = logo.getBoundingClientRect();
+                    const size = Math.max(rect.width, rect.height);
+                    const x = e.clientX - rect.left - size / 2;
+                    const y = e.clientY - rect.top - size / 2;
+                    
+                    const ripple = document.createElement('span');
+                    ripple.className = 'ripple';
+                    ripple.style.width = ripple.style.height = size + 'px';
+                    ripple.style.left = x + 'px';
+                    ripple.style.top = y + 'px';
+                    
+                    logo.appendChild(ripple);
+                    
+                    ripple.addEventListener('animationend', () => {
+                        ripple.remove();
+                    });
+                });
+            }
+        },
+        
+        highlightCurrentMenu() {
+            const currentPath = window.location.pathname;
+            const menuItems = document.querySelectorAll('.menu-item');
+            
+            menuItems.forEach(item => {
+                const href = item.getAttribute('href');
+                if (href === currentPath || (currentPath.startsWith(href) && href !== '/')) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        },
+        
+        initUserInfo() {
+            const user = AuthService.getUser();
+            if (user) {
+                const avatarEl = document.querySelector('.user-avatar');
+                const nameEl = document.querySelector('.user-name');
+                
+                if (avatarEl) {
+                    avatarEl.textContent = (user.username || user.realName || 'A').charAt(0).toUpperCase();
+                }
+                if (nameEl) {
+                    nameEl.textContent = user.realName || user.username || '管理员';
+                }
+            }
+        },
+        
+        initLogout() {
+            const logoutBtn = document.querySelector('.logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    
+                    ModalUtil.confirm({
+                        title: '退出确认',
+                        message: '确定要退出登录吗？',
+                        confirmText: '确定',
+                        cancelText: '取消',
+                        type: 'default',
+                        onConfirm: async () => {
+                            await AuthService.logout();
+                        }
+                    });
+                });
+            }
+        },
+        
+        showLoading() {
+            let loadingEl = document.getElementById('pageLoading');
+            if (!loadingEl) {
+                loadingEl = document.createElement('div');
+                loadingEl.id = 'pageLoading';
+                loadingEl.innerHTML = `
+                    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center;">
+                        <div style="text-align: center;">
+                            <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #e8e8e8; border-top-color: #4f46e5; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto;"></div>
+                            <div style="margin-top: 12px; color: #666;">加载中...</div>
+                        </div>
                     </div>
-                </div>
-            `;
-            document.body.appendChild(loadingEl);
+                `;
+                document.body.appendChild(loadingEl);
+            }
+            loadingEl.style.display = 'block';
+        },
+        
+        hideLoading() {
+            const loadingEl = document.getElementById('pageLoading');
+            if (loadingEl) {
+                loadingEl.style.display = 'none';
+            }
         }
-        loadingEl.style.display = 'block';
-    },
-    
-    hideLoading() {
-        const loadingEl = document.getElementById('pageLoading');
-        if (loadingEl) {
-            loadingEl.style.display = 'none';
+    };
+
+    const TimeRangeHelper = {
+        getAutoInterval(timeRange) {
+            const recommendations = {
+                '1h': '5m',
+                '6h': '10m',
+                '12h': '30m',
+                '24h': '30m',
+                '3d': '1h',
+                '7d': '1h',
+                '14d': '1d',
+                '30d': '1d'
+            };
+            return recommendations[timeRange] || '30m';
+        },
+        
+        getIntervalDisplay(timeRange) {
+            const displays = {
+                '1h': '5 分钟',
+                '6h': '10 分钟',
+                '12h': '30 分钟',
+                '24h': '30 分钟',
+                '3d': '1 小时',
+                '7d': '1 小时',
+                '14d': '1 天',
+                '30d': '1 天'
+            };
+            return displays[timeRange] || '30 分钟';
         }
-    }
-};
+    };
 
-const TimeRangeHelper = {
-    getAutoInterval(timeRange) {
-        const recommendations = {
-            '1h': '5m',
-            '6h': '10m',
-            '12h': '30m',
-            '24h': '30m',
-            '3d': '1h',
-            '7d': '1h',
-            '14d': '1d',
-            '30d': '1d'
-        };
-        return recommendations[timeRange] || '30m';
-    },
-    
-    getIntervalDisplay(timeRange) {
-        const displays = {
-            '1h': '5 分钟',
-            '6h': '10 分钟',
-            '12h': '30 分钟',
-            '24h': '30 分钟',
-            '3d': '1 小时',
-            '7d': '1 小时',
-            '14d': '1 天',
-            '30d': '1 天'
-        };
-        return displays[timeRange] || '30 分钟';
-    }
-};
-
-window.PageInit = PageInit;
-window.TimeRangeHelper = TimeRangeHelper;
+    window.PageInit = PageInit;
+    window.TimeRangeHelper = TimeRangeHelper;
+})();

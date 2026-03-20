@@ -134,6 +134,10 @@ public class MaliciousRequestBlockFilter implements GlobalFilter, Ordered {
         String requestUri = exchange.getRequest().getURI().getPath().toLowerCase();
 
         try {
+            if (shouldSkipMaliciousCheck(exchange)) {
+                return chain.filter(exchange);
+            }
+
             // 检查是否为恶意请求
             String blockReason = checkMaliciousRequest(sourceIp, userAgent, requestUri);
             
@@ -149,6 +153,19 @@ public class MaliciousRequestBlockFilter implements GlobalFilter, Ordered {
             // 发生异常时继续执行，避免影响正常请求
             return chain.filter(exchange);
         }
+    }
+
+    private boolean shouldSkipMaliciousCheck(ServerWebExchange exchange) {
+        if (ServerWebExchangeUtil.isStaticResource(exchange)) {
+            return true;
+        }
+        
+        if (ServerWebExchangeUtil.isHealthCheck(exchange) || 
+            ServerWebExchangeUtil.isManagementEndpoint(exchange)) {
+            return true;
+        }
+        
+        return false;
     }
 
     /**

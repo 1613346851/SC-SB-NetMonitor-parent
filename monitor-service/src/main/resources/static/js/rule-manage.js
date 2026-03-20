@@ -1,123 +1,62 @@
-/**
- * 规则管理页面 JavaScript
- * 负责规则数据加载、筛选、分页、新增、编辑、删除等功能
- */
-
-let currentPage = 1;
-const pageSize = 10;
-let searchParams = {};
+let ruleTable;
 
 document.addEventListener('DOMContentLoaded', function() {
-    loadRuleData();
+    initRuleTable();
 });
 
-async function loadRuleData() {
-    try {
-        const params = {
-            page: currentPage,
-            size: pageSize,
-            ...searchParams
-        };
-
-        const result = await http.get('/rule/list', params);
-        
-        renderRuleTable(result.list || result || []);
-        renderPagination(result.total || 0);
-    } catch (error) {
-        console.error('加载规则数据失败:', error);
-    }
-}
-
-function renderRuleTable(data) {
-    const tbody = document.getElementById('ruleTableBody');
-    
-    if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = data.map(item => `
-        <tr>
-            <td>${item.id || '-'}</td>
-            <td>${item.ruleName || '-'}</td>
-            <td>${tableRenderer.renderAttackType(item.attackType)}</td>
-            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${item.ruleContent || '-'}</td>
-            <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
-            <td>${item.enabled === 1 ? '<span class="tag success">启用</span>' : '<span class="tag info">禁用</span>'}</td>
-            <td>
-                <button class="btn btn-primary btn-sm" onclick="editRule(${item.id})">编辑</button>
-                <button class="btn btn-${item.enabled === 1 ? 'warning' : 'success'} btn-sm" onclick="toggleRuleStatus(${item.id}, ${item.enabled})">
-                    ${item.enabled === 1 ? '禁用' : '启用'}
-                </button>
-                <button class="btn btn-danger btn-sm" onclick="deleteRule(${item.id})">删除</button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function renderPagination(total) {
-    const totalPages = Math.ceil(total / pageSize);
-    const paginationEl = document.getElementById('pagination');
-    
-    let html = `
-        <span class="pagination-item ${currentPage === 1 ? 'disabled' : ''}" 
-              onclick="goPage(${currentPage - 1})">上一页</span>
-    `;
-    
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-            html += `
-                <span class="pagination-item ${i === currentPage ? 'active' : ''}" 
-                      onclick="goPage(${i})">${i}</span>
+function initRuleTable() {
+    ruleTable = TableUtils.createInstance({
+        instanceName: 'ruleTable',
+        apiUrl: '/rule/list',
+        pageSize: 10,
+        defaultSortField: 'id',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'ruleTableBody',
+        paginationEl: 'pagination',
+        colspan: 7,
+        renderRow: function(item) {
+            const actions = [
+                { text: '编辑', class: 'btn-primary', onClick: `editRule(${item.id})` },
+                { text: item.enabled === 1 ? '禁用' : '启用', class: item.enabled === 1 ? 'btn-warning' : 'btn-success', onClick: `toggleRuleStatus(${item.id}, ${item.enabled})` },
+                { text: '删除', class: 'btn-danger', onClick: `deleteRule(${item.id})` }
+            ];
+            
+            return `
+                <tr>
+                    <td>${item.id || '-'}</td>
+                    <td>${tableRenderer.renderText(item.ruleName)}</td>
+                    <td>${tableRenderer.renderAttackType(item.attackType)}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${tableRenderer.escapeHtml(item.ruleContent || '')}">${tableRenderer.renderText(item.ruleContent, 30)}</td>
+                    <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
+                    <td>${item.enabled === 1 ? '<span class="tag success">启用</span>' : '<span class="tag info">禁用</span>'}</td>
+                    <td class="action-btns">${tableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
+                </tr>
             `;
-        } else if (i === currentPage - 2 || i === currentPage + 2) {
-            html += `<span class="pagination-item">...</span>`;
         }
-    }
+    });
     
-    html += `
-        <span class="pagination-item ${currentPage === totalPages ? 'disabled' : ''}" 
-              onclick="goPage(${currentPage + 1})">下一页</span>
-        <span class="pagination-item">共 ${total} 条</span>
-    `;
-    
-    paginationEl.innerHTML = html;
-}
-
-function goPage(page) {
-    const totalPages = Math.ceil((searchParams.total || 10) / pageSize);
-    
-    if (page < 1 || page > totalPages || page === currentPage) {
-        return;
-    }
-    
-    currentPage = page;
-    loadRuleData();
+    window.ruleTable = ruleTable;
+    ruleTable.loadData();
 }
 
 function searchRules() {
-    const ruleName = document.getElementById('ruleName').value.trim();
-    const attackType = document.getElementById('attackType').value;
-    const enabled = document.getElementById('enabled').value;
+    const ruleName = ruleTable.getSearchValue('ruleName');
+    const attackType = ruleTable.getSearchSelectValue('attackType');
+    const enabled = ruleTable.getSearchSelectValue('enabled');
     
-    searchParams = {};
+    const params = {};
+    if (ruleName) params.ruleName = ruleName;
+    if (attackType) params.attackType = attackType;
+    if (enabled !== '') params.enabled = enabled;
     
-    if (ruleName) searchParams.ruleName = ruleName;
-    if (attackType) searchParams.attackType = attackType;
-    if (enabled !== '') searchParams.enabled = enabled;
-    
-    currentPage = 1;
-    loadRuleData();
+    ruleTable.search(params);
 }
 
 function resetSearch() {
     document.getElementById('ruleName').value = '';
     document.getElementById('attackType').value = '';
     document.getElementById('enabled').value = '';
-    
-    searchParams = {};
-    currentPage = 1;
-    loadRuleData();
+    ruleTable.resetSearch();
 }
 
 function showAddRuleModal() {
@@ -143,6 +82,7 @@ async function editRule(id) {
         document.getElementById('ruleModal').style.display = 'flex';
     } catch (error) {
         console.error('加载规则详情失败:', error);
+        message.error('加载规则详情失败');
     }
 }
 
@@ -151,61 +91,81 @@ function closeRuleModal() {
 }
 
 async function saveRule() {
-    const ruleId = document.getElementById('ruleId').value;
-    const ruleData = {
-        ruleName: document.getElementById('ruleNameInput').value,
-        attackType: document.getElementById('attackTypeInput').value,
-        ruleContent: document.getElementById('ruleExpressionInput').value,
-        riskLevel: document.getElementById('riskLevelInput').value,
-        enabled: parseInt(document.getElementById('enabledInput').value)
-    };
-
-    if (!ruleData.ruleName || !ruleData.attackType || !ruleData.ruleContent || !ruleData.riskLevel) {
-        message.error('请填写所有必填字段');
+    const id = document.getElementById('ruleId').value;
+    const ruleName = document.getElementById('ruleNameInput').value.trim();
+    const attackType = document.getElementById('attackTypeInput').value;
+    const ruleContent = document.getElementById('ruleExpressionInput').value.trim();
+    const riskLevel = document.getElementById('riskLevelInput').value;
+    const confidenceThreshold = parseInt(document.getElementById('confidenceThresholdInput').value) || 60;
+    const enabled = parseInt(document.getElementById('enabledInput').value);
+    
+    if (!ruleName) {
+        message.error('请输入规则名称');
         return;
     }
-
+    
+    if (!attackType) {
+        message.error('请选择攻击类型');
+        return;
+    }
+    
+    if (!ruleContent) {
+        message.error('请输入规则表达式');
+        return;
+    }
+    
+    const params = {
+        ruleName,
+        attackType,
+        ruleContent,
+        riskLevel,
+        confidenceThreshold,
+        enabled
+    };
+    
     try {
-        if (ruleId) {
-            ruleData.id = parseInt(ruleId);
-            await http.post('/rule/update', ruleData);
+        if (id) {
+            params.id = parseInt(id);
+            await http.put('/rule/update', params);
             message.success('更新成功');
         } else {
-            await http.post('/rule/add', ruleData);
+            await http.post('/rule/add', params);
             message.success('创建成功');
         }
-        
         closeRuleModal();
-        loadRuleData();
+        ruleTable.loadData();
     } catch (error) {
         console.error('保存规则失败:', error);
+        message.error(error.message || '保存失败');
     }
 }
 
 async function toggleRuleStatus(id, currentStatus) {
+    const newStatus = currentStatus === 1 ? 0 : 1;
+    const action = newStatus === 1 ? '启用' : '禁用';
+    
     try {
-        await http.put(`/rule/${id}/toggle`, {
-            enabled: currentStatus === 1 ? 0 : 1
-        });
-        
-        message.success('操作成功');
-        loadRuleData();
+        await http.put(`/rule/status/${id}?enabled=${newStatus}`);
+        message.success(`${action}成功`);
+        ruleTable.loadData();
     } catch (error) {
-        console.error('切换规则状态失败:', error);
+        console.error('操作失败:', error);
+        message.error('操作失败');
     }
 }
 
 async function deleteRule(id) {
-    if (!confirm('确定要删除这条规则吗？')) {
+    if (!confirm('确定要删除该规则吗？')) {
         return;
     }
-
+    
     try {
         await http.delete(`/rule/${id}`);
         message.success('删除成功');
-        loadRuleData();
+        ruleTable.loadData();
     } catch (error) {
-        console.error('删除规则失败:', error);
+        console.error('删除失败:', error);
+        message.error('删除失败');
     }
 }
 

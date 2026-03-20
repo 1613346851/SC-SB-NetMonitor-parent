@@ -76,7 +76,8 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
     private Mono<Void> handleBlacklistedIp(ServerWebExchange exchange, String blacklistedIp, long startTime) {
         ServerHttpResponse response = exchange.getResponse();
         
-        // 构建防御结果
+        Long expireTimestamp = blacklistCache.getBlacklistExpireTime(blacklistedIp);
+        
         DefenseResultBO defenseResult = new DefenseResultBO(
                 DefenseResultBO.DefenseType.BLACKLIST,
                 blacklistedIp,
@@ -84,6 +85,7 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
                 "IP在黑名单中"
         );
         
+        defenseResult.setExpireTimestamp(expireTimestamp);
         defenseResult.setRequestInfo(
                 exchange.getRequest().getMethodValue(),
                 exchange.getRequest().getURI().getPath(),

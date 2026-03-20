@@ -9,7 +9,9 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: none;
     align-items: center;
     justify-content: center;
@@ -24,23 +26,23 @@
 .modal-content {
     position: relative;
     background: var(--bg-white);
-    border-radius: var(--radius-base);
+    border-radius: var(--radius-lg);
     width: 600px;
     max-width: 90%;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    animation: modalSlideUp 0.3s ease;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes modalSlideUp {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(20px) scale(0.98);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -51,11 +53,19 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: var(--z-modal-backdrop);
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* ==================== .modal-overlay 内的 .modal 作为内容容器 ==================== */
@@ -67,13 +77,13 @@
     bottom: auto;
     background: var(--bg-white);
     display: block;
-    border-radius: var(--radius-base);
+    border-radius: var(--radius-lg);
     width: 600px;
     max-width: 90%;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    animation: modalSlideUp 0.3s ease;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     z-index: auto;
 }
 
@@ -84,24 +94,36 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background: rgba(248, 250, 252, 0.5);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .modal-title {
     font-size: var(--font-size-md);
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 .modal-close {
     cursor: pointer;
     font-size: var(--font-size-xl);
     color: var(--text-secondary);
-    background: none;
+    background: rgba(0, 0, 0, 0.05);
     border: none;
     padding: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-round);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-base);
 }
 
 .modal-close:hover {
     color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.1);
+    transform: rotate(90deg);
 }
 
 /* ==================== 模态框内容 ==================== */
@@ -116,4 +138,6 @@
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-sm);
+    background: rgba(248, 250, 252, 0.5);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }

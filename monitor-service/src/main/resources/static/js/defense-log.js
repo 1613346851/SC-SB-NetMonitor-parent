@@ -48,7 +48,7 @@ function renderDefenseTable(data) {
             <td title="${item.defenseTarget || '-'}">${truncateText(item.defenseTarget || '-', 20)}</td>
             <td title="${item.defenseReason || '-'}">${truncateText(item.defenseReason || '-', 15)}</td>
             <td>${item.expireTime ? dateFormat.format(item.expireTime) : (item.defenseType === 'BLOCK_IP' ? '永久' : '-')}</td>
-            <td>${item.attackId ? `<a href="/attack?id=${item.attackId}" style="color: #1890ff;">${item.attackId}</a>` : '-'}</td>
+            <td>${item.attackId ? `<a href="/attack?id=${item.attackId}" style="color: #4f46e5;">${item.attackId}</a>` : '-'}</td>
             <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
             <td>${renderOperator(item.operator)}</td>
         </tr>

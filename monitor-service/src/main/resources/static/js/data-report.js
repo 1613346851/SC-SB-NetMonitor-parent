@@ -210,10 +210,10 @@ function renderTrafficTrendChart(data) {
             type: 'line',
             smooth: true,
             areaStyle: {
-                color: 'rgba(24, 144, 255, 0.1)'
+                color: 'rgba(79, 70, 229, 0.1)'
             },
             itemStyle: {
-                color: '#1890ff'
+                color: '#4f46e5'
             }
         }]
     });

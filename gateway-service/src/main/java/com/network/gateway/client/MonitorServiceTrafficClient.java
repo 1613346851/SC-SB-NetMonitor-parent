@@ -1,5 +1,7 @@
 package com.network.gateway.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.gateway.constant.GatewayHttpConstant;
 import com.network.gateway.dto.TrafficMonitorDTO;
 import com.network.gateway.util.CrossServiceSecurityUtil;
@@ -34,11 +36,11 @@ public class MonitorServiceTrafficClient {
     @Qualifier("restTemplate")
     private RestTemplate restTemplate;
 
-    /**
-     * 跨服务安全密钥（从配置文件读取，需与监测服务一致）
-     */
     @Value("${cross-service.security.secret-key:DefaultSecretKeyPleaseChangeInProduction123456}")
     private String secretKey;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * 推送流量数据到监控服务
@@ -62,8 +64,6 @@ public class MonitorServiceTrafficClient {
             );
             securityHeaders.forEach(headers::set);
 
-            headers.set("X-Gateway-Timestamp", String.valueOf(System.currentTimeMillis()));
-
             HttpEntity<TrafficMonitorDTO> requestEntity = new HttpEntity<>(trafficDTO, headers);
 
             String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT;
@@ -73,13 +73,14 @@ public class MonitorServiceTrafficClient {
                     String.class
             );
 
-            if (response.getStatusCode().is2xxSuccessful()) {
-                logger.debug("流量数据推送成功: 请求ID[{}] 状态码[{}]", 
+            if (isResponseSuccessful(response)) {
+                logger.info("流量数据推送成功: 请求ID[{}] 状态码[{}]", 
                            trafficDTO.getRequestId(), response.getStatusCode());
             } else {
-                logger.warn("流量数据推送返回非成功状态: 请求ID[{}] 状态码[{}] 响应内容[{}]", 
-                           trafficDTO.getRequestId(), response.getStatusCode(), response.getBody());
-                throw new RestClientException("监控服务返回错误状态: " + response.getStatusCode());
+                String errorMsg = extractErrorMessage(response.getBody());
+                logger.error("流量数据推送失败: 请求ID[{}] 响应内容[{}]", 
+                            trafficDTO.getRequestId(), errorMsg);
+                throw new RestClientException("监控服务返回错误: " + errorMsg);
             }
 
         } catch (RestClientException e) {
@@ -89,6 +90,48 @@ public class MonitorServiceTrafficClient {
         } catch (Exception e) {
             logger.error("推送流量数据时发生未知异常: 请求ID[{}]", trafficDTO.getRequestId(), e);
             throw new RestClientException("推送流量数据时发生未知异常", e);
+        }
+    }
+
+    /**
+     * 检查响应是否成功
+     * 不仅检查 HTTP 状态码，还检查响应体中的 code 字段
+     */
+    private boolean isResponseSuccessful(ResponseEntity<String> response) {
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            return false;
+        }
+
+        String body = response.getBody();
+        if (body == null || body.isEmpty()) {
+            return true;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            int code = root.has("code") ? root.get("code").asInt() : 200;
+            return code == 200;
+        } catch (Exception e) {
+            logger.debug("解析响应体失败，默认认为成功: {}", e.getMessage());
+            return true;
+        }
+    }
+
+    /**
+     * 从响应体中提取错误信息
+     */
+    private String extractErrorMessage(String body) {
+        if (body == null || body.isEmpty()) {
+            return "未知错误";
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            String message = root.has("message") ? root.get("message").asText() : "未知错误";
+            int code = root.has("code") ? root.get("code").asInt() : 500;
+            return String.format("code=%d, message=%s", code, message);
+        } catch (Exception e) {
+            return body;
         }
     }
 
@@ -125,7 +168,6 @@ public class MonitorServiceTrafficClient {
      * @param trafficDTO 流量监控DTO
      */
     public void pushTrafficAsync(TrafficMonitorDTO trafficDTO) {
-        // 使用异步方式推送
         new Thread(() -> {
             try {
                 pushTraffic(trafficDTO);
@@ -152,9 +194,8 @@ public class MonitorServiceTrafficClient {
                            i + 1, trafficDTO.getRequestId(), e.getMessage());
                 
                 if (i < maxRetries) {
-                    // 等待后重试
                     try {
-                        Thread.sleep(1000 * (i + 1)); // 递增等待时间
+                        Thread.sleep(1000 * (i + 1));
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         return false;
@@ -198,7 +239,6 @@ public class MonitorServiceTrafficClient {
      * @return 统计信息
      */
     public String getStatistics() {
-        // 这里可以添加更详细的统计信息收集
         return "流量推送客户端 - 配置端点：" + GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT;
     }
 }

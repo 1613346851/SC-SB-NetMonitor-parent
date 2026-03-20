@@ -45,17 +45,23 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         }
 
         try {
-            if (expireTime == null) {
-                List<DefenseLogEntity> historyRecords = defenseLogMapper.selectBlacklistsByIp(ip);
-                if (historyRecords != null && !historyRecords.isEmpty()) {
-                    for (DefenseLogEntity record : historyRecords) {
-                        if (record.getExpireTime() == null) {
-                            log.warn("IP 已永久封禁，无需重复添加：ip={}", ip);
-                            return;
-                        }
+            List<DefenseLogEntity> historyRecords = defenseLogMapper.selectBlacklistsByIp(ip);
+            
+            if (historyRecords != null && !historyRecords.isEmpty()) {
+                for (DefenseLogEntity record : historyRecords) {
+                    if (record.getExpireTime() == null) {
+                        log.warn("IP 已永久封禁，无需重复添加：ip={}", ip);
+                        return;
+                    }
+                    if (record.getExpireTime() != null && record.getExpireTime().isAfter(LocalDateTime.now())) {
+                        log.info("IP 已存在生效中的封禁记录，跳过添加：ip={}, existingExpireTime={}", 
+                            ip, record.getExpireTime().format(TIME_FORMATTER));
+                        return;
                     }
                 }
-                
+            }
+            
+            if (expireTime == null) {
                 blacklistCache.add(ip, reason, null, operator);
                 syncToGateway(ip, "ADD");
                 recordDefenseLog(ip, "ADD", reason, operator, null);
@@ -63,36 +69,8 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
                 return;
             }
             
-            List<DefenseLogEntity> historyRecords = defenseLogMapper.selectBlacklistsByIp(ip);
-            
-            LocalDateTime baseTime = LocalDateTime.now();
-            boolean hasActiveRecord = false;
-            
-            if (historyRecords != null && !historyRecords.isEmpty()) {
-                for (DefenseLogEntity record : historyRecords) {
-                    if (record.getExpireTime() == null) {
-                        log.warn("IP 已永久封禁，无需延长：ip={}", ip);
-                        return;
-                    }
-                    if (record.getExpireTime().isAfter(LocalDateTime.now())) {
-                        hasActiveRecord = true;
-                        if (record.getExpireTime().isAfter(baseTime)) {
-                            baseTime = record.getExpireTime();
-                        }
-                    }
-                }
-            }
-            
-            LocalDateTime finalExpireTime;
-            if (hasActiveRecord) {
-                long extendSeconds = java.time.Duration.between(LocalDateTime.now(), expireTime).getSeconds();
-                finalExpireTime = baseTime.plusSeconds(extendSeconds);
-                log.info("IP 存在生效中的封禁记录，延长封禁时间：ip={}, baseTime={}, extendSeconds={}, finalExpireTime={}", 
-                    ip, baseTime.format(TIME_FORMATTER), extendSeconds, finalExpireTime.format(TIME_FORMATTER));
-            } else {
-                finalExpireTime = expireTime;
-                log.info("IP 无生效中的封禁记录，创建新封禁记录：ip={}, expireTime={}", ip, finalExpireTime.format(TIME_FORMATTER));
-            }
+            LocalDateTime finalExpireTime = expireTime;
+            log.info("IP 无生效中的封禁记录，创建新封禁记录：ip={}, expireTime={}", ip, finalExpireTime.format(TIME_FORMATTER));
 
             blacklistCache.add(ip, reason, finalExpireTime, operator);
 
@@ -426,8 +404,8 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         try {
             DefenseCommandDTO commandDTO = new DefenseCommandDTO();
             commandDTO.setSourceIp(ip);
-            commandDTO.setDefenseType("BLACKLIST");
-            commandDTO.setRiskLevel("HIGH");
+            commandDTO.setDefenseType(DefenseCommandDTO.DefenseType.BLACKLIST);
+            commandDTO.setRiskLevel(DefenseCommandDTO.RiskLevel.HIGH);
 
             if ("ADD".equals(action)) {
                 BlacklistCache.BlacklistInfo info = blacklistCache.getBlacklistInfo(ip);

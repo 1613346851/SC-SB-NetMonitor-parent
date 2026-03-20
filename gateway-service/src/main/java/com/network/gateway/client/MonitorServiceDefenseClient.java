@@ -1,7 +1,10 @@
 package com.network.gateway.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.gateway.constant.GatewayHttpConstant;
 import com.network.gateway.dto.DefenseLogDTO;
+import com.network.gateway.util.CrossServiceSecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +17,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * 监控服务防御日志推送客户端
@@ -31,11 +37,11 @@ public class MonitorServiceDefenseClient {
     @Qualifier("restTemplate")
     private RestTemplate restTemplate;
 
-    /**
-     * 跨服务鉴权 Token（从配置文件读取）
-     */
-    @Value("${cross-service.auth.monitor-token:MonitorSecureToken456}")
-    private String monitorAuthToken;
+    @Value("${cross-service.security.secret-key}")
+    private String secretKey;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * 推送防御日志到监控服务
@@ -50,20 +56,22 @@ public class MonitorServiceDefenseClient {
             return;
         }
 
+        String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+
         try {
-            // 构建请求头
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("X-Gateway-Timestamp", String.valueOf(System.currentTimeMillis()));
-            headers.set("X-Defense-Log-ID", defenseLogDTO.getLogId());
-            headers.set("X-Defense-Type", defenseLogDTO.getDefenseType().name());
-            // 添加跨服务鉴权头
-            headers.set("X-Auth-Token", monitorAuthToken);
 
-            // 构建请求实体
+            Map<String, String> securityHeaders = CrossServiceSecurityUtil.generateSecurityHeaders(
+                    requestId, 
+                    secretKey
+            );
+            headers.set("X-Timestamp", securityHeaders.get("X-Timestamp"));
+            headers.set("X-Request-ID", securityHeaders.get("X-Request-ID"));
+            headers.set("X-Signature", securityHeaders.get("X-Signature"));
+
             HttpEntity<DefenseLogDTO> requestEntity = new HttpEntity<>(defenseLogDTO, headers);
 
-            // 发送 POST 请求
             String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
             ResponseEntity<String> response = restTemplate.postForEntity(
                     url,
@@ -71,29 +79,69 @@ public class MonitorServiceDefenseClient {
                     String.class
             );
 
-            // 检查响应状态
-            if (response.getStatusCode().is2xxSuccessful()) {
-                logger.debug("防御日志推送成功: 日志ID[{}] 防御类型[{}] 状态码[{}]", 
-                           defenseLogDTO.getLogId(), 
+            if (isResponseSuccessful(response)) {
+                logger.info("防御日志推送成功: 防御类型[{}] 防御对象[{}] 状态码[{}]", 
                            defenseLogDTO.getDefenseType(),
+                           defenseLogDTO.getDefenseTarget(),
                            response.getStatusCode());
             } else {
-                logger.warn("防御日志推送返回非成功状态: 日志ID[{}] 状态码[{}] 响应内容[{}]", 
-                           defenseLogDTO.getLogId(), response.getStatusCode(), response.getBody());
-                throw new RestClientException("监控服务返回错误状态: " + response.getStatusCode());
+                String errorMsg = extractErrorMessage(response.getBody());
+                logger.error("防御日志推送失败: 防御类型[{}] 响应内容[{}]", 
+                            defenseLogDTO.getDefenseType(), errorMsg);
+                throw new RestClientException("监控服务返回错误: " + errorMsg);
             }
 
         } catch (RestClientException e) {
-            logger.error("推送防御日志到监控服务失败: 日志ID[{}] 防御类型[{}] 错误: {}", 
-                        defenseLogDTO.getLogId(), 
+            logger.error("推送防御日志到监控服务失败: 防御类型[{}] 防御对象[{}] 错误: {}", 
                         defenseLogDTO.getDefenseType(),
+                        defenseLogDTO.getDefenseTarget(),
                         e.getMessage());
             throw e;
         } catch (Exception e) {
-            logger.error("推送防御日志时发生未知异常: 日志ID[{}] 防御类型[{}]", 
-                        defenseLogDTO.getLogId(), 
-                        defenseLogDTO.getDefenseType(), e);
+            logger.error("推送防御日志时发生未知异常: 防御类型[{}]", defenseLogDTO.getDefenseType(), e);
             throw new RestClientException("推送防御日志时发生未知异常", e);
+        }
+    }
+
+    /**
+     * 检查响应是否成功
+     * 不仅检查 HTTP 状态码，还检查响应体中的 code 字段
+     */
+    private boolean isResponseSuccessful(ResponseEntity<String> response) {
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            return false;
+        }
+
+        String body = response.getBody();
+        if (body == null || body.isEmpty()) {
+            return true;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            int code = root.has("code") ? root.get("code").asInt() : 200;
+            return code == 200;
+        } catch (Exception e) {
+            logger.debug("解析响应体失败，默认认为成功: {}", e.getMessage());
+            return true;
+        }
+    }
+
+    /**
+     * 从响应体中提取错误信息
+     */
+    private String extractErrorMessage(String body) {
+        if (body == null || body.isEmpty()) {
+            return "未知错误";
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            String message = root.has("message") ? root.get("message").asText() : "未知错误";
+            int code = root.has("code") ? root.get("code").asInt() : 500;
+            return String.format("code=%d, message=%s", code, message);
+        } catch (Exception e) {
+            return body;
         }
     }
 
@@ -114,7 +162,7 @@ public class MonitorServiceDefenseClient {
                 pushDefenseLog(defenseLogDTO);
                 successCount++;
             } catch (Exception e) {
-                logger.warn("批量推送中单个防御日志失败: 日志ID[{}]", defenseLogDTO.getLogId(), e);
+                logger.warn("批量推送中单个防御日志失败: 防御对象[{}]", defenseLogDTO.getDefenseTarget(), e);
             }
         }
 
@@ -130,14 +178,13 @@ public class MonitorServiceDefenseClient {
      * @param defenseLogDTO 防御日志DTO
      */
     public void pushDefenseLogAsync(DefenseLogDTO defenseLogDTO) {
-        // 使用异步方式推送
         new Thread(() -> {
             try {
                 pushDefenseLog(defenseLogDTO);
             } catch (Exception e) {
-                logger.warn("异步推送防御日志失败: 日志ID[{}]", defenseLogDTO.getLogId(), e);
+                logger.warn("异步推送防御日志失败: 防御对象[{}]", defenseLogDTO.getDefenseTarget(), e);
             }
-        }, "defense-log-push-thread-" + defenseLogDTO.getLogId()).start();
+        }, "defense-log-push-" + System.currentTimeMillis()).start();
     }
 
     /**
@@ -153,13 +200,12 @@ public class MonitorServiceDefenseClient {
                 pushDefenseLog(defenseLogDTO);
                 return true;
             } catch (Exception e) {
-                logger.warn("第{}次推送防御日志失败: 日志ID[{}], 错误: {}", 
-                           i + 1, defenseLogDTO.getLogId(), e.getMessage());
+                logger.warn("第{}次推送防御日志失败: 防御对象[{}], 错误: {}", 
+                           i + 1, defenseLogDTO.getDefenseTarget(), e.getMessage());
                 
                 if (i < maxRetries) {
-                    // 等待后重试
                     try {
-                        Thread.sleep(1000 * (i + 1)); // 递增等待时间
+                        Thread.sleep(1000 * (i + 1));
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         return false;
@@ -168,50 +214,8 @@ public class MonitorServiceDefenseClient {
             }
         }
         
-        logger.error("防御日志推送最终失败，已达到最大重试次数: 日志ID[{}]", defenseLogDTO.getLogId());
+        logger.error("防御日志推送最终失败，已达到最大重试次数: 防御对象[{}]", defenseLogDTO.getDefenseTarget());
         return false;
-    }
-
-    /**
-     * 推送高风险防御日志（紧急处理）
-     *
-     * @param defenseLogDTO 防御日志DTO
-     * @return true表示推送成功
-     */
-    public boolean pushHighRiskDefenseLog(DefenseLogDTO defenseLogDTO) {
-        try {
-            // 为高风险日志添加特殊标记
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("X-Gateway-Timestamp", String.valueOf(System.currentTimeMillis()));
-            headers.set("X-Defense-Log-ID", defenseLogDTO.getLogId());
-            headers.set("X-Defense-Type", defenseLogDTO.getDefenseType().name());
-            headers.set("X-Risk-Level", "HIGH"); // 高风险标记
-            headers.set("X-Priority", "URGENT"); // 紧急优先级
-
-            HttpEntity<DefenseLogDTO> requestEntity = new HttpEntity<>(defenseLogDTO, headers);
-
-            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
-            ResponseEntity<String> response = restTemplate.postForEntity(
-                    url,
-                    requestEntity,
-                    String.class
-            );
-
-            boolean success = response.getStatusCode().is2xxSuccessful();
-            if (success) {
-                logger.info("高风险防御日志推送成功: 日志ID[{}] 防御类型[{}]", 
-                           defenseLogDTO.getLogId(), defenseLogDTO.getDefenseType());
-            } else {
-                logger.error("高风险防御日志推送失败: 日志ID[{}] 状态码[{}]", 
-                            defenseLogDTO.getLogId(), response.getStatusCode());
-            }
-            
-            return success;
-        } catch (Exception e) {
-            logger.error("推送高风险防御日志时发生异常: 日志ID[{}]", defenseLogDTO.getLogId(), e);
-            return false;
-        }
     }
 
     /**
@@ -245,7 +249,6 @@ public class MonitorServiceDefenseClient {
      * @return 统计信息
      */
     public String getStatistics() {
-        // 这里可以添加更详细的统计信息收集
         return "防御日志推送客户端 - 配置端点：" + GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
     }
 }

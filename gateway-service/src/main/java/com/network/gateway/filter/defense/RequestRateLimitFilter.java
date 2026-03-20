@@ -44,6 +44,10 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         String sourceIp = ServerWebExchangeUtil.extractSourceIp(exchange.getRequest());
 
         try {
+            if (shouldSkipRateLimit(exchange)) {
+                return chain.filter(exchange);
+            }
+
             int threshold = getCurrentThreshold(sourceIp);
             if (isRateLimited(sourceIp, threshold)) {
                 return handleRateLimitExceeded(exchange, sourceIp, startTime, threshold);
@@ -53,6 +57,19 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
             logger.error("请求限流检查过程中发生异常，IP: {}", sourceIp, e);
             return chain.filter(exchange);
         }
+    }
+
+    private boolean shouldSkipRateLimit(ServerWebExchange exchange) {
+        if (ServerWebExchangeUtil.isStaticResource(exchange)) {
+            return true;
+        }
+        
+        if (ServerWebExchangeUtil.isHealthCheck(exchange) || 
+            ServerWebExchangeUtil.isManagementEndpoint(exchange)) {
+            return true;
+        }
+        
+        return false;
     }
 
     private boolean isRateLimited(String ip, int threshold) {

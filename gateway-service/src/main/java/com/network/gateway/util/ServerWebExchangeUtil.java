@@ -340,4 +340,22 @@ public class ServerWebExchangeUtil {
         String contentType = request.getHeaders().getFirst(GatewayHttpConstant.Header.CONTENT_TYPE);
         return contentType != null ? contentType : "unknown";
     }
+
+    /**
+     * 检查是否为静态资源请求
+     *
+     * @param exchange ServerWebExchange对象
+     * @return true表示是静态资源请求
+     */
+    public static boolean isStaticResource(ServerWebExchange exchange) {
+        String path = exchange.getRequest().getURI().getPath().toLowerCase();
+        
+        return path.endsWith(".css") || path.endsWith(".js") || 
+               path.endsWith(".png") || path.endsWith(".jpg") || 
+               path.endsWith(".jpeg") || path.endsWith(".gif") ||
+               path.endsWith(".ico") || path.endsWith(".svg") ||
+               path.endsWith(".woff") || path.endsWith(".woff2") ||
+               path.endsWith(".ttf") || path.endsWith(".eot") ||
+               path.endsWith(".map") || path.endsWith(".webp");
+    }
 }

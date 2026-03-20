@@ -369,8 +369,8 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
         try {
             DefenseCommandDTO commandDTO = new DefenseCommandDTO();
             commandDTO.setSourceIp(ip);
-            commandDTO.setDefenseType("BLACKLIST");
-            commandDTO.setRiskLevel("HIGH");
+            commandDTO.setDefenseType(DefenseCommandDTO.DefenseType.BLACKLIST);
+            commandDTO.setRiskLevel(DefenseCommandDTO.RiskLevel.HIGH);
 
             if ("ADD".equals(action)) {
                 IpBlacklistEntity entity = ipBlacklistMapper.selectByIpAddress(ip);

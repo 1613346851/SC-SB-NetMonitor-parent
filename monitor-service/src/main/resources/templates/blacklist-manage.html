@@ -16,8 +16,8 @@
                     <h2>黑名单管理</h2>
                 </div>
                 <div class="header-right">
-                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                     <button class="btn btn-primary" onclick="showAddBlacklistModal()">+ 添加 IP</button>
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                 </div>
             </header>
 
@@ -43,14 +43,14 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>IP 地址</th>
+                                    <th data-sort="id">ID</th>
+                                    <th data-sort="ip">IP 地址</th>
                                     <th>拉黑原因</th>
-                                    <th>过期时间</th>
+                                    <th data-sort="expireTime">过期时间</th>
                                     <th>剩余时间</th>
-                                    <th>累计封禁</th>
-                                    <th>状态</th>
-                                    <th>创建时间</th>
+                                    <th data-sort="totalBanCount">累计封禁</th>
+                                    <th data-sort="status">状态</th>
+                                    <th data-sort="createTime">创建时间</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -177,6 +177,7 @@
     <script th:src="@{/js/core/page-init.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/pagination.js}"></script>
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/blacklist-manage.js}"></script>

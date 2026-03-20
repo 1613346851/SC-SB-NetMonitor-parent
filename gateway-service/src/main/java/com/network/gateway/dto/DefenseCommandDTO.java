@@ -117,11 +117,12 @@ public class DefenseCommandDTO implements Serializable {
 
     /**
      * 检查指令是否已过期
+     * 如果 expireTimestamp 为 null，表示永久有效，不会过期
      *
      * @return true表示已过期
      */
     public boolean isExpired() {
-        return System.currentTimeMillis() > this.expireTimestamp;
+        return this.expireTimestamp != null && System.currentTimeMillis() > this.expireTimestamp;
     }
 
     /**

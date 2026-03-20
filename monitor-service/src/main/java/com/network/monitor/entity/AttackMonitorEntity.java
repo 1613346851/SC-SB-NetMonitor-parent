@@ -124,7 +124,7 @@ public class AttackMonitorEntity {
     /**
      * 判断是否已处理
      */
-    public boolean isHandled() {
+    public boolean hasBeenHandled() {
         return this.handled != null && this.handled == 1;
     }
 
