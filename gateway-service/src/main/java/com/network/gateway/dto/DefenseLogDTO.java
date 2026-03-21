@@ -21,9 +21,8 @@ public class DefenseLogDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 关联攻击 ID
-     */
+    private String eventId;
+
     private Long attackId;
 
     /**

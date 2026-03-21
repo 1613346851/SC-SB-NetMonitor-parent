@@ -27,6 +27,7 @@ public interface AttackMonitorMapper {
      * 分页查询攻击记录
      */
     List<AttackMonitorEntity> selectByCondition(
+            @Param("eventId") String eventId,
             @Param("attackType") String attackType,
             @Param("riskLevel") String riskLevel,
             @Param("sourceIp") String sourceIp,
@@ -38,10 +39,8 @@ public interface AttackMonitorMapper {
             @Param("orderBy") String orderBy
     );
 
-    /**
-     * 统计总记录数
-     */
     long countByCondition(
+            @Param("eventId") String eventId,
             @Param("attackType") String attackType,
             @Param("riskLevel") String riskLevel,
             @Param("sourceIp") String sourceIp,

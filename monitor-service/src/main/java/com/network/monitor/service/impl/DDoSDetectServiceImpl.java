@@ -7,6 +7,8 @@ import com.network.monitor.common.constant.IpAttackStateConstant;
 import com.network.monitor.common.constant.RiskLevelConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;
+import com.network.monitor.entity.AttackEventEntity;
+import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.DDoSDetectService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +30,11 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
     @Autowired
     private IpAttackStateCache attackStateCache;
 
+    @Autowired
+    private AttackEventService attackEventService;
+
     private final Map<String, AtomicInteger> requestCounter = new ConcurrentHashMap<>();
+    private final Map<String, Integer> peakRpsMap = new ConcurrentHashMap<>();
 
     private static final DateTimeFormatter MINUTE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
 
@@ -45,16 +51,13 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
             return null;
         }
 
-        if (attackStateCache.hasActiveEvent(sourceIp)) {
-            log.debug("IP已有活跃攻击事件，跳过DDoS检测: ip={}, eventId={}", sourceIp, attackStateCache.getEventId(sourceIp));
-            return null;
-        }
-
         String currentTimeWindow = getCurrentMinuteWindow();
         String counterKey = sourceIp + "_" + currentTimeWindow;
 
         AtomicInteger count = requestCounter.computeIfAbsent(counterKey, k -> new AtomicInteger(0));
         int currentCount = count.incrementAndGet();
+
+        updatePeakRps(sourceIp, currentCount);
 
         int ddosThreshold = sysConfigCache.getIntValue("ddos.threshold", 100);
 
@@ -68,10 +71,37 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
                 log.info("IP状态更新为ATTACKING: ip={}, reason=ddos_detected", sourceIp);
             }
 
-            return buildDDoSAttackDTO(trafficDTO, currentCount, ddosThreshold);
+            AttackEventEntity event = attackEventService.getOrCreateEvent(
+                sourceIp, AttackTypeConstant.DDOS, RiskLevelConstant.HIGH, 
+                Math.min(90 + (currentCount - ddosThreshold) / 10, 100)
+            );
+
+            if (event != null) {
+                int peakRps = getPeakRps(sourceIp);
+                attackEventService.updateEventStatistics(event.getId(), currentCount, peakRps, 
+                    Math.min(90 + (currentCount - ddosThreshold) / 10, 100));
+                
+                if (!attackStateCache.hasActiveEvent(sourceIp)) {
+                    attackStateCache.setEventId(sourceIp, event.getEventId());
+                }
+            }
+
+            AttackMonitorDTO dto = buildDDoSAttackDTO(trafficDTO, currentCount, ddosThreshold);
+            if (event != null) {
+                dto.setEventId(event.getEventId());
+            }
+            return dto;
         }
 
         return null;
+    }
+
+    private void updatePeakRps(String sourceIp, int currentRps) {
+        peakRpsMap.merge(sourceIp, currentRps, Math::max);
+    }
+
+    private int getPeakRps(String sourceIp) {
+        return peakRpsMap.getOrDefault(sourceIp, 0);
     }
 
     @Override

@@ -3,24 +3,21 @@
  * 负责仪表盘数据加载、图表渲染、实时告警等功能
  */
 
-// 页面初始化
 document.addEventListener('DOMContentLoaded', async function() {
-    // 并行加载所有数据，提升加载速度
     await Promise.all([
         loadDashboardStats(),
+        loadEventStats(),
         loadTrafficTrend(),
         loadAttackTypeDistribution(),
         loadVulnerabilityLevelDistribution(),
-        loadRecentAttacks()
+        loadRecentAttacks(),
+        loadRecentEvents()
     ]);
     
-    // 5 秒后刷新最新告警
     setInterval(loadRecentAttacks, 5000);
+    setInterval(loadEventStats, 10000);
 });
 
-/**
- * 时间范围变化时自动调整统计精度
- */
 function onTimeRangeChange() {
     const timeRange = document.getElementById('trafficTimeRange').value;
     
@@ -45,9 +42,6 @@ function onTimeRangeChange() {
     loadTrafficTrend();
 }
 
-/**
- * 获取自动推荐的统计精度
- */
 function getAutoInterval(timeRange) {
     const recommendations = {
         '1h': '5m',
@@ -112,6 +106,24 @@ async function loadDashboardStats() {
         }
     } catch (error) {
         console.error('加载统计数据失败:', error);
+    }
+}
+
+async function loadEventStats() {
+    try {
+        const stats = await http.get('/api/event/statistics');
+        
+        const ongoingEventsEl = document.getElementById('ongoingEvents');
+        if (ongoingEventsEl) {
+            ongoingEventsEl.textContent = stats.ongoingEvents || 0;
+        }
+        
+        const totalEventsEl = document.getElementById('totalEvents');
+        if (totalEventsEl) {
+            totalEventsEl.textContent = stats.totalEvents || 0;
+        }
+    } catch (error) {
+        console.error('加载事件统计失败:', error);
     }
 }
 
@@ -319,7 +331,6 @@ async function loadAttackTypeDistribution() {
             return;
         }
         
-        // 处理无数据情况
         const seriesData = (chartData && chartData.length > 0) ? chartData : [{
             name: '无数据',
             value: 1
@@ -378,7 +389,6 @@ async function loadVulnerabilityLevelDistribution() {
             return;
         }
         
-        // 处理无数据情况
         const seriesData = (chartData && chartData.length > 0) ? chartData : [{
             name: '无数据',
             value: 1
@@ -446,5 +456,37 @@ async function loadRecentAttacks() {
         `).join('');
     } catch (error) {
         console.error('加载最新告警失败:', error);
+    }
+}
+
+async function loadRecentEvents() {
+    try {
+        const events = await http.get('/api/event/recent?limit=5');
+        
+        const tbody = document.getElementById('recentEvents');
+        if (!tbody) return;
+        
+        if (!events || events.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无数据</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = events.map(event => {
+            const statusTag = event.status === 0 
+                ? '<span class="tag warning">进行中</span>'
+                : '<span class="tag success">已结束</span>';
+            
+            return `
+                <tr onclick="window.location.href='/event?id=${event.eventId}'" style="cursor: pointer;">
+                    <td><span class="event-id" title="${event.eventId}">${event.eventId.substring(0, 12)}...</span></td>
+                    <td>${dateFormat.format(event.startTime)}</td>
+                    <td>${event.sourceIp}</td>
+                    <td>${tableRenderer.renderAttackType(event.attackType)}</td>
+                    <td>${statusTag}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('加载最近事件失败:', error);
     }
 }

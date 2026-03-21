@@ -65,7 +65,7 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
         DefenseResultBO defenseResult = new DefenseResultBO(
                 DefenseResultBO.DefenseType.BLACKLIST,
                 blacklistedIp,
-                existingEventId != null ? existingEventId : "BLACKLIST_EVENT_" + System.currentTimeMillis(),
+                existingEventId,
                 "IP在黑名单中"
         );
         
@@ -83,10 +83,11 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
                 defenseClient.pushDefenseLog(defenseLog);
             }
             
-            logger.info("拦截黑名单IP请求: IP[{}] URI[{}] 方法[{}] skipLog={}", 
+            logger.info("拦截黑名单IP请求: IP[{}] URI[{}] 方法[{}] eventId[{}] skipLog={}", 
                        blacklistedIp, 
                        exchange.getRequest().getURI().getPath(),
                        exchange.getRequest().getMethodValue(),
+                       existingEventId,
                        skipDefenseLog);
 
             defenseResult.setSuccessResult(403, "Forbidden - IP Blocked");

@@ -5,6 +5,8 @@ import com.network.monitor.client.GatewayApiClient;
 import com.network.monitor.common.constant.IpAttackStateConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.DefenseCommandDTO;
+import com.network.monitor.entity.AttackEventEntity;
+import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.DefenseDecisionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +29,9 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
     @Autowired
     private IpAttackStateCache attackStateCache;
 
+    @Autowired
+    private AttackEventService attackEventService;
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
@@ -43,17 +48,19 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
                 return null;
             }
 
-            if (attackStateCache.hasActiveEvent(sourceIp)) {
-                log.debug("IP已有活跃攻击事件，跳过防御决策: ip={}, eventId={}", sourceIp, attackStateCache.getEventId(sourceIp));
-                return null;
-            }
-
             String riskLevelStr = attackDTO.getRiskLevel();
             DefenseCommandDTO commandDTO = null;
 
             DefenseCommandDTO.RiskLevel riskLevel = parseRiskLevel(riskLevelStr);
 
-            String eventId = generateEventId();
+            AttackEventEntity event = attackEventService.getOrCreateEvent(
+                sourceIp, 
+                attackDTO.getAttackType(), 
+                riskLevelStr, 
+                attackDTO.getConfidence() != null ? attackDTO.getConfidence() : 80
+            );
+
+            String eventId = event != null ? event.getEventId() : generateEventId();
 
             if (riskLevel == DefenseCommandDTO.RiskLevel.HIGH || riskLevel == DefenseCommandDTO.RiskLevel.CRITICAL) {
                 commandDTO = buildDefenseCommand(
@@ -82,6 +89,19 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
                 boolean success = gatewayApiClient.pushDefenseCommand(commandDTO);
                 if (success) {
                     attackStateCache.markAsDefended(sourceIp, eventId);
+                    
+                    if (event != null) {
+                        LocalDateTime expireTime = LocalDateTime.now().plusMinutes(
+                            commandDTO.getDefenseType() == DefenseCommandDTO.DefenseType.BLACKLIST ? 30 : 60
+                        );
+                        attackEventService.setDefenseInfo(
+                            event.getId(), 
+                            commandDTO.getDefenseType().name(), 
+                            expireTime, 
+                            true
+                        );
+                    }
+                    
                     log.info("生成并推送防御决策成功：attackId={}, defenseType={}, sourceIp={}, eventId={}",
                             attackDTO.getTrafficId(), commandDTO.getDefenseType(), sourceIp, eventId);
                 } else {

@@ -26,6 +26,11 @@ public class PageController {
         return "attack-monitor";
     }
 
+    @GetMapping("/event")
+    public String attackEvent() {
+        return "attack-event";
+    }
+
     @GetMapping("/vulnerability")
     public String vulnerabilityMonitor() {
         return "vulnerability-monitor";
@@ -38,8 +43,12 @@ public class PageController {
 
     @GetMapping("/defense")
     public String defenseLog() {
-
         return "defense-log";
+    }
+
+    @GetMapping("/defense-evaluation")
+    public String defenseEvaluation() {
+        return "defense-evaluation";
     }
 
     @GetMapping("/rule")

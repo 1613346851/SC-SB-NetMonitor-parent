@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>防御日志 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .event-link {
+            color: #4f46e5;
+            text-decoration: none;
+            font-family: monospace;
+        }
+        .event-link:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -24,8 +34,12 @@
                 <div class="filter-bar">
                     <div class="form-inline">
                         <div class="form-group">
-                            <label class="form-label">源 IP</label>
-                            <input type="text" class="form-control" id="sourceIp" placeholder="请输入源 IP">
+                            <label class="form-label">事件 ID</label>
+                            <input type="text" class="form-control" id="eventId" placeholder="输入事件ID筛选" style="width: 160px;">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御目标</label>
+                            <input type="text" class="form-control" id="defenseTarget" placeholder="请输入防御目标">
                         </div>
                         <div class="form-group">
                             <label class="form-label">防御类型</label>
@@ -33,7 +47,15 @@
                                 <option value="">全部</option>
                                 <option value="BLOCK_IP">封禁 IP</option>
                                 <option value="RATE_LIMIT">限流</option>
-                                <option value="BLOCK_REQUEST">拦截请求</option>
+                                <option value="REDIRECT">重定向</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">执行状态</label>
+                            <select class="form-control" id="executeStatus">
+                                <option value="">全部</option>
+                                <option value="1">成功</option>
+                                <option value="0">失败</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -45,7 +67,7 @@
                             <input type="date" class="form-control" id="endDate">
                         </div>
                         <div class="form-group">
-                            <button class="btn btn-primary" onclick="searchDefenseLogs()">查询</button>
+                            <button class="btn btn-primary" onclick="searchDefense()">查询</button>
                             <button class="btn btn-default" onclick="resetSearch()">重置</button>
                         </div>
                     </div>
@@ -66,14 +88,15 @@
                                     <th>防御对象</th>
                                     <th>防御原因</th>
                                     <th>过期时间</th>
-                                    <th>关联攻击</th>
+                                    <th>关联事件</th>
                                     <th>执行状态</th>
                                     <th>操作人</th>
+                                    <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody id="defenseTableBody">
                                 <tr>
-                                    <td colspan="10" class="text-center">加载中...</td>
+                                    <td colspan="11" class="text-center">加载中...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -86,6 +109,21 @@
         </div>
     </div>
 
+    <div id="defenseDetailModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 700px;">
+            <div class="modal-header">
+                <h3 class="modal-title">防御详情</h3>
+                <span class="modal-close" onclick="closeDefenseDetail()">&times;</span>
+            </div>
+            <div class="modal-body" id="defenseDetailContent">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeDefenseDetail()">关闭</button>
+                <button class="btn btn-info" onclick="viewEventFromDetail()" id="viewEventBtn" style="display: none;">查看事件</button>
+            </div>
+        </div>
+    </div>
+
     <script th:src="@{/js/core/config.js}"></script>
     <script th:src="@{/js/utils/storage.js}"></script>
     <script th:src="@{/js/utils/date.js}"></script>
@@ -94,6 +132,7 @@
     <script th:src="@{/js/core/http.js}"></script>
     <script th:src="@{/js/core/auth.js}"></script>
     <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
     <script th:src="@{/js/components/pagination.js}"></script>

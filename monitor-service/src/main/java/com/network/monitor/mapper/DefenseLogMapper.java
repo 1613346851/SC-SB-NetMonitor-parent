@@ -15,8 +15,10 @@ public interface DefenseLogMapper {
     DefenseLogEntity selectById(@Param("id") Long id);
 
     List<DefenseLogEntity> selectByCondition(
+            @Param("eventId") String eventId,
             @Param("defenseType") String defenseType,
             @Param("defenseTarget") String defenseTarget,
+            @Param("executeStatus") Integer executeStatus,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
             @Param("offset") Integer offset,
@@ -24,8 +26,10 @@ public interface DefenseLogMapper {
     );
 
     long countByCondition(
+            @Param("eventId") String eventId,
             @Param("defenseType") String defenseType,
             @Param("defenseTarget") String defenseTarget,
+            @Param("executeStatus") Integer executeStatus,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime
     );
@@ -43,6 +47,8 @@ public interface DefenseLogMapper {
     int deleteAllBlacklistsByIp(@Param("ip") String ip);
 
     List<TrendStat> countDefenseTrend(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    int countByEventId(@Param("eventId") String eventId);
 
     class TrendStat {
         private LocalDateTime time;

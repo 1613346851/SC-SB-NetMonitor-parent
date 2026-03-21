@@ -11,14 +11,10 @@ import java.time.LocalDateTime;
 @Data
 public class AttackMonitorEntity {
 
-    /**
-     * 主键 ID
-     */
     private Long id;
 
-    /**
-     * 关联流量 ID
-     */
+    private String eventId;
+
     private Long trafficId;
 
     /**

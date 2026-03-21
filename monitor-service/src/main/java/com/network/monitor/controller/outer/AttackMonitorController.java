@@ -39,6 +39,7 @@ public class AttackMonitorController {
      */
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getAttackList(
+            @RequestParam(required = false) String eventId,
             @RequestParam(required = false) String attackType,
             @RequestParam(required = false) String riskLevel,
             @RequestParam(required = false) String sourceIp,
@@ -58,11 +59,11 @@ public class AttackMonitorController {
             String orderBy = buildOrderBy(sortField, sortOrder);
             
             List<AttackMonitorEntity> list = attackMonitorMapper.selectByCondition(
-                attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime, offset, pageSize, orderBy
+                eventId, attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime, offset, pageSize, orderBy
             );
             
             long total = attackMonitorMapper.countByCondition(
-                attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime
+                eventId, attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime
             );
 
             Map<String, Object> result = new HashMap<>();
@@ -92,9 +93,20 @@ public class AttackMonitorController {
         }
     }
 
-    /**
-     * 处理攻击记录
-     */
+    @GetMapping("/{id}")
+    public ApiResponse<AttackMonitorEntity> getAttackById(@PathVariable Long id) {
+        try {
+            AttackMonitorEntity entity = attackMonitorMapper.selectById(id);
+            if (entity == null) {
+                return ApiResponse.error("攻击记录不存在");
+            }
+            return ApiResponse.success(entity);
+        } catch (Exception e) {
+            log.error("查询攻击记录失败：id={}", id, e);
+            return ApiResponse.error("查询失败");
+        }
+    }
+
     @PutMapping("/{id}/handle")
     public ApiResponse<Void> handleAttack(
             @PathVariable Long id,
@@ -130,7 +142,7 @@ public class AttackMonitorController {
             String orderBy = buildOrderBy(sortField, sortOrder);
             
             List<AttackMonitorEntity> list = attackMonitorMapper.selectByCondition(
-                attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime, 0, 10000, orderBy
+                null, attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime, 0, 10000, orderBy
             );
             
             response.setContentType("text/csv;charset=UTF-8");

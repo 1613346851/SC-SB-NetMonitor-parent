@@ -39,22 +39,22 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             long totalTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, null, null);
             stats.put("totalTraffic", totalTraffic);
 
-            long totalAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, null);
+            long totalAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, null, null);
             stats.put("totalAttack", totalAttacks);
 
-            long highRiskAttacks = attackMonitorMapper.countByCondition(null, "HIGH", null, null, null, null);
+            long highRiskAttacks = attackMonitorMapper.countByCondition(null, "HIGH", null, null, null, null, null);
             stats.put("highRiskAttacks", highRiskAttacks);
 
             LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
             long todayTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, todayStart, null);
             stats.put("todayTraffic", todayTraffic);
 
-            long todayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, todayStart, null);
+            long todayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, todayStart, null);
             stats.put("todayAttacks", todayAttacks);
 
             LocalDateTime yesterdayStart = todayStart.minusDays(1);
             long yesterdayTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart);
-            long yesterdayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart);
+            long yesterdayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, yesterdayStart, todayStart);
 
             double trafficChange = calculateGrowthRate(todayTraffic, yesterdayTraffic);
             double attackChange = calculateGrowthRate(todayAttacks, yesterdayAttacks);
@@ -65,8 +65,8 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             long totalDefenses = defenseLogMapper.countAll();
             stats.put("totalDefense", totalDefenses);
 
-            long todayDefenses = defenseLogMapper.countByCondition(null, null, todayStart, null);
-            long yesterdayDefenses = defenseLogMapper.countByCondition(null, null, yesterdayStart, todayStart);
+            long todayDefenses = defenseLogMapper.countByCondition(null, null, null, null, todayStart, null);
+            long yesterdayDefenses = defenseLogMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart);
             double defenseChange = calculateGrowthRate(todayDefenses, yesterdayDefenses);
             stats.put("defenseChange", defenseChange);
 
@@ -481,7 +481,7 @@ public class DashboardStatServiceImpl implements DashboardStatService {
         try {
             LocalDateTime startDateTime = parseDateTime(startTime);
             LocalDateTime endDateTime = parseDateTime(endTime);
-            return attackMonitorMapper.countByCondition(null, null, null, null, startDateTime, endDateTime);
+            return attackMonitorMapper.countByCondition(null, null, null, null, null, startDateTime, endDateTime);
         } catch (Exception e) {
             log.error("获取总攻击次数失败：", e);
             return 0;

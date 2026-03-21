@@ -38,6 +38,7 @@ public class DefenseLogUtil {
     public static DefenseLogDTO buildBlacklistLog(String targetIp, String eventId, 
                                                 DefenseResultBO.RiskLevel riskLevel, String triggerReason) {
         DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
         logDTO.setDefenseType("BLOCK_IP");
         logDTO.setDefenseTarget(targetIp);
         logDTO.setDefenseReason(triggerReason);
@@ -64,6 +65,7 @@ public class DefenseLogUtil {
                                                 DefenseResultBO.RiskLevel riskLevel, String triggerReason,
                                                 int currentRate, int limitRate) {
         DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
         logDTO.setDefenseType("RATE_LIMIT");
         logDTO.setDefenseTarget(targetIp);
         logDTO.setDefenseReason(triggerReason);
@@ -87,6 +89,7 @@ public class DefenseLogUtil {
     public static DefenseLogDTO buildBlockLog(String targetIp, String eventId,
                                             DefenseResultBO.RiskLevel riskLevel, String triggerReason) {
         DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
         logDTO.setDefenseType("BLOCK_REQUEST");
         logDTO.setDefenseTarget(targetIp);
         logDTO.setDefenseReason(triggerReason);

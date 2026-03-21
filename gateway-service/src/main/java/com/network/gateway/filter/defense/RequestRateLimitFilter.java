@@ -101,11 +101,12 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         }
 
         boolean skipDefenseLog = attackStateCache.shouldSkipDefenseAction(sourceIp);
+        String eventId = attackStateCache.getEventId(sourceIp);
 
         DefenseResultBO defenseResult = new DefenseResultBO(
                 DefenseResultBO.DefenseType.RATE_LIMIT,
                 sourceIp,
-                "RATE_LIMIT_EVENT_" + System.currentTimeMillis(),
+                eventId,
                 String.format("请求频率过高(%d次/秒 > %d次/秒)", currentCount, threshold)
         );
 
@@ -123,10 +124,11 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                 defenseClient.pushDefenseLog(defenseLog);
             }
 
-            logger.warn("限流拦截请求: IP[{}] 当前频率{}次/秒 阈值{}次/秒 URI[{}] 方法[{}]",
+            logger.warn("限流拦截请求: IP[{}] 当前频率{}次/秒 阈值{}次/秒 URI[{}] 方法[{}] eventId[{}]",
                     sourceIp, currentCount, threshold,
                     exchange.getRequest().getURI().getPath(),
-                    exchange.getRequest().getMethodValue());
+                    exchange.getRequest().getMethodValue(),
+                    eventId);
 
             defenseResult.setSuccessResult(429, "Too Many Requests");
             return DefenseResponseUtil.buildRateLimitResponse(response, sourceIp, threshold);

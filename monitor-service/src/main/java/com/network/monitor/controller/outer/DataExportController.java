@@ -128,7 +128,7 @@ public class DataExportController {
         LocalDateTime thirtyDaysAgo = now.minusDays(30);
 
         return attackMonitorMapper.selectByCondition(
-                attackType, riskLevel, sourceIp, handled, thirtyDaysAgo, now, 0, 10000, "id DESC"
+                null, attackType, riskLevel, sourceIp, handled, thirtyDaysAgo, now, 0, 10000, "id DESC"
         );
     }
 

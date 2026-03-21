@@ -4,6 +4,7 @@
 
     <resultMap id="BaseResultMap" type="com.network.monitor.entity.AttackMonitorEntity">
         <id column="id" property="id"/>
+        <result column="event_id" property="eventId"/>
         <result column="traffic_id" property="trafficId"/>
         <result column="attack_type" property="attackType"/>
         <result column="risk_level" property="riskLevel"/>
@@ -21,16 +22,16 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, traffic_id, attack_type, risk_level, confidence, rule_id, rule_content, 
+        id, event_id, traffic_id, attack_type, risk_level, confidence, rule_id, rule_content, 
         source_ip, target_uri, attack_content, handled, handle_time, handle_remark, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.AttackMonitorEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_attack_monitor (
-            traffic_id, attack_type, risk_level, confidence, rule_id, rule_content,
+            event_id, traffic_id, attack_type, risk_level, confidence, rule_id, rule_content,
             source_ip, target_uri, attack_content, handled, handle_time, handle_remark, create_time, update_time
         ) VALUES (
-            #{trafficId}, #{attackType}, #{riskLevel}, #{confidence}, #{ruleId}, #{ruleContent},
+            #{eventId}, #{trafficId}, #{attackType}, #{riskLevel}, #{confidence}, #{ruleId}, #{ruleContent},
             #{sourceIp}, #{targetUri}, #{attackContent}, #{handled}, #{handleTime}, #{handleRemark}, #{createTime}, #{updateTime}
         )
     </insert>
@@ -45,6 +46,9 @@
         SELECT <include refid="Base_Column_List"/>
         FROM sys_attack_monitor
         <where>
+            <if test="eventId != null and eventId != ''">
+                AND event_id = #{eventId}
+            </if>
             <if test="attackType != null and attackType != ''">
                 AND attack_type = #{attackType}
             </if>
@@ -79,6 +83,9 @@
         SELECT COUNT(*)
         FROM sys_attack_monitor
         <where>
+            <if test="eventId != null and eventId != ''">
+                AND event_id = #{eventId}
+            </if>
             <if test="attackType != null and attackType != ''">
                 AND attack_type = #{attackType}
             </if>

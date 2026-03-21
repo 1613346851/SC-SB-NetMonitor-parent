@@ -10,7 +10,8 @@
 -- 1. 基础表结构（流量、攻击、漏洞、防御日志、规则）
 -- 2. 系统配置表
 -- 3. IP黑名单优化表结构（主表、历史表、全局防御日志表）
--- 4. 初始化数据（规则、漏洞、系统配置）
+-- 4. 攻击事件聚合表（第三阶段新增）
+-- 5. 初始化数据（规则、漏洞、系统配置）
 -- ============================================================
 
 -- 设置客户端字符集
@@ -74,6 +75,7 @@ CREATE TABLE `sys_traffic_monitor` (
 DROP TABLE IF EXISTS `sys_attack_monitor`;
 CREATE TABLE `sys_attack_monitor` (
   `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
+  `event_id` VARCHAR(64) DEFAULT NULL COMMENT '关联事件ID',
   `traffic_id` BIGINT DEFAULT NULL COMMENT '关联流量 ID',
   `attack_type` VARCHAR(50) NOT NULL COMMENT '攻击类型 (SQL_INJECTION/XSS/COMMAND_INJECTION/DDOS 等)',
   `risk_level` VARCHAR(20) NOT NULL COMMENT '风险等级 (HIGH/MEDIUM/LOW)',
@@ -90,6 +92,7 @@ CREATE TABLE `sys_attack_monitor` (
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
+  KEY `idx_event_id` (`event_id`),
   KEY `idx_traffic_id` (`traffic_id`),
   KEY `idx_source_ip` (`source_ip`),
   KEY `idx_attack_type` (`attack_type`),
@@ -227,6 +230,7 @@ CREATE TABLE `sys_ip_blacklist_history` (
 DROP TABLE IF EXISTS `sys_defense_log`;
 CREATE TABLE `sys_defense_log` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `event_id` VARCHAR(64) DEFAULT NULL COMMENT '关联事件ID',
     `defense_type` VARCHAR(32) NOT NULL COMMENT '防御类型(BLOCK_IP-封禁IP，RATE_LIMIT-限流，BLOCK_REQUEST-拦截请求)',
     `defense_action` VARCHAR(20) DEFAULT NULL COMMENT '防御动作(ADD-添加，REMOVE-移除，UPDATE-更新)',
     `defense_target` VARCHAR(255) NOT NULL COMMENT '防御对象(IP/接口URI/规则ID)',
@@ -236,12 +240,14 @@ CREATE TABLE `sys_defense_log` (
     `defense_reason` VARCHAR(500) DEFAULT NULL COMMENT '防御原因',
     `expire_time` DATETIME DEFAULT NULL COMMENT '防御过期时间(封禁IP时使用)',
     `execute_status` TINYINT DEFAULT 0 COMMENT '执行状态(0-失败，1-成功)',
+    `is_first` TINYINT DEFAULT 0 COMMENT '是否首次防御(0-否，1-是)',
     `execute_result` VARCHAR(500) DEFAULT NULL COMMENT '执行结果详情',
     `operator` VARCHAR(64) DEFAULT NULL COMMENT '操作人(SYSTEM-自动，MANUAL-人工)',
     `execute_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '防御执行时间',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
+    KEY `idx_event_id` (`event_id`),
     KEY `idx_defense_type` (`defense_type`),
     KEY `idx_defense_action` (`defense_action`),
     KEY `idx_defense_target` (`defense_target`),
@@ -254,7 +260,41 @@ CREATE TABLE `sys_defense_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='全局防御日志表';
 
 -- ------------------------------------------------------------
--- 2.10 系统用户表 (sys_user)
+-- 2.10 攻击事件聚合表 (sys_attack_event)
+-- 存储聚合后的攻击事件，用于态势感知和趋势分析
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_attack_event`;
+CREATE TABLE `sys_attack_event` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `event_id` VARCHAR(64) NOT NULL COMMENT '事件唯一标识(UUID)',
+    `source_ip` VARCHAR(128) NOT NULL COMMENT '攻击源IP(规范化后)',
+    `attack_type` VARCHAR(32) NOT NULL COMMENT '攻击类型',
+    `risk_level` VARCHAR(20) NOT NULL COMMENT '风险等级',
+    `start_time` DATETIME NOT NULL COMMENT '攻击开始时间',
+    `end_time` DATETIME DEFAULT NULL COMMENT '攻击结束时间',
+    `duration_seconds` INT DEFAULT 0 COMMENT '持续时间(秒)',
+    `total_requests` INT DEFAULT 0 COMMENT '总请求数',
+    `peak_rps` INT DEFAULT 0 COMMENT '峰值请求数/秒',
+    `attack_count` INT DEFAULT 0 COMMENT '关键攻击节点数',
+    `confidence_start` INT DEFAULT 0 COMMENT '初始置信度',
+    `confidence_end` INT DEFAULT 0 COMMENT '最终置信度',
+    `defense_action` VARCHAR(32) DEFAULT NULL COMMENT '防御动作',
+    `defense_expire_time` DATETIME DEFAULT NULL COMMENT '防御过期时间',
+    `defense_success` TINYINT DEFAULT NULL COMMENT '防御是否成功(0-失败，1-成功)',
+    `status` TINYINT DEFAULT 0 COMMENT '状态(0-进行中，1-已结束)',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_event_id` (`event_id`),
+    KEY `idx_source_ip` (`source_ip`),
+    KEY `idx_attack_type` (`attack_type`),
+    KEY `idx_status` (`status`),
+    KEY `idx_start_time` (`start_time`),
+    KEY `idx_risk_level` (`risk_level`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='攻击事件聚合表';
+
+-- ------------------------------------------------------------
+-- 2.11 系统用户表 (sys_user)
 -- 存储系统管理员账号信息
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_user`;
@@ -285,7 +325,7 @@ CREATE TABLE `sys_user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统用户表';
 
 -- ------------------------------------------------------------
--- 2.11 角色表 (sys_role)
+-- 2.12 角色表 (sys_role)
 -- 存储系统角色信息
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_role`;
@@ -308,7 +348,7 @@ CREATE TABLE `sys_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
 
 -- ------------------------------------------------------------
--- 2.12 菜单权限表 (sys_menu)
+-- 2.13 菜单权限表 (sys_menu)
 -- 存储系统菜单和权限信息
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_menu`;
@@ -338,7 +378,7 @@ CREATE TABLE `sys_menu` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='菜单权限表';
 
 -- ------------------------------------------------------------
--- 2.13 用户-角色关联表 (sys_user_role)
+-- 2.14 用户-角色关联表 (sys_user_role)
 -- 存储用户与角色的关联关系
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_user_role`;
@@ -354,7 +394,7 @@ CREATE TABLE `sys_user_role` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户-角色关联表';
 
 -- ------------------------------------------------------------
--- 2.14 角色-菜单关联表 (sys_role_menu)
+-- 2.15 角色-菜单关联表 (sys_role_menu)
 -- 存储角色与菜单权限的关联关系
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_role_menu`;
@@ -370,7 +410,7 @@ CREATE TABLE `sys_role_menu` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色-菜单关联表';
 
 -- ------------------------------------------------------------
--- 2.15 系统操作日志表 (sys_oper_log)
+-- 2.16 系统操作日志表 (sys_oper_log)
 -- 存储系统操作日志
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_oper_log`;
@@ -407,6 +447,7 @@ DROP VIEW IF EXISTS `v_attack_detail`;
 CREATE VIEW `v_attack_detail` AS
 SELECT 
     a.id AS attack_id,
+    a.event_id,
     a.traffic_id,
     a.attack_type,
     a.risk_level,
@@ -425,6 +466,7 @@ SELECT
     d.id AS defense_id,
     d.defense_type,
     d.execute_status AS defense_status,
+    d.is_first AS defense_is_first,
     d.operator
 FROM sys_attack_monitor a
 LEFT JOIN sys_traffic_monitor t ON a.traffic_id = t.id
@@ -450,6 +492,37 @@ FROM sys_vulnerability_monitor v
 LEFT JOIN sys_attack_monitor a ON FIND_IN_SET(a.id, v.attack_ids)
 GROUP BY v.id, v.vuln_name, v.vuln_type, v.vuln_level, v.verify_status, 
          v.attack_count, v.first_attack_time, v.last_attack_time;
+
+-- ------------------------------------------------------------
+-- 3.3 攻击事件详情视图 (v_attack_event_detail)
+-- 关联攻击事件与攻击监测记录
+-- ------------------------------------------------------------
+DROP VIEW IF EXISTS `v_attack_event_detail`;
+CREATE VIEW `v_attack_event_detail` AS
+SELECT 
+    e.id AS event_table_id,
+    e.event_id,
+    e.source_ip,
+    e.attack_type,
+    e.risk_level,
+    e.start_time,
+    e.end_time,
+    e.duration_seconds,
+    e.total_requests,
+    e.peak_rps,
+    e.attack_count,
+    e.confidence_start,
+    e.confidence_end,
+    e.defense_action,
+    e.defense_success,
+    e.status AS event_status,
+    COUNT(m.id) AS monitor_record_count
+FROM sys_attack_event e
+LEFT JOIN sys_attack_monitor m ON e.event_id = m.event_id
+GROUP BY e.id, e.event_id, e.source_ip, e.attack_type, e.risk_level,
+         e.start_time, e.end_time, e.duration_seconds, e.total_requests,
+         e.peak_rps, e.attack_count, e.confidence_start, e.confidence_end,
+         e.defense_action, e.defense_success, e.status;
 
 -- ============================================================
 -- 4. 初始化基础数据
@@ -669,6 +742,9 @@ SELECT '========================================' AS '';
 SELECT '数据库初始化完成！' AS '提示';
 SELECT '========================================' AS '';
 SELECT CONCAT('数据库：', DATABASE()) AS database_info;
+SELECT '核心表：sys_traffic_monitor, sys_attack_monitor, sys_attack_event, sys_defense_log' AS '核心表';
+SELECT '黑名单表：sys_ip_blacklist, sys_ip_blacklist_history' AS '黑名单表';
+SELECT '系统表：sys_user, sys_role, sys_menu, sys_config' AS '系统表';
 SELECT CONCAT('表数量：', COUNT(*)) AS table_count 
 FROM information_schema.TABLES 
 WHERE TABLE_SCHEMA = 'network_monitor';

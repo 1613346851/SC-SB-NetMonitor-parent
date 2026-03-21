@@ -1,6 +1,7 @@
 /**
  * 攻击监测页面 JavaScript
  * 使用 TableUtils 通用组件
+ * 支持事件ID筛选和关联查看
  */
 
 let attackTable;
@@ -9,6 +10,12 @@ let currentAttackId = null;
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventIdFromUrl = urlParams.get('eventId');
+    if (eventIdFromUrl) {
+        document.getElementById('eventId').value = eventIdFromUrl;
+    }
     
     initAttackTable();
     
@@ -29,14 +36,19 @@ function initAttackTable() {
         defaultSortOrder: 'desc',
         tableBodyEl: 'attackTableBody',
         paginationEl: 'pagination',
-        colspan: 9,
+        colspan: 10,
         renderRow: function(item) {
+            const eventIdLink = item.eventId 
+                ? `<a href="/event?id=${item.eventId}" class="event-link" title="查看事件详情">${item.eventId.substring(0, 12)}...</a>`
+                : '-';
+            
             return `
                 <tr>
                     <td><a href="javascript:void(0)" onclick="attackTable.sort('id')">${item.id || '-'}</a></td>
+                    <td>${eventIdLink}</td>
                     <td><a href="javascript:void(0)" onclick="attackTable.sort('createTime')">${dateFormat.format(item.createTime)}</a></td>
                     <td>${item.sourceIp || '-'}</td>
-                    <td>${item.targetUri || '-'}</td>
+                    <td title="${item.targetUri || '-'}">${truncateText(item.targetUri || '-', 30)}</td>
                     <td>${tableRenderer.renderAttackType(item.attackType)}</td>
                     <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
                     <td>${item.confidence ? item.confidence + '%' : '-'}</td>
@@ -44,6 +56,7 @@ function initAttackTable() {
                     <td>
                         <button class="btn btn-primary btn-sm" onclick="viewAttackDetail(${item.id})">详情</button>
                         ${item.handled === 0 ? `<button class="btn btn-success btn-sm" onclick="handleAttackDirect(${item.id})">处理</button>` : ''}
+                        ${item.eventId ? `<button class="btn btn-info btn-sm" onclick="viewEventDetail('${item.eventId}')">事件</button>` : ''}
                     </td>
                 </tr>
             `;
@@ -54,7 +67,14 @@ function initAttackTable() {
     attackTable.loadData();
 }
 
+function truncateText(text, maxLength) {
+    if (!text) return '-';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+}
+
 function searchAttacks() {
+    const eventId = attackTable.getSearchValue('eventId');
     const sourceIp = attackTable.getSearchValue('sourceIp');
     const attackType = attackTable.getSearchSelectValue('attackType');
     const riskLevel = attackTable.getSearchSelectValue('riskLevel');
@@ -62,6 +82,7 @@ function searchAttacks() {
     const dateRange = attackTable.getDateRangeValue('startDate', 'endDate');
     
     const params = {};
+    if (eventId) params.eventId = eventId;
     if (sourceIp) params.sourceIp = sourceIp;
     if (attackType) params.attackType = attackType;
     if (riskLevel) params.riskLevel = riskLevel;
@@ -73,6 +94,7 @@ function searchAttacks() {
 }
 
 function resetSearch() {
+    document.getElementById('eventId').value = '';
     document.getElementById('sourceIp').value = '';
     document.getElementById('attackType').value = '';
     document.getElementById('riskLevel').value = '';
@@ -92,10 +114,15 @@ async function viewAttackDetail(id) {
         const detail = await http.get(`/attack/${id}`);
         currentAttackId = id;
         
+        const eventIdHtml = detail.eventId 
+            ? `<a href="/event?id=${detail.eventId}" class="event-link">${detail.eventId}</a>`
+            : '-';
+        
         const content = document.getElementById('attackDetailContent');
         content.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div>
+                    <p><strong>事件 ID:</strong> ${eventIdHtml}</p>
                     <p><strong>攻击时间:</strong> ${dateFormat.format(detail.createTime)}</p>
                     <p><strong>源 IP:</strong> ${detail.sourceIp}</p>
                     <p><strong>目标 URI:</strong> ${detail.targetUri || '-'}</p>
@@ -120,6 +147,7 @@ async function viewAttackDetail(id) {
         document.getElementById('attackDetailModal').style.display = 'flex';
         
         document.getElementById('handleBtn').style.display = detail.handled === 0 ? 'inline-block' : 'none';
+        document.getElementById('viewEventBtn').style.display = detail.eventId ? 'inline-block' : 'none';
     } catch (error) {
         console.error('加载攻击详情失败:', error);
     }
@@ -157,6 +185,10 @@ async function handleAttack() {
     } catch (error) {
         console.error('处理攻击失败:', error);
     }
+}
+
+function viewEventDetail(eventId) {
+    window.location.href = `/event?id=${eventId}`;
 }
 
 document.getElementById('attackDetailModal')?.addEventListener('click', function(e) {

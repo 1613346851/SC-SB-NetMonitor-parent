@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>攻击监测 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .event-link {
+            color: #4f46e5;
+            text-decoration: none;
+            font-family: monospace;
+        }
+        .event-link:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -23,6 +33,10 @@
             <main class="content">
                 <div class="filter-bar">
                     <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">事件 ID</label>
+                            <input type="text" class="form-control" id="eventId" placeholder="输入事件ID筛选" style="width: 160px;">
+                        </div>
                         <div class="form-group">
                             <label class="form-label">源 IP</label>
                             <input type="text" class="form-control" id="sourceIp" placeholder="请输入源 IP">
@@ -80,9 +94,10 @@
                             <thead>
                                 <tr>
                                     <th>ID</th>
+                                    <th>事件ID</th>
                                     <th>攻击时间</th>
                                     <th>源 IP</th>
-                                    <th>目标 IP</th>
+                                    <th>目标 URI</th>
                                     <th>攻击类型</th>
                                     <th>风险等级</th>
                                     <th>置信度</th>
@@ -92,7 +107,7 @@
                             </thead>
                             <tbody id="attackTableBody">
                                 <tr>
-                                    <td colspan="9" class="text-center">加载中...</td>
+                                    <td colspan="10" class="text-center">加载中...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -115,6 +130,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-default" onclick="closeAttackDetail()">关闭</button>
+                <button class="btn btn-info" onclick="viewEventDetail()" id="viewEventBtn" style="display: none;">查看事件</button>
                 <button class="btn btn-primary" onclick="handleAttack()" id="handleBtn">标记为已处理</button>
             </div>
         </div>

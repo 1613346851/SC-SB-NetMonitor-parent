@@ -130,6 +130,7 @@ public class DefenseResultBO {
     public DefenseLogDTO toDefenseLogDTO() {
         DefenseLogDTO logDTO = new DefenseLogDTO();
         
+        logDTO.setEventId(this.eventId);
         logDTO.setDefenseType(this.defenseType.getCode());
         logDTO.setDefenseTarget(this.targetIp);
         logDTO.setDefenseReason(this.triggerReason);

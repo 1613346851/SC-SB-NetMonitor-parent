@@ -1,9 +1,11 @@
 package com.network.monitor.service.impl;
 
 import com.network.monitor.dto.DefenseLogDTO;
+import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.event.BlacklistSyncEvent;
 import com.network.monitor.mapper.DefenseLogMapper;
+import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.DefenseLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,9 @@ public class DefenseLogServiceImpl implements DefenseLogService {
     @Autowired
     private ApplicationEventPublisher eventPublisher;
 
+    @Autowired
+    private AttackEventService attackEventService;
+
     @Override
     public void receiveDefenseLog(DefenseLogDTO logDTO) {
         if (logDTO == null) {
@@ -33,11 +38,13 @@ public class DefenseLogServiceImpl implements DefenseLogService {
             
             defenseLogMapper.insert(entity);
             
-            log.info("接收并保存防御日志成功：defenseType={}, defenseTarget={}, defenseAction={}, executeStatus={}", 
-                logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getDefenseAction(), logDTO.getExecuteStatus());
+            log.info("接收并保存防御日志成功：defenseType={}, defenseTarget={}, defenseAction={}, executeStatus={}, isFirst={}", 
+                logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getDefenseAction(), logDTO.getExecuteStatus(), entity.getIsFirst());
 
-            if (logDTO.getExecuteStatus() != null && logDTO.getExecuteStatus() == 1) {
+            if (logDTO.getExecuteStatus() != null && logDTO.getExecuteStatus() == 1 && entity.getIsFirst() == 1) {
                 publishBlacklistSyncEvent(logDTO);
+            } else if (entity.getIsFirst() == 0) {
+                log.debug("非首次防御日志，跳过黑名单事件发布：eventId={}", entity.getEventId());
             }
             
         } catch (Exception e) {
@@ -122,6 +129,22 @@ public class DefenseLogServiceImpl implements DefenseLogService {
         entity.setOperator(dto.getOperator() != null ? dto.getOperator() : "SYSTEM");
         
         entity.setExpireTime(parseExpireTime(dto.getExpireTime()));
+
+        if (dto.getEventId() != null && !dto.getEventId().isEmpty()) {
+            entity.setEventId(dto.getEventId());
+        } else if (dto.getDefenseTarget() != null && !dto.getDefenseTarget().isEmpty()) {
+            AttackEventEntity ongoingEvent = attackEventService.getOngoingEventByIp(dto.getDefenseTarget());
+            if (ongoingEvent != null) {
+                entity.setEventId(ongoingEvent.getEventId());
+            }
+        }
+
+        if (entity.getEventId() != null) {
+            int existingCount = defenseLogMapper.countByEventId(entity.getEventId());
+            entity.setIsFirst(existingCount == 0 ? 1 : 0);
+        } else {
+            entity.setIsFirst(0);
+        }
         
         LocalDateTime now = LocalDateTime.now();
         entity.setExecuteTime(now);
