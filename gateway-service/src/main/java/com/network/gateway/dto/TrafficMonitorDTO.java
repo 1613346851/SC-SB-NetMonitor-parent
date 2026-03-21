@@ -137,6 +137,11 @@ public class TrafficMonitorDTO implements Serializable {
     private String errorMessage;
 
     /**
+     * 是否跳过推送（DEFENDED状态的IP不推送流量）
+     */
+    private Boolean skipPush;
+
+    /**
      * 构造函数（用于创建新的流量监控记录）
      *
      * @param requestId 请求 ID
@@ -186,5 +191,14 @@ public class TrafficMonitorDTO implements Serializable {
     public void markAsFailed(String errorMessage) {
         this.success = false;
         this.errorMessage = errorMessage;
+    }
+
+    /**
+     * 判断是否跳过推送
+     *
+     * @return true表示跳过推送
+     */
+    public boolean isSkipPush() {
+        return skipPush != null && skipPush;
     }
 }

@@ -1,5 +1,6 @@
 package com.network.monitor.service.impl;
 
+import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.client.GatewayApiClient;
 import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.entity.DefenseLogEntity;
@@ -40,6 +41,9 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
 
     @Autowired
     private GatewayApiClient gatewayApiClient;
+
+    @Autowired
+    private IpAttackStateCache attackStateCache;
 
     private static final String BLACKLIST_CACHE_PREFIX = "cache:blacklist:";
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -266,6 +270,10 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
             recordDefenseLog("BLOCK_IP", "REMOVE", ip, null, null, null, unbanReason, null, 1, "解封成功", operator);
 
             blacklistCache.remove(ip);
+            
+            attackStateCache.markAsCooldown(ip);
+            log.info("IP状态已更新为COOLDOWN: ip={}", ip);
+            
             syncToGateway(ip, "REMOVE");
 
             log.info("从黑名单移除 IP 成功：ip={}, unbanReason={}, operator={}", ip, unbanReason, operator);

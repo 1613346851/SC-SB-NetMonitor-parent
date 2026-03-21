@@ -1,6 +1,8 @@
 package com.network.monitor.service.impl;
 
+import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.client.GatewayApiClient;
+import com.network.monitor.common.constant.IpAttackStateConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.service.DefenseDecisionService;
@@ -11,10 +13,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
-/**
- * 防御决策生成服务实现类
- */
 @Slf4j
 @Service
 public class DefenseDecisionServiceImpl implements DefenseDecisionService {
@@ -23,6 +23,9 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
     @Autowired
     private GatewayApiClient gatewayApiClient;
+
+    @Autowired
+    private IpAttackStateCache attackStateCache;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -33,26 +36,42 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
         }
 
         try {
+            String sourceIp = attackDTO.getSourceIp();
+
+            if (attackStateCache.isInDefendedState(sourceIp)) {
+                log.debug("IP已处于DEFENDED状态，跳过防御决策: ip={}", sourceIp);
+                return null;
+            }
+
+            if (attackStateCache.hasActiveEvent(sourceIp)) {
+                log.debug("IP已有活跃攻击事件，跳过防御决策: ip={}, eventId={}", sourceIp, attackStateCache.getEventId(sourceIp));
+                return null;
+            }
+
             String riskLevelStr = attackDTO.getRiskLevel();
             DefenseCommandDTO commandDTO = null;
 
             DefenseCommandDTO.RiskLevel riskLevel = parseRiskLevel(riskLevelStr);
 
+            String eventId = generateEventId();
+
             if (riskLevel == DefenseCommandDTO.RiskLevel.HIGH || riskLevel == DefenseCommandDTO.RiskLevel.CRITICAL) {
                 commandDTO = buildDefenseCommand(
                         attackDTO,
                         DefenseCommandDTO.DefenseType.BLACKLIST,
-                        attackDTO.getSourceIp(),
+                        sourceIp,
                         "检测到高风险攻击：" + attackDTO.getAttackType(),
-                        calculateExpireTime(30)
+                        calculateExpireTime(30),
+                        eventId
                 );
             } else if (riskLevel == DefenseCommandDTO.RiskLevel.MEDIUM) {
                 commandDTO = buildDefenseCommand(
                         attackDTO,
                         DefenseCommandDTO.DefenseType.RATE_LIMIT,
-                        attackDTO.getSourceIp(),
+                        sourceIp,
                         "检测到中风险攻击：" + attackDTO.getAttackType(),
-                        calculateExpireTime(60)
+                        calculateExpireTime(60),
+                        eventId
                 );
                 if (commandDTO != null) {
                     commandDTO.setRateLimitThreshold(DEFAULT_RATE_LIMIT_THRESHOLD);
@@ -62,8 +81,9 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
             if (commandDTO != null) {
                 boolean success = gatewayApiClient.pushDefenseCommand(commandDTO);
                 if (success) {
-                    log.info("生成并推送防御决策成功：attackId={}, defenseType={}, sourceIp={}",
-                            attackDTO.getTrafficId(), commandDTO.getDefenseType(), commandDTO.getSourceIp());
+                    attackStateCache.markAsDefended(sourceIp, eventId);
+                    log.info("生成并推送防御决策成功：attackId={}, defenseType={}, sourceIp={}, eventId={}",
+                            attackDTO.getTrafficId(), commandDTO.getDefenseType(), sourceIp, eventId);
                 } else {
                     log.error("推送防御指令失败：attackId={}", attackDTO.getTrafficId());
                 }
@@ -79,11 +99,14 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
     @Override
     public DefenseCommandDTO generateManualDefense(String defenseType, String target, String reason) {
         try {
+            String eventId = generateEventId();
+
             DefenseCommandDTO commandDTO = new DefenseCommandDTO();
             commandDTO.setSourceIp(target);
             commandDTO.setDefenseType(parseDefenseType(defenseType));
             commandDTO.setRiskLevel(DefenseCommandDTO.RiskLevel.HIGH);
             commandDTO.setDescription(reason);
+            commandDTO.setEventId(eventId);
 
             if (commandDTO.getDefenseType() == DefenseCommandDTO.DefenseType.RATE_LIMIT) {
                 commandDTO.setRateLimitThreshold(DEFAULT_RATE_LIMIT_THRESHOLD);
@@ -96,7 +119,9 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
             gatewayApiClient.pushDefenseCommand(commandDTO);
 
-            log.info("生成手动防御决策：type={}, target={}, reason={}", defenseType, target, reason);
+            attackStateCache.markAsDefended(target, eventId);
+
+            log.info("生成手动防御决策：type={}, target={}, reason={}, eventId={}", defenseType, target, reason, eventId);
             return commandDTO;
         } catch (Exception e) {
             log.error("生成手动防御决策失败：", e);
@@ -104,17 +129,22 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
         }
     }
 
+    private String generateEventId() {
+        return "EVT_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
     private DefenseCommandDTO buildDefenseCommand(AttackMonitorDTO attackDTO,
                                                   DefenseCommandDTO.DefenseType defenseType,
                                                   String target,
                                                   String reason,
-                                                  String expireTime) {
+                                                  String expireTime,
+                                                  String eventId) {
         DefenseCommandDTO dto = new DefenseCommandDTO();
         dto.setSourceIp(target);
         dto.setDefenseType(defenseType);
         dto.setRiskLevel(parseRiskLevel(attackDTO.getRiskLevel()));
         dto.setDescription(reason);
-        dto.setEventId(String.valueOf(attackDTO.getTrafficId()));
+        dto.setEventId(eventId);
 
         if (expireTime != null) {
             try {

@@ -1,6 +1,7 @@
 package com.network.monitor.service.impl;
 
 import com.network.monitor.cache.BlacklistCache;
+import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.client.GatewayApiClient;
 import com.network.monitor.common.constant.DefenseTypeConstant;
 import com.network.monitor.common.util.IpNormalizeUtil;
@@ -36,6 +37,9 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
 
     @Autowired
     private DefenseLogMapper defenseLogMapper;
+
+    @Autowired
+    private IpAttackStateCache attackStateCache;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -161,6 +165,10 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
             int count = defenseLogMapper.deleteAllBlacklistsByIp(normalizedIp);
 
             blacklistCache.remove(normalizedIp);
+            
+            attackStateCache.markAsCooldown(normalizedIp);
+            log.info("IP状态已更新为COOLDOWN: ip={}", normalizedIp);
+            
             syncToGateway(normalizedIp, "REMOVE");
 
             recordDefenseLog(normalizedIp, "REMOVE", "删除所有封禁记录", "MANUAL", null);
@@ -183,6 +191,9 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
 
         try {
             blacklistCache.remove(normalizedIp);
+            
+            attackStateCache.markAsCooldown(normalizedIp);
+            log.info("IP状态已更新为COOLDOWN: ip={}", normalizedIp);
 
             syncToGateway(normalizedIp, "REMOVE");
 

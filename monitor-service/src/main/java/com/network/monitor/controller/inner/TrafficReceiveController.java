@@ -1,5 +1,6 @@
 package com.network.monitor.controller.inner;
 
+import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;
@@ -13,10 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * 流量数据接收控制器（对内跨服务接口）
- * 安全验证由 CrossServiceSecurityInterceptor 统一处理
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/inner/traffic")
@@ -52,15 +49,19 @@ public class TrafficReceiveController {
     @Autowired
     private AttackDetectService attackDetectServiceImpl;
 
-    /**
-     * 接收网关推送的流量数据（同步处理）
-     * 安全验证由 CrossServiceSecurityInterceptor 拦截器统一处理
-     */
+    @Autowired
+    private IpAttackStateCache attackStateCache;
+
     @PostMapping("/receive")
     public ApiResponse<Void> receiveTraffic(@RequestBody TrafficMonitorDTO trafficDTO) {
         try {
             log.info("接收到流量数据：sourceIp={}, uri={}, method={}", 
                 trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getHttpMethod());
+
+            if (trafficDTO.isSkipPush()) {
+                log.debug("流量标记为跳过推送，跳过处理: sourceIp={}", trafficDTO.getSourceIp());
+                return ApiResponse.success();
+            }
 
             processTrafficSync(trafficDTO);
 
@@ -73,19 +74,14 @@ public class TrafficReceiveController {
         }
     }
 
-    /**
-     * 同步处理流量数据（确保数据写入数据库）
-     */
     public void processTrafficSync(TrafficMonitorDTO trafficDTO) {
         try {
             log.debug("开始预处理流量：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
             
-            // 1. 预处理流量（解码等）
             trafficAnalyzeService.preprocessTraffic(trafficDTO);
 
             log.debug("开始保存流量数据：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
             
-            // 2. 保存原始流量数据到数据库
             TrafficMonitorEntity trafficEntity = trafficStoreService.convertToEntity(trafficDTO);
             Long trafficId = trafficStoreService.saveTraffic(trafficEntity);
             
@@ -96,38 +92,29 @@ public class TrafficReceiveController {
             log.info("流量数据已保存：trafficId={}, sourceIp={}, uri={}", 
                 trafficId, trafficDTO.getSourceIp(), trafficEntity.getSourceIp());
 
-            // 3. 执行规则引擎检测
             List<AttackMonitorDTO> detectedAttacks = ruleEngineService.executeMatching(trafficDTO);
 
-            // 4. 执行 DDoS 检测
             AttackMonitorDTO ddosAttack = ddosDetectService.detect(trafficDTO);
             if (ddosAttack != null) {
                 detectedAttacks.add(ddosAttack);
             }
 
-            // 5. 处理检测到的攻击
             if (!detectedAttacks.isEmpty()) {
                 for (AttackMonitorDTO attack : detectedAttacks) {
-                    // 设置关联的流量 ID
                     attack.setTrafficId(trafficId);
                     
-                    // 6. 漏洞验证（如果命中预设漏洞）
                     VulnerabilityMonitorEntity matchedVuln = vulnerabilityVerifyService.verifyAttack(attack);
                     
-                    // 7. 保存攻击记录到数据库
                     AttackMonitorEntity attackEntity = attackStoreService.convertToEntity(attack);
                     Long attackId = attackStoreService.saveAttack(attackEntity);
                     
-                    // 8. 更新漏洞统计
                     if (attackId != null && matchedVuln != null) {
-                        // 漏洞验证后更新统计
                         vulnerabilityStatService.incrementAttackCount(
-                            matchedVuln.getId(), // 使用命中的漏洞 ID
+                            matchedVuln.getId(),
                             attackId
                         );
                     }
                     
-                    // 9. 生成防御决策（高风险攻击）
                     defenseDecisionService.generateDefenseDecision(attack);
                 }
 

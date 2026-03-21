@@ -98,4 +98,18 @@ public class TrafficMonitorDTO {
      * Cookie 信息
      */
     private String cookie;
+
+    /**
+     * 是否跳过推送（DEFENDED状态的IP不推送流量）
+     */
+    private Boolean skipPush;
+
+    /**
+     * 判断是否跳过推送
+     *
+     * @return true表示跳过推送
+     */
+    public boolean isSkipPush() {
+        return skipPush != null && skipPush;
+    }
 }

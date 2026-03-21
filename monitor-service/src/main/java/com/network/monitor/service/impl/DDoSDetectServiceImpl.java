@@ -1,7 +1,9 @@
 package com.network.monitor.service.impl;
 
+import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.common.constant.AttackTypeConstant;
+import com.network.monitor.common.constant.IpAttackStateConstant;
 import com.network.monitor.common.constant.RiskLevelConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;
@@ -16,10 +18,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * DDoS 攻击专项检测服务实现类
- * 基于内存 ConcurrentHashMap 实现 1 分钟固定窗口计数
- */
 @Slf4j
 @Service
 public class DDoSDetectServiceImpl implements DDoSDetectService {
@@ -27,16 +25,11 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
     @Autowired
     private SysConfigCache sysConfigCache;
 
-    /**
-     * 源 IP 请求计数器
-     * Key: sourceIp_minuteTimestamp
-     * Value: requestCount
-     */
+    @Autowired
+    private IpAttackStateCache attackStateCache;
+
     private final Map<String, AtomicInteger> requestCounter = new ConcurrentHashMap<>();
 
-    /**
-     * 时间窗口格式化器
-     */
     private static final DateTimeFormatter MINUTE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
 
     @Override
@@ -46,21 +39,35 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
         }
 
         String sourceIp = trafficDTO.getSourceIp();
+
+        if (attackStateCache.isInDefendedState(sourceIp)) {
+            log.debug("IP已处于DEFENDED状态，跳过DDoS检测: ip={}", sourceIp);
+            return null;
+        }
+
+        if (attackStateCache.hasActiveEvent(sourceIp)) {
+            log.debug("IP已有活跃攻击事件，跳过DDoS检测: ip={}, eventId={}", sourceIp, attackStateCache.getEventId(sourceIp));
+            return null;
+        }
+
         String currentTimeWindow = getCurrentMinuteWindow();
         String counterKey = sourceIp + "_" + currentTimeWindow;
 
-        // 原子性增加计数
         AtomicInteger count = requestCounter.computeIfAbsent(counterKey, k -> new AtomicInteger(0));
         int currentCount = count.incrementAndGet();
 
-        // 从配置缓存获取阈值
         int ddosThreshold = sysConfigCache.getIntValue("ddos.threshold", 100);
 
-        // 检查是否超过阈值
         if (currentCount > ddosThreshold) {
             log.warn("检测到 DDoS 攻击！sourceIp={}, 当前窗口请求数={}, 阈值={}", 
                     sourceIp, currentCount, ddosThreshold);
-            
+
+            int currentState = attackStateCache.getState(sourceIp);
+            if (currentState == IpAttackStateConstant.NORMAL || currentState == IpAttackStateConstant.SUSPICIOUS) {
+                attackStateCache.markAsAttacking(sourceIp);
+                log.info("IP状态更新为ATTACKING: ip={}, reason=ddos_detected", sourceIp);
+            }
+
             return buildDDoSAttackDTO(trafficDTO, currentCount, ddosThreshold);
         }
 
@@ -74,16 +81,10 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
         log.debug("重置 DDoS 计数器：key={}", key);
     }
 
-    /**
-     * 获取当前分钟级时间窗口标识
-     */
     private String getCurrentMinuteWindow() {
         return LocalDateTime.now().format(MINUTE_FORMATTER);
     }
 
-    /**
-     * 构建 DDoS 攻击记录
-     */
     private AttackMonitorDTO buildDDoSAttackDTO(TrafficMonitorDTO trafficDTO, int requestCount, int ddosThreshold) {
         AttackMonitorDTO dto = new AttackMonitorDTO();
         
@@ -100,9 +101,6 @@ public class DDoSDetectServiceImpl implements DDoSDetectService {
         return dto;
     }
 
-    /**
-     * 定时清理过期的计数器（每分钟执行一次）
-     */
     public void cleanExpiredCounters() {
         String currentWindow = getCurrentMinuteWindow();
         
