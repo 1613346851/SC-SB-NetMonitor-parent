@@ -88,6 +88,17 @@ public class ServerWebExchangeUtil {
      * @return 源IP地址
      */
     public static String extractSourceIp(ServerHttpRequest request) {
+        String ip = doExtractSourceIp(request);
+        return IpNormalizeUtil.normalize(ip);
+    }
+
+    /**
+     * 执行源IP提取（内部方法）
+     *
+     * @param request ServerHttpRequest对象
+     * @return 源IP地址
+     */
+    private static String doExtractSourceIp(ServerHttpRequest request) {
         // 优先从X-Forwarded-For头部获取
         String xForwardedFor = request.getHeaders().getFirst(GatewayHttpConstant.Header.X_FORWARDED_FOR);
         if (StringUtils.hasText(xForwardedFor)) {

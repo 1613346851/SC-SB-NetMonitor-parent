@@ -88,6 +88,7 @@ function renderBlacklistTable(data) {
             <td>${renderStatus(item.status)}</td>
             <td>${item.createTime ? dateFormat.format(item.createTime) : '-'}</td>
             <td>
+                <button class="btn btn-warning btn-sm" onclick="showUnblockModal('${item.ip}')">解禁</button>
                 <button class="btn btn-primary btn-sm" onclick="showExtendModal('${item.ip}')">延长</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteAllBlacklists('${item.ip}')">删除</button>
             </td>
@@ -277,8 +278,10 @@ async function saveBlacklist() {
         return;
     }
 
-    const ipRegex = /^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$/;
-    if (!ipRegex.test(ipAddress)) {
+    const ipv4Regex = /^(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$/;
+    const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{1,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
+
+    if (!ipv4Regex.test(ipAddress) && !ipv6Regex.test(ipAddress)) {
         message.error('IP 地址格式不正确');
         return;
     }
@@ -488,5 +491,35 @@ async function deleteSingleHistory(ip, id) {
     } catch (error) {
         console.error('删除封禁记录失败:', error);
         message.error(error.message || '删除失败');
+    }
+}
+
+function showUnblockModal(ip) {
+    document.getElementById('unblockIpInput').value = ip;
+    document.getElementById('unblockIpDisplay').value = ip;
+    document.getElementById('unblockReason').value = '';
+    document.getElementById('unblockModal').style.display = 'flex';
+}
+
+function closeUnblockModal() {
+    document.getElementById('unblockModal').style.display = 'none';
+}
+
+async function confirmUnblock() {
+    const ip = document.getElementById('unblockIpInput').value;
+    const reason = document.getElementById('unblockReason').value || '手动解禁';
+
+    if (!confirm(`确定要解禁 IP ${ip} 吗？`)) {
+        return;
+    }
+
+    try {
+        await http.post(`/blacklist/${ip}/unblock`, { reason: reason });
+        message.success(`IP ${ip} 已解禁`);
+        closeUnblockModal();
+        loadBlacklistData();
+    } catch (error) {
+        console.error('解禁失败:', error);
+        message.error(error.message || '解禁失败');
     }
 }

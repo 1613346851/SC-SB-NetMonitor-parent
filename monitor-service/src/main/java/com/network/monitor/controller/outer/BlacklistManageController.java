@@ -1,11 +1,15 @@
 package com.network.monitor.controller.outer;
 
+import com.network.monitor.cache.BlacklistCache;
 import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.common.util.IpNormalizeUtil;
 import com.network.monitor.dto.BlacklistAddDTO;
 import com.network.monitor.dto.BlacklistInfoDTO;
 import com.network.monitor.entity.IpBlacklistEntity;
 import com.network.monitor.entity.IpBlacklistHistoryEntity;
+import com.network.monitor.mapper.DefenseLogMapper;
+import com.network.monitor.mapper.IpBlacklistMapper;
 import com.network.monitor.service.AuthService;
 import com.network.monitor.service.BlacklistManageService;
 import com.network.monitor.service.IpBlacklistService;
@@ -41,6 +45,15 @@ public class BlacklistManageController {
 
     @Autowired
     private OperLogService operLogService;
+
+    @Autowired
+    private DefenseLogMapper defenseLogMapper;
+
+    @Autowired
+    private IpBlacklistMapper ipBlacklistMapper;
+
+    @Autowired
+    private BlacklistCache blacklistCache;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -164,18 +177,48 @@ public class BlacklistManageController {
     }
 
     @DeleteMapping("/{ip}/all")
-    public ApiResponse<Map<String, Object>> deleteAllBlacklists(@PathVariable String ip) {
+    public ApiResponse<Map<String, Object>> deleteAllBlacklists(@PathVariable String ip, HttpServletRequest request) {
         try {
-            ipBlacklistService.removeFromBlacklist(ip, "删除所有封禁记录", "admin");
-            
+            String normalizedIp = IpNormalizeUtil.normalize(ip);
+
+            ipBlacklistMapper.deleteByIpAddress(normalizedIp);
+            blacklistCache.remove(normalizedIp);
+            defenseLogMapper.deleteAllBlacklistsByIp(normalizedIp);
+
+            ipBlacklistService.syncToGateway(normalizedIp, "REMOVE");
+
             Map<String, Object> result = new HashMap<>();
             result.put("deletedCount", 1);
-            
+
             log.info("删除 IP 的所有黑名单记录成功：ip={}", ip);
+
+            operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "黑名单管理",
+                    "删除黑名单IP：" + ip, "delete", "/api/blacklist/" + ip + "/all", getClientIp(request), 0);
+
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("删除 IP 的所有黑名单记录失败：ip={}", ip, e);
             return ApiResponse.error("删除黑名单记录失败：" + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{ip}/unblock")
+    public ApiResponse<Void> unblockIp(@PathVariable String ip, @RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            String unbanReason = params.get("reason") != null ? (String) params.get("reason") : "手动解禁";
+            String operator = authService.getCurrentUsername();
+
+            ipBlacklistService.removeFromBlacklist(ip, unbanReason, operator);
+
+            log.info("解禁 IP 成功：ip={}, reason={}, operator={}", ip, unbanReason, operator);
+
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "黑名单管理",
+                    "解禁IP：" + ip + "，原因：" + unbanReason, "unblock", "/api/blacklist/" + ip + "/unblock", getClientIp(request), 0);
+
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("解禁 IP 失败：ip={}", ip, e);
+            return ApiResponse.error("解禁失败：" + e.getMessage());
         }
     }
 

@@ -1,6 +1,7 @@
 package com.network.gateway.cache;
 
 import com.network.gateway.constant.GatewayCacheConstant;
+import com.network.gateway.util.IpNormalizeUtil;
 import com.network.gateway.util.LocalCacheUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -278,7 +279,8 @@ public class IpBlacklistCache {
      * @return 缓存键
      */
     private String buildCacheKey(String ip) {
-        return GatewayCacheConstant.BLACKLIST_CACHE_KEY_PREFIX + ip;
+        String normalizedIp = IpNormalizeUtil.normalize(ip);
+        return GatewayCacheConstant.BLACKLIST_CACHE_KEY_PREFIX + normalizedIp;
     }
 
     /**
