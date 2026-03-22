@@ -60,7 +60,11 @@ public class BlacklistManageController {
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getBlacklist(
             @RequestParam(defaultValue = "1") int pageNum,
-            @RequestParam(defaultValue = "10") int pageSize) {
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(defaultValue = "createTime") String sortField,
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            @RequestParam(required = false) String ip,
+            @RequestParam(required = false) Integer status) {
         try {
             List<IpBlacklistEntity> entities = ipBlacklistService.getAllBlacklists();
             
@@ -81,9 +85,53 @@ public class BlacklistManageController {
                 list.add(dto);
             }
             
+            if (ip != null && !ip.isEmpty()) {
+                list = list.stream()
+                    .filter(dto -> dto.getIp() != null && dto.getIp().contains(ip))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            if (status != null) {
+                list = list.stream()
+                    .filter(dto -> dto.getStatus() != null && dto.getStatus().equals(status))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            final String finalSortField = sortField;
+            final boolean isAsc = "asc".equalsIgnoreCase(sortOrder);
+            list.sort((a, b) -> {
+                int result = 0;
+                switch (finalSortField) {
+                    case "id":
+                        result = compareLongs(a.getId(), b.getId());
+                        break;
+                    case "ip":
+                        result = compareStrings(a.getIp(), b.getIp());
+                        break;
+                    case "status":
+                        result = compareIntegers(a.getStatus(), b.getStatus());
+                        break;
+                    case "expireTime":
+                        result = compareStrings(a.getExpireTime(), b.getExpireTime());
+                        break;
+                    case "totalBanCount":
+                        result = compareIntegers(a.getTotalBanCount(), b.getTotalBanCount());
+                        break;
+                    case "createTime":
+                    default:
+                        result = compareStrings(a.getCreateTime(), b.getCreateTime());
+                        break;
+                }
+                return isAsc ? result : -result;
+            });
+            
+            int total = list.size();
+            int start = (pageNum - 1) * pageSize;
+            int end = Math.min(start + pageSize, total);
+            List<BlacklistInfoDTO> pagedList = start < total ? list.subList(start, end) : new ArrayList<>();
+            
             Map<String, Object> result = new HashMap<>();
-            result.put("list", list);
-            result.put("total", list.size());
+            result.put("list", pagedList);
+            result.put("total", total);
             result.put("pageNum", pageNum);
             result.put("pageSize", pageSize);
             
@@ -92,6 +140,27 @@ public class BlacklistManageController {
             log.error("获取黑名单列表失败：", e);
             return ApiResponse.error("获取黑名单列表失败");
         }
+    }
+    
+    private int compareStrings(String a, String b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return -1;
+        if (b == null) return 1;
+        return a.compareTo(b);
+    }
+    
+    private int compareIntegers(Integer a, Integer b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return -1;
+        if (b == null) return 1;
+        return a.compareTo(b);
+    }
+    
+    private int compareLongs(Long a, Long b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return -1;
+        if (b == null) return 1;
+        return a.compareTo(b);
     }
 
     private String getLatestBanReason(Long blacklistId) {

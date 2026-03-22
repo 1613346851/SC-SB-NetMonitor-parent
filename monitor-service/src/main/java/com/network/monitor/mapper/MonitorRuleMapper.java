@@ -48,6 +48,18 @@ public interface MonitorRuleMapper {
             @Param("limit") int limit);
 
     /**
+     * 根据条件分页查询规则（支持排序）
+     */
+    List<MonitorRuleEntity> selectByConditionWithSort(
+            @Param("ruleName") String ruleName,
+            @Param("attackType") String attackType,
+            @Param("enabled") Integer enabled,
+            @Param("offset") int offset,
+            @Param("limit") int limit,
+            @Param("sortField") String sortField,
+            @Param("sortOrder") String sortOrder);
+
+    /**
      * 根据条件统计规则数量
      */
     long countByCondition(

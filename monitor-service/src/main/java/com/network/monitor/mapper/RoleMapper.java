@@ -17,6 +17,14 @@ public interface RoleMapper {
                                  @Param("status") Integer status,
                                  @Param("delFlag") Integer delFlag);
     
+    List<RoleEntity> selectListPaged(@Param("roleName") String roleName,
+                                      @Param("status") Integer status,
+                                      @Param("offset") Integer offset,
+                                      @Param("limit") Integer limit);
+    
+    long countList(@Param("roleName") String roleName,
+                   @Param("status") Integer status);
+    
     List<RoleEntity> selectByUserId(@Param("userId") Long userId);
     
     int insert(RoleEntity entity);

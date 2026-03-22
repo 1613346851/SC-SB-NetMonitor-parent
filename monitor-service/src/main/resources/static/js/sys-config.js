@@ -1,11 +1,14 @@
 let configList = [];
 let filteredConfigList = [];
 let currentFilterMode = 'ALL';
+let sortField = 'id';
+let sortOrder = 'desc';
 
 const AI_CONFIG_KEYS = ['ai.model.url', 'ai.model.apiKey'];
 
 document.addEventListener('DOMContentLoaded', function() {
     bindConfigModal();
+    initTableSorting();
     loadConfigList();
 });
 
@@ -14,6 +17,46 @@ function bindConfigModal() {
     modal?.addEventListener('click', function(event) {
         if (event.target === this) {
             closeConfigModal();
+        }
+    });
+}
+
+function initTableSorting() {
+    const table = document.querySelector('.data-table');
+    if (!table) return;
+    
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        header.classList.add('sortable');
+        if (!header.querySelector('.sort-icon')) {
+            header.innerHTML += `<span class="sort-icon"><span class="up">▲</span><span class="down">▼</span></span>`;
+        }
+        
+        header.addEventListener('click', (e) => {
+            const field = header.dataset.sort;
+            if (sortField === field) {
+                sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortField = field;
+                sortOrder = 'asc';
+            }
+            updateSortIcons(table);
+            applyFilters();
+        });
+    });
+    
+    updateSortIcons(table);
+}
+
+function updateSortIcons(table) {
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        const icon = header.querySelector('.sort-icon');
+        if (icon) {
+            icon.className = 'sort-icon';
+            if (header.dataset.sort === sortField) {
+                icon.classList.add(sortOrder);
+            }
         }
     });
 }
@@ -48,17 +91,43 @@ function applyFilters() {
         });
     }
 
-    filteredConfigList = list.sort((a, b) => {
-        const aAi = AI_CONFIG_KEYS.includes(a.configKey);
-        const bAi = AI_CONFIG_KEYS.includes(b.configKey);
-        if (aAi !== bAi) {
-            return aAi ? -1 : 1;
-        }
-        return new Date(b.updateTime || 0).getTime() - new Date(a.updateTime || 0).getTime();
-    });
+    list = sortConfigList(list);
+
+    filteredConfigList = list;
 
     renderOverview(filteredConfigList);
     renderConfigTable(filteredConfigList);
+}
+
+function sortConfigList(list) {
+    return list.sort((a, b) => {
+        const aAi = AI_CONFIG_KEYS.includes(a.configKey);
+        const bAi = AI_CONFIG_KEYS.includes(b.configKey);
+        
+        if (aAi !== bAi) {
+            return aAi ? -1 : 1;
+        }
+
+        let valueA = a[sortField];
+        let valueB = b[sortField];
+
+        if (valueA === null || valueA === undefined) valueA = '';
+        if (valueB === null || valueB === undefined) valueB = '';
+
+        if (sortField === 'createTime' || sortField === 'updateTime') {
+            valueA = valueA ? new Date(valueA).getTime() : 0;
+            valueB = valueB ? new Date(valueB).getTime() : 0;
+        } else if (typeof valueA === 'string') {
+            valueA = valueA.toLowerCase();
+            valueB = valueB.toLowerCase();
+        }
+
+        let result = 0;
+        if (valueA < valueB) result = -1;
+        else if (valueA > valueB) result = 1;
+
+        return sortOrder === 'asc' ? result : -result;
+    });
 }
 
 function renderOverview(list) {
@@ -100,6 +169,8 @@ function renderConfigTable(list) {
         return;
     }
 
+    const cell = TableUtils.cell;
+    
     tbody.innerHTML = list.map(config => {
         const isAiConfig = AI_CONFIG_KEYS.includes(config.configKey);
         return `
@@ -107,21 +178,23 @@ function renderConfigTable(list) {
                 <td>${config.id}</td>
                 <td>
                     <div class="config-table-key">
-                        <code>${escapeHtml(config.configKey)}</code>
+                        <code>${cell.escapeHtml(config.configKey)}</code>
                         ${isAiConfig ? '<span class="ai-badge">AI</span>' : ''}
                     </div>
                 </td>
-                <td><span class="config-value-text" title="${escapeHtml(config.configValue || '')}">${escapeHtml(formatConfigValue(config))}</span></td>
-                <td title="${escapeHtml(config.description || '')}">${escapeHtml(config.description || '-')}</td>
+                ${cell.renderCell(formatConfigValue(config), { maxLength: 40, showTooltip: true })}
+                ${cell.renderCell(config.description, { maxLength: 40 })}
                 <td>${formatTime(config.createTime)}</td>
                 <td>${formatTime(config.updateTime)}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" onclick="showEditConfigModal(${config.id})">编辑</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteConfig(${config.id})">删除</button>
-                </td>
+                ${cell.renderActionCell(`
+                    ${cell.renderButton('编辑', 'primary', `showEditConfigModal(${config.id})`)}
+                    ${cell.renderButton('删除', 'danger', `deleteConfig(${config.id})`)}
+                `)}
             </tr>
         `;
     }).join('');
+    
+    TableUtils.bindTooltip(tbody);
 }
 
 function searchConfig() {
@@ -220,9 +293,7 @@ async function saveConfig() {
 }
 
 async function deleteConfig(id) {
-    if (!confirm('确定要删除该配置吗？')) {
-        return;
-    }
+    if (!confirm('确定要删除该配置吗？')) return;
 
     try {
         await http.delete(`/config/${id}`);
@@ -251,12 +322,8 @@ function formatConfigValue(config) {
 }
 
 function maskConfigValue(value) {
-    if (!value) {
-        return '未配置';
-    }
-    if (value.length <= 8) {
-        return '*'.repeat(value.length);
-    }
+    if (!value) return '未配置';
+    if (value.length <= 8) return '*'.repeat(value.length);
     return `${value.slice(0, 4)}****${value.slice(-4)}`;
 }
 
@@ -266,19 +333,5 @@ function formatTime(value) {
 
 function setText(id, value) {
     const el = document.getElementById(id);
-    if (el) {
-        el.textContent = value;
-    }
-}
-
-function escapeHtml(text) {
-    if (text === null || text === undefined) {
-        return '';
-    }
-    return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    if (el) el.textContent = value;
 }

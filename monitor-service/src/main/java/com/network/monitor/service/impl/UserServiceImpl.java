@@ -44,6 +44,16 @@ public class UserServiceImpl implements UserService {
     }
     
     @Override
+    public List<UserEntity> listUsers(String username, Integer status, Integer offset, Integer limit) {
+        return userMapper.selectListPaged(username, status, offset, limit);
+    }
+    
+    @Override
+    public long countUsers(String username, Integer status) {
+        return userMapper.countList(username, status);
+    }
+    
+    @Override
     @Transactional
     public boolean createUser(UserEntity user, List<Long> roleIds) {
         if (checkUsernameExists(user.getUsername())) {

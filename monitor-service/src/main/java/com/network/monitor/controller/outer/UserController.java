@@ -27,10 +27,27 @@ public class UserController {
     private OperLogService operLogService;
 
     @GetMapping("/list")
-    public ApiResponse<List<UserEntity>> list(@RequestParam(required = false) String username,
-                                               @RequestParam(required = false) Integer status) {
-        List<UserEntity> users = userService.listUsers(username, status);
-        return ApiResponse.success(users);
+    public ApiResponse<Map<String, Object>> list(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        
+        if (pageNum < 1) pageNum = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        
+        int offset = (pageNum - 1) * pageSize;
+        
+        List<UserEntity> users = userService.listUsers(username, status, offset, pageSize);
+        long total = userService.countUsers(username, status);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", users);
+        result.put("total", total);
+        result.put("pageNum", pageNum);
+        result.put("pageSize", pageSize);
+        
+        return ApiResponse.success(result);
     }
     
     @GetMapping("/{id}")

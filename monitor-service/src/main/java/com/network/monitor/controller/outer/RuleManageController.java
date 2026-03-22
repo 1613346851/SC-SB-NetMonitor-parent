@@ -57,13 +57,22 @@ public class RuleManageController {
             @RequestParam(required = false) String ruleName,
             @RequestParam(required = false) String attackType,
             @RequestParam(required = false) Integer enabled,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(defaultValue = "id") String sortField,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         try {
-            int offset = (page - 1) * size;
+            if (pageNum < 1) {
+                pageNum = 1;
+            }
+            if (pageSize < 1 || pageSize > 100) {
+                pageSize = 10;
+            }
             
-            List<MonitorRuleEntity> list = monitorRuleMapper.selectByCondition(
-                ruleName, attackType, enabled, offset, size
+            int offset = (pageNum - 1) * pageSize;
+            
+            List<MonitorRuleEntity> list = monitorRuleMapper.selectByConditionWithSort(
+                ruleName, attackType, enabled, offset, pageSize, sortField, sortOrder
             );
             
             long total = monitorRuleMapper.countByCondition(ruleName, attackType, enabled);
@@ -71,8 +80,8 @@ public class RuleManageController {
             Map<String, Object> result = new HashMap<>();
             result.put("list", list);
             result.put("total", total);
-            result.put("page", page);
-            result.put("size", size);
+            result.put("pageNum", pageNum);
+            result.put("pageSize", pageSize);
 
             return ApiResponse.success(result);
         } catch (Exception e) {
@@ -119,7 +128,7 @@ public class RuleManageController {
     /**
      * 更新规则
      */
-    @PostMapping("/update")
+    @PutMapping("/update")
     public ApiResponse<Void> updateRule(@RequestBody MonitorRuleEntity rule, HttpServletRequest request) {
         try {
             rule.setUpdateTime(LocalDateTime.now());
@@ -167,6 +176,27 @@ public class RuleManageController {
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("切换规则状态失败：", e);
+            return ApiResponse.error("操作失败");
+        }
+    }
+
+    /**
+     * 更新规则启用状态
+     */
+    @PutMapping("/status/{id}")
+    public ApiResponse<Void> updateRuleStatus(@PathVariable Long id, @RequestParam Integer enabled, HttpServletRequest request) {
+        try {
+            MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
+            if (rule == null) {
+                return ApiResponse.notFound("规则不存在");
+            }
+            monitorRuleMapper.updateEnabled(id, enabled);
+            String action = enabled == 1 ? "启用" : "禁用";
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理", 
+                action + "规则ID：" + id, "status", "/api/rule/status/" + id, getClientIp(request), 0);
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("更新规则状态失败：", e);
             return ApiResponse.error("操作失败");
         }
     }

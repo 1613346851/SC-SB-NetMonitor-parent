@@ -1,12 +1,257 @@
 /**
  * 通用表格工具类
- * 封装分页、搜索、排序、导出等通用功能
+ * 封装分页、搜索、排序、导出、悬浮提示等通用功能
  */
 
 (function() {
+    let cellTooltip = null;
+    let tooltipInitialized = false;
+
+    const TooltipManager = {
+        init() {
+            if (tooltipInitialized) return;
+            
+            cellTooltip = document.createElement('div');
+            cellTooltip.className = 'cell-tooltip';
+            document.body.appendChild(cellTooltip);
+            tooltipInitialized = true;
+        },
+        
+        show(text, e) {
+            if (!cellTooltip) this.init();
+            if (!text || text.length === 0) return;
+            
+            cellTooltip.textContent = text;
+            cellTooltip.classList.add('visible');
+            this.updatePosition(e);
+        },
+        
+        hide() {
+            if (cellTooltip) {
+                cellTooltip.classList.remove('visible');
+            }
+        },
+        
+        updatePosition(e) {
+            if (!cellTooltip) return;
+            
+            const padding = 10;
+            let x = e.clientX + padding;
+            let y = e.clientY + padding;
+            
+            const tooltipRect = cellTooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+            
+            if (x + tooltipRect.width > viewportWidth - padding) {
+                x = viewportWidth - tooltipRect.width - padding;
+            }
+            if (y + tooltipRect.height > viewportHeight - padding) {
+                y = e.clientY - tooltipRect.height - padding;
+            }
+            
+            cellTooltip.style.left = x + 'px';
+            cellTooltip.style.top = y + 'px';
+        },
+        
+        bindEvents(tbodyEl) {
+            const tbody = typeof tbodyEl === 'string' 
+                ? document.getElementById(tbodyEl) 
+                : tbodyEl;
+            
+            if (!tbody) return;
+            
+            tbody.addEventListener('mouseover', (e) => {
+                const cell = e.target.closest('td.cell-overflow');
+                if (cell) {
+                    const fullText = cell.dataset.fullText;
+                    if (fullText) {
+                        this.show(fullText, e);
+                    }
+                }
+            });
+            
+            tbody.addEventListener('mouseout', (e) => {
+                const cell = e.target.closest('td.cell-overflow');
+                if (cell) {
+                    this.hide();
+                }
+            });
+            
+            tbody.addEventListener('mousemove', (e) => {
+                const cell = e.target.closest('td.cell-overflow');
+                if (cell && cellTooltip && cellTooltip.classList.contains('visible')) {
+                    this.updatePosition(e);
+                }
+            });
+        }
+    };
+
+    const CellRenderer = {
+        escapeAttr(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/\\/g, '\\\\')
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        },
+        
+        escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        },
+        
+        renderText(text, maxLength = 0) {
+            if (!text) return '-';
+            const escaped = this.escapeHtml(text);
+            if (maxLength > 0 && escaped.length > maxLength) {
+                return escaped.substring(0, maxLength) + '...';
+            }
+            return escaped;
+        },
+        
+        renderCell(text, options = {}) {
+            const {
+                maxLength = 60,
+                showTooltip = true,
+                className = ''
+            } = options;
+            
+            const displayText = this.renderText(text, maxLength);
+            
+            if (showTooltip && text && text.length > maxLength) {
+                const escapedFull = this.escapeAttr(text);
+                return `<td class="cell-overflow ${className}" data-full-text="${escapedFull}">${displayText}</td>`;
+            }
+            
+            return `<td class="${className}">${displayText}</td>`;
+        },
+        
+        renderRiskLevel(level) {
+            const levelMap = {
+                'CRITICAL': { text: '严重', class: 'critical' },
+                'HIGH': { text: '高风险', class: 'high' },
+                'MEDIUM': { text: '中风险', class: 'medium' },
+                'LOW': { text: '低风险', class: 'low' },
+                '严重': { text: '严重', class: 'critical' },
+                '高': { text: '高风险', class: 'high' },
+                '中': { text: '中风险', class: 'medium' },
+                '低': { text: '低风险', class: 'low' }
+            };
+            
+            const info = levelMap[level] || { text: level || '-', class: '' };
+            return `<span class="risk-tag ${info.class}">${info.text}</span>`;
+        },
+        
+        renderStatus(enabled, trueText = '启用', falseText = '禁用') {
+            if (enabled === 1 || enabled === true || enabled === '1') {
+                return `<span class="tag success">${trueText}</span>`;
+            }
+            return `<span class="tag info">${falseText}</span>`;
+        },
+        
+        renderAttackType(type) {
+            if (!type) return '-';
+            return `<span class="attack-type-tag">${this.escapeHtml(type)}</span>`;
+        },
+        
+        renderActionCell(buttons, options = {}) {
+            const { width = '200px' } = options;
+            return `<td class="action-cell" style="min-width: ${width}; max-width: ${width}; width: ${width};">
+                <div class="action-btns-fixed">${buttons}</div>
+            </td>`;
+        },
+        
+        renderButton(text, type, onclick, options = {}) {
+            const { size = 'sm', className = '' } = options;
+            const btnClass = `btn btn-${type} btn-${size} ${className}`.trim();
+            return `<button class="${btnClass}" onclick="${onclick}">${text}</button>`;
+        },
+        
+        renderToggleButton(currentValue, id, trueText = '禁用', falseText = '启用', callback = 'toggleStatus') {
+            if (currentValue === 1 || currentValue === true || currentValue === '1') {
+                return this.renderButton(trueText, 'warning', `${callback}(${id}, ${currentValue})`);
+            }
+            return this.renderButton(falseText, 'success', `${callback}(${id}, ${currentValue})`);
+        }
+    };
+
     const TableUtils = {
         createInstance(options) {
             return new TableInstance(options);
+        },
+        
+        initTooltip() {
+            TooltipManager.init();
+        },
+        
+        bindTooltip(tbodyEl) {
+            TooltipManager.bindEvents(tbodyEl);
+        },
+        
+        cell: CellRenderer,
+        
+        renderHeader(columns, options = {}) {
+            const { sortField = null, sortOrder = 'desc', fixedAction = false, actionWidth = '200px' } = options;
+            
+            let html = columns.map((col, index) => {
+                const {
+                    field,
+                    title,
+                    sortable = false,
+                    width = null,
+                    minWidth = null,
+                    align = 'left',
+                    className = '',
+                    isAction = false
+                } = col;
+                
+                let classes = [];
+                if (sortable) classes.push('sortable');
+                if (className) classes.push(className);
+                if (isAction) classes.push('action-header');
+                
+                let attrs = [];
+                if (sortable && field) attrs.push(`data-sort="${field}"`);
+                
+                let styleAttrs = [];
+                if (width) {
+                    styleAttrs.push(`width: ${width}`);
+                    styleAttrs.push(`min-width: ${width}`);
+                } else if (minWidth) {
+                    styleAttrs.push(`min-width: ${minWidth}`);
+                }
+                if (isAction && fixedAction) {
+                    styleAttrs.push(`min-width: ${actionWidth}`);
+                    styleAttrs.push(`max-width: ${actionWidth}`);
+                    styleAttrs.push(`width: ${actionWidth}`);
+                }
+                if (styleAttrs.length > 0) {
+                    attrs.push(`style="${styleAttrs.join('; ')}"`);
+                }
+                attrs.push(`class="${classes.join(' ')}"`);
+                
+                let sortIcon = '';
+                if (sortable) {
+                    let iconClass = 'sort-icon';
+                    if (field === sortField) {
+                        iconClass += ` ${sortOrder}`;
+                    }
+                    sortIcon = `<span class="${iconClass}"><span class="up">▲</span><span class="down">▼</span></span>`;
+                }
+                
+                return `<th ${attrs.join(' ')}>${title}${sortIcon}<div class="th-resizer"></div></th>`;
+            }).join('\n');
+            
+            return html;
         },
         
         initTableEnhancements(tableSelector, options = {}) {
@@ -112,6 +357,12 @@
                 renderRow: null,
                 paginationEl: 'pagination',
                 tableBodyEl: '',
+                tableEl: '',
+                columns: null,
+                colspan: 10,
+                fixedAction: false,
+                actionWidth: '200px',
+                enableTooltip: true,
                 ...options
             };
             
@@ -121,10 +372,13 @@
             this.sortField = this.options.defaultSortField;
             this.sortOrder = this.options.defaultSortOrder;
             this.data = [];
+            this.initialized = false;
         }
 
         async loadData() {
             try {
+                this.showLoading();
+                
                 const params = {
                     pageNum: this.currentPage,
                     pageSize: this.options.pageSize,
@@ -135,8 +389,16 @@
 
                 const result = await http.get(this.options.apiUrl, params);
                 
-                this.data = result.list || [];
-                this.totalCount = result.total || 0;
+                if (result && typeof result === 'object') {
+                    this.data = result.list || [];
+                    this.totalCount = result.total || 0;
+                } else if (Array.isArray(result)) {
+                    this.data = result;
+                    this.totalCount = result.length;
+                } else {
+                    this.data = [];
+                    this.totalCount = 0;
+                }
                 
                 this.renderTable();
                 this.renderPagination();
@@ -145,9 +407,18 @@
                 return result;
             } catch (error) {
                 console.error('加载数据失败:', error);
+                this.data = [];
+                this.totalCount = 0;
                 this.renderEmpty();
+                this.renderPagination();
                 throw error;
             }
+        }
+
+        showLoading() {
+            const tbody = document.getElementById(this.options.tableBodyEl);
+            if (!tbody) return;
+            tbody.innerHTML = TableUtils.renderLoading(this.options.colspan);
         }
 
         renderTable() {
@@ -168,8 +439,7 @@
             const tbody = document.getElementById(this.options.tableBodyEl);
             if (!tbody) return;
             
-            const colspan = this.options.colspan || 10;
-            tbody.innerHTML = `<tr><td colspan="${colspan}" class="text-center">暂无数据</td></tr>`;
+            tbody.innerHTML = TableUtils.renderEmpty(this.options.colspan);
         }
 
         renderPagination() {
@@ -274,14 +544,16 @@
             const table = tbody.closest('table');
             if (!table) return;
             
-            // Init sortable headers
+            if (this.options.fixedAction) {
+                table.classList.add('has-fixed-action');
+            }
+            
             const ths = table.querySelectorAll('th[data-sort]');
             ths.forEach(th => {
                 th.classList.add('sortable');
                 if (!th.querySelector('.sort-icon')) {
                     th.innerHTML += `<span class="sort-icon"><span class="up">▲</span><span class="down">▼</span></span>`;
                 }
-                // avoid duplicate listeners
                 if (!th.dataset.sortBound) {
                     th.dataset.sortBound = 'true';
                     th.addEventListener('click', (e) => {
@@ -292,10 +564,9 @@
             });
             this.updateSortIcons();
 
-            // Init resizable columns
             const cols = table.querySelectorAll('th');
             cols.forEach(th => {
-                if (th.querySelector('.th-resizer')) return; // already added
+                if (th.querySelector('.th-resizer')) return;
                 const resizer = document.createElement('div');
                 resizer.classList.add('th-resizer');
                 th.appendChild(resizer);
@@ -324,6 +595,15 @@
                     document.addEventListener('mouseup', onMouseUp);
                 });
             });
+
+            if (this.options.enableTooltip) {
+                TooltipManager.bindEvents(tbody);
+            }
+            
+            if (!this.initialized) {
+                TooltipManager.init();
+                this.initialized = true;
+            }
         }
 
         getSortIcon(field) {
@@ -392,8 +672,25 @@
                 endTime: endDate ? endDate + ' 23:59:59' : ''
             };
         }
+
+        refresh() {
+            this.loadData();
+        }
+
+        getData() {
+            return this.data;
+        }
+
+        getTotalCount() {
+            return this.totalCount;
+        }
+
+        getCurrentPage() {
+            return this.currentPage;
+        }
     }
 
     window.TableUtils = TableUtils;
     window.TableInstance = TableInstance;
+    window.CellRenderer = CellRenderer;
 })();

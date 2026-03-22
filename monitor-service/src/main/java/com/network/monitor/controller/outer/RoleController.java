@@ -27,10 +27,27 @@ public class RoleController {
     private OperLogService operLogService;
 
     @GetMapping("/list")
-    public ApiResponse<List<RoleEntity>> list(@RequestParam(required = false) String roleName,
-                                               @RequestParam(required = false) Integer status) {
-        List<RoleEntity> roles = roleService.listRoles(roleName, status);
-        return ApiResponse.success(roles);
+    public ApiResponse<Map<String, Object>> list(
+            @RequestParam(required = false) String roleName,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        
+        if (pageNum < 1) pageNum = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        
+        int offset = (pageNum - 1) * pageSize;
+        
+        List<RoleEntity> roles = roleService.listRoles(roleName, status, offset, pageSize);
+        long total = roleService.countRoles(roleName, status);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", roles);
+        result.put("total", total);
+        result.put("pageNum", pageNum);
+        result.put("pageSize", pageSize);
+        
+        return ApiResponse.success(result);
     }
     
     @GetMapping("/{id}")

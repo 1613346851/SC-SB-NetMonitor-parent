@@ -22,7 +22,9 @@ public interface DefenseLogMapper {
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
             @Param("offset") Integer offset,
-            @Param("limit") Integer limit
+            @Param("limit") Integer limit,
+            @Param("sortField") String sortField,
+            @Param("sortOrder") String sortOrder
     );
 
     long countByCondition(

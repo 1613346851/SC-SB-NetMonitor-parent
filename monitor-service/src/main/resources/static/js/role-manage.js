@@ -29,12 +29,12 @@ function initRoleTable() {
             return `
                 <tr>
                     <td>${role.id || '-'}</td>
-                    <td>${tableRenderer.renderText(role.roleName)}</td>
-                    <td><code>${tableRenderer.renderText(role.roleCode)}</code></td>
-                    <td>${tableRenderer.renderText(role.roleDesc)}</td>
+                    <td>${CellRenderer.renderText(role.roleName)}</td>
+                    <td><code>${CellRenderer.renderText(role.roleCode)}</code></td>
+                    <td>${CellRenderer.renderText(role.roleDesc)}</td>
                     <td>${renderStatus(role.status)}</td>
-                    <td>${tableRenderer.renderDateTime(role.createTime)}</td>
-                    <td class="action-btns">${tableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
+                    <td>${DateUtil.format(role.createTime)}</td>
+                    <td class="action-btns">${TableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
                 </tr>
             `;
         }

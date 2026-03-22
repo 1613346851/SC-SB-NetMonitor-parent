@@ -35,7 +35,12 @@ public class AttackEventController {
             @RequestParam(defaultValue = "desc") String sortOrder) {
 
         try {
-            int offset = (pageNum - 1) * pageSize;
+            if (pageNum < 1) {
+                pageNum = 1;
+            }
+            if (pageSize < 1 || pageSize > 100) {
+                pageSize = 10;
+            }
             
             LocalDateTime startDateTime = parseDateTime(startTime);
             LocalDateTime endDateTime = parseDateTime(endTime);
@@ -43,7 +48,7 @@ public class AttackEventController {
             
             List<AttackEventEntity> list = attackEventService.getEventsByCondition(
                 eventId, sourceIp, attackType, riskLevel, status, 
-                startDateTime, endDateTime, offset, pageSize, orderBy
+                startDateTime, endDateTime, pageNum, pageSize, orderBy
             );
             
             long total = attackEventService.countEventsByCondition(

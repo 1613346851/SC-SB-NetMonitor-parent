@@ -1,24 +1,77 @@
 /**
  * 防御效果评估页面 JavaScript
- * 展示防御效果统计、成功率分析和趋势图
  */
 
 let defenseChart = null;
 let successRateChart = null;
+let defenseLogTable;
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
-    document.getElementById('startDate').value = dateFormat.daysAgo(7);
+    document.getElementById('startDate').value = DateUtil.daysAgo(7);
     
     loadDefenseStatistics();
     loadDefenseTrend();
     loadSuccessRateByType();
-    loadRecentDefenseLogs();
+    initDefenseLogTable();
     
     setInterval(() => {
         loadDefenseStatistics();
     }, 30000);
 });
+
+function initDefenseLogTable() {
+    defenseLogTable = TableUtils.createInstance({
+        instanceName: 'defenseLogTable',
+        apiUrl: '/defense/list',
+        pageSize: 10,
+        defaultSortField: 'createTime',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'recentDefenseBody',
+        paginationEl: 'defensePagination',
+        colspan: 7,
+        fixedAction: false,
+        enableTooltip: true,
+        renderRow: function(item) {
+            return `
+                <tr>
+                    <td>${DateUtil.format(item.createTime)}</td>
+                    <td>${renderDefenseType(item.defenseType)}</td>
+                    ${CellRenderer.renderCell(item.defenseTarget, { maxLength: 20 })}
+                    <td>${renderDefenseAction(item.defenseAction)}</td>
+                    <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
+                    <td>${item.eventId ? `<a href="/event?id=${item.eventId}" class="event-link">${item.eventId.substring(0, 8)}...</a>` : '-'}</td>
+                    <td>
+                        <a href="/defense" class="btn btn-link btn-sm">详情</a>
+                    </td>
+                </tr>
+            `;
+        }
+    });
+    
+    window.defenseLogTable = defenseLogTable;
+    defenseLogTable.loadData();
+}
+
+function renderDefenseType(type) {
+    const typeMap = {
+        'BLOCK_IP': '<span class="tag danger">IP封禁</span>',
+        'RATE_LIMIT': '<span class="tag warning">限流</span>',
+        'REDIRECT': '<span class="tag info">重定向</span>',
+        'CAPTCHA': '<span class="tag info">验证码</span>'
+    };
+    return typeMap[type] || type || '-';
+}
+
+function renderDefenseAction(action) {
+    const actionMap = {
+        'BLOCK': '阻断',
+        'LIMIT': '限速',
+        'REDIRECT': '重定向',
+        'CHALLENGE': '挑战'
+    };
+    return actionMap[action] || action || '-';
+}
 
 async function loadDefenseStatistics() {
     try {
@@ -62,9 +115,7 @@ async function loadDefenseTrend() {
         const option = {
             tooltip: {
                 trigger: 'axis',
-                axisPointer: {
-                    type: 'shadow'
-                }
+                axisPointer: { type: 'shadow' }
             },
             legend: {
                 data: ['成功', '失败'],
@@ -80,31 +131,23 @@ async function loadDefenseTrend() {
             xAxis: {
                 type: 'category',
                 data: dates,
-                axisLabel: {
-                    rotate: 45
-                }
+                axisLabel: { rotate: 45 }
             },
-            yAxis: {
-                type: 'value'
-            },
+            yAxis: { type: 'value' },
             series: [
                 {
                     name: '成功',
                     type: 'bar',
                     stack: 'total',
                     data: successData,
-                    itemStyle: {
-                        color: '#10b981'
-                    }
+                    itemStyle: { color: '#10b981' }
                 },
                 {
                     name: '失败',
                     type: 'bar',
                     stack: 'total',
                     data: failData,
-                    itemStyle: {
-                        color: '#ef4444'
-                    }
+                    itemStyle: { color: '#ef4444' }
                 }
             ]
         };
@@ -148,17 +191,12 @@ async function loadSuccessRateByType() {
             xAxis: {
                 type: 'category',
                 data: types,
-                axisLabel: {
-                    interval: 0,
-                    rotate: 30
-                }
+                axisLabel: { interval: 0, rotate: 30 }
             },
             yAxis: {
                 type: 'value',
                 max: 100,
-                axisLabel: {
-                    formatter: '{value}%'
-                }
+                axisLabel: { formatter: '{value}%' }
             },
             series: [
                 {
@@ -193,67 +231,11 @@ async function loadSuccessRateByType() {
     }
 }
 
-async function loadRecentDefenseLogs() {
-    try {
-        const data = await http.get('/defense/list?pageSize=10');
-        
-        const tbody = document.getElementById('recentDefenseBody');
-        
-        if (!data || !data.list || data.list.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = data.list.map(item => `
-            <tr>
-                <td>${dateFormat.format(item.createTime)}</td>
-                <td>${renderDefenseType(item.defenseType)}</td>
-                <td title="${item.defenseTarget || '-'}">${truncateText(item.defenseTarget || '-', 20)}</td>
-                <td>${renderDefenseAction(item.defenseAction)}</td>
-                <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
-                <td>${item.eventId ? `<a href="/event?id=${item.eventId}" class="event-link">${item.eventId.substring(0, 8)}...</a>` : '-'}</td>
-                <td>
-                    <a href="/defense" class="btn btn-link btn-sm">详情</a>
-                </td>
-            </tr>
-        `).join('');
-        
-    } catch (error) {
-        console.error('加载最近防御日志失败:', error);
-    }
-}
-
-function renderDefenseType(type) {
-    const typeMap = {
-        'BLOCK_IP': '<span class="tag danger">IP封禁</span>',
-        'RATE_LIMIT': '<span class="tag warning">限流</span>',
-        'REDIRECT': '<span class="tag info">重定向</span>',
-        'CAPTCHA': '<span class="tag info">验证码</span>'
-    };
-    return typeMap[type] || type;
-}
-
-function renderDefenseAction(action) {
-    const actionMap = {
-        'BLOCK': '阻断',
-        'LIMIT': '限速',
-        'REDIRECT': '重定向',
-        'CHALLENGE': '挑战'
-    };
-    return actionMap[action] || action;
-}
-
-function truncateText(text, maxLength) {
-    if (!text) return '-';
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-}
-
 function refreshData() {
     loadDefenseStatistics();
     loadDefenseTrend();
     loadSuccessRateByType();
-    loadRecentDefenseLogs();
+    defenseLogTable.refresh();
 }
 
 function exportReport() {

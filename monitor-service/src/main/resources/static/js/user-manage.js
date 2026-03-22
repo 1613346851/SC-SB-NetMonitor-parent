@@ -36,13 +36,13 @@ function initUserTable() {
             return `
                 <tr>
                     <td>${user.id || '-'}</td>
-                    <td>${tableRenderer.renderText(user.username)}</td>
-                    <td>${tableRenderer.renderText(user.nickname)}</td>
-                    <td>${tableRenderer.renderText(user.phone)}</td>
-                    <td>${tableRenderer.renderText(user.email)}</td>
+                    <td>${CellRenderer.renderText(user.username)}</td>
+                    <td>${CellRenderer.renderText(user.nickname)}</td>
+                    <td>${CellRenderer.renderText(user.phone)}</td>
+                    <td>${CellRenderer.renderText(user.email)}</td>
                     <td>${renderStatus(user.status)}</td>
-                    <td>${tableRenderer.renderDateTime(user.createTime)}</td>
-                    <td class="action-btns">${tableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
+                    <td>${DateUtil.format(user.createTime)}</td>
+                    <td class="action-btns">${TableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
                 </tr>
             `;
         }
@@ -54,9 +54,11 @@ function initUserTable() {
 
 async function loadRoles() {
     try {
-        allRoles = await http.get('/system/role/list', { status: 0 });
+        const result = await http.get('/system/role/list', { status: 0 });
+        allRoles = result.list || result || [];
     } catch (error) {
         console.error('加载角色列表失败:', error);
+        allRoles = [];
     }
 }
 

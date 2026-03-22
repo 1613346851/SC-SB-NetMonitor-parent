@@ -12,6 +12,10 @@ public interface RoleService {
     
     List<RoleEntity> listRoles(String roleName, Integer status);
     
+    List<RoleEntity> listRoles(String roleName, Integer status, Integer offset, Integer limit);
+    
+    long countRoles(String roleName, Integer status);
+    
     List<RoleEntity> getRolesByUserId(Long userId);
     
     boolean createRole(RoleEntity role, List<Long> menuIds);

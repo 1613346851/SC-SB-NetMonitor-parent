@@ -59,12 +59,29 @@
             
             menuItems.forEach(item => {
                 const href = item.getAttribute('href');
-                if (href === currentPath || (currentPath.startsWith(href) && href !== '/')) {
-                    item.classList.add('active');
-                } else {
-                    item.classList.remove('active');
+                item.classList.remove('active');
+            });
+            
+            let bestMatch = null;
+            let bestMatchLength = 0;
+            
+            menuItems.forEach(item => {
+                const href = item.getAttribute('href');
+                if (href === currentPath) {
+                    bestMatch = item;
+                    bestMatchLength = href.length;
+                } else if (currentPath.startsWith(href + '/') || 
+                           (currentPath.startsWith(href) && href !== '/' && currentPath.length === href.length)) {
+                    if (href.length > bestMatchLength) {
+                        bestMatch = item;
+                        bestMatchLength = href.length;
+                    }
                 }
             });
+            
+            if (bestMatch) {
+                bestMatch.classList.add('active');
+            }
         },
         
         initUserInfo() {

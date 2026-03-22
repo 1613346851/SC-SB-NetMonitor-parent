@@ -124,12 +124,12 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>配置键</th>
+                                    <th data-sort="id">ID</th>
+                                    <th data-sort="configKey">配置键</th>
                                     <th>配置值</th>
                                     <th>描述</th>
-                                    <th>创建时间</th>
-                                    <th>更新时间</th>
+                                    <th data-sort="createTime">创建时间</th>
+                                    <th data-sort="updateTime">更新时间</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -184,6 +184,7 @@
     <script th:src="@{/js/core/http.js}"></script>
     <script th:src="@{/js/core/auth.js}"></script>
     <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
     <script th:src="@{/js/components/pagination.js}"></script>

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>防御效果评估 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
-    <script th:src="@{/js/lib/echarts.min.js}"></script>
     <style>
         .stats-grid {
             display: grid;
@@ -180,11 +179,11 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>时间</th>
-                                    <th>防御类型</th>
-                                    <th>防御目标</th>
-                                    <th>防御动作</th>
-                                    <th>执行结果</th>
+                                    <th data-sort="createTime">时间</th>
+                                    <th data-sort="defenseType">防御类型</th>
+                                    <th data-sort="defenseTarget">防御目标</th>
+                                    <th data-sort="defenseAction">防御动作</th>
+                                    <th data-sort="executeStatus">执行结果</th>
                                     <th>关联事件</th>
                                     <th>操作</th>
                                 </tr>
@@ -196,12 +195,14 @@
                             </tbody>
                         </table>
                     </div>
+                    <div id="defensePagination" class="pagination"></div>
                 </div>
             </main>
         </div>
     </div>
 
     <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/core/resource-loader.js}"></script>
     <script th:src="@{/js/utils/storage.js}"></script>
     <script th:src="@{/js/utils/date.js}"></script>
     <script th:src="@{/js/utils/message.js}"></script>
@@ -216,9 +217,17 @@
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/defense-evaluation.js}"></script>
     <script>
-        PageInit.init({
-            requireAuth: true,
-            highlightMenu: true
+        ResourceLoader.loadEcharts().then(function() {
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
+        }).catch(function(e) {
+            console.error('ECharts 加载失败:', e);
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
         });
     </script>
 </body>

@@ -47,24 +47,27 @@
                         </div>
                     </div>
                     
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>操作账号</th>
-                                <th>操作类型</th>
-                                <th>操作模块</th>
-                                <th>操作内容</th>
-                                <th>操作IP</th>
-                                <th>状态</th>
-                                <th>操作时间</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logTableBody">
-                            <tr><td colspan="9" class="text-center">加载中...</td></tr>
-                        </tbody>
-                    </table>
+                    <div class="table-wrapper" style="position: relative;">
+                        <table class="data-table has-fixed-action">
+                            <thead>
+                                <tr>
+                                    <th data-sort="id" style="min-width: 60px;">ID</th>
+                                    <th data-sort="operName" style="min-width: 100px;">操作账号</th>
+                                    <th data-sort="operType" style="min-width: 80px;">操作类型</th>
+                                    <th data-sort="module" style="min-width: 100px;">操作模块</th>
+                                    <th style="min-width: 150px;">操作内容</th>
+                                    <th data-sort="operIp" style="min-width: 120px;">操作IP</th>
+                                    <th data-sort="status" style="min-width: 80px;">状态</th>
+                                    <th data-sort="operTime" style="min-width: 150px;">操作时间</th>
+                                    <th style="min-width: 100px; width: 100px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logTableBody">
+                                <tr><td colspan="9" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="pagination" class="pagination-container"></div>
                 </div>
             </main>
         </div>
@@ -92,6 +95,7 @@
     <script th:src="@{/js/core/http.js}"></script>
     <script th:src="@{/js/core/auth.js}"></script>
     <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/oper-log.js}"></script>

@@ -14,22 +14,25 @@ function initRuleTable() {
         tableBodyEl: 'ruleTableBody',
         paginationEl: 'pagination',
         colspan: 7,
+        fixedAction: true,
+        actionWidth: '200px',
+        enableTooltip: true,
         renderRow: function(item) {
-            const actions = [
-                { text: '编辑', class: 'btn-primary', onClick: `editRule(${item.id})` },
-                { text: item.enabled === 1 ? '禁用' : '启用', class: item.enabled === 1 ? 'btn-warning' : 'btn-success', onClick: `toggleRuleStatus(${item.id}, ${item.enabled})` },
-                { text: '删除', class: 'btn-danger', onClick: `deleteRule(${item.id})` }
-            ];
+            const cell = TableUtils.cell;
             
             return `
                 <tr>
                     <td>${item.id || '-'}</td>
-                    <td>${tableRenderer.renderText(item.ruleName)}</td>
-                    <td>${tableRenderer.renderAttackType(item.attackType)}</td>
-                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${tableRenderer.escapeHtml(item.ruleContent || '')}">${tableRenderer.renderText(item.ruleContent, 30)}</td>
-                    <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
-                    <td>${item.enabled === 1 ? '<span class="tag success">启用</span>' : '<span class="tag info">禁用</span>'}</td>
-                    <td class="action-btns">${tableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
+                    ${cell.renderCell(item.ruleName, { maxLength: 40 })}
+                    <td>${cell.renderAttackType(item.attackType)}</td>
+                    ${cell.renderCell(item.ruleContent, { maxLength: 60 })}
+                    <td>${cell.renderRiskLevel(item.riskLevel)}</td>
+                    <td>${cell.renderStatus(item.enabled)}</td>
+                    ${cell.renderActionCell(`
+                        ${cell.renderToggleButton(item.enabled, item.id, '禁用', '启用', 'toggleRuleStatus')}
+                        ${cell.renderButton('编辑', 'primary', `editRule(${item.id})`)}
+                        ${cell.renderButton('删除', 'danger', `deleteRule(${item.id})`)}
+                    `)}
                 </tr>
             `;
         }
@@ -59,118 +62,133 @@ function resetSearch() {
     ruleTable.resetSearch();
 }
 
-function showAddRuleModal() {
-    document.getElementById('ruleModalTitle').textContent = '新增规则';
-    document.getElementById('ruleForm').reset();
-    document.getElementById('ruleId').value = '';
-    document.getElementById('ruleModal').style.display = 'flex';
+function toggleRuleStatus(id, currentStatus) {
+    const newStatus = currentStatus === 1 ? 0 : 1;
+    const actionText = newStatus === 1 ? '启用' : '禁用';
+    
+    if (!confirm(`确定要${actionText}该规则吗？`)) {
+        return;
+    }
+    
+    http.put('/rule/toggle', { id: id, enabled: newStatus })
+        .then(result => {
+            message.success(`${actionText}成功`);
+            ruleTable.refresh();
+        })
+        .catch(error => {
+            message.error(`${actionText}失败: ` + (error.message || '未知错误'));
+        });
 }
 
-async function editRule(id) {
-    try {
-        const rule = await http.get(`/rule/${id}`);
-        
-        document.getElementById('ruleModalTitle').textContent = '编辑规则';
-        document.getElementById('ruleId').value = rule.id;
-        document.getElementById('ruleNameInput').value = rule.ruleName;
-        document.getElementById('attackTypeInput').value = rule.attackType;
-        document.getElementById('ruleExpressionInput').value = rule.ruleContent || '';
-        document.getElementById('riskLevelInput').value = rule.riskLevel;
-        document.getElementById('confidenceThresholdInput').value = rule.confidenceThreshold || 60;
-        document.getElementById('enabledInput').value = rule.enabled;
-        
-        document.getElementById('ruleModal').style.display = 'flex';
-    } catch (error) {
-        console.error('加载规则详情失败:', error);
-        message.error('加载规则详情失败');
+function editRule(id) {
+    http.get('/rule/detail/' + id)
+        .then(result => {
+            if (result) {
+                document.getElementById('ruleId').value = result.id;
+                document.getElementById('ruleNameInput').value = result.ruleName || '';
+                document.getElementById('attackTypeInput').value = result.attackType || '';
+                document.getElementById('ruleContentInput').value = result.ruleContent || '';
+                document.getElementById('descriptionInput').value = result.description || '';
+                document.getElementById('riskLevelInput').value = result.riskLevel || 'MEDIUM';
+                document.getElementById('enabledInput').value = result.enabled !== undefined ? result.enabled : 1;
+                document.getElementById('priorityInput').value = result.priority || 100;
+                
+                document.getElementById('ruleModalTitle').textContent = '编辑规则';
+                document.getElementById('ruleModal').style.display = 'flex';
+            }
+        })
+        .catch(error => {
+            message.error('获取规则详情失败: ' + (error.message || '未知错误'));
+        });
+}
+
+function deleteRule(id) {
+    if (!confirm('确定要删除该规则吗？此操作不可恢复。')) {
+        return;
     }
+    
+    http.delete('/rule/delete/' + id)
+        .then(result => {
+            message.success('删除成功');
+            ruleTable.refresh();
+        })
+        .catch(error => {
+            message.error('删除失败: ' + (error.message || '未知错误'));
+        });
+}
+
+function openAddRuleModal() {
+    document.getElementById('ruleId').value = '';
+    document.getElementById('ruleNameInput').value = '';
+    document.getElementById('attackTypeInput').value = '';
+    document.getElementById('ruleContentInput').value = '';
+    document.getElementById('descriptionInput').value = '';
+    document.getElementById('riskLevelInput').value = 'MEDIUM';
+    document.getElementById('enabledInput').value = '1';
+    document.getElementById('priorityInput').value = '100';
+    
+    document.getElementById('ruleModalTitle').textContent = '新增规则';
+    document.getElementById('ruleModal').style.display = 'flex';
 }
 
 function closeRuleModal() {
     document.getElementById('ruleModal').style.display = 'none';
 }
 
-async function saveRule() {
+function saveRule() {
     const id = document.getElementById('ruleId').value;
     const ruleName = document.getElementById('ruleNameInput').value.trim();
-    const attackType = document.getElementById('attackTypeInput').value;
-    const ruleContent = document.getElementById('ruleExpressionInput').value.trim();
+    const attackType = document.getElementById('attackTypeInput').value.trim();
+    const ruleContent = document.getElementById('ruleContentInput').value.trim();
+    const description = document.getElementById('descriptionInput').value.trim();
     const riskLevel = document.getElementById('riskLevelInput').value;
-    const confidenceThreshold = parseInt(document.getElementById('confidenceThresholdInput').value) || 60;
     const enabled = parseInt(document.getElementById('enabledInput').value);
+    const priority = parseInt(document.getElementById('priorityInput').value) || 100;
     
     if (!ruleName) {
         message.error('请输入规则名称');
         return;
     }
-    
     if (!attackType) {
         message.error('请选择攻击类型');
         return;
     }
-    
     if (!ruleContent) {
         message.error('请输入规则表达式');
         return;
     }
     
-    const params = {
-        ruleName,
-        attackType,
-        ruleContent,
-        riskLevel,
-        confidenceThreshold,
-        enabled
+    const data = {
+        ruleName: ruleName,
+        attackType: attackType,
+        ruleContent: ruleContent,
+        description: description,
+        riskLevel: riskLevel,
+        enabled: enabled,
+        priority: priority
     };
     
-    try {
-        if (id) {
-            params.id = parseInt(id);
-            await http.put('/rule/update', params);
-            message.success('更新成功');
-        } else {
-            await http.post('/rule/add', params);
-            message.success('创建成功');
-        }
-        closeRuleModal();
-        ruleTable.loadData();
-    } catch (error) {
-        console.error('保存规则失败:', error);
-        message.error(error.message || '保存失败');
-    }
-}
-
-async function toggleRuleStatus(id, currentStatus) {
-    const newStatus = currentStatus === 1 ? 0 : 1;
-    const action = newStatus === 1 ? '启用' : '禁用';
+    const isEdit = id && id !== '';
+    const url = isEdit ? '/rule/update' : '/rule/add';
+    const method = isEdit ? 'put' : 'post';
     
-    try {
-        await http.put(`/rule/status/${id}?enabled=${newStatus}`);
-        message.success(`${action}成功`);
-        ruleTable.loadData();
-    } catch (error) {
-        console.error('操作失败:', error);
-        message.error('操作失败');
-    }
-}
-
-async function deleteRule(id) {
-    if (!confirm('确定要删除该规则吗？')) {
-        return;
+    if (isEdit) {
+        data.id = parseInt(id);
     }
     
-    try {
-        await http.delete(`/rule/${id}`);
-        message.success('删除成功');
-        ruleTable.loadData();
-    } catch (error) {
-        console.error('删除失败:', error);
-        message.error('删除失败');
-    }
+    http[method](url, data)
+        .then(result => {
+            message.success(isEdit ? '更新成功' : '新增成功');
+            closeRuleModal();
+            ruleTable.refresh();
+        })
+        .catch(error => {
+            message.error((isEdit ? '更新失败' : '新增失败') + ': ' + (error.message || '未知错误'));
+        });
 }
 
-document.getElementById('ruleModal')?.addEventListener('click', function(e) {
-    if (e.target === this) {
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
         closeRuleModal();
     }
 });

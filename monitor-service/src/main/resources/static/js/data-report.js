@@ -3,12 +3,119 @@
  * 负责报表数据加载、图表渲染、统计展示等功能
  */
 
+let topAttackersData = [];
+let topAttackersSortField = 'attackCount';
+let topAttackersSortOrder = 'desc';
+
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
-    document.getElementById('startDate').value = dateFormat.daysAgo(30);
+    document.getElementById('startDate').value = DateUtil.daysAgo(30);
     
+    initTopAttackersTableSorting();
     loadReportData();
 });
+
+function initTopAttackersTableSorting() {
+    const table = document.querySelector('#topAttackersBody')?.closest('table');
+    if (!table) return;
+    
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        header.classList.add('sortable');
+        if (!header.querySelector('.sort-icon')) {
+            header.innerHTML += `<span class="sort-icon"><span class="up">▲</span><span class="down">▼</span></span>`;
+        }
+        
+        header.addEventListener('click', (e) => {
+            const field = header.dataset.sort;
+            if (topAttackersSortField === field) {
+                topAttackersSortOrder = topAttackersSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                topAttackersSortField = field;
+                topAttackersSortOrder = 'desc';
+            }
+            updateTopAttackersSortIcons(table);
+            renderTopAttackersTable();
+        });
+    });
+    
+    updateTopAttackersSortIcons(table);
+}
+
+function updateTopAttackersSortIcons(table) {
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        const icon = header.querySelector('.sort-icon');
+        if (icon) {
+            icon.className = 'sort-icon';
+            if (header.dataset.sort === topAttackersSortField) {
+                icon.classList.add(topAttackersSortOrder);
+            }
+        }
+    });
+}
+
+async function loadTopAttackers() {
+    try {
+        const data = await http.get('/report/top-attackers');
+        topAttackersData = Array.isArray(data) ? data : (data.list || []);
+        renderTopAttackersTable();
+    } catch (error) {
+        console.error('加载TOP攻击源失败:', error);
+        topAttackersData = [];
+        renderTopAttackersTable();
+    }
+}
+
+function sortTopAttackers(data) {
+    const field = topAttackersSortField;
+    const order = topAttackersSortOrder;
+    
+    return [...data].sort((a, b) => {
+        let valueA = a[field];
+        let valueB = b[field];
+        
+        if (valueA === null || valueA === undefined) valueA = '';
+        if (valueB === null || valueB === undefined) valueB = '';
+        
+        if (field === 'riskLevel') {
+            const levelOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+            valueA = levelOrder[valueA] || 0;
+            valueB = levelOrder[valueB] || 0;
+        } else if (typeof valueA === 'string') {
+            valueA = valueA.toLowerCase();
+            valueB = valueB.toLowerCase();
+        }
+        
+        let result = 0;
+        if (valueA < valueB) result = -1;
+        else if (valueA > valueB) result = 1;
+        
+        return order === 'asc' ? result : -result;
+    });
+}
+
+function renderTopAttackersTable() {
+    const tbody = document.getElementById('topAttackersBody');
+    if (!tbody) return;
+    
+    if (!topAttackersData || topAttackersData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">暂无数据</td></tr>';
+        return;
+    }
+    
+    const sortedData = sortTopAttackers(topAttackersData);
+    const cell = TableUtils.cell;
+    
+    tbody.innerHTML = sortedData.map((item, index) => `
+        <tr>
+            <td>${index + 1}</td>
+            <td>${cell.renderText(item.sourceIp)}</td>
+            <td>${item.attackCount || 0}</td>
+            <td>${TableRenderer.renderRiskLevel(item.riskLevel)}</td>
+        </tr>
+    `).join('');
+}
 
 /**
  * 时间范围变化时自动调整统计精度
@@ -67,8 +174,7 @@ async function loadReportData() {
         loadTrafficTrendReport(),
         loadAttackTrendReport(),
         loadAttackTypeChart(),
-        loadRiskLevelChart(),
-        loadTopAttackers()
+        loadRiskLevelChart()
     ]);
 }
 
@@ -142,16 +248,6 @@ async function loadRiskLevelChart() {
     } catch (error) {
         console.error('加载风险等级分布失败:', error);
         renderRiskLevelChart([]);
-    }
-}
-
-async function loadTopAttackers() {
-    try {
-        const data = await http.get('/report/top-attackers');
-        renderTopAttackers(data);
-    } catch (error) {
-        console.error('加载攻击源统计失败:', error);
-        renderTopAttackers([]);
     }
 }
 
@@ -425,22 +521,4 @@ function renderRiskLevelChart(data) {
     };
     
     chart.setOption(option, { notMerge: true });
-}
-
-function renderTopAttackers(data) {
-    const tbody = document.getElementById('topAttackersBody');
-    
-    if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center">暂无数据</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = data.map((item, index) => `
-        <tr>
-            <td>${index + 1}</td>
-            <td>${item.sourceIp}</td>
-            <td>${item.attackCount}</td>
-            <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
-        </tr>
-    `).join('');
 }

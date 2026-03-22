@@ -52,6 +52,13 @@ public class TrafficManageController {
             @RequestParam(defaultValue = "desc") String sortOrder) {
 
         try {
+            if (pageNum < 1) {
+                pageNum = 1;
+            }
+            if (pageSize < 1 || pageSize > 100) {
+                pageSize = 10;
+            }
+            
             int offset = (pageNum - 1) * pageSize;
             
             LocalDateTime startDateTime = parseDateTime(startTime);

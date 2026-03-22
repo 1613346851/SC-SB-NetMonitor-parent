@@ -1,11 +1,17 @@
 let scanPageState = {
     pollingTimer: null,
-    currentResults: []
+    currentResults: [],
+    historyList: [],
+    resultSortField: 'detectedAt',
+    resultSortOrder: 'desc',
+    historySortField: 'startTime',
+    historySortOrder: 'desc'
 };
 
 document.addEventListener('DOMContentLoaded', function() {
     bindScanModeUI();
     bindDetailModal();
+    initTableSorting();
     loadScanState();
 });
 
@@ -23,6 +29,74 @@ function bindDetailModal() {
     modal?.addEventListener('click', function(event) {
         if (event.target === this) {
             closeScanResultDetail();
+        }
+    });
+}
+
+function initTableSorting() {
+    initResultTableSorting();
+    initHistoryTableSorting();
+}
+
+function initResultTableSorting() {
+    const table = document.querySelector('#scanResultTableBody')?.closest('table');
+    if (!table) return;
+    
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        header.classList.add('sortable');
+        if (!header.querySelector('.sort-icon')) {
+            header.innerHTML += `<span class="sort-icon"><span class="up">▲</span><span class="down">▼</span></span>`;
+        }
+        
+        header.addEventListener('click', (e) => {
+            const field = header.dataset.sort;
+            if (scanPageState.resultSortField === field) {
+                scanPageState.resultSortOrder = scanPageState.resultSortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                scanPageState.resultSortField = field;
+                scanPageState.resultSortOrder = 'asc';
+            }
+            updateSortIcons(table, scanPageState.resultSortField, scanPageState.resultSortOrder);
+            renderResultTable(scanPageState.currentResults);
+        });
+    });
+}
+
+function initHistoryTableSorting() {
+    const table = document.querySelector('#scanHistoryTableBody')?.closest('table');
+    if (!table) return;
+    
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        header.classList.add('sortable');
+        if (!header.querySelector('.sort-icon')) {
+            header.innerHTML += `<span class="sort-icon"><span class="up">▲</span><span class="down">▼</span></span>`;
+        }
+        
+        header.addEventListener('click', (e) => {
+            const field = header.dataset.sort;
+            if (scanPageState.historySortField === field) {
+                scanPageState.historySortOrder = scanPageState.historySortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                scanPageState.historySortField = field;
+                scanPageState.historySortOrder = 'asc';
+            }
+            updateSortIcons(table, scanPageState.historySortField, scanPageState.historySortOrder);
+            renderHistoryTable(scanPageState.historyList);
+        });
+    });
+}
+
+function updateSortIcons(table, sortField, sortOrder) {
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        const icon = header.querySelector('.sort-icon');
+        if (icon) {
+            icon.className = 'sort-icon';
+            if (header.dataset.sort === sortField) {
+                icon.classList.add(sortOrder);
+            }
         }
     });
 }
@@ -139,11 +213,74 @@ function renderScanResult(result) {
     const results = Array.isArray(result.results) ? result.results : [];
     const historyList = Array.isArray(result.history) ? result.history : [];
     scanPageState.currentResults = results;
+    scanPageState.historyList = historyList;
 
     renderResultTable(results);
     renderHistoryTable(historyList);
     setText('syncedCountValue', results.filter(item => item.synced).length);
     updateButtonStates(result.status || 'IDLE', results);
+}
+
+function sortResults(results) {
+    const field = scanPageState.resultSortField;
+    const order = scanPageState.resultSortOrder;
+    
+    return [...results].sort((a, b) => {
+        let valueA = a[field];
+        let valueB = b[field];
+        
+        if (valueA === null || valueA === undefined) valueA = '';
+        if (valueB === null || valueB === undefined) valueB = '';
+        
+        if (field === 'detectedAt' || field === 'createTime') {
+            valueA = valueA ? new Date(valueA).getTime() : 0;
+            valueB = valueB ? new Date(valueB).getTime() : 0;
+        } else if (field === 'vulnLevel') {
+            const levelOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+            valueA = levelOrder[valueA] || 0;
+            valueB = levelOrder[valueB] || 0;
+        } else if (typeof valueA === 'string') {
+            valueA = valueA.toLowerCase();
+            valueB = valueB.toLowerCase();
+        }
+        
+        let result = 0;
+        if (valueA < valueB) result = -1;
+        else if (valueA > valueB) result = 1;
+        
+        return order === 'asc' ? result : -result;
+    });
+}
+
+function sortHistory(historyList) {
+    const field = scanPageState.historySortField;
+    const order = scanPageState.historySortOrder;
+    
+    return [...historyList].sort((a, b) => {
+        let valueA = a[field];
+        let valueB = b[field];
+        
+        if (valueA === null || valueA === undefined) valueA = '';
+        if (valueB === null || valueB === undefined) valueB = '';
+        
+        if (field === 'startTime' || field === 'endTime') {
+            valueA = valueA ? new Date(valueA).getTime() : 0;
+            valueB = valueB ? new Date(valueB).getTime() : 0;
+        } else if (field === 'status') {
+            const statusOrder = { 'RUNNING': 4, 'PAUSED': 3, 'COMPLETED': 2, 'TERMINATED': 1, 'FAILED': 0 };
+            valueA = statusOrder[valueA] || 0;
+            valueB = statusOrder[valueB] || 0;
+        } else if (typeof valueA === 'string') {
+            valueA = valueA.toLowerCase();
+            valueB = valueB.toLowerCase();
+        }
+        
+        let result = 0;
+        if (valueA < valueB) result = -1;
+        else if (valueA > valueB) result = 1;
+        
+        return order === 'asc' ? result : -result;
+    });
 }
 
 function renderResultTable(results) {
@@ -155,18 +292,23 @@ function renderResultTable(results) {
         return;
     }
 
-    tbody.innerHTML = results.map((item, index) => `
+    const sortedResults = sortResults(results);
+    const cell = TableUtils.cell;
+
+    tbody.innerHTML = sortedResults.map((item, index) => `
         <tr>
-            <td>${escapeHtml(item.vulnName || '-')}</td>
-            <td>${tableRenderer.renderAttackType(item.vulnType || 'UNKNOWN')}</td>
-            <td>${tableRenderer.renderRiskLevel(item.vulnLevel || 'LOW')}</td>
-            <td><code>${escapeHtml(item.vulnPath || '-')}</code></td>
-            <td><span class="scan-payload-chip" title="${escapeHtml(item.payload || '')}">${escapeHtml(truncateText(item.payload || '-', 32))}</span></td>
+            <td>${cell.renderText(item.vulnName)}</td>
+            <td>${TableRenderer.renderAttackType(item.vulnType || 'UNKNOWN')}</td>
+            <td>${TableRenderer.renderRiskLevel(item.vulnLevel || 'LOW')}</td>
+            <td><code>${cell.renderText(item.vulnPath)}</code></td>
+            ${cell.renderCell(item.payload, { maxLength: 32, showTooltip: true })}
             <td>${item.synced ? '<span class="tag success">已同步</span>' : '<span class="tag warning">待同步</span>'}</td>
-            <td>${escapeHtml(item.detectedAt || '-')}</td>
-            <td><button class="btn btn-primary btn-sm" onclick="viewScanResultDetail(${index})">详情</button></td>
+            <td>${cell.renderText(item.detectedAt)}</td>
+            <td><button class="btn btn-primary btn-sm" onclick="viewScanResultDetail(${scanPageState.currentResults.indexOf(item)})">详情</button></td>
         </tr>
     `).join('');
+    
+    TableUtils.bindTooltip(tbody);
 }
 
 function renderHistoryTable(historyList) {
@@ -178,18 +320,23 @@ function renderHistoryTable(historyList) {
         return;
     }
 
-    tbody.innerHTML = historyList.map(item => `
+    const sortedHistory = sortHistory(historyList);
+    const cell = TableUtils.cell;
+
+    tbody.innerHTML = sortedHistory.map(item => `
         <tr>
-            <td><code>${escapeHtml(item.taskId || '-')}</code></td>
-            <td>${escapeHtml(item.scanType || '-')}</td>
+            <td><code>${cell.renderText(item.taskId)}</code></td>
+            <td>${cell.renderText(item.scanType)}</td>
             <td><span class="tag ${getStatusTagClass(item.status)}">${getStatusLabel(item.status)}</span></td>
             <td>${item.discoveredCount || 0}</td>
             <td>${item.completedInterfaces || 0} / ${item.totalInterfaces || 0}</td>
-            <td>${escapeHtml(item.startTime || '-')}</td>
-            <td>${escapeHtml(item.endTime || '-')}</td>
-            <td title="${escapeHtml(item.summary || '')}">${escapeHtml(truncateText(item.summary || '-', 36))}</td>
+            <td>${cell.renderText(item.startTime)}</td>
+            <td>${cell.renderText(item.endTime)}</td>
+            ${cell.renderCell(item.summary, { maxLength: 36, showTooltip: true })}
         </tr>
     `).join('');
+    
+    TableUtils.bindTooltip(tbody);
 }
 
 function renderWarnings(warnings) {
@@ -201,7 +348,7 @@ function renderWarnings(warnings) {
         return;
     }
 
-    container.innerHTML = warnings.map(item => `<div class="scan-warning-item">${escapeHtml(item)}</div>`).join('');
+    container.innerHTML = warnings.map(item => `<div class="scan-warning-item">${CellRenderer.renderText(item)}</div>`).join('');
 }
 
 function renderInterfaceTags(interfaces) {
@@ -214,9 +361,9 @@ function renderInterfaceTags(interfaces) {
     }
 
     container.innerHTML = interfaces.map(item => `
-        <span class="interface-tag" title="${escapeHtml(item.title || '')}">
-            <strong>${escapeHtml(item.method || 'GET')}</strong>
-            <span>${escapeHtml(item.path || '')}</span>
+        <span class="interface-tag" title="${CellRenderer.escapeAttr(item.title || '')}">
+            <strong>${CellRenderer.renderText(item.method || 'GET')}</strong>
+            <span>${CellRenderer.renderText(item.path)}</span>
         </span>
     `).join('');
 }
@@ -273,36 +420,36 @@ function viewScanResultDetail(index) {
     content.innerHTML = `
         <div class="scan-detail-grid">
             <div>
-                <p><strong>漏洞名称：</strong>${escapeHtml(result.vulnName || '-')}</p>
-                <p><strong>漏洞类型：</strong>${escapeHtml(result.vulnType || '-')}</p>
-                <p><strong>风险等级：</strong>${tableRenderer.renderRiskLevel(result.vulnLevel || 'LOW')}</p>
-                <p><strong>请求方法：</strong>${escapeHtml(result.requestMethod || '-')}</p>
-                <p><strong>漏洞路径：</strong><code>${escapeHtml(result.vulnPath || '-')}</code></p>
-                <p><strong>匹配关键字：</strong>${escapeHtml(result.matchedKeyword || '-')}</p>
+                <p><strong>漏洞名称：</strong>${CellRenderer.renderText(result.vulnName)}</p>
+                <p><strong>漏洞类型：</strong>${CellRenderer.renderText(result.vulnType)}</p>
+                <p><strong>风险等级：</strong>${TableRenderer.renderRiskLevel(result.vulnLevel || 'LOW')}</p>
+                <p><strong>请求方法：</strong>${CellRenderer.renderText(result.requestMethod)}</p>
+                <p><strong>漏洞路径：</strong><code>${CellRenderer.renderText(result.vulnPath)}</code></p>
+                <p><strong>匹配关键字：</strong>${CellRenderer.renderText(result.matchedKeyword)}</p>
             </div>
             <div>
-                <p><strong>发现时间：</strong>${escapeHtml(result.detectedAt || '-')}</p>
-                <p><strong>来源：</strong>${escapeHtml(result.source || '-')}</p>
+                <p><strong>发现时间：</strong>${CellRenderer.renderText(result.detectedAt)}</p>
+                <p><strong>来源：</strong>${CellRenderer.renderText(result.source)}</p>
                 <p><strong>同步状态：</strong>${result.synced ? '<span class="tag success">已同步</span>' : '<span class="tag warning">待同步</span>'}</p>
-                <p><strong>漏洞ID：</strong>${escapeHtml(result.vulnerabilityId ? String(result.vulnerabilityId) : '-')}</p>
-                <p><strong>AI研判预留：</strong>${escapeHtml(result.aiVerdict || '当前未启用 AI 自动研判')}</p>
+                <p><strong>漏洞ID：</strong>${CellRenderer.renderText(result.vulnerabilityId ? String(result.vulnerabilityId) : null)}</p>
+                <p><strong>AI研判预留：</strong>${CellRenderer.renderText(result.aiVerdict || '当前未启用 AI 自动研判')}</p>
             </div>
         </div>
         <div class="scan-detail-section">
             <p><strong>Payload：</strong></p>
-            <pre class="scan-code-block">${escapeHtml(result.payload || '-')}</pre>
+            <pre class="scan-code-block">${CellRenderer.renderText(result.payload)}</pre>
         </div>
         <div class="scan-detail-section">
             <p><strong>漏洞描述：</strong></p>
-            <p>${escapeHtml(result.description || '-')}</p>
+            <p>${CellRenderer.renderText(result.description)}</p>
         </div>
         <div class="scan-detail-section">
             <p><strong>修复建议：</strong></p>
-            <p>${escapeHtml(result.fixSuggestion || '-')}</p>
+            <p>${CellRenderer.renderText(result.fixSuggestion)}</p>
         </div>
         <div class="scan-detail-section">
             <p><strong>响应摘要：</strong></p>
-            <pre class="scan-code-block">${escapeHtml(result.responseSnippet || '-')}</pre>
+            <pre class="scan-code-block">${CellRenderer.renderText(result.responseSnippet)}</pre>
         </div>
     `;
 
@@ -374,23 +521,4 @@ function formatDuration(seconds) {
     const minutes = Math.floor(totalSeconds / 60);
     const remain = totalSeconds % 60;
     return `${minutes}m ${remain}s`;
-}
-
-function truncateText(text, length) {
-    if (!text || text.length <= length) {
-        return text;
-    }
-    return `${text.slice(0, length)}...`;
-}
-
-function escapeHtml(text) {
-    if (text === null || text === undefined) {
-        return '';
-    }
-    return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
 }

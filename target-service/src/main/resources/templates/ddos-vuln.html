@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${pageTitle}">DDoS攻击模拟靶场</title>
     <link rel="stylesheet" th:href="@{/css/ddos-vuln.css}">
-    <link href="https://cdn.staticfile.org/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
 <div class="container-fluid vh-100 p-0">
@@ -272,10 +270,11 @@
     </div>
 </div>
 
-<!-- JavaScript 资源 -->
+<script th:src="@{/js/resource-loader.js}"></script>
 <script th:src="@{/js/common.js}"></script>
 <script th:src="@{/js/ddos-vuln.js}"></script>
-<!-- 使用国内 CDN 加速 -->
-<script src="https://cdn.staticfile.org/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+<script>
+    ResourceLoader.loadAll();
+</script>
 </body>
 </html>

@@ -3,20 +3,55 @@
  * 负责仪表盘数据加载、图表渲染、实时告警等功能
  */
 
+let recentAttacksTable;
+
 document.addEventListener('DOMContentLoaded', async function() {
+    initRecentAttacksTable();
+    
     await Promise.all([
         loadDashboardStats(),
         loadEventStats(),
         loadTrafficTrend(),
         loadAttackTypeDistribution(),
         loadVulnerabilityLevelDistribution(),
-        loadRecentAttacks(),
         loadRecentEvents()
     ]);
     
-    setInterval(loadRecentAttacks, 5000);
+    setInterval(() => {
+        if (recentAttacksTable) {
+            recentAttacksTable.loadData();
+        }
+    }, 5000);
     setInterval(loadEventStats, 10000);
 });
+
+function initRecentAttacksTable() {
+    recentAttacksTable = TableUtils.createInstance({
+        instanceName: 'recentAttacksTable',
+        apiUrl: '/attack/unhandled/high-risk',
+        pageSize: 10,
+        defaultSortField: 'attackTime',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'recentAttacks',
+        paginationEl: null,
+        colspan: 5,
+        enablePagination: false,
+        renderRow: function(attack) {
+            return `
+                <tr>
+                    <td>${DateUtil.format(attack.attackTime)}</td>
+                    <td>${CellRenderer.renderText(attack.sourceIp)}</td>
+                    <td>${TableRenderer.renderAttackType(attack.attackType)}</td>
+                    <td>${TableRenderer.renderRiskLevel(attack.riskLevel)}</td>
+                    <td>${TableRenderer.renderStatus(attack.handled)}</td>
+                </tr>
+            `;
+        }
+    });
+    
+    window.recentAttacksTable = recentAttacksTable;
+    recentAttacksTable.loadData();
+}
 
 function onTimeRangeChange() {
     const timeRange = document.getElementById('trafficTimeRange').value;
@@ -111,7 +146,7 @@ async function loadDashboardStats() {
 
 async function loadEventStats() {
     try {
-        const stats = await http.get('/api/event/statistics');
+        const stats = await http.get('/event/statistics');
         
         const ongoingEventsEl = document.getElementById('ongoingEvents');
         if (ongoingEventsEl) {
@@ -433,35 +468,9 @@ async function loadVulnerabilityLevelDistribution() {
     }
 }
 
-async function loadRecentAttacks() {
-    try {
-        const response = await http.get('/attack/unhandled/high-risk');
-        const attacks = response || [];
-        
-        const tbody = document.getElementById('recentAttacks');
-        
-        if (!attacks || attacks.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无数据</td></tr>';
-            return;
-        }
-        
-        tbody.innerHTML = attacks.map(attack => `
-            <tr>
-                <td>${dateFormat.format(attack.attackTime)}</td>
-                <td>${attack.sourceIp}</td>
-                <td>${tableRenderer.renderAttackType(attack.attackType)}</td>
-                <td>${tableRenderer.renderRiskLevel(attack.riskLevel)}</td>
-                <td>${tableRenderer.renderStatus(attack.handled)}</td>
-            </tr>
-        `).join('');
-    } catch (error) {
-        console.error('加载最新告警失败:', error);
-    }
-}
-
 async function loadRecentEvents() {
     try {
-        const events = await http.get('/api/event/recent?limit=5');
+        const events = await http.get('/event/recent?limit=5');
         
         const tbody = document.getElementById('recentEvents');
         if (!tbody) return;
@@ -479,9 +488,9 @@ async function loadRecentEvents() {
             return `
                 <tr onclick="window.location.href='/event?id=${event.eventId}'" style="cursor: pointer;">
                     <td><span class="event-id" title="${event.eventId}">${event.eventId.substring(0, 12)}...</span></td>
-                    <td>${dateFormat.format(event.startTime)}</td>
-                    <td>${event.sourceIp}</td>
-                    <td>${tableRenderer.renderAttackType(event.attackType)}</td>
+                    <td>${DateUtil.format(event.startTime)}</td>
+                    <td>${CellRenderer.renderText(event.sourceIp)}</td>
+                    <td>${TableRenderer.renderAttackType(event.attackType)}</td>
                     <td>${statusTag}</td>
                 </tr>
             `;

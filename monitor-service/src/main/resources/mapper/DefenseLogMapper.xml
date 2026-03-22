@@ -71,7 +71,17 @@
                 AND execute_time &lt;= #{endTime}
             </if>
         </where>
-        ORDER BY execute_time DESC
+        <choose>
+            <when test="sortField != null and sortOrder != null">
+                <if test="sortField == 'id'">ORDER BY id ${sortOrder}</if>
+                <if test="sortField == 'createTime'">ORDER BY execute_time ${sortOrder}</if>
+                <if test="sortField == 'expireTime'">ORDER BY expire_time ${sortOrder}</if>
+                <if test="sortField == 'executeStatus'">ORDER BY execute_status ${sortOrder}</if>
+            </when>
+            <otherwise>
+                ORDER BY execute_time DESC
+            </otherwise>
+        </choose>
         LIMIT #{offset}, #{limit}
     </select>
 

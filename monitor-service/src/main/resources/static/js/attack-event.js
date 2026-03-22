@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initEventTable() {
     eventTable = TableUtils.createInstance({
         instanceName: 'eventTable',
-        apiUrl: '/api/event/list',
+        apiUrl: '/event/list',
         pageSize: 10,
         defaultSortField: 'startTime',
         defaultSortOrder: 'desc',
@@ -114,7 +114,7 @@ function resetSearch() {
 
 async function loadEventStatistics() {
     try {
-        const stats = await http.get('/api/event/statistics');
+        const stats = await http.get('/event/statistics');
         
         document.getElementById('totalEvents').textContent = stats.totalEvents || 0;
         document.getElementById('ongoingEvents').textContent = stats.ongoingEvents || 0;
@@ -127,7 +127,7 @@ async function loadEventStatistics() {
 
 async function loadEventDetail(eventId) {
     try {
-        const event = await http.get(`/api/event/eventId/${eventId}`);
+        const event = await http.get(`/event/eventId/${eventId}`);
         currentEventId = eventId;
         
         const detailContent = document.getElementById('eventDetailContent');

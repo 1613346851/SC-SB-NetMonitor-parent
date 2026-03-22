@@ -153,13 +153,13 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>漏洞名称</th>
-                                    <th>类型</th>
-                                    <th>等级</th>
-                                    <th>路径</th>
+                                    <th data-sort="vulnName">漏洞名称</th>
+                                    <th data-sort="vulnType">类型</th>
+                                    <th data-sort="vulnLevel">等级</th>
+                                    <th data-sort="vulnPath">路径</th>
                                     <th>Payload</th>
-                                    <th>同步状态</th>
-                                    <th>发现时间</th>
+                                    <th data-sort="syncStatus">同步状态</th>
+                                    <th data-sort="createTime">发现时间</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -183,13 +183,13 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>任务ID</th>
-                                    <th>模式</th>
-                                    <th>状态</th>
-                                    <th>发现数量</th>
-                                    <th>已完成接口</th>
-                                    <th>开始时间</th>
-                                    <th>结束时间</th>
+                                    <th data-sort="taskId">任务ID</th>
+                                    <th data-sort="scanMode">模式</th>
+                                    <th data-sort="status">状态</th>
+                                    <th data-sort="vulnCount">发现数量</th>
+                                    <th data-sort="completedCount">已完成接口</th>
+                                    <th data-sort="startTime">开始时间</th>
+                                    <th data-sort="endTime">结束时间</th>
                                     <th>摘要</th>
                                 </tr>
                             </thead>
@@ -225,6 +225,7 @@
     <script th:src="@{/js/core/http.js}"></script>
     <script th:src="@{/js/core/auth.js}"></script>
     <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
     <script th:src="@{/js/utils.js}"></script>

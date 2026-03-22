@@ -6,7 +6,6 @@
     <title>仪表盘 - 网络监测系统</title>
     <link rel="icon" type="image/x-icon" th:href="@{/favicon.ico}">
     <link rel="stylesheet" th:href="@{/css/style.css}">
-    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js" defer></script>
 </head>
 <body>
     <div class="app-container">
@@ -144,11 +143,11 @@
                             <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th>时间</th>
-                                        <th>源 IP</th>
-                                        <th>攻击类型</th>
-                                        <th>风险等级</th>
-                                        <th>状态</th>
+                                        <th data-sort="createTime">时间</th>
+                                        <th data-sort="sourceIp">源 IP</th>
+                                        <th data-sort="attackType">攻击类型</th>
+                                        <th data-sort="riskLevel">风险等级</th>
+                                        <th data-sort="status">状态</th>
                                     </tr>
                                 </thead>
                                 <tbody id="recentAttacks">
@@ -165,6 +164,7 @@
     </div>
 
     <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/core/resource-loader.js}"></script>
     <script th:src="@{/js/utils/storage.js}"></script>
     <script th:src="@{/js/utils/date.js}"></script>
     <script th:src="@{/js/utils/message.js}"></script>
@@ -172,6 +172,7 @@
     <script th:src="@{/js/core/http.js}"></script>
     <script th:src="@{/js/core/auth.js}"></script>
     <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
     <script th:src="@{/js/components/pagination.js}"></script>
@@ -179,9 +180,17 @@
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/dashboard.js}"></script>
     <script>
-        PageInit.init({
-            requireAuth: true,
-            highlightMenu: true
+        ResourceLoader.loadEcharts().then(function() {
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
+        }).catch(function(e) {
+            console.error('ECharts 加载失败:', e);
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
         });
     </script>
 </body>
