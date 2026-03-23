@@ -17,32 +17,36 @@ function initUserTable() {
         tableBodyEl: 'userTableBody',
         paginationEl: 'pagination',
         colspan: 8,
+        fixedAction: true,
+        enableTooltip: true,
         renderRow: function(user) {
-            const actions = [
-                { text: '编辑', class: 'btn-primary', onClick: `editUser(${user.id})` },
-                { text: '重置密码', class: 'btn-warning', onClick: `showResetPwdModal(${user.id})` }
+            const cell = TableUtils.cell;
+            
+            const buttons = [
+                { text: '编辑', type: 'primary', onClick: `editUser(${user.id})` },
+                { text: '重置密码', type: 'warning', onClick: `showResetPwdModal(${user.id})` }
             ];
             
             if (user.status === 0) {
-                actions.push({ text: '禁用', class: 'btn-default', onClick: `changeStatus(${user.id}, 1)` });
+                buttons.push({ text: '禁用', type: 'default', onClick: `changeStatus(${user.id}, 1)` });
             } else if (user.status === 1) {
-                actions.push({ text: '启用', class: 'btn-success', onClick: `changeStatus(${user.id}, 0)` });
+                buttons.push({ text: '启用', type: 'success', onClick: `changeStatus(${user.id}, 0)` });
             } else {
-                actions.push({ text: '解锁', class: 'btn-success', onClick: `changeStatus(${user.id}, 0)` });
+                buttons.push({ text: '解锁', type: 'success', onClick: `changeStatus(${user.id}, 0)` });
             }
             
-            actions.push({ text: '删除', class: 'btn-danger', onClick: `deleteUser(${user.id})` });
+            buttons.push({ text: '删除', type: 'danger', onClick: `deleteUser(${user.id})` });
             
             return `
                 <tr>
                     <td>${user.id || '-'}</td>
-                    <td>${CellRenderer.renderText(user.username)}</td>
-                    <td>${CellRenderer.renderText(user.nickname)}</td>
-                    <td>${CellRenderer.renderText(user.phone)}</td>
-                    <td>${CellRenderer.renderText(user.email)}</td>
+                    ${cell.renderCell(user.username, { maxLength: 20 })}
+                    ${cell.renderCell(user.nickname, { maxLength: 20 })}
+                    ${cell.renderCell(user.phone, { maxLength: 20 })}
+                    ${cell.renderCell(user.email, { maxLength: 30 })}
                     <td>${renderStatus(user.status)}</td>
-                    <td>${DateUtil.format(user.createTime)}</td>
-                    <td class="action-btns">${TableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
+                    <td>${dateFormat.format(user.createTime)}</td>
+                    ${cell.renderActionCell(buttons)}
                 </tr>
             `;
         }
@@ -50,6 +54,16 @@ function initUserTable() {
     
     window.userTable = userTable;
     userTable.loadData();
+}
+
+function renderStatusButton(user) {
+    if (user.status === 0) {
+        return TableUtils.cell.renderButton('禁用', 'default', `changeStatus(${user.id}, 1)`);
+    } else if (user.status === 1) {
+        return TableUtils.cell.renderButton('启用', 'success', `changeStatus(${user.id}, 0)`);
+    } else {
+        return TableUtils.cell.renderButton('解锁', 'success', `changeStatus(${user.id}, 0)`);
+    }
 }
 
 async function loadRoles() {

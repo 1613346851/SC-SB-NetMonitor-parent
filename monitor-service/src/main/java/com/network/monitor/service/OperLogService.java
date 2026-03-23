@@ -3,6 +3,7 @@ package com.network.monitor.service;
 import com.network.monitor.entity.OperLogEntity;
 
 import java.util.List;
+import java.util.Map;
 
 public interface OperLogService {
     
@@ -10,6 +11,10 @@ public interface OperLogService {
     
     List<OperLogEntity> listLogs(String username, String operType, Integer operStatus, 
                                   String startTime, String endTime);
+    
+    Map<String, Object> listLogsWithPaging(String username, String operType, Integer operStatus,
+                                            String startTime, String endTime, int pageNum, int pageSize,
+                                            String sortField, String sortOrder);
     
     void log(String username, String operType, String operModule, String operContent,
              String operMethod, String operUrl, String operIp, Integer operStatus, String errorMsg, Long costTime);

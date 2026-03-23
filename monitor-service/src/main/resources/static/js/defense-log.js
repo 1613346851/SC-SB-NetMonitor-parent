@@ -28,7 +28,10 @@ function initDefenseTable() {
         tableBodyEl: 'defenseTableBody',
         paginationEl: 'pagination',
         colspan: 11,
+        fixedAction: true,
+        enableTooltip: true,
         renderRow: function(item) {
+            const cell = TableUtils.cell;
             const eventIdLink = item.eventId 
                 ? `<a href="/event?id=${item.eventId}" class="event-link" title="查看事件详情">${item.eventId.substring(0, 12)}...</a>`
                 : '-';
@@ -43,15 +46,15 @@ function initDefenseTable() {
                     <td>${dateFormat.format(item.createTime)}</td>
                     <td>${renderDefenseType(item.defenseType)}${isFirstTag}</td>
                     <td>${renderDefenseAction(item.defenseAction)}</td>
-                    <td title="${item.defenseTarget || '-'}">${truncateText(item.defenseTarget || '-', 20)}</td>
-                    <td title="${item.defenseReason || '-'}">${truncateText(item.defenseReason || '-', 15)}</td>
+                    ${cell.renderCell(item.defenseTarget, { maxLength: 20 })}
+                    ${cell.renderCell(item.defenseReason, { maxLength: 15 })}
                     <td>${item.expireTime ? dateFormat.format(item.expireTime) : (item.defenseType === 'BLOCK_IP' ? '永久' : '-')}</td>
                     <td>${eventIdLink}</td>
                     <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
                     <td>${renderOperator(item.operator)}</td>
-                    <td>
-                        <button class="btn btn-primary btn-sm" onclick="viewDefenseDetail(${item.id})">详情</button>
-                    </td>
+                    ${cell.renderActionCell([
+                        { text: '详情', type: 'primary', onClick: `viewDefenseDetail(${item.id})` }
+                    ])}
                 </tr>
             `;
         }

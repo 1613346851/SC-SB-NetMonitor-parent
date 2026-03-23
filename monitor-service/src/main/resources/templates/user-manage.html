@@ -49,17 +49,17 @@
                     <div class="table-header">
                         <h3 class="table-title">用户列表</h3>
                     </div>
-                    <div class="table-wrapper">
+                    <div class="table-wrapper" style="position: relative;">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th data-sort="id">ID</th>
-                                    <th data-sort="username">用户名</th>
-                                    <th>昵称</th>
-                                    <th>手机号</th>
-                                    <th>邮箱</th>
-                                    <th data-sort="status">状态</th>
-                                    <th data-sort="createTime">创建时间</th>
+                                    <th data-sort="id" style="min-width: 60px;">ID</th>
+                                    <th data-sort="username" style="min-width: 100px;">用户名</th>
+                                    <th style="min-width: 100px;">昵称</th>
+                                    <th style="min-width: 120px;">手机号</th>
+                                    <th style="min-width: 150px;">邮箱</th>
+                                    <th data-sort="status" style="min-width: 80px;">状态</th>
+                                    <th data-sort="createTime" style="min-width: 150px;">创建时间</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -68,7 +68,7 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="pagination-container">
+                    <div class="pagination-container" style="padding: 16px 24px;">
                         <div class="pagination" id="pagination"></div>
                     </div>
                 </div>

@@ -30,20 +30,21 @@ function initDefenseLogTable() {
         tableBodyEl: 'recentDefenseBody',
         paginationEl: 'defensePagination',
         colspan: 7,
-        fixedAction: false,
         enableTooltip: true,
         renderRow: function(item) {
+            const cell = TableUtils.cell;
+            
             return `
                 <tr>
                     <td>${DateUtil.format(item.createTime)}</td>
                     <td>${renderDefenseType(item.defenseType)}</td>
-                    ${CellRenderer.renderCell(item.defenseTarget, { maxLength: 20 })}
+                    ${cell.renderCell(item.defenseTarget, { maxLength: 20 })}
                     <td>${renderDefenseAction(item.defenseAction)}</td>
                     <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
                     <td>${item.eventId ? `<a href="/event?id=${item.eventId}" class="event-link">${item.eventId.substring(0, 8)}...</a>` : '-'}</td>
-                    <td>
-                        <a href="/defense" class="btn btn-link btn-sm">详情</a>
-                    </td>
+                    ${cell.renderActionCell([
+                        { text: '详情', type: 'link', onClick: `window.location.href='/defense'` }
+                    ])}
                 </tr>
             `;
         }

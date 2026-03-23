@@ -25,24 +25,23 @@ function initOperLogTable() {
         paginationEl: 'pagination',
         colspan: 9,
         fixedAction: true,
-        actionWidth: '100px',
         enableTooltip: true,
         renderRow: function(item) {
             const cell = TableUtils.cell;
             
             return `
                 <tr>
-                    <td>${item.id}</td>
-                    <td>${item.username || '-'}</td>
+                    <td>${item.id || '-'}</td>
+                    ${cell.renderCell(item.username, { maxLength: 20 })}
                     <td>${renderOperType(item.operType)}</td>
-                    <td>${item.operModule || '-'}</td>
+                    ${cell.renderCell(item.operModule, { maxLength: 20 })}
                     ${cell.renderCell(item.operContent, { maxLength: 30 })}
-                    <td>${item.operIp || '-'}</td>
+                    ${cell.renderCell(item.operIp, { maxLength: 20 })}
                     <td>${renderOperStatus(item.operStatus)}</td>
                     <td>${dateFormat.format(item.operTime)}</td>
-                    ${cell.renderActionCell(`
-                        ${cell.renderButton('详情', 'primary', `showDetail(${item.id})`)}
-                    `, { width: '100px' })}
+                    ${cell.renderActionCell([
+                        { text: '详情', type: 'primary', onClick: `showDetail(${item.id})` }
+                    ])}
                 </tr>
             `;
         }

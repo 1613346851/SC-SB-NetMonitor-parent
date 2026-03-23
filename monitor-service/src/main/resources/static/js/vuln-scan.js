@@ -294,20 +294,24 @@ function renderResultTable(results) {
 
     const sortedResults = sortResults(results);
     const cell = TableUtils.cell;
+    cell._currentTableBodyId = 'scanResultTableBody';
 
     tbody.innerHTML = sortedResults.map((item, index) => `
         <tr>
-            <td>${cell.renderText(item.vulnName)}</td>
-            <td>${TableRenderer.renderAttackType(item.vulnType || 'UNKNOWN')}</td>
-            <td>${TableRenderer.renderRiskLevel(item.vulnLevel || 'LOW')}</td>
-            <td><code>${cell.renderText(item.vulnPath)}</code></td>
-            ${cell.renderCell(item.payload, { maxLength: 32, showTooltip: true })}
+            ${cell.renderCell(item.vulnName, { maxLength: 20 })}
+            <td>${cell.renderAttackType(item.vulnType || 'UNKNOWN')}</td>
+            <td>${cell.renderRiskLevel(item.vulnLevel || 'LOW')}</td>
+            ${cell.renderCell(item.vulnPath, { maxLength: 30 })}
+            ${cell.renderCell(item.payload, { maxLength: 30 })}
             <td>${item.synced ? '<span class="tag success">已同步</span>' : '<span class="tag warning">待同步</span>'}</td>
-            <td>${cell.renderText(item.detectedAt)}</td>
-            <td><button class="btn btn-primary btn-sm" onclick="viewScanResultDetail(${scanPageState.currentResults.indexOf(item)})">详情</button></td>
+            <td>${item.detectedAt || '-'}</td>
+            ${cell.renderActionCell([
+                { text: '详情', type: 'primary', onClick: `viewScanResultDetail(${scanPageState.currentResults.indexOf(item)})` }
+            ])}
         </tr>
     `).join('');
     
+    cell._currentTableBodyId = null;
     TableUtils.bindTooltip(tbody);
 }
 

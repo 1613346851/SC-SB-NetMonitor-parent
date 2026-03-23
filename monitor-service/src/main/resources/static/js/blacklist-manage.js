@@ -47,9 +47,9 @@ function initBlacklistTable() {
         paginationEl: 'pagination',
         colspan: 9,
         fixedAction: true,
-        actionWidth: '200px',
         enableTooltip: true,
         renderRow: function(item, index) {
+            const cell = TableUtils.cell;
             const ipId = item.ip.replace(/\./g, '-');
             
             return `
@@ -57,20 +57,20 @@ function initBlacklistTable() {
                     <td>${item.id || index + 1}</td>
                     <td>
                         <span class="ip-link" onclick="toggleHistory('${item.ip}')" style="cursor: pointer; color: #4f46e5; text-decoration: underline;">
-                            ${CellRenderer.renderText(item.ip)}
+                            ${cell.renderText(item.ip)}
                         </span>
                     </td>
-                    ${CellRenderer.renderCell(item.reason, { maxLength: 20 })}
+                    ${cell.renderCell(item.reason, { maxLength: 20 })}
                     <td>${item.expireTime ? DateUtil.format(item.expireTime) : '<span class="tag danger">永久</span>'}</td>
-                    <td>${CellRenderer.renderText(item.remainingTime)}</td>
+                    <td>${cell.renderText(item.remainingTime)}</td>
                     <td>${item.totalBanCount || 0} 次</td>
                     <td>${renderBlacklistStatus(item.status)}</td>
                     <td>${item.createTime ? DateUtil.format(item.createTime) : '-'}</td>
-                    ${CellRenderer.renderActionCell(`
-                        ${CellRenderer.renderButton('解禁', 'warning', `showUnblockModal('${item.ip}')`)}
-                        ${CellRenderer.renderButton('延长', 'primary', `showExtendModal('${item.ip}')`)}
-                        ${CellRenderer.renderButton('删除', 'danger', `deleteAllBlacklists('${item.ip}')`)}
-                    `)}
+                    ${cell.renderActionCell([
+                        { text: '解禁', type: 'warning', onClick: `showUnblockModal('${item.ip}')` },
+                        { text: '延长', type: 'primary', onClick: `showExtendModal('${item.ip}')` },
+                        { text: '删除', type: 'danger', onClick: `deleteAllBlacklists('${item.ip}')` }
+                    ])}
                 </tr>
                 <tr class="history-row" id="history-${ipId}" style="display: none;">
                     <td colspan="9">

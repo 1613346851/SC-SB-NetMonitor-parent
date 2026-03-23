@@ -282,9 +282,6 @@
     right: 0;
     background: var(--bg-white);
     z-index: 10;
-    min-width: 200px;
-    max-width: 200px;
-    width: 200px;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -357,6 +354,27 @@
 
 .action-btns-fixed .btn {
     flex-shrink: 0;
+}
+
+.action-cell.auto-width {
+    position: static;
+    min-width: auto;
+    max-width: none;
+    width: auto;
+    box-shadow: none;
+}
+
+.action-btns-auto {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    padding: 0;
+}
+
+.action-btns-auto .btn {
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 /* ==================== 筛选栏 ==================== */

@@ -17,24 +17,28 @@ function initRoleTable() {
         tableBodyEl: 'roleTableBody',
         paginationEl: 'pagination',
         colspan: 7,
+        fixedAction: true,
+        enableTooltip: true,
         renderRow: function(role) {
-            const actions = [
-                { text: '编辑', class: 'btn-primary', onClick: `editRole(${role.id})` }
+            const cell = TableUtils.cell;
+            
+            const buttons = [
+                { text: '编辑', type: 'primary', onClick: `editRole(${role.id})` }
             ];
             
             if (role.roleCode !== 'SUPER_ADMIN') {
-                actions.push({ text: '删除', class: 'btn-danger', onClick: `deleteRole(${role.id})` });
+                buttons.push({ text: '删除', type: 'danger', onClick: `deleteRole(${role.id})` });
             }
             
             return `
                 <tr>
                     <td>${role.id || '-'}</td>
-                    <td>${CellRenderer.renderText(role.roleName)}</td>
-                    <td><code>${CellRenderer.renderText(role.roleCode)}</code></td>
-                    <td>${CellRenderer.renderText(role.roleDesc)}</td>
+                    ${cell.renderCell(role.roleName, { maxLength: 20 })}
+                    ${cell.renderCell(role.roleCode, { maxLength: 20 })}
+                    ${cell.renderCell(role.roleDesc, { maxLength: 30 })}
                     <td>${renderStatus(role.status)}</td>
-                    <td>${DateUtil.format(role.createTime)}</td>
-                    <td class="action-btns">${TableRenderer.renderActionsSmart(actions, { maxVisible: 2 })}</td>
+                    <td>${dateFormat.format(role.createTime)}</td>
+                    ${cell.renderActionCell(buttons)}
                 </tr>
             `;
         }

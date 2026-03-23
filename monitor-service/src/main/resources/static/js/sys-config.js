@@ -170,6 +170,7 @@ function renderConfigTable(list) {
     }
 
     const cell = TableUtils.cell;
+    cell._currentTableBodyId = 'configTableBody';
     
     tbody.innerHTML = list.map(config => {
         const isAiConfig = AI_CONFIG_KEYS.includes(config.configKey);
@@ -186,14 +187,15 @@ function renderConfigTable(list) {
                 ${cell.renderCell(config.description, { maxLength: 40 })}
                 <td>${formatTime(config.createTime)}</td>
                 <td>${formatTime(config.updateTime)}</td>
-                ${cell.renderActionCell(`
-                    ${cell.renderButton('编辑', 'primary', `showEditConfigModal(${config.id})`)}
-                    ${cell.renderButton('删除', 'danger', `deleteConfig(${config.id})`)}
-                `)}
+                ${cell.renderActionCell([
+                    { text: '编辑', type: 'primary', onClick: `showEditConfigModal(${config.id})` },
+                    { text: '删除', type: 'danger', onClick: `deleteConfig(${config.id})` }
+                ])}
             </tr>
         `;
     }).join('');
     
+    cell._currentTableBodyId = null;
     TableUtils.bindTooltip(tbody);
 }
 

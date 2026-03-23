@@ -22,23 +22,27 @@ function initTrafficTable() {
         tableBodyEl: 'trafficTableBody',
         paginationEl: 'pagination',
         colspan: 12,
+        fixedAction: true,
+        enableTooltip: true,
         renderRow: function(item) {
+            const cell = TableUtils.cell;
+            
             return `
                 <tr>
-                    <td><a href="javascript:void(0)" onclick="trafficTable.sort('id')">${item.id || '-'}</a></td>
-                    <td>${item.trafficId || '-'}</td>
-                    <td><a href="javascript:void(0)" onclick="trafficTable.sort('requestTime')">${dateFormat.format(item.requestTime)}</a></td>
+                    <td>${item.id || '-'}</td>
+                    ${cell.renderCell(item.trafficId, { maxLength: 20 })}
+                    <td>${dateFormat.format(item.requestTime)}</td>
                     <td>${item.sourceIp || '-'}</td>
                     <td>${item.targetIp || '-'}</td>
                     <td>${item.sourcePort || '-'}</td>
                     <td>${item.targetPort || '-'}</td>
                     <td><span class="badge badge-${getHttpMethodBadge(item.httpMethod)}">${item.httpMethod || '-'}</span></td>
-                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${item.requestUri || ''}">${item.requestUri || '-'}</td>
+                    ${cell.renderCell(item.requestUri, { maxLength: 30 })}
                     <td><span class="badge badge-${getStatusBadge(item.responseStatus)}">${item.responseStatus || '-'}</span></td>
                     <td>${item.responseTime || '-'}</td>
-                    <td>
-                        <button class="btn btn-primary btn-sm" onclick="viewTrafficDetail(${item.id})">详情</button>
-                    </td>
+                    ${cell.renderActionCell([
+                        { text: '详情', type: 'primary', onClick: `viewTrafficDetail(${item.id})` }
+                    ])}
                 </tr>
             `;
         }

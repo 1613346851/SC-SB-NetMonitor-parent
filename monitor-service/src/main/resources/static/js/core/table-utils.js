@@ -158,16 +158,108 @@
             return `<span class="tag info">${falseText}</span>`;
         },
         
+        renderVerifyStatus(status) {
+            const statusMap = {
+                0: { text: '未验证', class: 'info' },
+                1: { text: '已验证', class: 'success' },
+                2: { text: '误报', class: 'warning' }
+            };
+            
+            const info = statusMap[status] || { text: '未知', class: 'info' };
+            return `<span class="tag ${info.class}">${info.text}</span>`;
+        },
+        
         renderAttackType(type) {
             if (!type) return '-';
             return `<span class="attack-type-tag">${this.escapeHtml(type)}</span>`;
         },
         
         renderActionCell(buttons, options = {}) {
-            const { width = '200px' } = options;
-            return `<td class="action-cell" style="min-width: ${width}; max-width: ${width}; width: ${width};">
-                <div class="action-btns-fixed">${buttons}</div>
+            const { width = null, autoWidth = false } = options;
+            
+            let buttonsHtml = '';
+            let calculatedWidth = width;
+            
+            if (Array.isArray(buttons)) {
+                const visibleButtons = buttons.filter(btn => {
+                    if (typeof btn === 'string') return true;
+                    return btn.visible !== false;
+                });
+                buttonsHtml = this.renderButtons(buttons);
+                if (!width && !autoWidth) {
+                    calculatedWidth = this.calculateActionWidth(visibleButtons.length);
+                }
+            } else {
+                buttonsHtml = buttons;
+            }
+            
+            if (calculatedWidth) {
+                this._setActionHeaderWidth(calculatedWidth, this._currentTableBodyId);
+            }
+            
+            if (autoWidth || !calculatedWidth) {
+                return `<td class="action-cell auto-width">
+                    <div class="action-btns-auto">${buttonsHtml}</div>
+                </td>`;
+            }
+            
+            return `<td class="action-cell" style="min-width: ${calculatedWidth}; max-width: ${calculatedWidth}; width: ${calculatedWidth};">
+                <div class="action-btns-fixed">${buttonsHtml}</div>
             </td>`;
+        },
+        
+        _actionHeaderWidths: new Map(),
+        
+        _setActionHeaderWidth(width, tableBodyId) {
+            const key = tableBodyId || 'default';
+            if (this._actionHeaderWidths.has(key)) return;
+            this._actionHeaderWidths.set(key, width);
+            
+            requestAnimationFrame(() => {
+                const tbody = document.getElementById(tableBodyId);
+                if (!tbody) return;
+                const table = tbody.closest('table');
+                if (!table) return;
+                
+                const actionTh = table.querySelector('thead tr th:last-child');
+                if (actionTh) {
+                    actionTh.style.minWidth = width;
+                    actionTh.style.maxWidth = width;
+                    actionTh.style.width = width;
+                }
+            });
+        },
+        
+        renderButtons(buttons) {
+            if (!Array.isArray(buttons) || buttons.length === 0) return '';
+            
+            return buttons.map(btn => {
+                if (typeof btn === 'string') return btn;
+                
+                const {
+                    text,
+                    type = 'primary',
+                    onClick = '',
+                    visible = true,
+                    disabled = false,
+                    className = ''
+                } = btn;
+                
+                if (visible === false) return '';
+                
+                return this.renderButton(text, type, onClick, { className, disabled });
+            }).join('');
+        },
+        
+        calculateActionWidth(buttonCount) {
+            const cellPadding = 48;
+            const buttonWidth = 52;
+            const buttonGap = 8;
+            
+            if (buttonCount <= 0) return '60px';
+            
+            const totalWidth = cellPadding + buttonWidth * buttonCount + buttonGap * (buttonCount - 1);
+            return `${totalWidth}px`;
         },
         
         renderButton(text, type, onclick, options = {}) {
@@ -181,6 +273,13 @@
                 return this.renderButton(trueText, 'warning', `${callback}(${id}, ${currentValue})`);
             }
             return this.renderButton(falseText, 'success', `${callback}(${id}, ${currentValue})`);
+        },
+        
+        renderToggleButtonItem(currentValue, id, trueText = '禁用', falseText = '启用', callback = 'toggleStatus') {
+            if (currentValue === 1 || currentValue === true || currentValue === '1') {
+                return { text: trueText, type: 'warning', onClick: `${callback}(${id}, ${currentValue})` };
+            }
+            return { text: falseText, type: 'success', onClick: `${callback}(${id}, ${currentValue})` };
         }
     };
 
@@ -431,7 +530,9 @@
             }
 
             if (this.options.renderRow) {
+                TableUtils.cell._currentTableBodyId = this.options.tableBodyEl;
                 tbody.innerHTML = this.data.map(item => this.options.renderRow(item)).join('');
+                TableUtils.cell._currentTableBodyId = null;
             }
         }
 

@@ -15,7 +15,6 @@ function initRuleTable() {
         paginationEl: 'pagination',
         colspan: 7,
         fixedAction: true,
-        actionWidth: '200px',
         enableTooltip: true,
         renderRow: function(item) {
             const cell = TableUtils.cell;
@@ -28,11 +27,11 @@ function initRuleTable() {
                     ${cell.renderCell(item.ruleContent, { maxLength: 60 })}
                     <td>${cell.renderRiskLevel(item.riskLevel)}</td>
                     <td>${cell.renderStatus(item.enabled)}</td>
-                    ${cell.renderActionCell(`
-                        ${cell.renderToggleButton(item.enabled, item.id, '禁用', '启用', 'toggleRuleStatus')}
-                        ${cell.renderButton('编辑', 'primary', `editRule(${item.id})`)}
-                        ${cell.renderButton('删除', 'danger', `deleteRule(${item.id})`)}
-                    `)}
+                    ${cell.renderActionCell([
+                        cell.renderToggleButtonItem(item.enabled, item.id, '禁用', '启用', 'toggleRuleStatus'),
+                        { text: '编辑', type: 'primary', onClick: `editRule(${item.id})` },
+                        { text: '删除', type: 'danger', onClick: `deleteRule(${item.id})` }
+                    ])}
                 </tr>
             `;
         }

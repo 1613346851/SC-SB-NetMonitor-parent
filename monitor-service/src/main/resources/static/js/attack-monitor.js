@@ -37,27 +37,29 @@ function initAttackTable() {
         tableBodyEl: 'attackTableBody',
         paginationEl: 'pagination',
         colspan: 10,
+        fixedAction: true,
+        enableTooltip: true,
         renderRow: function(item) {
-            const eventIdLink = item.eventId 
-                ? `<a href="/event?id=${item.eventId}" class="event-link" title="查看事件详情">${item.eventId.substring(0, 12)}...</a>`
-                : '-';
+            const cell = TableUtils.cell;
+            
+            const buttons = [
+                { text: '详情', type: 'primary', onClick: `viewAttackDetail(${item.id})` },
+                { text: '处理', type: 'success', onClick: `handleAttackDirect(${item.id})`, visible: item.handled === 0 },
+                { text: '事件', type: 'info', onClick: `viewEventDetail('${item.eventId}')`, visible: !!item.eventId }
+            ];
             
             return `
                 <tr>
-                    <td><a href="javascript:void(0)" onclick="attackTable.sort('id')">${item.id || '-'}</a></td>
-                    <td>${eventIdLink}</td>
-                    <td><a href="javascript:void(0)" onclick="attackTable.sort('createTime')">${dateFormat.format(item.createTime)}</a></td>
+                    <td>${item.id || '-'}</td>
+                    ${cell.renderCell(item.eventId, { maxLength: 16 })}
+                    <td>${dateFormat.format(item.createTime)}</td>
                     <td>${item.sourceIp || '-'}</td>
-                    <td title="${item.targetUri || '-'}">${truncateText(item.targetUri || '-', 30)}</td>
-                    <td>${tableRenderer.renderAttackType(item.attackType)}</td>
-                    <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
+                    ${cell.renderCell(item.targetUri, { maxLength: 30 })}
+                    <td>${cell.renderAttackType(item.attackType)}</td>
+                    <td>${cell.renderRiskLevel(item.riskLevel)}</td>
                     <td>${item.confidence ? item.confidence + '%' : '-'}</td>
-                    <td>${tableRenderer.renderStatus(item.handled)}</td>
-                    <td>
-                        <button class="btn btn-primary btn-sm" onclick="viewAttackDetail(${item.id})">详情</button>
-                        ${item.handled === 0 ? `<button class="btn btn-success btn-sm" onclick="handleAttackDirect(${item.id})">处理</button>` : ''}
-                        ${item.eventId ? `<button class="btn btn-info btn-sm" onclick="viewEventDetail('${item.eventId}')">事件</button>` : ''}
-                    </td>
+                    <td>${cell.renderStatus(item.handled, '已处理', '未处理')}</td>
+                    ${cell.renderActionCell(buttons)}
                 </tr>
             `;
         }

@@ -34,7 +34,10 @@ function initEventTable() {
         tableBodyEl: 'eventTableBody',
         paginationEl: 'pagination',
         colspan: 10,
+        fixedAction: true,
+        enableTooltip: true,
         renderRow: function(item) {
+            const cell = TableUtils.cell;
             const statusTag = item.status === 0 
                 ? '<span class="tag warning">进行中</span>'
                 : '<span class="tag success">已结束</span>';
@@ -43,18 +46,18 @@ function initEventTable() {
             
             return `
                 <tr onclick="loadEventDetail('${item.eventId}')" style="cursor: pointer;">
-                    <td><span class="event-id" title="${item.eventId}">${item.eventId.substring(0, 12)}...</span></td>
+                    ${cell.renderCell(item.eventId, { maxLength: 16 })}
                     <td>${dateFormat.format(item.startTime)}</td>
                     <td>${item.sourceIp || '-'}</td>
-                    <td>${tableRenderer.renderAttackType(item.attackType)}</td>
-                    <td>${tableRenderer.renderRiskLevel(item.riskLevel)}</td>
+                    <td>${cell.renderAttackType(item.attackType)}</td>
+                    <td>${cell.renderRiskLevel(item.riskLevel)}</td>
                     <td>${duration}</td>
                     <td>${item.totalRequests || 0}</td>
                     <td>${item.peakRps || 0}</td>
                     <td>${statusTag}</td>
-                    <td>
-                        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); loadEventDetail('${item.eventId}')">详情</button>
-                    </td>
+                    ${cell.renderActionCell([
+                        { text: '详情', type: 'primary', onClick: `event.stopPropagation(); loadEventDetail('${item.eventId}')` }
+                    ])}
                 </tr>
             `;
         }
