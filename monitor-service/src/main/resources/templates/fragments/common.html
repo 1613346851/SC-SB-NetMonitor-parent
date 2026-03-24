@@ -2,77 +2,102 @@
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head></head>
 <body>
+    <div class="sidebar-overlay"></div>
+    
     <th:block th:fragment="sidebar">
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-logo" id="sidebarLogo" title="网络监测系统 - 雷达节点"></div>
                 <h1 class="sidebar-title">网络监测系统</h1>
+                <button class="sidebar-close" id="sidebarClose" title="关闭菜单">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="sidebar-toggle-wrapper">
+                <button class="sidebar-toggle" id="sidebarToggle" title="折叠侧边栏">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                    <span>收起菜单</span>
+                </button>
             </div>
             <nav class="sidebar-menu">
-                <a href="/" class="menu-item">
+                <a href="/" class="menu-item" data-title="仪表盘">
                     <span class="menu-icon">📊</span>
                     <span>仪表盘</span>
                 </a>
-                <a href="/traffic" class="menu-item">
+                <a href="/traffic" class="menu-item" data-title="流量列表">
                     <span class="menu-icon">🌐</span>
                     <span>流量列表</span>
                 </a>
-                <a href="/event" class="menu-item">
+                <a href="/event" class="menu-item" data-title="态势感知">
                     <span class="menu-icon">🎯</span>
                     <span>态势感知</span>
                 </a>
-                <a href="/attack" class="menu-item">
+                <a href="/attack" class="menu-item" data-title="攻击监测">
                     <span class="menu-icon">⚠️</span>
                     <span>攻击监测</span>
                 </a>
-                <a href="/vulnerability" class="menu-item">
+                <a href="/vulnerability" class="menu-item" data-title="漏洞监测">
                     <span class="menu-icon">🔓</span>
                     <span>漏洞监测</span>
                 </a>
-                <a href="/scan" class="menu-item">
+                <a href="/scan" class="menu-item" data-title="漏洞扫描">
                     <span class="menu-icon">SC</span>
                     <span>漏洞扫描</span>
                 </a>
-                <a href="/defense" class="menu-item">
+                <a href="/defense" class="menu-item" data-title="防御日志">
                     <span class="menu-icon">🛡️</span>
                     <span>防御日志</span>
                 </a>
-                <a href="/defense-evaluation" class="menu-item">
+                <a href="/defense-evaluation" class="menu-item" data-title="防御效果评估">
                     <span class="menu-icon">📈</span>
                     <span>防御效果评估</span>
                 </a>
-                <a href="/rule" class="menu-item">
+                <a href="/rule" class="menu-item" data-title="规则管理">
                     <span class="menu-icon">📋</span>
                     <span>规则管理</span>
                 </a>
-                <a href="/blacklist" class="menu-item">
+                <a href="/blacklist" class="menu-item" data-title="黑名单管理">
                     <span class="menu-icon">🚫</span>
                     <span>黑名单管理</span>
                 </a>
-                <a href="/report" class="menu-item">
+                <a href="/report" class="menu-item" data-title="数据报表">
                     <span class="menu-icon">📉</span>
                     <span>数据报表</span>
                 </a>
-                <a href="/config" class="menu-item">
+                <a href="/config" class="menu-item" data-title="系统配置">
                     <span class="menu-icon">⚙️</span>
                     <span>系统配置</span>
                 </a>
                 <div class="menu-divider"></div>
                 <div class="menu-group-title">系统管理</div>
-                <a href="/system/user" class="menu-item">
+                <a href="/system/user" class="menu-item" data-title="用户管理">
                     <span class="menu-icon">👥</span>
                     <span>用户管理</span>
                 </a>
-                <a href="/system/role" class="menu-item">
+                <a href="/system/role" class="menu-item" data-title="角色管理">
                     <span class="menu-icon">🔑</span>
                     <span>角色管理</span>
                 </a>
-                <a href="/system/log" class="menu-item">
+                <a href="/system/log" class="menu-item" data-title="操作日志">
                     <span class="menu-icon">📝</span>
                     <span>操作日志</span>
                 </a>
             </nav>
         </aside>
+    </th:block>
+    
+    <th:block th:fragment="mobileMenuToggle">
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </button>
     </th:block>
     
     <th:block th:fragment="userDropdown">

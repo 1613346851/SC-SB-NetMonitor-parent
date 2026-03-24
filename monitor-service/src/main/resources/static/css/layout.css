@@ -26,15 +26,17 @@
     height: var(--header-height);
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    padding: 0 var(--spacing-md);
     background: rgba(255, 255, 255, 0.02);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
 }
 
 .sidebar-logo {
     width: 36px;
     height: 36px;
-    margin-right: var(--spacing-md);
+    flex-shrink: 0;
     background: linear-gradient(135deg, var(--primary-color), var(--info-color));
     border-radius: var(--radius-md);
     box-shadow: 0 4px 10px rgba(79, 70, 229, 0.4);
@@ -118,6 +120,15 @@
     font-weight: 700;
     letter-spacing: 0.5px;
     color: #fff;
+    margin-left: var(--spacing-md);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidebar-toggle-wrapper {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sidebar-menu {
@@ -197,6 +208,7 @@
 .header-left {
     display: flex;
     align-items: center;
+    gap: var(--spacing-md);
 }
 
 .header-right {
@@ -231,24 +243,252 @@
     padding: var(--spacing-xl);
 }
 
+/* ==================== 侧边栏折叠 ==================== */
+.sidebar-toggle {
+    width: 100%;
+    height: 32px;
+    border-radius: var(--radius-base);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    color: rgba(255, 255, 255, 0.6);
+    transition: all var(--transition-base);
+    font-size: var(--font-size-sm);
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-toggle svg {
+    width: 14px;
+    height: 14px;
+    transition: transform var(--transition-base);
+}
+
+.sidebar-toggle span {
+    font-size: var(--font-size-sm);
+}
+
+.sidebar.collapsed {
+    width: 64px;
+}
+
+.sidebar.collapsed .sidebar-title {
+    display: none;
+}
+
+.sidebar.collapsed .menu-item {
+    justify-content: center;
+    padding: var(--spacing-md);
+    margin: 4px 8px;
+}
+
+.sidebar.collapsed .menu-item span:not(.menu-icon) {
+    display: none;
+}
+
+.sidebar.collapsed .menu-icon {
+    margin-right: 0;
+}
+
+.sidebar.collapsed .menu-divider {
+    margin: var(--spacing-md) 12px;
+}
+
+.sidebar.collapsed .menu-group-title {
+    display: none;
+}
+
+.sidebar.collapsed .sidebar-toggle svg {
+    transform: rotate(180deg);
+}
+
+.sidebar.collapsed .sidebar-toggle-wrapper {
+    padding: var(--spacing-sm) 8px;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    height: 28px;
+}
+
+.sidebar.collapsed .sidebar-toggle span {
+    display: none;
+}
+
+.sidebar-close {
+    display: none;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-base);
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.7);
+    transition: all var(--transition-base);
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.sidebar-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.sidebar-close svg {
+    width: 16px;
+    height: 16px;
+}
+
+.sidebar.collapsed .menu-item {
+    position: relative;
+}
+
+.sidebar.collapsed .menu-item::after {
+    content: attr(data-title);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 12px;
+    padding: 6px 12px;
+    background: var(--bg-dark);
+    color: #fff;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+    border-radius: var(--radius-base);
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--transition-base);
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar.collapsed .menu-item:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* ==================== 移动端菜单切换按钮 ==================== */
+.mobile-menu-toggle {
+    display: none;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: var(--radius-base);
+    transition: all var(--transition-base);
+    box-shadow: var(--shadow-sm);
+}
+
+.mobile-menu-toggle:hover {
+    background: var(--bg-light);
+    border-color: var(--primary-color);
+}
+
+.mobile-menu-toggle .hamburger {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 18px;
+    width: 20px;
+}
+
+.mobile-menu-toggle .hamburger span {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: var(--text-primary);
+    border-radius: 2px;
+    transition: all var(--transition-base);
+}
+
+/* ==================== 侧边栏遮罩层 ==================== */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: calc(var(--z-fixed) - 1);
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+.sidebar-overlay.show {
+    display: block;
+    opacity: 1;
+}
+
 /* ==================== 响应式布局 ==================== */
 @media (max-width: 1200px) {
     .sidebar {
         width: 200px;
     }
+    
+    .sidebar.collapsed {
+        width: 64px;
+    }
 }
 
 @media (max-width: 768px) {
+    .mobile-menu-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .sidebar-toggle-wrapper {
+        display: none;
+    }
+    
+    .sidebar-close {
+        display: flex;
+    }
+    
     .sidebar {
         position: fixed;
-        left: -256px;
+        left: -260px;
         top: 0;
         bottom: 0;
+        width: 260px;
         z-index: var(--z-fixed);
     }
     
     .sidebar.open {
         left: 0;
+    }
+    
+    .sidebar.collapsed {
+        width: 260px;
+    }
+    
+    .sidebar.collapsed .sidebar-title,
+    .sidebar.collapsed .menu-item span:not(.menu-icon),
+    .sidebar.collapsed .menu-group-title {
+        display: block;
+    }
+    
+    .sidebar.collapsed .menu-item {
+        justify-content: flex-start;
+        padding: var(--spacing-md) var(--spacing-xl);
+        margin: 4px 16px;
+    }
+    
+    .sidebar.collapsed .menu-icon {
+        margin-right: 12px;
     }
     
     .header {
