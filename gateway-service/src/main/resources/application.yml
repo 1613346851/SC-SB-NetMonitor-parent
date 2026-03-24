@@ -46,6 +46,15 @@ spring:
             - RewritePath=/target/(?<segment>.*),/target/page/${segment}
             - AddResponseHeader=X-Gateway-Version, 1.0.0
         
+        # 靶场服务静态资源路由（lib目录）- 必须在 target_service_route 之前
+        - id: target_static_lib_route
+          uri: http://localhost:9001
+          predicates:
+            - Path=/target/lib/**
+          filters:
+            - StripPrefix=1
+            - AddResponseHeader=X-Gateway-Version, 1.0.0
+        
         # 靶场服务 API 路由
         - id: target_service_route
           uri: http://localhost:9001
@@ -53,7 +62,6 @@ spring:
             - Path=/target/**
           filters:
             - StripPrefix=0
-            # 添加响应头
             - AddResponseHeader=X-Gateway-Version, 1.0.0
         
         # 静态资源路由
@@ -187,6 +195,12 @@ gateway:
       default-threshold: 10
     malicious-request:
       enabled: true
+      
+  # 配置同步配置
+  config:
+    sync:
+      enabled: true
+      interval: 300000  # 5分钟同步一次
       
   # 缓存配置
   cache:

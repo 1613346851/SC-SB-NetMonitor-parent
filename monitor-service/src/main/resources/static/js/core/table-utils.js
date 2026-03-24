@@ -136,19 +136,8 @@
         },
         
         renderRiskLevel(level) {
-            const levelMap = {
-                'CRITICAL': { text: '严重', class: 'critical' },
-                'HIGH': { text: '高风险', class: 'high' },
-                'MEDIUM': { text: '中风险', class: 'medium' },
-                'LOW': { text: '低风险', class: 'low' },
-                '严重': { text: '严重', class: 'critical' },
-                '高': { text: '高风险', class: 'high' },
-                '中': { text: '中风险', class: 'medium' },
-                '低': { text: '低风险', class: 'low' }
-            };
-            
-            const info = levelMap[level] || { text: level || '-', class: '' };
-            return `<span class="risk-tag ${info.class}">${info.text}</span>`;
+            return window.TableRenderer ? window.TableRenderer.renderRiskLevel(level) : 
+                `<span class="tag">${level || '-'}</span>`;
         },
         
         renderStatus(enabled, trueText = '启用', falseText = '禁用') {
@@ -170,8 +159,8 @@
         },
         
         renderAttackType(type) {
-            if (!type) return '-';
-            return `<span class="attack-type-tag">${this.escapeHtml(type)}</span>`;
+            return window.TableRenderer ? window.TableRenderer.renderAttackType(type) : 
+                `<span class="tag">${type || '-'}</span>`;
         },
         
         renderActionCell(buttons, options = {}) {

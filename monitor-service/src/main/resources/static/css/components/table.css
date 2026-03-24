@@ -301,6 +301,14 @@
     white-space: nowrap;
 }
 
+.data-table.has-fixed-action td:last-child,
+.data-table.has-fixed-action td.action-cell {
+    max-width: none;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+}
+
 .data-table.has-fixed-action td.cell-overflow {
     cursor: default;
 }

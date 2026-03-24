@@ -7,8 +7,12 @@
     const TableRenderer = {
         renderRiskLevel(level) {
             const config = AppConfig.RISK_LEVELS[level] || { text: level, class: 'info' };
+            const riskClass = level === 'CRITICAL' ? 'risk-critical' : 
+                             level === 'HIGH' ? 'risk-high' : 
+                             level === 'MEDIUM' ? 'risk-medium' : 
+                             level === 'LOW' ? 'risk-low' : '';
             const extraStyle = level === 'CRITICAL' ? 'animation: pulse-danger 2s infinite;' : '';
-            return `<span class="tag ${config.class}" style="${extraStyle}">${config.text}</span>`;
+            return `<span class="tag ${config.class} ${riskClass}" style="${extraStyle}">${config.text}</span>`;
         },
         
         renderAttackType(type) {

@@ -227,6 +227,7 @@ async function loadEventDetail(eventId) {
         `;
         
         document.getElementById('eventDetailPanel').style.display = 'block';
+        document.getElementById('eventDetailPanel').classList.add('show');
         
         loadRelatedAttacks(eventId);
         loadEventTimeline(event);
@@ -296,7 +297,11 @@ function loadEventTimeline(event) {
 }
 
 function closeEventDetail() {
-    document.getElementById('eventDetailPanel').style.display = 'none';
+    const panel = document.getElementById('eventDetailPanel');
+    panel.classList.remove('show');
+    setTimeout(() => {
+        panel.style.display = 'none';
+    }, 300);
     currentEventId = null;
     
     const url = new URL(window.location);

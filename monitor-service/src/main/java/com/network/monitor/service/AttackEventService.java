@@ -45,4 +45,6 @@ public interface AttackEventService {
     Map<String, Object> getEventStatistics();
 
     List<AttackEventEntity> getEventsByIp(String sourceIp);
+
+    int endExpiredEvents(int expireMinutes);
 }

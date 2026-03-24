@@ -225,4 +225,16 @@
         FROM sys_attack_event
         WHERE source_ip = #{sourceIp}
     </select>
+
+    <select id="selectAvgDuration" resultType="java.lang.Double">
+        SELECT AVG(duration_seconds)
+        FROM sys_attack_event
+        WHERE duration_seconds IS NOT NULL AND duration_seconds > 0
+    </select>
+
+    <select id="selectOngoingEventsNotUpdatedSince" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        WHERE status = 0 AND update_time &lt; #{thresholdTime}
+    </select>
 </mapper>

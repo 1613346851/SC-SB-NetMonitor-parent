@@ -17,6 +17,7 @@
                 </div>
                 <div class="header-right">
                     <button class="btn btn-default" onclick="refreshConfig()">刷新缓存</button>
+                    <button class="btn btn-warning" onclick="pushAllToGateway()">推送全部到网关</button>
                     <button class="btn btn-primary" onclick="showAddConfigModal()">新增配置</button>
                     <div th:replace="~{fragments/common :: userDropdown}"></div>
                 </div>
@@ -27,10 +28,10 @@
                     <div class="card config-hero">
                         <div class="config-hero__eyebrow">GLOBAL CONFIG CENTER</div>
                         <h3 class="config-hero__title">统一系统配置管理</h3>
-                        <p class="config-hero__desc">管理系统配置项，支持配置的新增、编辑、删除和查询，配置变更后可刷新缓存即时生效。</p>
+                        <p class="config-hero__desc">管理系统配置项，支持配置的新增、编辑、删除和查询，配置变更后可刷新缓存即时生效。网关配置支持实时推送到网关服务。</p>
                         <div class="config-hero__meta">
                             <span class="config-meta-chip">监测服务配置中心</span>
-                            <span class="config-meta-chip">支持 AI 模型配置</span>
+                            <span class="config-meta-chip">网关配置统一管理</span>
                             <span class="config-meta-chip">配置变更即时刷新</span>
                         </div>
                     </div>
@@ -42,8 +43,8 @@
                             </div>
                             <div class="stat-card-value" id="configTotalCount">0</div>
                             <div class="stat-card-footer">
-                                <span>AI 相关</span>
-                                <span id="configAiCount">0</span>
+                                <span>网关配置</span>
+                                <span id="configGatewayCount">0</span>
                             </div>
                         </div>
                         <div class="stat-card">
@@ -60,38 +61,91 @@
                     </div>
                 </section>
 
+                <section class="gateway-sync-panel">
+                    <div class="card gateway-sync-card">
+                        <div class="gateway-sync-card__head">
+                            <div>
+                                <div class="gateway-sync-card__title">网关配置同步状态</div>
+                                <div class="gateway-sync-card__desc">实时监控网关配置同步状态，支持手动推送配置到网关服务</div>
+                            </div>
+                            <span class="gateway-badge" id="gatewaySyncStatus">检测中...</span>
+                        </div>
+                        <div class="gateway-sync-stats">
+                            <div class="gateway-sync-stat">
+                                <div class="gateway-sync-stat__label">网关配置数量</div>
+                                <div class="gateway-sync-stat__value" id="gatewayConfigCount">--</div>
+                            </div>
+                            <div class="gateway-sync-stat">
+                                <div class="gateway-sync-stat__label">上次同步时间</div>
+                                <div class="gateway-sync-stat__value" id="gatewayLastSync">--</div>
+                            </div>
+                            <div class="gateway-sync-stat">
+                                <div class="gateway-sync-stat__label">同步状态</div>
+                                <div class="gateway-sync-stat__value" id="gatewaySyncResult">--</div>
+                            </div>
+                        </div>
+                        <div class="gateway-sync-actions">
+                            <button class="btn btn-default btn-sm" onclick="checkGatewayStatus()">刷新状态</button>
+                            <button class="btn btn-primary btn-sm" onclick="pushGatewayConfigs()">推送网关配置</button>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="ai-config-panel">
                     <div class="card ai-config-card">
                         <div class="ai-config-card__head">
                             <div>
-                                <div class="ai-config-card__title">AI 模型接口地址</div>
-                                <div class="ai-config-card__key">ai.model.url</div>
+                                <div class="ai-config-card__title">AI 模型配置</div>
+                                <div class="ai-config-card__key">ai.model.*</div>
                             </div>
                             <span class="ai-badge">AI</span>
                         </div>
-                        <div id="aiModelUrlValue" class="ai-config-card__value empty">未配置</div>
-                        <div class="ai-config-card__footer">
-                            <div class="ai-config-card__desc">漏洞扫描、攻击分析与智能研判等场景共用该模型接入地址。</div>
-                            <div class="ai-card-actions">
-                                <button class="btn btn-default btn-sm" onclick="filterAiConfigs()">定位</button>
+                        <div class="ai-config-items">
+                            <div class="ai-config-item">
+                                <div class="ai-config-item__label">接口地址 <code>ai.model.url</code></div>
+                                <div class="ai-config-item__value" id="aiModelUrlValue">未配置</div>
                                 <button class="btn btn-primary btn-sm" onclick="editAiConfig('ai.model.url')">编辑</button>
+                            </div>
+                            <div class="ai-config-item">
+                                <div class="ai-config-item__label">API 密钥 <code>ai.model.apiKey</code></div>
+                                <div class="ai-config-item__value" id="aiModelApiKeyValue">未配置</div>
+                                <button class="btn btn-primary btn-sm" onclick="editAiConfig('ai.model.apiKey')">编辑</button>
+                            </div>
+                        </div>
+                        <div class="ai-config-card__footer">
+                            <div class="ai-config-card__desc">漏洞扫描、攻击分析与智能研判等场景共用的AI模型配置。</div>
+                            <div class="ai-card-actions">
+                                <button class="btn btn-default btn-sm" onclick="filterAiConfigs()">定位配置</button>
                             </div>
                         </div>
                     </div>
-                    <div class="card ai-config-card">
+                    <div class="card gateway-config-card">
                         <div class="ai-config-card__head">
                             <div>
-                                <div class="ai-config-card__title">AI 模型 API Key</div>
-                                <div class="ai-config-card__key">ai.model.apiKey</div>
+                                <div class="ai-config-card__title">网关防御开关</div>
+                                <div class="ai-config-card__key">gateway.defense.*.enabled</div>
                             </div>
-                            <span class="ai-badge">AI</span>
+                            <span class="gateway-badge">网关</span>
                         </div>
-                        <div id="aiModelApiKeyValue" class="ai-config-card__value empty">未配置</div>
+                        <div class="gateway-defense-switches">
+                            <div class="defense-switch-item">
+                                <span class="defense-switch-label">黑名单防御</span>
+                                <span class="defense-switch-value" id="gatewayBlacklistEnabled">--</span>
+                            </div>
+                            <div class="defense-switch-item">
+                                <span class="defense-switch-label">请求限流</span>
+                                <span class="defense-switch-value" id="gatewayRateLimitEnabled">--</span>
+                            </div>
+                            <div class="defense-switch-item">
+                                <span class="defense-switch-label">恶意请求拦截</span>
+                                <span class="defense-switch-value" id="gatewayMaliciousEnabled">--</span>
+                            </div>
+                        </div>
                         <div class="ai-config-card__footer">
-                            <div class="ai-config-card__desc">页面将对密钥做掩码展示，保存后由各模块统一按需读取。</div>
+                            <div class="ai-config-card__desc">控制网关防御模块的开关状态，修改后实时推送到网关生效。</div>
                             <div class="ai-card-actions">
-                                <button class="btn btn-default btn-sm" onclick="filterAiConfigs()">定位</button>
-                                <button class="btn btn-primary btn-sm" onclick="editAiConfig('ai.model.apiKey')">编辑</button>
+                                <button class="btn btn-default btn-sm" onclick="filterGatewayConfigs()">定位</button>
+                                <button class="btn btn-primary btn-sm" onclick="showGatewayDefenseModal()">配置</button>
                             </div>
                         </div>
                     </div>
@@ -103,33 +157,41 @@
                             <label class="form-label">配置键</label>
                             <input type="text" class="form-control" id="configKey" placeholder="支持按配置键模糊检索">
                         </div>
+                        <div class="form-group">
+                            <label class="form-label">配置分类</label>
+                            <select class="form-control" id="configCategory" onchange="filterByCategory()">
+                                <option value="ALL">全部配置</option>
+                                <option value="GATEWAY">网关配置</option>
+                                <option value="AI">AI 配置</option>
+                                <option value="MONITOR">监测服务配置</option>
+                            </select>
+                        </div>
                         <div class="form-group config-inline-actions">
                             <button class="btn btn-primary" onclick="searchConfig()">查询</button>
                             <button class="btn btn-default" onclick="resetSearch()">重置</button>
-                            <button class="btn btn-default" onclick="filterAiConfigs()">仅看 AI 配置</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="config-tip">提示：`ai.model.url` 与 `ai.model.apiKey` 已作为全局 AI 配置接入，主要用于漏洞扫描与告警研判等场景。</div>
+                <div class="config-tip">提示：网关配置（gateway.*）支持实时推送到网关服务，修改后点击"推送到网关"按钮即可生效，无需重启网关服务。</div>
 
                 <div class="table-container" style="margin-top: 24px;">
                     <div class="table-header">
                         <div>
                             <h3 class="table-title">系统配置列表</h3>
-                            <div class="scan-section-desc">系统配置统一维护，编辑后刷新缓存使配置生效。</div>
+                            <div class="scan-section-desc">系统配置统一维护，编辑后刷新缓存使配置生效。网关配置支持实时推送。</div>
                         </div>
                     </div>
-                    <div class="table-wrapper">
-                        <table class="data-table">
+                    <div class="table-wrapper" style="position: relative;">
+                        <table class="data-table has-fixed-action config-table">
                             <thead>
                                 <tr>
-                                    <th data-sort="id">ID</th>
-                                    <th data-sort="configKey">配置键</th>
-                                    <th>配置值</th>
-                                    <th>描述</th>
-                                    <th data-sort="createTime">创建时间</th>
-                                    <th data-sort="updateTime">更新时间</th>
+                                    <th data-sort="id" style="min-width: 60px;">ID</th>
+                                    <th data-sort="configKey" style="min-width: 200px;">配置键</th>
+                                    <th style="min-width: 200px;">配置值</th>
+                                    <th style="min-width: 150px;">描述</th>
+                                    <th data-sort="createTime" style="min-width: 150px;">创建时间</th>
+                                    <th data-sort="updateTime" style="min-width: 150px;">更新时间</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -156,8 +218,8 @@
                     <input type="hidden" id="configId">
                     <div class="form-group">
                         <label class="form-label">配置键 <span style="color: red;">*</span></label>
-                        <input type="text" class="form-control" id="configKeyInput" required placeholder="请输入配置键，如：ddos.threshold">
-                        <small style="color: var(--text-secondary);">配置键唯一，用于标识配置项；AI 配置推荐使用 ai.model.url / ai.model.apiKey</small>
+                        <input type="text" class="form-control" id="configKeyInput" required placeholder="请输入配置键，如：gateway.defense.blacklist.enabled">
+                        <small style="color: var(--text-secondary);">配置键唯一，用于标识配置项；网关配置以 gateway. 开头</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">配置值 <span style="color: red;">*</span></label>
@@ -172,6 +234,52 @@
             <div class="modal-footer">
                 <button class="btn btn-default" onclick="closeConfigModal()">取消</button>
                 <button class="btn btn-primary" onclick="saveConfig()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="gatewayDefenseModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">网关防御开关配置</h3>
+                <span class="modal-close" onclick="closeGatewayDefenseModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="gateway-defense-form">
+                    <div class="form-group">
+                        <label class="form-label">黑名单防御开关</label>
+                        <select class="form-control" id="gatewayBlacklistSwitch">
+                            <option value="true">开启</option>
+                            <option value="false">关闭</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">请求限流开关</label>
+                        <select class="form-control" id="gatewayRateLimitSwitch">
+                            <option value="true">开启</option>
+                            <option value="false">关闭</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">恶意请求拦截开关</label>
+                        <select class="form-control" id="gatewayMaliciousSwitch">
+                            <option value="true">开启</option>
+                            <option value="false">关闭</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">默认限流阈值（次/秒）</label>
+                        <input type="number" class="form-control" id="gatewayRateLimitThreshold" min="1" max="1000" value="10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">黑名单默认过期时间（秒）</label>
+                        <input type="number" class="form-control" id="gatewayBlacklistExpire" min="60" max="86400" value="600">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeGatewayDefenseModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveGatewayDefenseConfig()">保存并推送</button>
             </div>
         </div>
     </div>

@@ -627,6 +627,54 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('alert.heartbeat.interval', '10000', '告警心跳间隔（毫秒）');
 
 -- ------------------------------------------------------------
+-- 4.3.0 初始化AI配置项
+-- AI模型配置，用于漏洞扫描、攻击分析与智能研判
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('ai.model.url', '', 'AI大模型接口地址'),
+('ai.model.apiKey', '', 'AI大模型API密钥');
+
+-- ------------------------------------------------------------
+-- 4.3.1 初始化网关配置项
+-- 网关服务统一配置，由监测服务管理
+-- ------------------------------------------------------------
+-- 网关防御开关配置
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.blacklist.enabled', 'true', '网关-黑名单防御开关'),
+('gateway.defense.rate-limit.enabled', 'true', '网关-限流防御开关'),
+('gateway.defense.malicious-request.enabled', 'true', '网关-恶意请求拦截开关');
+
+-- 限流配置
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.rate-limit.default-threshold', '10', '网关-默认限流阈值(次/秒)'),
+('gateway.defense.rate-limit.window-size', '1000', '网关-限流时间窗口(毫秒)');
+
+-- 黑名单配置
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.blacklist.default-expire-seconds', '600', '网关-黑名单默认过期时间(秒)');
+
+-- 恶意请求检测配置
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.malicious.user-agents', 'sqlmap,nessus,nmap,burp suite,zaproxy,nikto,w3af,arachni,skipfish,wvs,dirb,gobuster,ffuf,hydra,medusa', '网关-恶意User-Agent列表(逗号分隔)'),
+('gateway.defense.malicious.uri-patterns', '/admin,/manager,/console,/wp-admin,/phpmyadmin,/mysql,/dbadmin,/webdav,/.git/config,/.env,/config/database.yml,/backup,/dump,/export,/download', '网关-恶意URI模式列表(逗号分隔)');
+
+-- 缓存配置
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.cache.traffic-expire-ms', '3600000', '网关-流量缓存过期时间(毫秒)'),
+('gateway.cache.blacklist-expire-ms', '600000', '网关-黑名单缓存过期时间(毫秒)'),
+('gateway.cache.cleanup-interval-ms', '60000', '网关-缓存清理间隔(毫秒)');
+
+-- 攻击状态配置
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.attack-state.cooldown-duration-ms', '300000', '网关-冷却持续时间(毫秒)'),
+('gateway.attack-state.state-expire-ms', '600000', '网关-攻击状态过期时间(毫秒)');
+
+-- 请求限制配置
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.request.max-body-size', '102400', '网关-最大请求体大小(字节)'),
+('gateway.request.abnormal-response-threshold-ms', '3000', '网关-异常响应时间阈值(毫秒)');
+
+-- ------------------------------------------------------------
 -- 4.4 初始化角色数据
 -- 内置三个默认角色：超级管理员、安全管理员、审计管理员
 -- ------------------------------------------------------------

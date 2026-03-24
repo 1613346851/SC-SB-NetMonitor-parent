@@ -282,9 +282,9 @@ async function getStoredObjects() {
                     content += `
                         <tr>
                             <td>${obj.id}</td>
-                            <td><code>${VulnCommon.escapeHtml(obj.objectName)}</code></td>
-                            <td><small>${VulnCommon.escapeHtml(obj.objectType)}</small></td>
-                            <td><small>${obj.createTime}</small></td>
+                            <td><code>${VulnCommon.escapeHtml(obj.object_name)}</code></td>
+                            <td><small>${VulnCommon.escapeHtml(obj.object_type)}</small></td>
+                            <td><small>${obj.create_time}</small></td>
                             <td>
                                 <button class="btn btn-sm btn-outline-danger" onclick="deleteStoredObject(${obj.id})">
                                     <i class="fas fa-trash"></i>

@@ -137,4 +137,8 @@ public interface AttackEventMapper {
     int countOngoingEvents();
 
     int countEventsByIp(@Param("sourceIp") String sourceIp);
+
+    Double selectAvgDuration();
+
+    List<AttackEventEntity> selectOngoingEventsNotUpdatedSince(@Param("thresholdTime") LocalDateTime thresholdTime);
 }

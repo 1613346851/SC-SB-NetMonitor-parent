@@ -1,6 +1,7 @@
 package com.network.gateway.filter.defense;
 
 import com.network.gateway.bo.DefenseResultBO;
+import com.network.gateway.cache.GatewayConfigCache;
 import com.network.gateway.cache.IpAttackStateCache;
 import com.network.gateway.cache.RequestRateLimitCache;
 import com.network.gateway.client.MonitorServiceDefenseClient;
@@ -13,7 +14,6 @@ import com.network.gateway.util.ServerWebExchangeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -22,13 +22,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+/**
+ * 请求限流过滤器
+ * 使用动态配置获取限流阈值和开关
+ *
+ * @author network-monitor
+ * @since 1.0.0
+ */
 @Component
 public class RequestRateLimitFilter implements GlobalFilter, Ordered {
 
     private static final Logger logger = LoggerFactory.getLogger(RequestRateLimitFilter.class);
-
-    @Value("${gateway.defense.rate-limit.default-threshold:10}")
-    private int defaultThreshold;
 
     @Autowired
     private RequestRateLimitCache rateLimitCache;
@@ -39,6 +43,9 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
     @Autowired
     private IpAttackStateCache attackStateCache;
 
+    @Autowired
+    private GatewayConfigCache configCache;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         long startTime = System.currentTimeMillis();
@@ -46,6 +53,10 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
 
         try {
             if (shouldSkipRateLimit(exchange)) {
+                return chain.filter(exchange);
+            }
+
+            if (!isRateLimitEnabled()) {
                 return chain.filter(exchange);
             }
 
@@ -78,11 +89,16 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         return false;
     }
 
+    private boolean isRateLimitEnabled() {
+        return configCache.isDefenseEnabled("rate-limit");
+    }
+
     private boolean isRateLimited(String ip, int threshold) {
         return rateLimitCache.checkAndIncrement(ip, threshold);
     }
 
     private int getCurrentThreshold(String ip) {
+        int defaultThreshold = configCache.getRateLimitThreshold();
         return rateLimitCache.getEffectiveThreshold(ip, defaultThreshold);
     }
 
@@ -160,7 +176,7 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
     }
 
     public int getDefaultThreshold() {
-        return defaultThreshold;
+        return configCache.getRateLimitThreshold();
     }
 
     public int getCurrentThresholdForIp(String ip) {
@@ -176,12 +192,15 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
     }
 
     public java.util.Set<String> getHighFrequencyIps(double ratio) {
-        return rateLimitCache.getHighFrequencyIps(defaultThreshold, ratio);
+        int threshold = configCache.getRateLimitThreshold();
+        return rateLimitCache.getHighFrequencyIps(threshold, ratio);
     }
 
     public String getStatistics() {
-        RequestRateLimitCache.RateLimitStatistics stats = rateLimitCache.getStatistics(defaultThreshold);
-        return String.format("请求限流过滤器 - 默认阈值:%d次/秒 %s", defaultThreshold, stats.toString());
+        int threshold = configCache.getRateLimitThreshold();
+        RequestRateLimitCache.RateLimitStatistics stats = rateLimitCache.getStatistics(threshold);
+        return String.format("请求限流过滤器 - 动态阈值:%d次/秒 开关:%s %s", 
+                threshold, isRateLimitEnabled() ? "开启" : "关闭", stats.toString());
     }
 
     public int batchResetRequestCounts(java.util.Set<String> ips) {

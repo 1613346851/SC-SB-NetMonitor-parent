@@ -1,6 +1,7 @@
 package com.network.gateway.filter.defense;
 
 import com.network.gateway.bo.DefenseResultBO;
+import com.network.gateway.cache.GatewayConfigCache;
 import com.network.gateway.cache.IpAttackStateCache;
 import com.network.gateway.cache.IpBlacklistCache;
 import com.network.gateway.client.MonitorServiceDefenseClient;
@@ -20,6 +21,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
+/**
+ * IP黑名单防御过滤器
+ * 使用动态配置获取黑名单开关
+ *
+ * @author network-monitor
+ * @since 1.0.0
+ */
 @Component
 public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
 
@@ -34,12 +42,19 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
     @Autowired
     private IpAttackStateCache attackStateCache;
 
+    @Autowired
+    private GatewayConfigCache configCache;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         long startTime = System.currentTimeMillis();
         String sourceIp = ServerWebExchangeUtil.extractSourceIp(exchange.getRequest());
 
         try {
+            if (!isBlacklistDefenseEnabled()) {
+                return chain.filter(exchange);
+            }
+
             if (blacklistCache.isInBlacklist(sourceIp)) {
                 return handleBlacklistedIp(exchange, sourceIp, startTime);
             }
@@ -50,6 +65,10 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
             logger.error("IP黑名单检查过程中发生异常，IP: {}", sourceIp, e);
             return chain.filter(exchange);
         }
+    }
+
+    private boolean isBlacklistDefenseEnabled() {
+        return configCache.isDefenseEnabled("blacklist");
     }
 
     private Mono<Void> handleBlacklistedIp(ServerWebExchange exchange, String blacklistedIp, long startTime) {
@@ -103,70 +122,35 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
         }
     }
 
-    /**
-     * 获取过滤器优先级
-     *
-     * @return 优先级数值
-     */
     @Override
     public int getOrder() {
         return GatewayFilterOrderConstant.IP_BLACKLIST_DEFENSE_FILTER_ORDER;
     }
 
-    /**
-     * 获取过滤器名称
-     *
-     * @return 过滤器名称
-     */
     public String getFilterName() {
         return "IpBlacklistDefenseFilter";
     }
 
-    /**
-     * 获取黑名单缓存大小
-     *
-     * @return 黑名单数量
-     */
     public int getBlacklistSize() {
         return blacklistCache.getSize();
     }
 
-    /**
-     * 手动添加IP到黑名单
-     *
-     * @param ip IP地址
-     * @param expireTime 过期时间戳
-     * @return true表示添加成功
-     */
     public boolean addToBlacklist(String ip, Long expireTime) {
         return blacklistCache.addToBlacklist(ip, expireTime);
     }
 
-    /**
-     * 从黑名单中移除IP
-     *
-     * @param ip IP地址
-     * @return true表示移除成功
-     */
     public boolean removeFromBlacklist(String ip) {
         return blacklistCache.removeFromBlacklist(ip);
     }
 
-    /**
-     * 清理过期的黑名单条目
-     */
     public void cleanupExpiredBlacklist() {
         blacklistCache.cleanupExpired();
     }
 
-    /**
-     * 获取过滤器统计信息
-     *
-     * @return 统计信息
-     */
     public String getStatistics() {
-        return String.format("IP黑名单过滤器 - 黑名单数量:%d 缓存统计:%s", 
-                           getBlacklistSize(), 
-                           blacklistCache.getStats());
+        return String.format("IP黑名单过滤器 - 黑名单数量:%d 开关:%s 缓存统计:%s", 
+                getBlacklistSize(),
+                isBlacklistDefenseEnabled() ? "开启" : "关闭",
+                blacklistCache.getStats());
     }
 }

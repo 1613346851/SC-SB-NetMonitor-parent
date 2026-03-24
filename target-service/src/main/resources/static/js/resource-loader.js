@@ -3,22 +3,35 @@
         loadedResources: new Set(),
         failedResources: new Set(),
         
-        cdnFallbacks: {
-            bootstrapCss: [
-                '/lib/bootstrap/bootstrap.min.css',
-                'https://cdn.staticfile.org/bootstrap/5.1.3/css/bootstrap.min.css',
-                'https://lib.baomitu.com/bootstrap/5.1.3/css/bootstrap.min.css'
-            ],
-            bootstrapJs: [
-                '/lib/bootstrap/bootstrap.bundle.min.js',
-                'https://cdn.staticfile.org/bootstrap/5.1.3/js/bootstrap.bundle.min.js',
-                'https://lib.baomitu.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js'
-            ],
-            fontawesome: [
-                '/lib/fontawesome/all.min.css',
-                'https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css',
-                'https://lib.baomitu.com/font-awesome/6.4.0/css/all.min.css'
-            ]
+        getContextPath: function() {
+            var path = window.location.pathname;
+            if (path.indexOf('/target') === 0) {
+                return '/target';
+            }
+            return '';
+        },
+        
+        cdnFallbacks: null,
+        
+        initCdnFallbacks: function() {
+            var ctx = this.getContextPath();
+            this.cdnFallbacks = {
+                bootstrapCss: [
+                    ctx + '/lib/bootstrap/bootstrap.min.css',
+                    'https://cdn.staticfile.org/bootstrap/5.1.3/css/bootstrap.min.css',
+                    'https://lib.baomitu.com/bootstrap/5.1.3/css/bootstrap.min.css'
+                ],
+                bootstrapJs: [
+                    ctx + '/lib/bootstrap/bootstrap.bundle.min.js',
+                    'https://cdn.staticfile.org/bootstrap/5.1.3/js/bootstrap.bundle.min.js',
+                    'https://lib.baomitu.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js'
+                ],
+                fontawesome: [
+                    ctx + '/lib/fontawesome/all.min.css',
+                    'https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css',
+                    'https://lib.baomitu.com/font-awesome/6.4.0/css/all.min.css'
+                ]
+            };
         },
         
         async loadCss(src) {
@@ -75,6 +88,9 @@
         },
         
         async loadWithFallback(name, type) {
+            if (!this.cdnFallbacks) {
+                this.initCdnFallbacks();
+            }
             const fallbacks = this.cdnFallbacks[name];
             if (!fallbacks || fallbacks.length === 0) {
                 throw new Error('No fallbacks defined for: ' + name);
@@ -113,6 +129,9 @@
         },
         
         async loadAll() {
+            if (!this.cdnFallbacks) {
+                this.initCdnFallbacks();
+            }
             try {
                 await this.loadWithFallback('bootstrapCss', 'css');
                 await this.loadWithFallback('fontawesome', 'css');

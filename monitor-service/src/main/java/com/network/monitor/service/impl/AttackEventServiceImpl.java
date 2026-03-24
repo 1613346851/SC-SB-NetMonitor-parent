@@ -229,7 +229,16 @@ public class AttackEventServiceImpl implements AttackEventService {
         }
         stats.put("riskLevelStats", riskCount);
 
-        stats.put("ongoingCount", attackEventMapper.countOngoingEvents());
+        int ongoingCount = attackEventMapper.countOngoingEvents();
+        long totalCount = attackEventMapper.countByCondition(null, null, null, null, null, null, null);
+        
+        stats.put("ongoingCount", ongoingCount);
+        stats.put("totalEvents", totalCount);
+        stats.put("ongoingEvents", ongoingCount);
+        stats.put("endedEvents", totalCount - ongoingCount);
+        
+        Double avgDuration = attackEventMapper.selectAvgDuration();
+        stats.put("avgDuration", avgDuration != null ? avgDuration.intValue() : 0);
 
         return stats;
     }
@@ -250,5 +259,37 @@ public class AttackEventServiceImpl implements AttackEventService {
     private String generateEventId() {
         return "EVT_" + System.currentTimeMillis() + "_" + 
                UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    @Override
+    @Transactional
+    public int endExpiredEvents(int expireMinutes) {
+        LocalDateTime thresholdTime = LocalDateTime.now().minusMinutes(expireMinutes);
+        List<AttackEventEntity> expiredEvents = attackEventMapper.selectOngoingEventsNotUpdatedSince(thresholdTime);
+        
+        int endedCount = 0;
+        for (AttackEventEntity event : expiredEvents) {
+            try {
+                LocalDateTime endTime = LocalDateTime.now();
+                int durationSeconds = 0;
+                if (event.getStartTime() != null) {
+                    durationSeconds = (int) java.time.Duration.between(event.getStartTime(), endTime).getSeconds();
+                }
+                
+                attackEventMapper.markAsEnded(event.getId(), endTime, durationSeconds);
+                endedCount++;
+                
+                log.info("自动结束过期事件：eventId={}, ip={}, duration={}秒", 
+                    event.getEventId(), event.getSourceIp(), durationSeconds);
+            } catch (Exception e) {
+                log.error("结束过期事件失败：eventId={}", event.getEventId(), e);
+            }
+        }
+        
+        if (endedCount > 0) {
+            log.info("批量结束过期事件完成：共{}个事件已结束", endedCount);
+        }
+        
+        return endedCount;
     }
 }

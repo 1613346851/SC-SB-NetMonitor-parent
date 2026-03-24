@@ -85,4 +85,19 @@ public class HttpConstant {
      * 网关日志同步接口
      */
     public static final String GATEWAY_LOG_ENDPOINT = "/api/gateway/defense/log/sync";
+
+    /**
+     * 网关配置推送接口（单个配置）
+     */
+    public static final String GATEWAY_CONFIG_PUSH_ENDPOINT = "/api/gateway/config/push";
+
+    /**
+     * 网关配置同步接口（批量配置）
+     */
+    public static final String GATEWAY_CONFIG_SYNC_ENDPOINT = "/api/gateway/config/sync";
+
+    /**
+     * 网关当前配置查询接口
+     */
+    public static final String GATEWAY_CONFIG_CURRENT_ENDPOINT = "/api/gateway/config/current";
 }
