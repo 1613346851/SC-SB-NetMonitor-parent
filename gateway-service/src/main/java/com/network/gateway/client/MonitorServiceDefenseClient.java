@@ -251,4 +251,128 @@ public class MonitorServiceDefenseClient {
     public String getStatistics() {
         return "防御日志推送客户端 - 配置端点：" + GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DEFENSE_LOG_ENDPOINT;
     }
+
+    /**
+     * 推送DDoS攻击事件到监控服务
+     * 当IP连续触发限流达到阈值时，自动推送DDoS攻击事件
+     *
+     * @param sourceIp 源IP地址
+     * @param rateLimitCount 限流触发次数
+     * @param httpMethod HTTP方法
+     * @param requestUri 请求URI
+     * @param userAgent 用户代理
+     * @throws RestClientException 网络异常
+     */
+    public void pushDDoSAttackEvent(String sourceIp, int rateLimitCount, 
+                                    String httpMethod, String requestUri, String userAgent) throws RestClientException {
+        String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, String> securityHeaders = CrossServiceSecurityUtil.generateSecurityHeaders(
+                    requestId, 
+                    secretKey
+            );
+            headers.set("X-Timestamp", securityHeaders.get("X-Timestamp"));
+            headers.set("X-Request-ID", securityHeaders.get("X-Request-ID"));
+            headers.set("X-Signature", securityHeaders.get("X-Signature"));
+
+            java.util.Map<String, Object> eventBody = new java.util.HashMap<>();
+            eventBody.put("sourceIp", sourceIp);
+            eventBody.put("attackType", "DDOS");
+            eventBody.put("riskLevel", "HIGH");
+            eventBody.put("confidence", 85);
+            eventBody.put("rateLimitCount", rateLimitCount);
+            eventBody.put("httpMethod", httpMethod);
+            eventBody.put("requestUri", requestUri);
+            eventBody.put("userAgent", userAgent);
+            eventBody.put("description", String.format("连续触发限流%d次，自动升级为DDoS攻击", rateLimitCount));
+            eventBody.put("timestamp", System.currentTimeMillis());
+
+            HttpEntity<java.util.Map<String, Object>> requestEntity = new HttpEntity<>(eventBody, headers);
+
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.DDOS_ATTACK_EVENT_ENDPOINT;
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    url,
+                    requestEntity,
+                    String.class
+            );
+
+            if (isResponseSuccessful(response)) {
+                logger.info("DDoS攻击事件推送成功: ip={}, rateLimitCount={}", sourceIp, rateLimitCount);
+            } else {
+                String errorMsg = extractErrorMessage(response.getBody());
+                logger.error("DDoS攻击事件推送失败: ip={}, 响应内容[{}]", sourceIp, errorMsg);
+                throw new RestClientException("监控服务返回错误: " + errorMsg);
+            }
+
+        } catch (RestClientException e) {
+            logger.error("推送DDoS攻击事件到监控服务失败: ip={}, 错误: {}", sourceIp, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            logger.error("推送DDoS攻击事件时发生未知异常: ip={}", sourceIp, e);
+            throw new RestClientException("推送DDoS攻击事件时发生未知异常", e);
+        }
+    }
+
+    /**
+     * 推送黑名单事件到监控服务
+     * 当IP被确认攻击并执行防御时，推送黑名单事件
+     *
+     * @param sourceIp 源IP地址
+     * @param banType 封禁类型（SYSTEM/MANUAL）
+     * @param banReason 封禁原因
+     * @param duration 封禁时长（秒，null表示永久）
+     * @throws RestClientException 网络异常
+     */
+    public void pushBlacklistEvent(String sourceIp, String banType, String banReason, Long duration) throws RestClientException {
+        String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, String> securityHeaders = CrossServiceSecurityUtil.generateSecurityHeaders(
+                    requestId, 
+                    secretKey
+            );
+            headers.set("X-Timestamp", securityHeaders.get("X-Timestamp"));
+            headers.set("X-Request-ID", securityHeaders.get("X-Request-ID"));
+            headers.set("X-Signature", securityHeaders.get("X-Signature"));
+
+            java.util.Map<String, Object> eventBody = new java.util.HashMap<>();
+            eventBody.put("ip", sourceIp);
+            eventBody.put("banType", banType != null ? banType : "SYSTEM");
+            eventBody.put("banReason", banReason);
+            eventBody.put("duration", duration);
+            eventBody.put("operator", "SYSTEM");
+            eventBody.put("timestamp", System.currentTimeMillis());
+
+            HttpEntity<java.util.Map<String, Object>> requestEntity = new HttpEntity<>(eventBody, headers);
+
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.BLACKLIST_EVENT_ENDPOINT;
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    url,
+                    requestEntity,
+                    String.class
+            );
+
+            if (isResponseSuccessful(response)) {
+                logger.info("黑名单事件推送成功: ip={}, banType={}, reason={}", sourceIp, banType, banReason);
+            } else {
+                String errorMsg = extractErrorMessage(response.getBody());
+                logger.error("黑名单事件推送失败: ip={}, 响应内容[{}]", sourceIp, errorMsg);
+                throw new RestClientException("监控服务返回错误: " + errorMsg);
+            }
+
+        } catch (RestClientException e) {
+            logger.error("推送黑名单事件到监控服务失败: ip={}, 错误: {}", sourceIp, e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            logger.error("推送黑名单事件时发生未知异常: ip={}", sourceIp, e);
+            throw new RestClientException("推送黑名单事件时发生未知异常", e);
+        }
+    }
 }

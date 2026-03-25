@@ -21,6 +21,12 @@ public class GatewayFilterOrderConstant {
     public static final int IP_BLACKLIST_DEFENSE_FILTER_ORDER = 0;
 
     /**
+     * 防御状态检查过滤器优先级
+     * 在黑名单过滤器之后，限流过滤器之前执行
+     */
+    public static final int DEFENSE_STATE_CHECK_FILTER_ORDER = 5;
+
+    /**
      * 请求限流过滤器优先级
      */
     public static final int REQUEST_RATE_LIMIT_FILTER_ORDER = 10;

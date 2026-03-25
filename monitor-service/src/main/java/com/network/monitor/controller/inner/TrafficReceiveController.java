@@ -55,8 +55,14 @@ public class TrafficReceiveController {
     @PostMapping("/receive")
     public ApiResponse<Void> receiveTraffic(@RequestBody TrafficMonitorDTO trafficDTO) {
         try {
-            log.info("接收到流量数据：sourceIp={}, uri={}, method={}", 
-                trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getHttpMethod());
+            if (trafficDTO.isAggregated()) {
+                log.info("接收到聚合流量数据：sourceIp={}, uri={}, method={}, requestCount={}, stateTag={}", 
+                    trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getHttpMethod(),
+                    trafficDTO.getRequestCount(), trafficDTO.getStateTag());
+            } else {
+                log.info("接收到流量数据：sourceIp={}, uri={}, method={}", 
+                    trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getHttpMethod());
+            }
 
             if (trafficDTO.isSkipPush()) {
                 log.debug("流量标记为跳过推送，跳过处理: sourceIp={}", trafficDTO.getSourceIp());
@@ -65,7 +71,12 @@ public class TrafficReceiveController {
 
             processTrafficSync(trafficDTO);
 
-            log.info("流量数据处理完成：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+            if (trafficDTO.isAggregated()) {
+                log.info("聚合流量数据处理完成：sourceIp={}, uri={}, requestCount={}", 
+                    trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getRequestCount());
+            } else {
+                log.info("流量数据处理完成：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+            }
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("接收流量数据失败：sourceIp={}, error={}", 
@@ -87,6 +98,12 @@ public class TrafficReceiveController {
             
             if (trafficId == null) {
                 throw new RuntimeException("保存流量数据失败：sourceIp=" + trafficDTO.getSourceIp());
+            }
+            
+            if (trafficDTO.isAggregated()) {
+                log.info("聚合流量数据已保存：trafficId={}, sourceIp={}, uri={}, requestCount={}", 
+                    trafficId, trafficDTO.getSourceIp(), trafficEntity.getRequestUri(), trafficDTO.getRequestCount());
+                return;
             }
             
             log.info("流量数据已保存：trafficId={}, sourceIp={}, uri={}", 

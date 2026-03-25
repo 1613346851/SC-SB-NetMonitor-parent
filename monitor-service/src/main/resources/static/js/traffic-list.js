@@ -21,11 +21,15 @@ function initTrafficTable() {
         defaultSortOrder: 'desc',
         tableBodyEl: 'trafficTableBody',
         paginationEl: 'pagination',
-        colspan: 12,
+        colspan: 13,
         fixedAction: true,
         enableTooltip: true,
         renderRow: function(item) {
             const cell = TableUtils.cell;
+            
+            const isAggregated = item.isAggregated === 1 || item.isAggregated === true;
+            const stateTag = item.stateTag || 'NORMAL';
+            const requestCount = item.requestCount || 1;
             
             return `
                 <tr>
@@ -34,10 +38,11 @@ function initTrafficTable() {
                     <td>${dateFormat.format(item.requestTime)}</td>
                     <td>${item.sourceIp || '-'}</td>
                     <td>${item.targetIp || '-'}</td>
-                    <td>${item.sourcePort || '-'}</td>
-                    <td>${item.targetPort || '-'}</td>
                     <td><span class="badge badge-${getHttpMethodBadge(item.httpMethod)}">${item.httpMethod || '-'}</span></td>
                     ${cell.renderCell(item.requestUri, { maxLength: 30 })}
+                    <td><span class="badge badge-${getStateTagBadge(stateTag)}">${getStateTagText(stateTag)}</span></td>
+                    <td>${isAggregated ? '<span class="badge badge-info">是</span>' : '<span class="badge badge-default">否</span>'}</td>
+                    <td>${requestCount}</td>
                     <td><span class="badge badge-${getStatusBadge(item.responseStatus)}">${item.responseStatus || '-'}</span></td>
                     <td>${item.responseTime || '-'}</td>
                     ${cell.renderActionCell([
@@ -50,6 +55,28 @@ function initTrafficTable() {
     
     window.trafficTable = trafficTable;
     trafficTable.loadData();
+}
+
+function getStateTagBadge(stateTag) {
+    const badges = {
+        'NORMAL': 'success',
+        'SUSPICIOUS': 'warning',
+        'ATTACKING': 'danger',
+        'DEFENDED': 'danger',
+        'COOLDOWN': 'info'
+    };
+    return badges[stateTag] || 'default';
+}
+
+function getStateTagText(stateTag) {
+    const texts = {
+        'NORMAL': '正常',
+        'SUSPICIOUS': '可疑',
+        'ATTACKING': '攻击中',
+        'DEFENDED': '已防御',
+        'COOLDOWN': '冷却期'
+    };
+    return texts[stateTag] || stateTag;
 }
 
 function getHttpMethodBadge(method) {

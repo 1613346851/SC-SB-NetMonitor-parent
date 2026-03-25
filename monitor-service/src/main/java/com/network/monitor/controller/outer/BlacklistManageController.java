@@ -9,6 +9,7 @@ import com.network.monitor.dto.BlacklistInfoDTO;
 import com.network.monitor.entity.IpBlacklistEntity;
 import com.network.monitor.entity.IpBlacklistHistoryEntity;
 import com.network.monitor.mapper.DefenseLogMapper;
+import com.network.monitor.mapper.IpBlacklistHistoryMapper;
 import com.network.monitor.mapper.IpBlacklistMapper;
 import com.network.monitor.service.AuthService;
 import com.network.monitor.service.BlacklistManageService;
@@ -53,6 +54,9 @@ public class BlacklistManageController {
     private IpBlacklistMapper ipBlacklistMapper;
 
     @Autowired
+    private IpBlacklistHistoryMapper ipBlacklistHistoryMapper;
+
+    @Autowired
     private BlacklistCache blacklistCache;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -74,6 +78,9 @@ public class BlacklistManageController {
                 dto.setId(entity.getId());
                 dto.setIp(entity.getIpAddress());
                 dto.setReason(getLatestBanReason(entity.getId()));
+                String banType = getLatestBanType(entity.getId());
+                dto.setBanType(banType);
+                dto.setBanTypeText(getBanTypeText(banType));
                 dto.setExpireTime(entity.getCurrentExpireTime() != null ? 
                     entity.getCurrentExpireTime().format(TIME_FORMATTER) : null);
                 dto.setCreateTime(entity.getCreateTime() != null ? 
@@ -165,9 +172,7 @@ public class BlacklistManageController {
 
     private String getLatestBanReason(Long blacklistId) {
         try {
-            List<IpBlacklistHistoryEntity> historyList = ipBlacklistService.getHistoryByIp(
-                ipBlacklistService.getBlacklistByIp(null) != null ? 
-                    ipBlacklistService.getBlacklistByIp(null).getIpAddress() : null);
+            List<IpBlacklistHistoryEntity> historyList = ipBlacklistHistoryMapper.selectBanningByBlacklistId(blacklistId);
             if (historyList != null && !historyList.isEmpty()) {
                 return historyList.get(0).getBanReason();
             }
@@ -175,6 +180,28 @@ public class BlacklistManageController {
             log.warn("获取封禁原因失败", e);
         }
         return "手动添加";
+    }
+
+    private String getLatestBanType(Long blacklistId) {
+        try {
+            List<IpBlacklistHistoryEntity> historyList = ipBlacklistHistoryMapper.selectBanningByBlacklistId(blacklistId);
+            if (historyList != null && !historyList.isEmpty()) {
+                String banType = historyList.get(0).getBanType();
+                return banType != null ? banType : "MANUAL";
+            }
+        } catch (Exception e) {
+            log.warn("获取封禁类型失败", e);
+        }
+        return "MANUAL";
+    }
+
+    private String getBanTypeText(String banType) {
+        if ("SYSTEM".equals(banType)) {
+            return "系统自动";
+        } else if ("MANUAL".equals(banType)) {
+            return "手动添加";
+        }
+        return banType != null ? banType : "手动添加";
     }
 
     @GetMapping("/{ip}/history")

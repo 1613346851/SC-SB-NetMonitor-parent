@@ -2,16 +2,22 @@ package com.network.monitor.service.impl;
 
 import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.client.GatewayApiClient;
+import com.network.monitor.common.constant.DefenseTypeConstant;
 import com.network.monitor.common.constant.IpAttackStateConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.entity.AttackEventEntity;
+import com.network.monitor.entity.DefenseLogEntity;
+import com.network.monitor.event.BlacklistSyncEvent;
+import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.DefenseDecisionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -31,6 +37,12 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
     @Autowired
     private AttackEventService attackEventService;
+
+    @Autowired
+    private DefenseLogMapper defenseLogMapper;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -88,6 +100,12 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
             if (commandDTO != null) {
                 boolean success = gatewayApiClient.pushDefenseCommand(commandDTO);
                 if (success) {
+                    recordDefenseLog(commandDTO, event, attackDTO);
+                    
+                    if (commandDTO.getDefenseType() == DefenseCommandDTO.DefenseType.BLACKLIST) {
+                        publishBlacklistSyncEvent(commandDTO);
+                    }
+                    
                     attackStateCache.markAsDefended(sourceIp, eventId);
                     
                     if (event != null) {
@@ -207,5 +225,85 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
     private String calculateExpireTime(int minutes) {
         return LocalDateTime.now().plusMinutes(minutes).format(TIME_FORMATTER);
+    }
+
+    private void recordDefenseLog(DefenseCommandDTO commandDTO, AttackEventEntity event, AttackMonitorDTO attackDTO) {
+        try {
+            DefenseLogEntity logEntity = new DefenseLogEntity();
+            logEntity.setEventId(commandDTO.getEventId());
+            logEntity.setDefenseType(convertDefenseType(commandDTO.getDefenseType()));
+            logEntity.setDefenseTarget(commandDTO.getSourceIp());
+            logEntity.setDefenseReason(commandDTO.getDescription());
+            logEntity.setDefenseAction("ADD_BLACKLIST");
+            logEntity.setExecuteStatus(1);
+            logEntity.setIsFirst(1);
+            logEntity.setOperator("SYSTEM");
+            
+            if (event != null) {
+                logEntity.setAttackId(event.getId());
+            }
+            
+            if (attackDTO != null) {
+                logEntity.setTrafficId(attackDTO.getTrafficId());
+            }
+            
+            if (commandDTO.getExpireTimestamp() != null) {
+                logEntity.setExpireTime(LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(commandDTO.getExpireTimestamp()),
+                    ZoneId.systemDefault()
+                ));
+            }
+            
+            LocalDateTime now = LocalDateTime.now();
+            logEntity.setExecuteTime(now);
+            logEntity.setCreateTime(now);
+            logEntity.setUpdateTime(now);
+            
+            defenseLogMapper.insert(logEntity);
+            
+            log.info("记录防御日志成功：eventId={}, defenseType={}, target={}, isFirst=1", 
+                commandDTO.getEventId(), logEntity.getDefenseType(), logEntity.getDefenseTarget());
+        } catch (Exception e) {
+            log.error("记录防御日志失败：eventId={}, target={}", 
+                commandDTO.getEventId(), commandDTO.getSourceIp(), e);
+        }
+    }
+
+    private void publishBlacklistSyncEvent(DefenseCommandDTO commandDTO) {
+        try {
+            LocalDateTime expireTime = null;
+            if (commandDTO.getExpireTimestamp() != null) {
+                expireTime = LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(commandDTO.getExpireTimestamp()),
+                    ZoneId.systemDefault()
+                );
+            }
+            
+            BlacklistSyncEvent syncEvent = BlacklistSyncEvent.add(
+                this,
+                commandDTO.getSourceIp(),
+                commandDTO.getDescription(),
+                expireTime,
+                "SYSTEM"
+            );
+            
+            eventPublisher.publishEvent(syncEvent);
+            
+            log.info("发布黑名单同步事件：ip={}, reason={}, expireTime={}", 
+                commandDTO.getSourceIp(), commandDTO.getDescription(), expireTime);
+        } catch (Exception e) {
+            log.error("发布黑名单同步事件失败：ip={}", commandDTO.getSourceIp(), e);
+        }
+    }
+
+    private String convertDefenseType(DefenseCommandDTO.DefenseType defenseType) {
+        if (defenseType == null) {
+            return DefenseTypeConstant.BLOCK_IP;
+        }
+        return switch (defenseType) {
+            case BLACKLIST -> DefenseTypeConstant.BLOCK_IP;
+            case RATE_LIMIT -> DefenseTypeConstant.RATE_LIMIT;
+            case BLOCK -> DefenseTypeConstant.BLOCK_REQUEST;
+        };
     }
 }

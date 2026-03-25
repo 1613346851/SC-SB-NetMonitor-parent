@@ -77,6 +77,10 @@ public class GatewayHttpConstant {
         public static final String DEFENSE_LOG_ENDPOINT = "/api/inner/defense/log/sync";
         /** 防御指令接口路径 */
         public static final String DEFENSE_COMMAND_ENDPOINT = "/api/monitor/defense/command";
+        /** DDoS攻击事件接口路径 */
+        public static final String DDOS_ATTACK_EVENT_ENDPOINT = "/api/inner/attack/ddos-event";
+        /** 黑名单事件接口路径 */
+        public static final String BLACKLIST_EVENT_ENDPOINT = "/api/inner/blacklist/event";
         
         /** 连接超时时间（毫秒） */
         public static final int CONNECT_TIMEOUT = 5000;

@@ -450,3 +450,114 @@
 .config-table.has-fixed-action td:nth-child(2) .config-table-key {
     overflow: visible;
 }
+
+.config-group-panel {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.ddos-config-card {
+    border: 1px solid rgba(239, 68, 68, 0.12);
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.04), rgba(239, 68, 68, 0.01));
+}
+
+.defense-strategy-card {
+    border: 1px solid rgba(245, 158, 11, 0.12);
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.04), rgba(245, 158, 11, 0.01));
+}
+
+.traffic-push-card {
+    border: 1px solid rgba(59, 130, 246, 0.12);
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.04), rgba(59, 130, 246, 0.01));
+}
+
+.defense-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 50px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.strategy-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 50px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.traffic-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 50px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.config-items-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.04);
+}
+
+.config-item-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 8px;
+}
+
+.config-item-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.config-item-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.config-item-unit {
+    font-size: 11px;
+    color: var(--text-disabled);
+}
+
+@media (max-width: 1200px) {
+    .config-group-panel {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .config-group-panel {
+        grid-template-columns: 1fr;
+    }
+    
+    .config-items-grid {
+        grid-template-columns: 1fr;
+    }
+}

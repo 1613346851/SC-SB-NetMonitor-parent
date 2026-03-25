@@ -142,6 +142,41 @@ public class TrafficMonitorDTO implements Serializable {
     private Boolean skipPush;
 
     /**
+     * 请求次数（聚合统计）
+     */
+    private Integer requestCount;
+
+    /**
+     * IP状态标签
+     */
+    private String stateTag;
+
+    /**
+     * 是否为聚合记录
+     */
+    private Boolean isAggregated;
+
+    /**
+     * 聚合开始时间
+     */
+    private String aggregateStartTime;
+
+    /**
+     * 聚合结束时间
+     */
+    private String aggregateEndTime;
+
+    /**
+     * 错误次数（聚合统计）
+     */
+    private Integer errorCount;
+
+    /**
+     * 平均处理时间（毫秒）
+     */
+    private Long avgProcessingTime;
+
+    /**
      * 构造函数（用于创建新的流量监控记录）
      *
      * @param requestId 请求 ID

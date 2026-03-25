@@ -22,6 +22,13 @@
         <result column="content_type" property="contentType"/>
         <result column="user_agent" property="userAgent"/>
         <result column="cookie" property="cookie"/>
+        <result column="request_count" property="requestCount"/>
+        <result column="state_tag" property="stateTag"/>
+        <result column="is_aggregated" property="isAggregated"/>
+        <result column="aggregate_start_time" property="aggregateStartTime"/>
+        <result column="aggregate_end_time" property="aggregateEndTime"/>
+        <result column="error_count" property="errorCount"/>
+        <result column="avg_processing_time" property="avgProcessingTime"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
@@ -29,18 +36,24 @@
     <sql id="Base_Column_List">
         id, traffic_id, request_time, source_ip, target_ip, source_port, target_port, http_method, protocol,
         request_uri, query_params, request_headers, request_body, response_status, 
-        response_body, response_time, content_type, user_agent, cookie, create_time, update_time
+        response_body, response_time, content_type, user_agent, cookie, 
+        request_count, state_tag, is_aggregated, aggregate_start_time, aggregate_end_time, 
+        error_count, avg_processing_time, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.TrafficMonitorEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_traffic_monitor (
             traffic_id, request_time, source_ip, target_ip, source_port, target_port, http_method, protocol,
             request_uri, query_params, request_headers, request_body, response_status,
-            response_body, response_time, content_type, user_agent, cookie, create_time, update_time
+            response_body, response_time, content_type, user_agent, cookie, 
+            request_count, state_tag, is_aggregated, aggregate_start_time, aggregate_end_time,
+            error_count, avg_processing_time, create_time, update_time
         ) VALUES (
             #{trafficId}, #{requestTime}, #{sourceIp}, #{targetIp}, #{sourcePort}, #{targetPort}, #{httpMethod}, #{protocol},
             #{requestUri}, #{queryParams}, #{requestHeaders}, #{requestBody}, #{responseStatus},
-            #{responseBody}, #{responseTime}, #{contentType}, #{userAgent}, #{cookie}, #{createTime}, #{updateTime}
+            #{responseBody}, #{responseTime}, #{contentType}, #{userAgent}, #{cookie},
+            #{requestCount}, #{stateTag}, #{isAggregated}, #{aggregateStartTime}, #{aggregateEndTime},
+            #{errorCount}, #{avgProcessingTime}, #{createTime}, #{updateTime}
         )
     </insert>
 
@@ -117,12 +130,16 @@
         INSERT INTO sys_traffic_monitor (
             traffic_id, request_time, source_ip, target_ip, source_port, target_port, http_method, protocol,
             request_uri, query_params, request_headers, request_body, response_status,
-            response_body, response_time, content_type, user_agent, cookie, create_time, update_time
+            response_body, response_time, content_type, user_agent, cookie, 
+            request_count, state_tag, is_aggregated, aggregate_start_time, aggregate_end_time,
+            error_count, avg_processing_time, create_time, update_time
         ) VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.trafficId}, #{item.requestTime}, #{item.sourceIp}, #{item.targetIp}, #{item.sourcePort}, #{item.targetPort}, #{item.httpMethod}, #{item.protocol},
             #{item.requestUri}, #{item.queryParams}, #{item.requestHeaders}, #{item.requestBody}, #{item.responseStatus},
-            #{item.responseBody}, #{item.responseTime}, #{item.contentType}, #{item.userAgent}, #{item.cookie}, #{item.createTime}, #{item.updateTime})
+            #{item.responseBody}, #{item.responseTime}, #{item.contentType}, #{item.userAgent}, #{item.cookie},
+            #{item.requestCount}, #{item.stateTag}, #{item.isAggregated}, #{item.aggregateStartTime}, #{item.aggregateEndTime},
+            #{item.errorCount}, #{item.avgProcessingTime}, #{item.createTime}, #{item.updateTime})
         </foreach>
     </insert>
 

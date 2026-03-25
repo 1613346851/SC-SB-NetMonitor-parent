@@ -64,6 +64,20 @@ public class GatewayConfigCache {
         configCache.put("gateway.request.max-body-size", "102400");
         configCache.put("gateway.request.abnormal-response-threshold-ms", "3000");
 
+        configCache.put("traffic.push.normal.strategy", "realtime");
+        configCache.put("traffic.push.suspicious.strategy", "sampling");
+        configCache.put("traffic.push.attacking.strategy", "batch");
+        configCache.put("traffic.push.defended.strategy", "skip");
+        configCache.put("traffic.push.cooldown.strategy", "sampling");
+        configCache.put("traffic.push.batch-interval-ms", "5000");
+        configCache.put("traffic.push.sampling-rate", "10");
+        configCache.put("traffic.push.enabled", "true");
+
+        configCache.put("ddos.threshold", "20");
+        configCache.put("ddos.detection.window-ms", "1000");
+        configCache.put("ddos.rate-limit-trigger-count", "3");
+        configCache.put("ddos.rate-limit-trigger-window-seconds", "60");
+
         logger.info("加载默认配置完成，共{}项", configCache.size());
     }
 
@@ -71,12 +85,15 @@ public class GatewayConfigCache {
         try {
             Map<String, String> remoteConfigs = configClient.pullAllConfigs();
             if (remoteConfigs != null && !remoteConfigs.isEmpty()) {
+                int updateCount = 0;
                 for (Map.Entry<String, String> entry : remoteConfigs.entrySet()) {
-                    if (entry.getKey() != null && entry.getKey().startsWith("gateway.")) {
-                        configCache.put(entry.getKey(), entry.getValue());
+                    String key = entry.getKey();
+                    if (key != null && isValidConfigKey(key)) {
+                        configCache.put(key, entry.getValue());
+                        updateCount++;
                     }
                 }
-                logger.info("从监控服务拉取配置成功，更新{}项", remoteConfigs.size());
+                logger.info("从监控服务拉取配置成功，更新{}项", updateCount);
                 return true;
             }
             return false;
@@ -86,13 +103,20 @@ public class GatewayConfigCache {
         }
     }
 
+    private boolean isValidConfigKey(String key) {
+        return key.startsWith("gateway.") ||
+               key.startsWith("traffic.push.") ||
+               key.startsWith("ddos.") ||
+               key.startsWith("defense.");
+    }
+
     public void updateConfig(String configKey, String configValue) {
         if (configKey == null || configKey.isEmpty()) {
             logger.warn("尝试更新空配置键");
             return;
         }
 
-        if (!configKey.startsWith("gateway.")) {
+        if (!isValidConfigKey(configKey)) {
             logger.warn("非网关配置项，忽略更新: {}", configKey);
             return;
         }
@@ -109,7 +133,7 @@ public class GatewayConfigCache {
         int updateCount = 0;
         for (Map.Entry<String, String> entry : configs.entrySet()) {
             String key = entry.getKey();
-            if (key != null && key.startsWith("gateway.")) {
+            if (key != null && isValidConfigKey(key)) {
                 configCache.put(key, entry.getValue());
                 updateCount++;
             }
@@ -217,6 +241,38 @@ public class GatewayConfigCache {
     public List<String> getMaliciousUriPatterns() {
         return getList("gateway.defense.malicious.uri-patterns",
                 "/admin,/manager,/console,/wp-admin,/phpmyadmin,/mysql,/dbadmin,/webdav,/.git/config,/.env,/config/database.yml,/backup,/dump,/export,/download");
+    }
+
+    public int getTrafficPushSamplingRate() {
+        return getInt("traffic.push.sampling-rate", 10);
+    }
+
+    public long getTrafficPushBatchIntervalMs() {
+        return getLong("traffic.push.batch-interval-ms", 5000L);
+    }
+
+    public boolean isTrafficPushEnabled() {
+        return getBoolean("traffic.push.enabled", true);
+    }
+
+    public String getTrafficPushStrategy(String state) {
+        return getString("traffic.push." + state.toLowerCase() + ".strategy", "realtime");
+    }
+
+    public int getDdosThreshold() {
+        return getInt("ddos.threshold", 20);
+    }
+
+    public long getDdosDetectionWindowMs() {
+        return getLong("ddos.detection.window-ms", 1000L);
+    }
+
+    public int getDdosRateLimitTriggerCount() {
+        return getInt("ddos.rate-limit-trigger-count", 3);
+    }
+
+    public int getDdosRateLimitTriggerWindowSeconds() {
+        return getInt("ddos.rate-limit-trigger-window-seconds", 60);
     }
 
     public int size() {

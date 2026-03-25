@@ -32,19 +32,28 @@ public class DefenseLogController {
             Map<String, Object> stats = new HashMap<>();
             
             long totalCount = defenseLogMapper.countByCondition(null, null, null, null, startTime, endTime);
+            stats.put("totalDefenses", totalCount);
             stats.put("totalCount", totalCount);
             
             long successCount = defenseLogMapper.countByCondition(null, null, null, 1, startTime, endTime);
+            stats.put("successDefenses", successCount);
             stats.put("successCount", successCount);
             
             long failedCount = defenseLogMapper.countByCondition(null, null, null, 0, startTime, endTime);
+            stats.put("failedDefenses", failedCount);
             stats.put("failedCount", failedCount);
             
             double successRate = totalCount > 0 ? (double) successCount / totalCount * 100 : 0;
             stats.put("successRate", Math.round(successRate * 100.0) / 100.0);
             
-            long firstDefenseCount = countFirstDefense(startTime, endTime);
-            stats.put("uniqueEventCount", firstDefenseCount);
+            long blockIpCount = defenseLogMapper.countByCondition(null, "BLOCK_IP", null, null, startTime, endTime);
+            stats.put("blockCount", blockIpCount);
+            
+            long rateLimitCount = defenseLogMapper.countByCondition(null, "RATE_LIMIT", null, null, startTime, endTime);
+            stats.put("rateLimitCount", rateLimitCount);
+            
+            long blockRequestCount = defenseLogMapper.countByCondition(null, "BLOCK_REQUEST", null, null, startTime, endTime);
+            stats.put("redirectCount", blockRequestCount);
 
             return ApiResponse.success(stats);
         } catch (Exception e) {
@@ -68,13 +77,39 @@ public class DefenseLogController {
                 endTime = LocalDateTime.now();
             }
 
-            List<DefenseLogMapper.TrendStat> trendStats = defenseLogMapper.countDefenseTrend(startTime, endTime);
+            List<DefenseLogEntity> allLogs = defenseLogMapper.selectByCondition(
+                null, null, null, null, startTime, endTime, 0, Integer.MAX_VALUE, null, null
+            );
+            
+            Map<String, Map<String, Long>> dailyStats = new LinkedHashMap<>();
+            
+            for (DefenseLogEntity log : allLogs) {
+                if (log.getExecuteTime() != null) {
+                    String dateKey = log.getExecuteTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    
+                    dailyStats.computeIfAbsent(dateKey, k -> {
+                        Map<String, Long> stats = new HashMap<>();
+                        stats.put("success", 0L);
+                        stats.put("fail", 0L);
+                        return stats;
+                    });
+                    
+                    Map<String, Long> stats = dailyStats.get(dateKey);
+                    if (log.getExecuteStatus() != null && log.getExecuteStatus() == 1) {
+                        stats.put("success", stats.get("success") + 1);
+                    } else {
+                        stats.put("fail", stats.get("fail") + 1);
+                    }
+                }
+            }
             
             List<Map<String, Object>> result = new ArrayList<>();
-            for (DefenseLogMapper.TrendStat stat : trendStats) {
+            DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("MM-dd");
+            for (Map.Entry<String, Map<String, Long>> entry : dailyStats.entrySet()) {
                 Map<String, Object> item = new HashMap<>();
-                item.put("time", stat.getTime().format(DATE_FORMATTER));
-                item.put("count", stat.getCount());
+                item.put("date", entry.getKey().substring(5));
+                item.put("success", entry.getValue().get("success"));
+                item.put("fail", entry.getValue().get("fail"));
                 result.add(item);
             }
 
@@ -95,16 +130,25 @@ public class DefenseLogController {
 
             List<Map<String, Object>> result = new ArrayList<>();
             
-            String[] defenseTypes = {"BLOCK_IP", "RATE_LIMIT", "BLOCK_REQUEST"};
-            for (String type : defenseTypes) {
-                long total = defenseLogMapper.countByCondition(null, type, null, null, startTime, endTime);
-                long success = defenseLogMapper.countByCondition(null, type, null, 1, startTime, endTime);
+            Map<String, String> typeNameMap = new LinkedHashMap<>();
+            typeNameMap.put("BLOCK_IP", "IP封禁");
+            typeNameMap.put("RATE_LIMIT", "限流");
+            typeNameMap.put("BLOCK_REQUEST", "请求拦截");
+            
+            for (Map.Entry<String, String> entry : typeNameMap.entrySet()) {
+                String typeCode = entry.getKey();
+                String typeName = entry.getValue();
+                
+                long total = defenseLogMapper.countByCondition(null, typeCode, null, null, startTime, endTime);
+                long success = defenseLogMapper.countByCondition(null, typeCode, null, 1, startTime, endTime);
+                
+                double rate = total > 0 ? Math.round((double) success / total * 10000.0) / 100.0 : 0;
                 
                 Map<String, Object> item = new HashMap<>();
-                item.put("defenseType", type);
+                item.put("type", typeName);
+                item.put("rate", rate);
                 item.put("total", total);
                 item.put("success", success);
-                item.put("successRate", total > 0 ? Math.round((double) success / total * 10000.0) / 100.0 : 0);
                 result.add(item);
             }
 

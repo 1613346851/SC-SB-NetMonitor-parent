@@ -6,10 +6,32 @@ let sortOrder = 'desc';
 
 const AI_CONFIG_KEYS = ['ai.model.url', 'ai.model.apiKey'];
 const GATEWAY_CONFIG_PREFIX = 'gateway.';
+const DDOS_CONFIG_PREFIX = 'ddos.';
+const DEFENSE_CONFIG_PREFIX = 'defense.';
+const TRAFFIC_CONFIG_PREFIX = 'traffic.push.';
 const GATEWAY_DEFENSE_KEYS = [
     'gateway.defense.blacklist.enabled',
     'gateway.defense.rate-limit.enabled',
     'gateway.defense.malicious-request.enabled'
+];
+const DDOS_CONFIG_KEYS = [
+    'ddos.threshold',
+    'ddos.detection.window-ms',
+    'ddos.rate-limit-trigger-count',
+    'ddos.rate-limit-trigger-window-seconds'
+];
+const DEFENSE_STRATEGY_KEYS = [
+    'defense.blacklist.default-duration-seconds',
+    'defense.blacklist.high-risk-duration-seconds',
+    'defense.blacklist.critical-risk-duration-seconds',
+    'defense.blacklist.auto-unban.enabled'
+];
+const TRAFFIC_PUSH_KEYS = [
+    'traffic.push.normal.strategy',
+    'traffic.push.suspicious.strategy',
+    'traffic.push.attacking.strategy',
+    'traffic.push.defended.strategy',
+    'traffic.push.sampling-rate'
 ];
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -31,6 +53,27 @@ function bindConfigModal() {
     gatewayModal?.addEventListener('click', function(event) {
         if (event.target === this) {
             closeGatewayDefenseModal();
+        }
+    });
+    
+    const ddosModal = document.getElementById('ddosConfigModal');
+    ddosModal?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeDdosConfigModal();
+        }
+    });
+    
+    const defenseModal = document.getElementById('defenseStrategyModal');
+    defenseModal?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeDefenseStrategyModal();
+        }
+    });
+    
+    const trafficModal = document.getElementById('trafficPushModal');
+    trafficModal?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeTrafficPushModal();
         }
     });
 }
@@ -137,6 +180,12 @@ function applyFilters() {
         list = list.filter(item => AI_CONFIG_KEYS.includes(item.configKey));
     } else if (currentFilterMode === 'GATEWAY_ONLY') {
         list = list.filter(item => item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX));
+    } else if (currentFilterMode === 'DDOS_ONLY') {
+        list = list.filter(item => item.configKey && item.configKey.startsWith(DDOS_CONFIG_PREFIX));
+    } else if (currentFilterMode === 'DEFENSE_ONLY') {
+        list = list.filter(item => item.configKey && item.configKey.startsWith(DEFENSE_CONFIG_PREFIX));
+    } else if (currentFilterMode === 'TRAFFIC_ONLY') {
+        list = list.filter(item => item.configKey && item.configKey.startsWith(TRAFFIC_CONFIG_PREFIX));
     }
 
     if (category === 'GATEWAY') {
@@ -215,6 +264,57 @@ function renderOverview(list) {
 
     renderAiCard('ai.model.url', false);
     renderAiCard('ai.model.apiKey', true);
+    
+    renderDdosConfigPanel();
+    renderDefenseStrategyPanel();
+    renderTrafficPushPanel();
+}
+
+function renderDdosConfigPanel() {
+    const thresholdConfig = configList.find(item => item.configKey === 'ddos.threshold');
+    const windowConfig = configList.find(item => item.configKey === 'ddos.detection.window-ms');
+    const triggerConfig = configList.find(item => item.configKey === 'ddos.rate-limit-trigger-count');
+    const triggerWindowConfig = configList.find(item => item.configKey === 'ddos.rate-limit-trigger-window-seconds');
+
+    setText('ddosThresholdValue', thresholdConfig?.configValue || '--');
+    setText('ddosWindowValue', windowConfig?.configValue || '--');
+    setText('ddosRateLimitTriggerValue', triggerConfig?.configValue || '--');
+    setText('ddosRateLimitWindowValue', triggerWindowConfig?.configValue || '--');
+}
+
+function renderDefenseStrategyPanel() {
+    const defaultDuration = configList.find(item => item.configKey === 'defense.blacklist.default-duration-seconds');
+    const highRiskDuration = configList.find(item => item.configKey === 'defense.blacklist.high-risk-duration-seconds');
+    const criticalDuration = configList.find(item => item.configKey === 'defense.blacklist.critical-risk-duration-seconds');
+    const autoUnban = configList.find(item => item.configKey === 'defense.blacklist.auto-unban.enabled');
+
+    setText('defenseDefaultDurationValue', defaultDuration?.configValue || '--');
+    setText('defenseHighRiskDurationValue', highRiskDuration?.configValue || '--');
+    setText('defenseCriticalDurationValue', criticalDuration?.configValue || '--');
+    setText('defenseAutoUnbanValue', autoUnban?.configValue === 'true' ? '已启用' : (autoUnban?.configValue === 'false' ? '已禁用' : '--'));
+}
+
+function renderTrafficPushPanel() {
+    const normalStrategy = configList.find(item => item.configKey === 'traffic.push.normal.strategy');
+    const suspiciousStrategy = configList.find(item => item.configKey === 'traffic.push.suspicious.strategy');
+    const attackingStrategy = configList.find(item => item.configKey === 'traffic.push.attacking.strategy');
+    const samplingRate = configList.find(item => item.configKey === 'traffic.push.sampling-rate');
+
+    setText('trafficNormalStrategyValue', formatStrategyName(normalStrategy?.configValue));
+    setText('trafficSuspiciousStrategyValue', formatStrategyName(suspiciousStrategy?.configValue));
+    setText('trafficAttackingStrategyValue', formatStrategyName(attackingStrategy?.configValue));
+    setText('trafficSamplingRateValue', samplingRate?.configValue || '--');
+}
+
+function formatStrategyName(value) {
+    if (!value) return '--';
+    const strategyMap = {
+        'realtime': '实时推送',
+        'sampling': '采样推送',
+        'batch': '批量推送',
+        'skip': '跳过推送'
+    };
+    return strategyMap[value] || value;
 }
 
 function renderAiCard(configKey, masked) {
@@ -633,4 +733,172 @@ function formatTime(value) {
 function setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
+}
+
+function filterDdosConfigs() {
+    currentFilterMode = 'DDOS_ONLY';
+    document.getElementById('configCategory').value = 'ALL';
+    document.getElementById('configKey').value = 'ddos.';
+    applyFilters();
+}
+
+function filterDefenseConfigs() {
+    currentFilterMode = 'DEFENSE_ONLY';
+    document.getElementById('configCategory').value = 'ALL';
+    document.getElementById('configKey').value = 'defense.';
+    applyFilters();
+}
+
+function filterTrafficConfigs() {
+    currentFilterMode = 'TRAFFIC_ONLY';
+    document.getElementById('configCategory').value = 'ALL';
+    document.getElementById('configKey').value = 'traffic.push.';
+    applyFilters();
+}
+
+function showDdosConfigModal() {
+    const thresholdConfig = configList.find(item => item.configKey === 'ddos.threshold');
+    const windowConfig = configList.find(item => item.configKey === 'ddos.detection.window-ms');
+    const triggerConfig = configList.find(item => item.configKey === 'ddos.rate-limit-trigger-count');
+    const triggerWindowConfig = configList.find(item => item.configKey === 'ddos.rate-limit-trigger-window-seconds');
+
+    document.getElementById('ddosThresholdInput').value = thresholdConfig?.configValue || '20';
+    document.getElementById('ddosWindowInput').value = windowConfig?.configValue || '1000';
+    document.getElementById('ddosRateLimitTriggerInput').value = triggerConfig?.configValue || '3';
+    document.getElementById('ddosRateLimitWindowInput').value = triggerWindowConfig?.configValue || '60';
+
+    document.getElementById('ddosConfigModal').style.display = 'flex';
+}
+
+function closeDdosConfigModal() {
+    document.getElementById('ddosConfigModal').style.display = 'none';
+}
+
+async function saveDdosConfig() {
+    const configs = {
+        'ddos.threshold': document.getElementById('ddosThresholdInput').value,
+        'ddos.detection.window-ms': document.getElementById('ddosWindowInput').value,
+        'ddos.rate-limit-trigger-count': document.getElementById('ddosRateLimitTriggerInput').value,
+        'ddos.rate-limit-trigger-window-seconds': document.getElementById('ddosRateLimitWindowInput').value
+    };
+
+    try {
+        let successCount = 0;
+        for (const [key, value] of Object.entries(configs)) {
+            const existingConfig = configList.find(item => item.configKey === key);
+            if (existingConfig) {
+                await http.post('/config/update', { id: existingConfig.id, configKey: key, configValue: value });
+            } else {
+                await http.post('/config/add', { configKey: key, configValue: value });
+            }
+            successCount++;
+        }
+
+        message.success(`已保存 ${successCount} 项DDoS配置`);
+        closeDdosConfigModal();
+        await loadConfigList();
+    } catch (error) {
+        console.error('保存DDoS配置失败:', error);
+        message.error('保存配置失败：' + (error.message || '未知错误'));
+    }
+}
+
+function showDefenseStrategyModal() {
+    const defaultDuration = configList.find(item => item.configKey === 'defense.blacklist.default-duration-seconds');
+    const highRiskDuration = configList.find(item => item.configKey === 'defense.blacklist.high-risk-duration-seconds');
+    const criticalDuration = configList.find(item => item.configKey === 'defense.blacklist.critical-risk-duration-seconds');
+    const autoUnban = configList.find(item => item.configKey === 'defense.blacklist.auto-unban.enabled');
+
+    document.getElementById('defenseDefaultDurationInput').value = defaultDuration?.configValue || '1800';
+    document.getElementById('defenseHighRiskDurationInput').value = highRiskDuration?.configValue || '3600';
+    document.getElementById('defenseCriticalDurationInput').value = criticalDuration?.configValue || '86400';
+    document.getElementById('defenseAutoUnbanInput').value = autoUnban?.configValue || 'true';
+
+    document.getElementById('defenseStrategyModal').style.display = 'flex';
+}
+
+function closeDefenseStrategyModal() {
+    document.getElementById('defenseStrategyModal').style.display = 'none';
+}
+
+async function saveDefenseStrategyConfig() {
+    const configs = {
+        'defense.blacklist.default-duration-seconds': document.getElementById('defenseDefaultDurationInput').value,
+        'defense.blacklist.high-risk-duration-seconds': document.getElementById('defenseHighRiskDurationInput').value,
+        'defense.blacklist.critical-risk-duration-seconds': document.getElementById('defenseCriticalDurationInput').value,
+        'defense.blacklist.auto-unban.enabled': document.getElementById('defenseAutoUnbanInput').value
+    };
+
+    try {
+        let successCount = 0;
+        for (const [key, value] of Object.entries(configs)) {
+            const existingConfig = configList.find(item => item.configKey === key);
+            if (existingConfig) {
+                await http.post('/config/update', { id: existingConfig.id, configKey: key, configValue: value });
+            } else {
+                await http.post('/config/add', { configKey: key, configValue: value });
+            }
+            successCount++;
+        }
+
+        message.success(`已保存 ${successCount} 项防御策略配置`);
+        closeDefenseStrategyModal();
+        await loadConfigList();
+    } catch (error) {
+        console.error('保存防御策略配置失败:', error);
+        message.error('保存配置失败：' + (error.message || '未知错误'));
+    }
+}
+
+function showTrafficPushModal() {
+    const normalStrategy = configList.find(item => item.configKey === 'traffic.push.normal.strategy');
+    const suspiciousStrategy = configList.find(item => item.configKey === 'traffic.push.suspicious.strategy');
+    const attackingStrategy = configList.find(item => item.configKey === 'traffic.push.attacking.strategy');
+    const defendedStrategy = configList.find(item => item.configKey === 'traffic.push.defended.strategy');
+    const samplingRate = configList.find(item => item.configKey === 'traffic.push.sampling-rate');
+    const batchInterval = configList.find(item => item.configKey === 'traffic.push.batch-interval-ms');
+
+    document.getElementById('trafficNormalStrategyInput').value = normalStrategy?.configValue || 'realtime';
+    document.getElementById('trafficSuspiciousStrategyInput').value = suspiciousStrategy?.configValue || 'sampling';
+    document.getElementById('trafficAttackingStrategyInput').value = attackingStrategy?.configValue || 'batch';
+    document.getElementById('trafficDefendedStrategyInput').value = defendedStrategy?.configValue || 'skip';
+    document.getElementById('trafficSamplingRateInput').value = samplingRate?.configValue || '10';
+    document.getElementById('trafficBatchIntervalInput').value = batchInterval?.configValue || '5000';
+
+    document.getElementById('trafficPushModal').style.display = 'flex';
+}
+
+function closeTrafficPushModal() {
+    document.getElementById('trafficPushModal').style.display = 'none';
+}
+
+async function saveTrafficPushConfig() {
+    const configs = {
+        'traffic.push.normal.strategy': document.getElementById('trafficNormalStrategyInput').value,
+        'traffic.push.suspicious.strategy': document.getElementById('trafficSuspiciousStrategyInput').value,
+        'traffic.push.attacking.strategy': document.getElementById('trafficAttackingStrategyInput').value,
+        'traffic.push.defended.strategy': document.getElementById('trafficDefendedStrategyInput').value,
+        'traffic.push.sampling-rate': document.getElementById('trafficSamplingRateInput').value,
+        'traffic.push.batch-interval-ms': document.getElementById('trafficBatchIntervalInput').value
+    };
+
+    try {
+        let successCount = 0;
+        for (const [key, value] of Object.entries(configs)) {
+            const existingConfig = configList.find(item => item.configKey === key);
+            if (existingConfig) {
+                await http.post('/config/update', { id: existingConfig.id, configKey: key, configValue: value });
+            } else {
+                await http.post('/config/add', { configKey: key, configValue: value });
+            }
+            successCount++;
+        }
+
+        message.success(`已保存 ${successCount} 项流量推送配置`);
+        closeTrafficPushModal();
+        await loadConfigList();
+    } catch (error) {
+        console.error('保存流量推送配置失败:', error);
+        message.error('保存配置失败：' + (error.message || '未知错误'));
+    }
 }

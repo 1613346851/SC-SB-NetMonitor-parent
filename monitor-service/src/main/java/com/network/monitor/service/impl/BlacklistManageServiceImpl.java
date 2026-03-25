@@ -11,6 +11,7 @@ import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.service.BlacklistManageService;
 import com.network.monitor.service.DefenseLogService;
+import com.network.monitor.service.IpBlacklistService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,9 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
     @Autowired
     private IpAttackStateCache attackStateCache;
 
+    @Autowired
+    private IpBlacklistService ipBlacklistService;
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
@@ -52,41 +56,10 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         String normalizedIp = IpNormalizeUtil.normalize(ip);
 
         try {
-            List<DefenseLogEntity> historyRecords = defenseLogMapper.selectBlacklistsByIp(normalizedIp);
-
-            if (historyRecords != null && !historyRecords.isEmpty()) {
-                for (DefenseLogEntity record : historyRecords) {
-                    if (record.getExpireTime() == null) {
-                        log.warn("IP 已永久封禁，无需重复添加：ip={}", normalizedIp);
-                        return;
-                    }
-                    if (record.getExpireTime() != null && record.getExpireTime().isAfter(LocalDateTime.now())) {
-                        log.info("IP 已存在生效中的封禁记录，跳过添加：ip={}, existingExpireTime={}",
-                            normalizedIp, record.getExpireTime().format(TIME_FORMATTER));
-                        return;
-                    }
-                }
-            }
-
-            if (expireTime == null) {
-                blacklistCache.add(normalizedIp, reason, null, operator);
-                syncToGateway(normalizedIp, "ADD");
-                recordDefenseLog(normalizedIp, "ADD", reason, operator, null);
-                log.info("添加 IP 到黑名单成功（永久封禁）：ip={}, reason={}, operator={}", normalizedIp, reason, operator);
-                return;
-            }
-
-            LocalDateTime finalExpireTime = expireTime;
-            log.info("IP 无生效中的封禁记录，创建新封禁记录：ip={}, expireTime={}", normalizedIp, finalExpireTime.format(TIME_FORMATTER));
-
-            blacklistCache.add(normalizedIp, reason, finalExpireTime, operator);
-
-            syncToGateway(normalizedIp, "ADD");
-
-            recordDefenseLog(normalizedIp, "ADD", reason, operator, finalExpireTime);
+            ipBlacklistService.addToBlacklist(normalizedIp, reason, expireTime, operator, "SYSTEM", null, null, null);
 
             log.info("添加 IP 到黑名单成功：ip={}, reason={}, expireTime={}, operator={}",
-                    normalizedIp, reason, finalExpireTime.format(TIME_FORMATTER), operator);
+                    normalizedIp, reason, expireTime != null ? expireTime.format(TIME_FORMATTER) : "永久", operator);
         } catch (Exception e) {
             log.error("添加 IP 到黑名单失败：ip={}", normalizedIp, e);
             throw new RuntimeException("添加黑名单失败：" + e.getMessage(), e);
@@ -190,14 +163,7 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         String normalizedIp = IpNormalizeUtil.normalize(ip);
 
         try {
-            blacklistCache.remove(normalizedIp);
-            
-            attackStateCache.markAsCooldown(normalizedIp);
-            log.info("IP状态已更新为COOLDOWN: ip={}", normalizedIp);
-
-            syncToGateway(normalizedIp, "REMOVE");
-
-            recordDefenseLog(normalizedIp, "REMOVE", "手动移除黑名单", "MANUAL", null);
+            ipBlacklistService.removeFromBlacklist(normalizedIp, "事件驱动移除黑名单", "SYSTEM");
 
             log.info("从黑名单移除 IP 成功：ip={}", normalizedIp);
         } catch (Exception e) {

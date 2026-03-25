@@ -57,6 +57,13 @@ CREATE TABLE `sys_traffic_monitor` (
   `content_type` VARCHAR(255) DEFAULT NULL COMMENT '内容类型',
   `user_agent` VARCHAR(1024) DEFAULT NULL COMMENT 'User-Agent',
   `cookie` TEXT DEFAULT NULL COMMENT 'Cookie 信息',
+  `request_count` INT DEFAULT 1 COMMENT '请求次数(聚合统计)',
+  `state_tag` VARCHAR(20) DEFAULT 'NORMAL' COMMENT 'IP状态标签',
+  `is_aggregated` TINYINT DEFAULT 0 COMMENT '是否为聚合记录(0-否,1-是)',
+  `aggregate_start_time` DATETIME DEFAULT NULL COMMENT '聚合开始时间',
+  `aggregate_end_time` DATETIME DEFAULT NULL COMMENT '聚合结束时间',
+  `error_count` INT DEFAULT 0 COMMENT '错误次数(聚合统计)',
+  `avg_processing_time` BIGINT DEFAULT NULL COMMENT '平均处理时间(毫秒)',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
@@ -65,7 +72,9 @@ CREATE TABLE `sys_traffic_monitor` (
   KEY `idx_target_ip` (`target_ip`),
   KEY `idx_request_time` (`request_time`),
   KEY `idx_http_method` (`http_method`),
-  KEY `idx_request_uri` (`request_uri`(255))
+  KEY `idx_request_uri` (`request_uri`(255)),
+  KEY `idx_state_tag` (`state_tag`),
+  KEY `idx_is_aggregated` (`is_aggregated`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='流量监测表';
 
 -- ------------------------------------------------------------
@@ -620,7 +629,6 @@ INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`,
 -- 4.3 初始化系统配置
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('ddos.threshold', '100', 'DDoS 检测阈值（次/分钟）'),
 ('blacklist.default.expire.seconds', '86400', '黑名单默认过期时间（秒）'),
 ('alert.enabled', 'true', '是否启用告警通知'),
 ('alert.push.interval', '5000', '告警推送间隔（毫秒）'),
@@ -633,6 +641,43 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('ai.model.url', '', 'AI大模型接口地址'),
 ('ai.model.apiKey', '', 'AI大模型API密钥');
+
+-- ------------------------------------------------------------
+-- 4.3.1 DDoS防护配置项
+-- 统一时间单位为"次/秒"，使用毫秒级时间窗口
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('ddos.threshold', '20', 'DDoS检测阈值(次/秒)'),
+('ddos.detection.window-ms', '1000', 'DDoS检测时间窗口(毫秒)'),
+('ddos.rate-limit-trigger-count', '3', '连续限流触发封禁阈值(次)'),
+('ddos.rate-limit-trigger-window-seconds', '60', '连续限流检测时间窗口(秒)'),
+('ddos.peak-rps.record.enabled', 'true', '是否记录峰值RPS');
+
+-- ------------------------------------------------------------
+-- 4.3.2 防御策略配置项
+-- 不同风险等级的封禁时长配置
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('defense.blacklist.default-duration-seconds', '1800', '黑名单默认持续时间(秒)'),
+('defense.blacklist.high-risk-duration-seconds', '3600', '高风险攻击封禁时长(秒)'),
+('defense.blacklist.critical-risk-duration-seconds', '86400', '严重风险攻击封禁时长(秒)'),
+('defense.blacklist.auto-unban.enabled', 'true', '是否启用自动解封'),
+('defense.blacklist.repeat-offender.multiplier', '2', '重复违规封禁时长倍数'),
+('defense.blacklist.repeat-offender.max-multiplier', '8', '最大封禁时长倍数');
+
+-- ------------------------------------------------------------
+-- 4.3.3 流量推送策略配置项
+-- 根据IP状态决定流量数据处理策略
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('traffic.push.normal.strategy', 'realtime', 'NORMAL状态推送策略: realtime/sampling'),
+('traffic.push.suspicious.strategy', 'sampling', 'SUSPICIOUS状态推送策略'),
+('traffic.push.attacking.strategy', 'batch', 'ATTACKING状态推送策略'),
+('traffic.push.defended.strategy', 'skip', 'DEFENDED状态推送策略: skip/sampling'),
+('traffic.push.cooldown.strategy', 'sampling', 'COOLDOWN状态推送策略'),
+('traffic.push.batch-interval-ms', '5000', '批量推送间隔(毫秒)'),
+('traffic.push.sampling-rate', '10', '采样推送比例(1/N)'),
+('traffic.push.enabled', 'true', '是否启用流量推送');
 
 -- ------------------------------------------------------------
 -- 4.3.1 初始化网关配置项

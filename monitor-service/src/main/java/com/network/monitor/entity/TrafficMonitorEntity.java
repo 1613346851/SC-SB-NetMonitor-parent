@@ -107,6 +107,41 @@ public class TrafficMonitorEntity {
     private String cookie;
 
     /**
+     * 请求次数（聚合统计）
+     */
+    private Integer requestCount;
+
+    /**
+     * IP状态标签
+     */
+    private String stateTag;
+
+    /**
+     * 是否为聚合记录（0-否，1-是）
+     */
+    private Integer isAggregated;
+
+    /**
+     * 聚合开始时间
+     */
+    private LocalDateTime aggregateStartTime;
+
+    /**
+     * 聚合结束时间
+     */
+    private LocalDateTime aggregateEndTime;
+
+    /**
+     * 错误次数（聚合统计）
+     */
+    private Integer errorCount;
+
+    /**
+     * 平均处理时间（毫秒）
+     */
+    private Long avgProcessingTime;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

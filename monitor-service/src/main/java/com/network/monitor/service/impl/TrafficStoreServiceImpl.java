@@ -102,6 +102,54 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
             }
         }
 
+        // 处理聚合字段
+        if (dto.getRequestCount() != null) {
+            entity.setRequestCount(dto.getRequestCount());
+        } else {
+            entity.setRequestCount(1);
+        }
+        
+        if (dto.getStateTag() != null) {
+            entity.setStateTag(dto.getStateTag());
+        } else {
+            entity.setStateTag("NORMAL");
+        }
+        
+        if (dto.getIsAggregated() != null && dto.getIsAggregated()) {
+            entity.setIsAggregated(1);
+        } else {
+            entity.setIsAggregated(0);
+        }
+        
+        if (dto.getErrorCount() != null) {
+            entity.setErrorCount(dto.getErrorCount());
+        } else {
+            entity.setErrorCount(0);
+        }
+        
+        if (dto.getAvgProcessingTime() != null) {
+            entity.setAvgProcessingTime(dto.getAvgProcessingTime());
+        }
+        
+        // 转换聚合时间字段
+        if (dto.getAggregateStartTime() != null && !dto.getAggregateStartTime().isEmpty()) {
+            try {
+                entity.setAggregateStartTime(LocalDateTime.parse(
+                    dto.getAggregateStartTime().replace(" ", "T")));
+            } catch (Exception e) {
+                log.warn("转换聚合开始时间失败：{}", e.getMessage());
+            }
+        }
+        
+        if (dto.getAggregateEndTime() != null && !dto.getAggregateEndTime().isEmpty()) {
+            try {
+                entity.setAggregateEndTime(LocalDateTime.parse(
+                    dto.getAggregateEndTime().replace(" ", "T")));
+            } catch (Exception e) {
+                log.warn("转换聚合结束时间失败：{}", e.getMessage());
+            }
+        }
+
         return entity;
     }
 

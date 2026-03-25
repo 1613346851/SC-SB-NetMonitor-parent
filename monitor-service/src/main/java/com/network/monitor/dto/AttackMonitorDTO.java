@@ -8,6 +8,8 @@ import lombok.Data;
 @Data
 public class AttackMonitorDTO {
 
+    private Long attackId;
+
     private String eventId;
 
     private Long trafficId;
@@ -51,4 +53,9 @@ public class AttackMonitorDTO {
      * 攻击内容（解码后）
      */
     private String attackContent;
+
+    /**
+     * 攻击描述
+     */
+    private String description;
 }

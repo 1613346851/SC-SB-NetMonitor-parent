@@ -72,10 +72,11 @@
                                     <th data-sort="requestTime" style="min-width: 150px;">请求时间</th>
                                     <th data-sort="sourceIp" style="min-width: 120px;">源 IP</th>
                                     <th data-sort="targetIp" style="min-width: 120px;">目标 IP</th>
-                                    <th data-sort="sourcePort" style="min-width: 80px;">源端口</th>
-                                    <th data-sort="targetPort" style="min-width: 80px;">目标端口</th>
                                     <th data-sort="httpMethod" style="min-width: 100px;">HTTP 方法</th>
                                     <th style="min-width: 200px;">请求 URI</th>
+                                    <th data-sort="stateTag" style="min-width: 100px;">IP状态</th>
+                                    <th data-sort="isAggregated" style="min-width: 80px;">聚合</th>
+                                    <th data-sort="requestCount" style="min-width: 80px;">请求次数</th>
                                     <th data-sort="responseStatus" style="min-width: 100px;">响应状态</th>
                                     <th data-sort="responseTime" style="min-width: 120px;">响应时间 (ms)</th>
                                     <th>操作</th>
@@ -83,7 +84,7 @@
                             </thead>
                             <tbody id="trafficTableBody">
                                 <tr>
-                                    <td colspan="12" class="text-center">加载中...</td>
+                                    <td colspan="13" class="text-center">加载中...</td>
                                 </tr>
                             </tbody>
                         </table>

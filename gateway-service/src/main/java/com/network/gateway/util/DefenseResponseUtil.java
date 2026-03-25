@@ -129,6 +129,56 @@ public class DefenseResponseUtil {
     }
 
     /**
+     * 构建403禁止访问响应（用于直接拉黑场景）
+     *
+     * @param response ServerHttpResponse对象
+     * @param sourceIp 源IP
+     * @param message 错误消息
+     * @return Mono<Void>
+     */
+    public static Mono<Void> buildForbiddenResponse(ServerHttpResponse response,
+                                                   String sourceIp, String message) {
+        response.setStatusCode(HttpStatus.FORBIDDEN);
+        
+        HttpHeaders headers = response.getHeaders();
+        headers.add(HttpHeaders.CONTENT_TYPE, GatewayHttpConstant.ContentType.TEXT_HTML + ";charset=" + GatewayHttpConstant.Charset.UTF_8);
+        headers.add(HttpHeaders.CACHE_CONTROL, "no-cache,no-store,must-revalidate");
+        
+        String responseBody = String.format("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="%s">
+                <title>访问被拒绝</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f8f9fa; }
+                    .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+                    .error-icon { font-size: 60px; color: #dc3545; margin-bottom: 20px; }
+                    h1 { color: #333; margin-bottom: 20px; }
+                    p { color: #666; line-height: 1.6; margin: 10px 0; }
+                    .info { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="error-icon">🚫</div>
+                    <h1>访问被拒绝</h1>
+                    <p>%s</p>
+                    <div class="info">
+                        <strong>源IP:</strong> %s<br>
+                        <strong>状态:</strong> 已自动拉黑
+                    </div>
+                </div>
+            </body>
+            </html>
+            """, GatewayHttpConstant.Charset.UTF_8, message, sourceIp);
+        DataBuffer buffer = BUFFER_FACTORY.wrap(responseBody.getBytes(StandardCharsets.UTF_8));
+        
+        return response.writeWith(Mono.just(buffer))
+                .then(response.setComplete());
+    }
+
+    /**
      * 构建IP黑名单HTML页面
      *
      * @param blockedIp 被阻止的IP

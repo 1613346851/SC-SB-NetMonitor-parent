@@ -30,6 +30,7 @@ function initDefenseLogTable() {
         tableBodyEl: 'recentDefenseBody',
         paginationEl: 'defensePagination',
         colspan: 7,
+        fixedAction: true,
         enableTooltip: true,
         renderRow: function(item) {
             const cell = TableUtils.cell;
@@ -43,7 +44,7 @@ function initDefenseLogTable() {
                     <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
                     <td>${item.eventId ? `<a href="/event?id=${item.eventId}" class="event-link">${item.eventId.substring(0, 8)}...</a>` : '-'}</td>
                     ${cell.renderActionCell([
-                        { text: '详情', type: 'link', onClick: `window.location.href='/defense'` }
+                        { text: '详情', type: 'primary', onClick: `showDefenseDetail(${item.id})` }
                     ])}
                 </tr>
             `;
@@ -54,14 +55,73 @@ function initDefenseLogTable() {
     defenseLogTable.loadData();
 }
 
+function showDefenseDetail(id) {
+    http.get('/defense/' + id)
+        .then(result => {
+            if (result) {
+                const detailContent = document.getElementById('defenseDetailContent');
+                detailContent.innerHTML = `
+                    <div class="detail-section">
+                        <h4>基本信息</h4>
+                        <div class="detail-item">
+                            <label>防御类型:</label>
+                            <span>${renderDefenseType(result.defenseType)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>防御动作:</label>
+                            <span>${renderDefenseAction(result.defenseAction)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>防御目标:</label>
+                            <span>${result.defenseTarget || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>执行结果:</label>
+                            <span>${result.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</span>
+                        </div>
+                    </div>
+                    <div class="detail-section">
+                        <h4>详细信息</h4>
+                        <div class="detail-item">
+                            <label>关联事件:</label>
+                            <span>${result.eventId || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>防御原因:</label>
+                            <span>${result.defenseReason || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>过期时间:</label>
+                            <span>${result.expireTime || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <label>执行时间:</label>
+                            <span>${result.createTime || '-'}</span>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('defenseDetailModal').style.display = 'flex';
+            }
+        })
+        .catch(error => {
+            message.error('获取防御详情失败: ' + (error.message || '未知错误'));
+        });
+}
+
+function closeDefenseDetailModal() {
+    document.getElementById('defenseDetailModal').style.display = 'none';
+}
+
 function renderDefenseType(type) {
     const typeMap = {
         'BLOCK_IP': '<span class="tag danger">IP封禁</span>',
         'RATE_LIMIT': '<span class="tag warning">限流</span>',
+        'BLOCK_REQUEST': '<span class="tag info">请求拦截</span>',
         'REDIRECT': '<span class="tag info">重定向</span>',
         'CAPTCHA': '<span class="tag info">验证码</span>'
     };
-    return typeMap[type] || type || '-';
+    return typeMap[type] || `<span class="tag">${type || '-'}</span>`;
 }
 
 function renderDefenseAction(action) {

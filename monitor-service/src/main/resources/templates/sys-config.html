@@ -152,6 +152,125 @@
                     </div>
                 </section>
 
+                <section class="config-group-panel">
+                    <div class="card ddos-config-card">
+                        <div class="ai-config-card__head">
+                            <div>
+                                <div class="ai-config-card__title">DDoS 防护配置</div>
+                                <div class="ai-config-card__key">ddos.*</div>
+                            </div>
+                            <span class="defense-badge">防护</span>
+                        </div>
+                        <div class="config-items-grid">
+                            <div class="config-item-compact">
+                                <div class="config-item-label">检测阈值</div>
+                                <div class="config-item-value" id="ddosThresholdValue">--</div>
+                                <div class="config-item-unit">次/秒</div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">检测窗口</div>
+                                <div class="config-item-value" id="ddosWindowValue">--</div>
+                                <div class="config-item-unit">毫秒</div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">限流触发次数</div>
+                                <div class="config-item-value" id="ddosRateLimitTriggerValue">--</div>
+                                <div class="config-item-unit">次</div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">限流检测窗口</div>
+                                <div class="config-item-value" id="ddosRateLimitWindowValue">--</div>
+                                <div class="config-item-unit">秒</div>
+                            </div>
+                        </div>
+                        <div class="ai-config-card__footer">
+                            <div class="ai-config-card__desc">DDoS攻击检测参数，统一使用"次/秒"作为时间单位。</div>
+                            <div class="ai-card-actions">
+                                <button class="btn btn-default btn-sm" onclick="filterDdosConfigs()">定位</button>
+                                <button class="btn btn-primary btn-sm" onclick="showDdosConfigModal()">配置</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card defense-strategy-card">
+                        <div class="ai-config-card__head">
+                            <div>
+                                <div class="ai-config-card__title">防御策略配置</div>
+                                <div class="ai-config-card__key">defense.blacklist.*</div>
+                            </div>
+                            <span class="strategy-badge">策略</span>
+                        </div>
+                        <div class="config-items-grid">
+                            <div class="config-item-compact">
+                                <div class="config-item-label">默认封禁时长</div>
+                                <div class="config-item-value" id="defenseDefaultDurationValue">--</div>
+                                <div class="config-item-unit">秒</div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">高风险封禁时长</div>
+                                <div class="config-item-value" id="defenseHighRiskDurationValue">--</div>
+                                <div class="config-item-unit">秒</div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">严重风险封禁时长</div>
+                                <div class="config-item-value" id="defenseCriticalDurationValue">--</div>
+                                <div class="config-item-unit">秒</div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">自动解封</div>
+                                <div class="config-item-value" id="defenseAutoUnbanValue">--</div>
+                                <div class="config-item-unit"></div>
+                            </div>
+                        </div>
+                        <div class="ai-config-card__footer">
+                            <div class="ai-config-card__desc">不同风险等级的封禁时长配置，支持自动解封。</div>
+                            <div class="ai-card-actions">
+                                <button class="btn btn-default btn-sm" onclick="filterDefenseConfigs()">定位</button>
+                                <button class="btn btn-primary btn-sm" onclick="showDefenseStrategyModal()">配置</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card traffic-push-card">
+                        <div class="ai-config-card__head">
+                            <div>
+                                <div class="ai-config-card__title">流量推送策略</div>
+                                <div class="ai-config-card__key">traffic.push.*</div>
+                            </div>
+                            <span class="traffic-badge">流量</span>
+                        </div>
+                        <div class="config-items-grid">
+                            <div class="config-item-compact">
+                                <div class="config-item-label">正常状态策略</div>
+                                <div class="config-item-value" id="trafficNormalStrategyValue">--</div>
+                                <div class="config-item-unit"></div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">可疑状态策略</div>
+                                <div class="config-item-value" id="trafficSuspiciousStrategyValue">--</div>
+                                <div class="config-item-unit"></div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">攻击状态策略</div>
+                                <div class="config-item-value" id="trafficAttackingStrategyValue">--</div>
+                                <div class="config-item-unit"></div>
+                            </div>
+                            <div class="config-item-compact">
+                                <div class="config-item-label">采样比例</div>
+                                <div class="config-item-value" id="trafficSamplingRateValue">--</div>
+                                <div class="config-item-unit">1/N</div>
+                            </div>
+                        </div>
+                        <div class="ai-config-card__footer">
+                            <div class="ai-config-card__desc">根据IP状态决定流量数据处理策略，优化系统性能。</div>
+                            <div class="ai-card-actions">
+                                <button class="btn btn-default btn-sm" onclick="filterTrafficConfigs()">定位</button>
+                                <button class="btn btn-primary btn-sm" onclick="showTrafficPushModal()">配置</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <div class="filter-bar">
                     <div class="form-inline">
                         <div class="form-group">
@@ -281,6 +400,144 @@
             <div class="modal-footer">
                 <button class="btn btn-default" onclick="closeGatewayDefenseModal()">取消</button>
                 <button class="btn btn-primary" onclick="saveGatewayDefenseConfig()">保存并推送</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ddosConfigModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">DDoS 防护配置</h3>
+                <span class="modal-close" onclick="closeDdosConfigModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="gateway-defense-form">
+                    <div class="form-group">
+                        <label class="form-label">检测阈值（次/秒）</label>
+                        <input type="number" class="form-control" id="ddosThresholdInput" min="1" max="10000" value="20">
+                        <small style="color: var(--text-secondary);">单位时间窗口内超过此阈值视为DDoS攻击</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">检测时间窗口（毫秒）</label>
+                        <input type="number" class="form-control" id="ddosWindowInput" min="100" max="60000" value="1000">
+                        <small style="color: var(--text-secondary);">统计请求的时间窗口，默认1000毫秒（1秒）</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">连续限流触发封禁阈值（次）</label>
+                        <input type="number" class="form-control" id="ddosRateLimitTriggerInput" min="1" max="100" value="3">
+                        <small style="color: var(--text-secondary);">短时间内连续触发限流达到此次数自动封禁</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">限流检测时间窗口（秒）</label>
+                        <input type="number" class="form-control" id="ddosRateLimitWindowInput" min="10" max="3600" value="60">
+                        <small style="color: var(--text-secondary);">统计连续限流次数的时间窗口</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeDdosConfigModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveDdosConfig()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="defenseStrategyModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">防御策略配置</h3>
+                <span class="modal-close" onclick="closeDefenseStrategyModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="gateway-defense-form">
+                    <div class="form-group">
+                        <label class="form-label">默认封禁时长（秒）</label>
+                        <input type="number" class="form-control" id="defenseDefaultDurationInput" min="60" max="86400" value="1800">
+                        <small style="color: var(--text-secondary);">默认封禁时长，30分钟=1800秒</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">高风险攻击封禁时长（秒）</label>
+                        <input type="number" class="form-control" id="defenseHighRiskDurationInput" min="60" max="86400" value="3600">
+                        <small style="color: var(--text-secondary);">高风险攻击封禁时长，1小时=3600秒</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">严重风险攻击封禁时长（秒）</label>
+                        <input type="number" class="form-control" id="defenseCriticalDurationInput" min="60" max="604800" value="86400">
+                        <small style="color: var(--text-secondary);">严重风险攻击封禁时长，1天=86400秒</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">自动解封</label>
+                        <select class="form-control" id="defenseAutoUnbanInput">
+                            <option value="true">启用</option>
+                            <option value="false">禁用</option>
+                        </select>
+                        <small style="color: var(--text-secondary);">封禁到期后自动解除封禁</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeDefenseStrategyModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveDefenseStrategyConfig()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="trafficPushModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">流量推送策略配置</h3>
+                <span class="modal-close" onclick="closeTrafficPushModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="gateway-defense-form">
+                    <div class="form-group">
+                        <label class="form-label">NORMAL状态推送策略</label>
+                        <select class="form-control" id="trafficNormalStrategyInput">
+                            <option value="realtime">实时推送</option>
+                            <option value="sampling">采样推送</option>
+                        </select>
+                        <small style="color: var(--text-secondary);">正常IP的流量推送策略</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">SUSPICIOUS状态推送策略</label>
+                        <select class="form-control" id="trafficSuspiciousStrategyInput">
+                            <option value="sampling">采样推送</option>
+                            <option value="realtime">实时推送</option>
+                            <option value="batch">批量推送</option>
+                        </select>
+                        <small style="color: var(--text-secondary);">可疑IP的流量推送策略</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ATTACKING状态推送策略</label>
+                        <select class="form-control" id="trafficAttackingStrategyInput">
+                            <option value="batch">批量推送</option>
+                            <option value="sampling">采样推送</option>
+                            <option value="skip">跳过推送</option>
+                        </select>
+                        <small style="color: var(--text-secondary);">攻击中IP的流量推送策略</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">DEFENDED状态推送策略</label>
+                        <select class="form-control" id="trafficDefendedStrategyInput">
+                            <option value="skip">跳过推送</option>
+                            <option value="sampling">采样推送</option>
+                        </select>
+                        <small style="color: var(--text-secondary);">已防御IP的流量推送策略</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">采样比例（1/N）</label>
+                        <input type="number" class="form-control" id="trafficSamplingRateInput" min="1" max="1000" value="10">
+                        <small style="color: var(--text-secondary);">采样推送时每N个请求推送1个</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">批量推送间隔（毫秒）</label>
+                        <input type="number" class="form-control" id="trafficBatchIntervalInput" min="1000" max="60000" value="5000">
+                        <small style="color: var(--text-secondary);">批量推送模式的时间间隔</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeTrafficPushModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveTrafficPushConfig()">保存</button>
             </div>
         </div>
     </div>

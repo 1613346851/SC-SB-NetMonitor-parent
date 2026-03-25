@@ -177,15 +177,15 @@
                         <a href="/defense" class="btn btn-link">查看全部</a>
                     </div>
                     <div class="table-wrapper">
-                        <table class="data-table">
+                        <table class="data-table has-fixed-action">
                             <thead>
                                 <tr>
-                                    <th data-sort="createTime">时间</th>
-                                    <th data-sort="defenseType">防御类型</th>
-                                    <th data-sort="defenseTarget">防御目标</th>
-                                    <th data-sort="defenseAction">防御动作</th>
-                                    <th data-sort="executeStatus">执行结果</th>
-                                    <th>关联事件</th>
+                                    <th data-sort="createTime" style="min-width: 150px;">时间</th>
+                                    <th data-sort="defenseType" style="min-width: 100px;">防御类型</th>
+                                    <th data-sort="defenseTarget" style="min-width: 120px;">防御目标</th>
+                                    <th data-sort="defenseAction" style="min-width: 100px;">防御动作</th>
+                                    <th data-sort="executeStatus" style="min-width: 80px;">执行结果</th>
+                                    <th style="min-width: 120px;">关联事件</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -196,9 +196,27 @@
                             </tbody>
                         </table>
                     </div>
-                    <div id="defensePagination" class="pagination"></div>
+                    <div class="pagination-container" style="padding: 16px 24px;">
+                        <div class="pagination" id="defensePagination"></div>
+                    </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <div class="modal" id="defenseDetailModal" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">防御详情</h3>
+                    <button class="modal-close" onclick="closeDefenseDetailModal()">&times;</button>
+                </div>
+                <div class="modal-body" id="defenseDetailContent">
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-default" onclick="closeDefenseDetailModal()">关闭</button>
+                </div>
+            </div>
         </div>
     </div>
 

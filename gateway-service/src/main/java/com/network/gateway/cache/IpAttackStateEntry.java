@@ -19,7 +19,12 @@ public class IpAttackStateEntry implements Serializable {
     private long firstRequestTime;
     private long lastRequestTime;
     private int rateLimitCount;
+    private long rateLimitWindowStart;
     private int attackCount;
+
+    private int stateRequestCount;
+    private long stateStartTime;
+    private int previousState;
 
     public IpAttackStateEntry() {
         this.state = IpAttackStateConstant.NORMAL;
@@ -27,7 +32,11 @@ public class IpAttackStateEntry implements Serializable {
         this.stateExpireTime = this.stateUpdateTime + IpAttackStateConstant.STATE_EXPIRE_MS;
         this.requestCount = 0;
         this.rateLimitCount = 0;
+        this.rateLimitWindowStart = System.currentTimeMillis();
         this.attackCount = 0;
+        this.stateRequestCount = 0;
+        this.stateStartTime = System.currentTimeMillis();
+        this.previousState = IpAttackStateConstant.NORMAL;
     }
 
     public IpAttackStateEntry(String ip) {
@@ -39,12 +48,29 @@ public class IpAttackStateEntry implements Serializable {
 
     public void incrementRequestCount() {
         this.requestCount++;
+        this.stateRequestCount++;
         this.lastRequestTime = System.currentTimeMillis();
     }
 
-    public void incrementRateLimitCount() {
-        this.rateLimitCount++;
-        this.lastRequestTime = System.currentTimeMillis();
+    public int incrementRateLimitCount() {
+        return incrementRateLimitCount(60000);
+    }
+
+    public int incrementRateLimitCount(long windowMs) {
+        long now = System.currentTimeMillis();
+        if (now - rateLimitWindowStart > windowMs) {
+            this.rateLimitCount = 1;
+            this.rateLimitWindowStart = now;
+        } else {
+            this.rateLimitCount++;
+        }
+        this.lastRequestTime = now;
+        return this.rateLimitCount;
+    }
+
+    public void resetRateLimitCount() {
+        this.rateLimitCount = 0;
+        this.rateLimitWindowStart = System.currentTimeMillis();
     }
 
     public void incrementAttackCount() {
@@ -53,16 +79,32 @@ public class IpAttackStateEntry implements Serializable {
     }
 
     public void updateState(int newState) {
+        this.previousState = this.state;
         this.state = newState;
         this.stateUpdateTime = System.currentTimeMillis();
         this.stateExpireTime = this.stateUpdateTime + IpAttackStateConstant.STATE_EXPIRE_MS;
+        this.stateRequestCount = 0;
+        this.stateStartTime = System.currentTimeMillis();
     }
 
     public void updateState(int newState, String eventId) {
+        this.previousState = this.state;
         this.state = newState;
         this.eventId = eventId;
         this.stateUpdateTime = System.currentTimeMillis();
         this.stateExpireTime = this.stateUpdateTime + IpAttackStateConstant.STATE_EXPIRE_MS;
+        this.stateRequestCount = 0;
+        this.stateStartTime = System.currentTimeMillis();
+    }
+
+    public int getAndResetStateRequestCount() {
+        int count = this.stateRequestCount;
+        this.stateRequestCount = 0;
+        return count;
+    }
+
+    public long getStateDuration() {
+        return System.currentTimeMillis() - this.stateStartTime;
     }
 
     public boolean isStateExpired() {
@@ -77,10 +119,14 @@ public class IpAttackStateEntry implements Serializable {
     }
 
     public boolean shouldSkipTrafficPush() {
-        return state == IpAttackStateConstant.DEFENDED;
+        return false;
     }
 
     public boolean shouldSkipDefenseAction() {
         return state == IpAttackStateConstant.DEFENDED || state == IpAttackStateConstant.COOLDOWN;
+    }
+
+    public boolean isInAttackState() {
+        return state == IpAttackStateConstant.ATTACKING || state == IpAttackStateConstant.DEFENDED;
     }
 }
