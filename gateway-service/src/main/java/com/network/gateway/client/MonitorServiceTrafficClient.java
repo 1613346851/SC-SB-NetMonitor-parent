@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.gateway.constant.GatewayHttpConstant;
 import com.network.gateway.dto.TrafficMonitorDTO;
+import com.network.gateway.traffic.TrafficAggregatePushDTO;
 import com.network.gateway.util.CrossServiceSecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -233,11 +234,50 @@ public class MonitorServiceTrafficClient {
         }
     }
 
-    /**
-     * 获取客户端统计信息
-     *
-     * @return 统计信息
-     */
+    public void pushAggregateTraffic(TrafficAggregatePushDTO aggregateDTO) throws RestClientException {
+        if (aggregateDTO == null) {
+            logger.warn("尝试推送空的聚合流量数据");
+            return;
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, String> securityHeaders = CrossServiceSecurityUtil.generateSecurityHeaders(
+                aggregateDTO.getRequestId(), secretKey
+            );
+            securityHeaders.forEach(headers::set);
+
+            HttpEntity<TrafficAggregatePushDTO> requestEntity = new HttpEntity<>(aggregateDTO, headers);
+
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + "/api/inner/traffic/aggregate";
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    url,
+                    requestEntity,
+                    String.class
+            );
+
+            if (isResponseSuccessful(response)) {
+                logger.debug("聚合流量数据推送成功: ip[{}] requests[{}]", 
+                           aggregateDTO.getIp(), aggregateDTO.getTotalRequests());
+            } else {
+                String errorMsg = extractErrorMessage(response.getBody());
+                logger.error("聚合流量数据推送失败: ip[{}] 响应内容[{}]", 
+                            aggregateDTO.getIp(), errorMsg);
+                throw new RestClientException("监控服务返回错误: " + errorMsg);
+            }
+
+        } catch (RestClientException e) {
+            logger.error("推送聚合流量数据到监控服务失败: ip[{}] 错误: {}", 
+                        aggregateDTO.getIp(), e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            logger.error("推送聚合流量数据时发生未知异常: ip[{}]", aggregateDTO.getIp(), e);
+            throw new RestClientException("推送聚合流量数据时发生未知异常", e);
+        }
+    }
+
     public String getStatistics() {
         return "流量推送客户端 - 配置端点：" + GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.TRAFFIC_MONITOR_ENDPOINT;
     }

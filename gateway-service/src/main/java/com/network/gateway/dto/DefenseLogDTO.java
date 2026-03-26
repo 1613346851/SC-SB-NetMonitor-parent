@@ -71,6 +71,41 @@ public class DefenseLogDTO implements Serializable {
     private String operator;
 
     /**
+     * 置信度
+     */
+    private Integer confidence;
+
+    /**
+     * 执行时间（时间戳）
+     */
+    private Long executeTime;
+
+    /**
+     * 处理耗时（毫秒）
+     */
+    private Long processingTime;
+
+    /**
+     * 请求URI
+     */
+    private String requestUri;
+
+    /**
+     * HTTP方法
+     */
+    private String httpMethod;
+
+    /**
+     * 限流次数（用于聚合日志）
+     */
+    private Integer rateLimitCount;
+
+    /**
+     * 时间窗口（用于聚合日志）
+     */
+    private String timeWindow;
+
+    /**
      * 构造函数（用于创建防御日志）
      *
      * @param defenseType 防御类型

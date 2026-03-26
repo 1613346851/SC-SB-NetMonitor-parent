@@ -644,12 +644,13 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 -- ------------------------------------------------------------
 -- 4.3.1 DDoS防护配置项
 -- 统一时间单位为"次/秒"，使用毫秒级时间窗口
+-- 优化后提高阈值，增加各阶段区分度
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('ddos.threshold', '20', 'DDoS检测阈值(次/秒)'),
+('ddos.threshold', '50', 'DDoS检测阈值(次/秒) -- 提高阈值减少误判'),
 ('ddos.detection.window-ms', '1000', 'DDoS检测时间窗口(毫秒)'),
-('ddos.rate-limit-trigger-count', '3', '连续限流触发封禁阈值(次)'),
-('ddos.rate-limit-trigger-window-seconds', '60', '连续限流检测时间窗口(秒)'),
+('ddos.rate-limit-trigger-count', '5', '连续限流触发封禁阈值(次) -- 增加容错'),
+('ddos.rate-limit-trigger-window-seconds', '30', '连续限流检测时间窗口(秒) -- 缩短窗口'),
 ('ddos.peak-rps.record.enabled', 'true', '是否记录峰值RPS');
 
 -- ------------------------------------------------------------
@@ -690,7 +691,7 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 
 -- 限流配置
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('gateway.defense.rate-limit.default-threshold', '10', '网关-默认限流阈值(次/秒)'),
+('gateway.defense.rate-limit.default-threshold', '30', '网关-默认限流阈值(次/秒) -- 提高阈值增加测试空间'),
 ('gateway.defense.rate-limit.window-size', '1000', '网关-限流时间窗口(毫秒)');
 
 -- 黑名单配置
@@ -712,6 +713,34 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('gateway.attack-state.cooldown-duration-ms', '300000', '网关-冷却持续时间(毫秒)'),
 ('gateway.attack-state.state-expire-ms', '600000', '网关-攻击状态过期时间(毫秒)');
+
+-- ------------------------------------------------------------
+-- 4.3.2 状态转换配置项（新增）
+-- 定义IP状态机各状态之间的转换条件
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+-- NORMAL -> SUSPICIOUS 触发条件
+('state.normal-to-suspicious.threshold-rps', '30', 'NORMAL到SUSPICIOUS的RPS阈值(次/秒)'),
+('state.normal-to-suspicious.window-ms', '1000', 'NORMAL到SUSPICIOUS的检测窗口(毫秒)'),
+
+-- SUSPICIOUS -> ATTACKING 触发条件
+('state.suspicious-to-attacking.duration-ms', '5000', 'SUSPICIOUS持续多久转为ATTACKING(毫秒)'),
+('state.suspicious-to-attacking.min-requests', '50', 'SUSPICIOUS期间最小请求数'),
+('state.suspicious-to-attacking.uri-diversity-threshold', '3', 'URI多样性阈值(不同URI数量)'),
+
+-- SUSPICIOUS -> NORMAL 恢复条件
+('state.suspicious-to-normal.quiet-duration-ms', '10000', 'SUSPICIOUS静止多久恢复NORMAL(毫秒)'),
+
+-- DEFENDED -> COOLDOWN 触发条件
+('state.defended-to-cooldown.quiet-duration-ms', '30000', 'DEFENDED静止多久进入COOLDOWN(毫秒)'),
+
+-- COOLDOWN -> NORMAL 恢复条件（动态时长基础配置）
+('state.cooldown.base-duration-ms', '180000', 'COOLDOWN基础时长(毫秒)，默认3分钟'),
+('state.cooldown.max-duration-ms', '600000', 'COOLDOWN最大时长(毫秒)，默认10分钟'),
+('state.cooldown.attack-intensity-multiplier', '0.5', '攻击强度系数，用于计算动态时长'),
+
+-- COOLDOWN -> ATTACKING 重新攻击条件
+('state.cooldown-to-attacking.threshold-rps', '20', 'COOLDOWN期间重新攻击的RPS阈值');
 
 -- 请求限制配置
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
@@ -893,6 +922,90 @@ CREATE TABLE `sys_alert_rule` (
     KEY `idx_enabled` (`enabled`),
     KEY `idx_priority` (`priority`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警规则表';
+
+-- ------------------------------------------------------------
+-- 4.8.1 动态冷却时长配置项（新增）
+-- 攻击越猛冷却期越长，支持历史攻击加成
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('cooldown.dynamic.enabled', 'true', '是否启用动态冷却时长'),
+('cooldown.base-duration-ms', '180000', '基础冷却时长(毫秒)'),
+('cooldown.max-duration-ms', '600000', '最大冷却时长(毫秒)'),
+('cooldown.intensity-multiplier', '0.5', '攻击强度系数(秒/强度点)'),
+('cooldown.history-multiplier', '0.2', '历史攻击加成系数(每次增加比例)'),
+('cooldown.history-max-multiplier', '2.0', '历史攻击最大加成倍数');
+
+-- ------------------------------------------------------------
+-- 4.8.2 置信度计算配置项（新增）
+-- 基于多因素科学计算置信度
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+-- 基础分
+('confidence.base-score', '30', '置信度基础分'),
+
+-- 频率异常评分
+('confidence.frequency.max-score', '25', '频率异常最高分'),
+('confidence.frequency.per-exceed-score', '5', '每超过阈值1倍的得分'),
+
+-- 多样性评分
+('confidence.diversity.max-score', '20', '多样性最高分'),
+('confidence.diversity.per-uri-score', '3', '每个不同URI的得分'),
+
+-- 持续时间评分
+('confidence.persistence.max-score', '15', '持续时间最高分'),
+('confidence.persistence.per-10s-score', '3', '每持续10秒的得分'),
+
+-- 攻击模式评分
+('confidence.pattern.max-score', '10', '攻击模式匹配最高分'),
+
+-- 正常行为抵扣
+('confidence.normal-behavior.max-deduction', '20', '正常行为最高抵扣'),
+('confidence.normal-behavior.no-history-deduction', '5', '无历史攻击记录抵扣'),
+('confidence.normal-behavior.normal-requests-deduction', '15', '历史正常请求多抵扣');
+
+-- ------------------------------------------------------------
+-- 4.8.3 置信度平滑配置项（新增）
+-- 避免置信度跳变，采用只升不降策略
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('confidence.smooth.strategy', 'ONLY_UP', '置信度平滑策略：ONLY_UP(只升不降) / SLIDING_AVERAGE(滑动平均)'),
+('confidence.smooth.alpha', '0.4', '滑动平均系数(仅SLIDING_AVERAGE策略使用)');
+
+-- ------------------------------------------------------------
+-- 4.8.4 流量推送配置项（新增）
+-- 周期性推送、样本保留、聚合配置
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+-- 周期性推送
+('traffic.push.interval-ms', '3000', '流量推送周期(毫秒)'),
+('traffic.push.enabled', 'true', '是否启用流量推送'),
+
+-- 样本保留
+('traffic.sample.max-per-uri', '3', '每个URI模式保留的最大样本数'),
+('traffic.sample.max-total', '20', '单次推送保留的最大样本总数'),
+
+-- 聚合配置
+('traffic.aggregate.uri-pattern-depth', '2', 'URI模式聚合深度(路径段数)'),
+('traffic.aggregate.max-uri-groups', '50', '单次推送最大URI分组数');
+
+-- ------------------------------------------------------------
+-- 4.8.5 推送重试与降级配置项（新增）
+-- 失败重试、内存保护、降级策略
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+-- 重试配置
+('traffic.push.retry.max-count', '3', '推送失败最大重试次数'),
+('traffic.push.retry.delay-ms', '1000', '重试延迟基础时间(毫秒)'),
+('traffic.push.retry.max-queue-size', '10000', '重试队列最大大小'),
+
+-- 内存保护
+('traffic.push.memory.max-usage-percent', '80', '内存使用上限百分比'),
+('traffic.push.memory.force-flush-threshold', '90', '强制推送内存阈值百分比'),
+
+-- 降级配置
+('traffic.push.degradation.enabled', 'true', '是否启用降级模式'),
+('traffic.push.degradation.local-cache-size', '50000', '降级模式本地缓存大小'),
+('traffic.push.degradation.health-check-interval-ms', '30000', '下游服务健康检查间隔(毫秒)');
 
 -- ------------------------------------------------------------
 -- 4.9 告警配置项

@@ -441,4 +441,147 @@ public class DefenseCommandController {
             return ResponseEntity.status(500).body(response);
         }
     }
+
+    @Autowired
+    private com.network.gateway.service.StateInterventionService interventionService;
+
+    @PostMapping("/intervention/reset")
+    public ResponseEntity<Map<String, Object>> forceResetToNormal(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            String ip = (String) request.get("ip");
+            String operator = (String) request.getOrDefault("operator", "MANUAL");
+            String reason = (String) request.getOrDefault("reason", "人工干预重置");
+            
+            if (ip == null || ip.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "IP 地址不能为空");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            interventionService.forceResetToNormal(ip, operator, reason);
+            
+            response.put("success", true);
+            response.put("message", "状态已强制重置为NORMAL");
+            response.put("ip", ip);
+            logger.info("人工干预：强制重置状态, ip={}, operator={}", ip, operator);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("强制重置状态时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/intervention/ban")
+    public ResponseEntity<Map<String, Object>> forceBan(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            String ip = (String) request.get("ip");
+            Long duration = request.get("duration") != null ? 
+                ((Number) request.get("duration")).longValue() : null;
+            String operator = (String) request.getOrDefault("operator", "MANUAL");
+            String reason = (String) request.getOrDefault("reason", "紧急封禁");
+            
+            if (ip == null || ip.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "IP 地址不能为空");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            interventionService.forceBan(ip, duration, operator, reason);
+            
+            long expireTime = duration != null ? 
+                System.currentTimeMillis() + duration * 1000 : Long.MAX_VALUE;
+            blacklistFilter.addToBlacklist(ip, expireTime);
+            
+            response.put("success", true);
+            response.put("message", "已强制封禁IP");
+            response.put("ip", ip);
+            response.put("duration", duration);
+            logger.info("人工干预：紧急封禁, ip={}, duration={}, operator={}", ip, duration, operator);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("强制封禁时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/intervention/batch-reset")
+    public ResponseEntity<Map<String, Object>> batchResetToNormal(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.List<String> ips = (java.util.List<String>) request.get("ips");
+            String operator = (String) request.getOrDefault("operator", "MANUAL");
+            String reason = (String) request.getOrDefault("reason", "批量重置");
+            
+            if (ips == null || ips.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "IP 列表不能为空");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            interventionService.batchResetToNormal(ips, operator, reason);
+            
+            response.put("success", true);
+            response.put("message", "批量重置成功");
+            response.put("count", ips.size());
+            logger.info("人工干预：批量重置状态, count={}, operator={}", ips.size(), operator);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("批量重置状态时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @GetMapping("/intervention/logs/{ip}")
+    public ResponseEntity<Map<String, Object>> getInterventionLogs(@PathVariable String ip) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            java.util.List<com.network.gateway.dto.StateInterventionLog> logs = 
+                interventionService.getInterventionLogs(ip);
+            
+            response.put("success", true);
+            response.put("ip", ip);
+            response.put("logs", logs);
+            response.put("count", logs.size());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("获取干预日志时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @GetMapping("/intervention/stats")
+    public ResponseEntity<Map<String, Object>> getInterventionStats() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            response.put("success", true);
+            response.put("stats", interventionService.getStats());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("获取干预统计时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
 }

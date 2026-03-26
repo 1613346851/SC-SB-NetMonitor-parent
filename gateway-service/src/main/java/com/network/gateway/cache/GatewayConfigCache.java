@@ -49,7 +49,7 @@ public class GatewayConfigCache {
         configCache.put("gateway.defense.blacklist.enabled", "true");
         configCache.put("gateway.defense.rate-limit.enabled", "true");
         configCache.put("gateway.defense.malicious-request.enabled", "true");
-        configCache.put("gateway.defense.rate-limit.default-threshold", "10");
+        configCache.put("gateway.defense.rate-limit.default-threshold", "30");
         configCache.put("gateway.defense.rate-limit.window-size", "1000");
         configCache.put("gateway.defense.blacklist.default-expire-seconds", "600");
         configCache.put("gateway.defense.malicious.user-agents", 
@@ -73,10 +73,58 @@ public class GatewayConfigCache {
         configCache.put("traffic.push.sampling-rate", "10");
         configCache.put("traffic.push.enabled", "true");
 
-        configCache.put("ddos.threshold", "20");
+        configCache.put("ddos.threshold", "50");
         configCache.put("ddos.detection.window-ms", "1000");
-        configCache.put("ddos.rate-limit-trigger-count", "3");
-        configCache.put("ddos.rate-limit-trigger-window-seconds", "60");
+        configCache.put("ddos.rate-limit-trigger-count", "5");
+        configCache.put("ddos.rate-limit-trigger-window-seconds", "30");
+
+        configCache.put("state.normal-to-suspicious.threshold-rps", "30");
+        configCache.put("state.normal-to-suspicious.window-ms", "1000");
+        configCache.put("state.suspicious-to-attacking.duration-ms", "5000");
+        configCache.put("state.suspicious-to-attacking.min-requests", "50");
+        configCache.put("state.suspicious-to-attacking.uri-diversity-threshold", "3");
+        configCache.put("state.suspicious-to-normal.quiet-duration-ms", "10000");
+        configCache.put("state.defended-to-cooldown.quiet-duration-ms", "30000");
+        configCache.put("state.cooldown.base-duration-ms", "180000");
+        configCache.put("state.cooldown.max-duration-ms", "600000");
+        configCache.put("state.cooldown.attack-intensity-multiplier", "0.5");
+        configCache.put("state.cooldown-to-attacking.threshold-rps", "20");
+
+        configCache.put("cooldown.dynamic.enabled", "true");
+        configCache.put("cooldown.base-duration-ms", "180000");
+        configCache.put("cooldown.max-duration-ms", "600000");
+        configCache.put("cooldown.intensity-multiplier", "0.5");
+        configCache.put("cooldown.history-multiplier", "0.2");
+        configCache.put("cooldown.history-max-multiplier", "2.0");
+
+        configCache.put("confidence.base-score", "30");
+        configCache.put("confidence.frequency.max-score", "25");
+        configCache.put("confidence.frequency.per-exceed-score", "5");
+        configCache.put("confidence.diversity.max-score", "20");
+        configCache.put("confidence.diversity.per-uri-score", "3");
+        configCache.put("confidence.persistence.max-score", "15");
+        configCache.put("confidence.persistence.per-10s-score", "3");
+        configCache.put("confidence.pattern.max-score", "10");
+        configCache.put("confidence.normal-behavior.max-deduction", "20");
+        configCache.put("confidence.normal-behavior.no-history-deduction", "5");
+        configCache.put("confidence.normal-behavior.normal-requests-deduction", "15");
+        configCache.put("confidence.smooth.strategy", "ONLY_UP");
+        configCache.put("confidence.smooth.alpha", "0.4");
+
+        configCache.put("traffic.push.interval-ms", "3000");
+        configCache.put("traffic.sample.max-per-uri", "3");
+        configCache.put("traffic.sample.max-total", "20");
+        configCache.put("traffic.aggregate.uri-pattern-depth", "2");
+        configCache.put("traffic.aggregate.max-uri-groups", "50");
+
+        configCache.put("traffic.push.retry.max-count", "3");
+        configCache.put("traffic.push.retry.delay-ms", "1000");
+        configCache.put("traffic.push.retry.max-queue-size", "10000");
+        configCache.put("traffic.push.memory.max-usage-percent", "80");
+        configCache.put("traffic.push.memory.force-flush-threshold", "90");
+        configCache.put("traffic.push.degradation.enabled", "true");
+        configCache.put("traffic.push.degradation.local-cache-size", "50000");
+        configCache.put("traffic.push.degradation.health-check-interval-ms", "30000");
 
         logger.info("加载默认配置完成，共{}项", configCache.size());
     }
@@ -106,8 +154,13 @@ public class GatewayConfigCache {
     private boolean isValidConfigKey(String key) {
         return key.startsWith("gateway.") ||
                key.startsWith("traffic.push.") ||
+               key.startsWith("traffic.sample.") ||
+               key.startsWith("traffic.aggregate.") ||
                key.startsWith("ddos.") ||
-               key.startsWith("defense.");
+               key.startsWith("defense.") ||
+               key.startsWith("state.") ||
+               key.startsWith("cooldown.") ||
+               key.startsWith("confidence.");
     }
 
     public void updateConfig(String configKey, String configValue) {
@@ -206,7 +259,7 @@ public class GatewayConfigCache {
     }
 
     public int getRateLimitThreshold() {
-        return getInt("gateway.defense.rate-limit.default-threshold", 10);
+        return getInt("gateway.defense.rate-limit.default-threshold", 30);
     }
 
     public int getBlacklistExpireSeconds() {
@@ -260,7 +313,7 @@ public class GatewayConfigCache {
     }
 
     public int getDdosThreshold() {
-        return getInt("ddos.threshold", 20);
+        return getInt("ddos.threshold", 50);
     }
 
     public long getDdosDetectionWindowMs() {
@@ -268,11 +321,208 @@ public class GatewayConfigCache {
     }
 
     public int getDdosRateLimitTriggerCount() {
-        return getInt("ddos.rate-limit-trigger-count", 3);
+        return getInt("ddos.rate-limit-trigger-count", 5);
     }
 
     public int getDdosRateLimitTriggerWindowSeconds() {
-        return getInt("ddos.rate-limit-trigger-window-seconds", 60);
+        return getInt("ddos.rate-limit-trigger-window-seconds", 30);
+    }
+
+    public int getStateNormalToSuspiciousThresholdRps() {
+        return getInt("state.normal-to-suspicious.threshold-rps", 30);
+    }
+
+    public long getStateNormalToSuspiciousWindowMs() {
+        return getLong("state.normal-to-suspicious.window-ms", 1000L);
+    }
+
+    public long getStateSuspiciousToAttackingDurationMs() {
+        return getLong("state.suspicious-to-attacking.duration-ms", 5000L);
+    }
+
+    public int getStateSuspiciousToAttackingMinRequests() {
+        return getInt("state.suspicious-to-attacking.min-requests", 50);
+    }
+
+    public int getStateSuspiciousToAttackingUriDiversityThreshold() {
+        return getInt("state.suspicious-to-attacking.uri-diversity-threshold", 3);
+    }
+
+    public long getStateSuspiciousToNormalQuietDurationMs() {
+        return getLong("state.suspicious-to-normal.quiet-duration-ms", 10000L);
+    }
+
+    public long getStateDefendedToCooldownQuietDurationMs() {
+        return getLong("state.defended-to-cooldown.quiet-duration-ms", 30000L);
+    }
+
+    public long getStateCooldownBaseDurationMs() {
+        return getLong("state.cooldown.base-duration-ms", 180000L);
+    }
+
+    public long getStateCooldownMaxDurationMs() {
+        return getLong("state.cooldown.max-duration-ms", 600000L);
+    }
+
+    public double getStateCooldownAttackIntensityMultiplier() {
+        String value = getString("state.cooldown.attack-intensity-multiplier", "0.5");
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return 0.5;
+        }
+    }
+
+    public int getStateCooldownToAttackingThresholdRps() {
+        return getInt("state.cooldown-to-attacking.threshold-rps", 20);
+    }
+
+    public boolean isCooldownDynamicEnabled() {
+        return getBoolean("cooldown.dynamic.enabled", true);
+    }
+
+    public long getCooldownBaseDurationMs() {
+        return getLong("cooldown.base-duration-ms", 180000L);
+    }
+
+    public long getCooldownMaxDurationMs() {
+        return getLong("cooldown.max-duration-ms", 600000L);
+    }
+
+    public double getCooldownIntensityMultiplier() {
+        String value = getString("cooldown.intensity-multiplier", "0.5");
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return 0.5;
+        }
+    }
+
+    public double getCooldownHistoryMultiplier() {
+        String value = getString("cooldown.history-multiplier", "0.2");
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return 0.2;
+        }
+    }
+
+    public double getCooldownHistoryMaxMultiplier() {
+        String value = getString("cooldown.history-max-multiplier", "2.0");
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return 2.0;
+        }
+    }
+
+    public int getConfidenceBaseScore() {
+        return getInt("confidence.base-score", 30);
+    }
+
+    public int getConfidenceFrequencyMaxScore() {
+        return getInt("confidence.frequency.max-score", 25);
+    }
+
+    public int getConfidencePerExceedScore() {
+        return getInt("confidence.frequency.per-exceed-score", 5);
+    }
+
+    public int getConfidenceDiversityMaxScore() {
+        return getInt("confidence.diversity.max-score", 20);
+    }
+
+    public int getConfidencePerUriScore() {
+        return getInt("confidence.diversity.per-uri-score", 3);
+    }
+
+    public int getConfidencePersistenceMaxScore() {
+        return getInt("confidence.persistence.max-score", 15);
+    }
+
+    public int getConfidencePer10sScore() {
+        return getInt("confidence.persistence.per-10s-score", 3);
+    }
+
+    public int getConfidencePatternMaxScore() {
+        return getInt("confidence.pattern.max-score", 10);
+    }
+
+    public int getConfidenceNormalBehaviorMaxDeduction() {
+        return getInt("confidence.normal-behavior.max-deduction", 20);
+    }
+
+    public int getConfidenceNormalBehaviorNoHistoryDeduction() {
+        return getInt("confidence.normal-behavior.no-history-deduction", 5);
+    }
+
+    public int getConfidenceNormalBehaviorNormalRequestsDeduction() {
+        return getInt("confidence.normal-behavior.normal-requests-deduction", 15);
+    }
+
+    public String getConfidenceSmoothStrategy() {
+        return getString("confidence.smooth.strategy", "ONLY_UP");
+    }
+
+    public double getConfidenceSmoothAlpha() {
+        String value = getString("confidence.smooth.alpha", "0.4");
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return 0.4;
+        }
+    }
+
+    public long getTrafficPushIntervalMs() {
+        return getLong("traffic.push.interval-ms", 3000L);
+    }
+
+    public int getTrafficSampleMaxPerUri() {
+        return getInt("traffic.sample.max-per-uri", 3);
+    }
+
+    public int getTrafficSampleMaxTotal() {
+        return getInt("traffic.sample.max-total", 20);
+    }
+
+    public int getTrafficAggregateUriPatternDepth() {
+        return getInt("traffic.aggregate.uri-pattern-depth", 2);
+    }
+
+    public int getTrafficAggregateMaxUriGroups() {
+        return getInt("traffic.aggregate.max-uri-groups", 50);
+    }
+
+    public int getTrafficPushRetryMaxCount() {
+        return getInt("traffic.push.retry.max-count", 3);
+    }
+
+    public long getTrafficPushRetryDelayMs() {
+        return getLong("traffic.push.retry.delay-ms", 1000L);
+    }
+
+    public int getTrafficPushRetryMaxQueueSize() {
+        return getInt("traffic.push.retry.max-queue-size", 10000);
+    }
+
+    public int getTrafficPushMemoryMaxUsagePercent() {
+        return getInt("traffic.push.memory.max-usage-percent", 80);
+    }
+
+    public int getTrafficPushMemoryForceFlushThreshold() {
+        return getInt("traffic.push.memory.force-flush-threshold", 90);
+    }
+
+    public boolean isTrafficPushDegradationEnabled() {
+        return getBoolean("traffic.push.degradation.enabled", true);
+    }
+
+    public int getTrafficPushDegradationLocalCacheSize() {
+        return getInt("traffic.push.degradation.local-cache-size", 50000);
+    }
+
+    public long getTrafficPushDegradationHealthCheckIntervalMs() {
+        return getLong("traffic.push.degradation.health-check-interval-ms", 30000L);
     }
 
     public int size() {

@@ -20,6 +20,29 @@ public class IpAttackStateConstant {
     public static final long ATTACK_STOP_THRESHOLD_MS = 10000L;
     public static final long SUSPICIOUS_RECOVERY_MS = 60000L;
 
+    public static final String STATE_NORMAL_NAME = "正常";
+    public static final String STATE_NORMAL_DESC = "正常请求，无异常行为";
+    public static final String STATE_SUSPICIOUS_NAME = "可疑";
+    public static final String STATE_SUSPICIOUS_DESC = "请求频率异常，需要关注";
+    public static final String STATE_ATTACKING_NAME = "攻击中";
+    public static final String STATE_ATTACKING_DESC = "确认攻击行为，准备防御";
+    public static final String STATE_DEFENDED_NAME = "已防御";
+    public static final String STATE_DEFENDED_DESC = "已执行防御措施，拦截请求";
+    public static final String STATE_COOLDOWN_NAME = "冷却期";
+    public static final String STATE_COOLDOWN_DESC = "攻击停止后的观察期";
+
+    public static final String TRANSITION_REASON_FREQUENCY_ABNORMAL = "请求频率异常，进入可疑状态";
+    public static final String TRANSITION_REASON_ATTACK_CONFIRMED = "攻击行为确认，准备防御";
+    public static final String TRANSITION_REASON_DEFENSE_EXECUTED = "防御措施已执行";
+    public static final String TRANSITION_REASON_ATTACK_STOPPED = "攻击停止，进入冷却期";
+    public static final String TRANSITION_REASON_COOLDOWN_ENDED = "冷却期结束，恢复正常";
+    public static final String TRANSITION_REASON_RECOVERY = "异常行为停止，恢复正常";
+    public static final String TRANSITION_REASON_RATE_LIMIT_THRESHOLD = "连续限流达到阈值，执行防御";
+    public static final String TRANSITION_REASON_REATTACK = "冷却期内再次攻击";
+    public static final String TRANSITION_REASON_MANUAL_RESET = "人工重置状态";
+    public static final String TRANSITION_REASON_MANUAL_BAN = "人工封禁";
+    public static final String TRANSITION_REASON_SYSTEM_RESET = "系统重置";
+
     public static String getStateName(int state) {
         switch (state) {
             case NORMAL:
@@ -40,17 +63,61 @@ public class IpAttackStateConstant {
     public static String getStateNameZh(int state) {
         switch (state) {
             case NORMAL:
-                return "正常";
+                return STATE_NORMAL_NAME;
             case SUSPICIOUS:
-                return "可疑";
+                return STATE_SUSPICIOUS_NAME;
             case ATTACKING:
-                return "攻击中";
+                return STATE_ATTACKING_NAME;
             case DEFENDED:
-                return "已防御";
+                return STATE_DEFENDED_NAME;
             case COOLDOWN:
-                return "冷却期";
+                return STATE_COOLDOWN_NAME;
             default:
                 return "未知";
+        }
+    }
+
+    public static String getStateDescription(int state) {
+        switch (state) {
+            case NORMAL:
+                return STATE_NORMAL_DESC;
+            case SUSPICIOUS:
+                return STATE_SUSPICIOUS_DESC;
+            case ATTACKING:
+                return STATE_ATTACKING_DESC;
+            case DEFENDED:
+                return STATE_DEFENDED_DESC;
+            case COOLDOWN:
+                return STATE_COOLDOWN_DESC;
+            default:
+                return "未知状态";
+        }
+    }
+
+    public static boolean isValidState(int state) {
+        return state >= NORMAL && state <= COOLDOWN;
+    }
+
+    public static boolean canTransitionTo(int fromState, int toState) {
+        if (!isValidState(fromState) || !isValidState(toState)) {
+            return false;
+        }
+        if (fromState == toState) {
+            return false;
+        }
+        switch (fromState) {
+            case NORMAL:
+                return toState == SUSPICIOUS;
+            case SUSPICIOUS:
+                return toState == NORMAL || toState == ATTACKING || toState == DEFENDED;
+            case ATTACKING:
+                return toState == DEFENDED || toState == NORMAL;
+            case DEFENDED:
+                return toState == COOLDOWN || toState == NORMAL;
+            case COOLDOWN:
+                return toState == NORMAL || toState == ATTACKING;
+            default:
+                return false;
         }
     }
 

@@ -10,6 +10,7 @@ import com.network.gateway.constant.IpAttackStateConstant;
 import com.network.gateway.dto.TrafficMonitorDTO;
 import com.network.gateway.enums.TrafficPushStrategy;
 import com.network.gateway.handler.TrafficPushStrategyManager;
+import com.network.gateway.traffic.*;
 import com.network.gateway.util.ServerWebExchangeUtil;
 import com.network.gateway.util.TrafficPreProcessUtil;
 import org.slf4j.Logger;
@@ -22,6 +23,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Component
 public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
@@ -42,6 +45,17 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
 
     @Autowired
     private TrafficPushStrategyManager strategyManager;
+
+    @Autowired
+    private TrafficQueueManager queueManager;
+
+    @Autowired
+    private PushRetryQueue retryQueue;
+
+    @Autowired
+    private PushDegradationHandler degradationHandler;
+
+    private boolean useNewQueueSystem = true;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -72,24 +86,102 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
                 IpAttackStateConstant.getStateName(currentState),
                 pushStrategy);
 
-            TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
-            monitorDTO.setSkipPush(pushStrategy == TrafficPushStrategy.SKIP);
-
-            trafficTempCache.putTraffic(requestId, monitorDTO);
-
-            final TrafficPushStrategy finalPushStrategy = pushStrategy;
-
-            return chain.filter(exchange)
-                    .doOnSuccess(unused -> {
-                        handleRequestSuccess(exchange, monitorDTO, startTime, finalPushStrategy);
-                    })
-                    .doOnError(throwable -> {
-                        handleRequestError(exchange, monitorDTO, throwable, startTime, finalPushStrategy);
-                    });
+            if (useNewQueueSystem) {
+                return handleWithNewQueueSystem(exchange, chain, rawTraffic, sourceIp, currentState, startTime);
+            } else {
+                return handleWithOldSystem(exchange, chain, rawTraffic, requestId, pushStrategy, startTime);
+            }
 
         } catch (Exception e) {
             logger.error("流量采集过程中发生异常", e);
             return chain.filter(exchange);
+        }
+    }
+
+    private Mono<Void> handleWithNewQueueSystem(ServerWebExchange exchange, GatewayFilterChain chain,
+                                                RawTrafficBO rawTraffic, String sourceIp, 
+                                                int currentState, long startTime) {
+        TrafficSample sample = createTrafficSample(rawTraffic);
+        
+        return chain.filter(exchange)
+                .doOnSuccess(unused -> {
+                    handleNewQueueSuccess(exchange, sample, sourceIp, startTime);
+                })
+                .doOnError(throwable -> {
+                    handleNewQueueError(exchange, sample, sourceIp, startTime, throwable);
+                });
+    }
+
+    private Mono<Void> handleWithOldSystem(ServerWebExchange exchange, GatewayFilterChain chain,
+                                          RawTrafficBO rawTraffic, String requestId,
+                                          TrafficPushStrategy pushStrategy, long startTime) {
+        TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
+        monitorDTO.setSkipPush(pushStrategy == TrafficPushStrategy.SKIP);
+
+        trafficTempCache.putTraffic(requestId, monitorDTO);
+
+        final TrafficPushStrategy finalPushStrategy = pushStrategy;
+
+        return chain.filter(exchange)
+                .doOnSuccess(unused -> {
+                    handleRequestSuccess(exchange, monitorDTO, startTime, finalPushStrategy);
+                })
+                .doOnError(throwable -> {
+                    handleRequestError(exchange, monitorDTO, throwable, startTime, finalPushStrategy);
+                });
+    }
+
+    private TrafficSample createTrafficSample(RawTrafficBO rawTraffic) {
+        TrafficSample sample = new TrafficSample();
+        sample.setRequestId(rawTraffic.getRequestId());
+        sample.setRequestUri(rawTraffic.getUri());
+        sample.setHttpMethod(rawTraffic.getMethod());
+        sample.setHeaders(rawTraffic.getHeaders());
+        sample.setRequestBody(rawTraffic.getRequestBody());
+        sample.setTimestamp(System.currentTimeMillis());
+        return sample;
+    }
+
+    private void handleNewQueueSuccess(ServerWebExchange exchange, TrafficSample sample, 
+                                       String sourceIp, long startTime) {
+        try {
+            long endTime = System.currentTimeMillis();
+            int statusCode = exchange.getResponse().getStatusCode() != null ? 
+                           exchange.getResponse().getStatusCode().value() : 200;
+            
+            sample.setResponseStatus(statusCode);
+            sample.setProcessingTime(endTime - startTime);
+            sample.setError(statusCode >= 400);
+            
+            queueManager.addRequest(sourceIp, sample);
+            
+            logger.debug("流量采集完成（新队列）：ip={} uri={} 耗时{}ms 状态码{}", 
+                        sourceIp, sample.getRequestUri(), endTime - startTime, statusCode);
+
+        } catch (Exception e) {
+            logger.error("处理请求成功回调时发生异常（新队列）", e);
+        }
+    }
+
+    private void handleNewQueueError(ServerWebExchange exchange, TrafficSample sample, 
+                                     String sourceIp, long startTime, Throwable throwable) {
+        try {
+            long endTime = System.currentTimeMillis();
+            int statusCode = exchange.getResponse().getStatusCode() != null ? 
+                           exchange.getResponse().getStatusCode().value() : 500;
+            
+            sample.setResponseStatus(statusCode);
+            sample.setProcessingTime(endTime - startTime);
+            sample.setError(true);
+            sample.setErrorMessage(throwable.getMessage());
+            
+            queueManager.addRequest(sourceIp, sample);
+            
+            logger.warn("流量采集记录错误（新队列）：ip={} uri={} 耗时{}ms 错误：{}", 
+                       sourceIp, sample.getRequestUri(), endTime - startTime, throwable.getMessage());
+
+        } catch (Exception e) {
+            logger.error("处理请求错误回调时发生异常（新队列）", e);
         }
     }
 
@@ -250,10 +342,15 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
     }
 
     public String getStatistics() {
-        return String.format("流量采集过滤器 - 缓存流量数:%d 缓存统计:%s\n%s", 
-                           getCachedTrafficCount(),
-                           trafficTempCache.getStats(),
-                           strategyManager.getAllStats());
+        StringBuilder sb = new StringBuilder();
+        sb.append("流量采集过滤器统计:\n");
+        sb.append(String.format("  - 缓存流量数: %d\n", getCachedTrafficCount()));
+        sb.append(String.format("  - 缓存统计: %s\n", trafficTempCache.getStats()));
+        sb.append(String.format("  - 队列管理器: %s\n", queueManager.getStatistics()));
+        sb.append(String.format("  - 重试队列: %s\n", retryQueue.getStats()));
+        sb.append(String.format("  - 降级状态: %s\n", degradationHandler.getStats()));
+        sb.append(strategyManager.getAllStats());
+        return sb.toString();
     }
 
     @Scheduled(fixedRateString = "${traffic.push.batch-interval-ms:5000}")
@@ -264,5 +361,83 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         } catch (Exception e) {
             logger.error("定时刷新推送处理器失败", e);
         }
+    }
+
+    @Scheduled(fixedRateString = "${traffic.queue.flush-interval-ms:5000}")
+    public void flushQueueManager() {
+        try {
+            logger.debug("开始定时刷新流量队列管理器");
+            
+            List<TrafficAggregateData> flushData = queueManager.flushPeriodic();
+            
+            for (TrafficAggregateData data : flushData) {
+                pushAggregateData(data);
+            }
+            
+            queueManager.cleanupExpiredQueues(300000);
+            
+            processRetryTasks();
+            
+        } catch (Exception e) {
+            logger.error("定时刷新流量队列管理器失败", e);
+        }
+    }
+
+    private void pushAggregateData(TrafficAggregateData data) {
+        if (degradationHandler.isInDegradationMode()) {
+            degradationHandler.handlePushFailure(
+                createPushTask(data), 
+                new Exception("系统处于降级模式"));
+            return;
+        }
+        
+        try {
+            TrafficAggregatePushDTO dto = new TrafficAggregatePushDTO(data);
+            trafficClient.pushAggregateTraffic(dto);
+            degradationHandler.handlePushSuccess();
+            logger.debug("推送聚合流量数据成功: ip={}, requests={}", 
+                data.getIp(), data.getTotalRequests());
+        } catch (Exception e) {
+            logger.warn("推送聚合流量数据失败: ip={}, error={}", 
+                data.getIp(), e.getMessage());
+            
+            degradationHandler.handlePushFailure(createPushTask(data), e);
+            
+            retryQueue.addRetryTask(createPushTask(data), e);
+        }
+    }
+
+    private PushTask createPushTask(TrafficAggregateData data) {
+        PushTask task = new PushTask();
+        task.setTaskId(System.currentTimeMillis());
+        task.setType(PushTaskType.PERIODIC_FLUSH);
+        task.setIp(data.getIp());
+        task.setData(data);
+        task.setCreateTime(System.currentTimeMillis());
+        return task;
+    }
+
+    private void processRetryTasks() {
+        List<RetryTask> readyTasks = retryQueue.getReadyTasks(10);
+        
+        for (RetryTask retryTask : readyTasks) {
+            PushTask task = retryTask.getTask();
+            try {
+                TrafficAggregatePushDTO dto = new TrafficAggregatePushDTO(task.getData());
+                trafficClient.pushAggregateTraffic(dto);
+                retryQueue.recordSuccess(task);
+                degradationHandler.handlePushSuccess();
+            } catch (Exception e) {
+                retryQueue.recordFailure(task, e);
+            }
+        }
+    }
+
+    public void recordStateTransition(String ip, int fromState, int toState, String reason, int confidence) {
+        queueManager.recordStateTransition(ip, fromState, toState, reason, confidence);
+    }
+
+    public void setUseNewQueueSystem(boolean useNewQueueSystem) {
+        this.useNewQueueSystem = useNewQueueSystem;
     }
 }

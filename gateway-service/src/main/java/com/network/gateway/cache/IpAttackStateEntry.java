@@ -6,7 +6,9 @@ import lombok.Data;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Data
@@ -34,6 +36,15 @@ public class IpAttackStateEntry implements Serializable {
     private long periodStartTime;
     private Map<String, RequestAggregate> currentAggregates;
 
+    private long cooldownDuration;
+    private long cooldownEndTime;
+    private int attackHistoryCount;
+    private int confidence;
+    private Set<String> uniqueUris;
+    private long attackStartTime;
+    private int attackRequestCount;
+    private String transitionReason;
+
     private static final int MAX_SAMPLE_SIZE = 5;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -51,6 +62,11 @@ public class IpAttackStateEntry implements Serializable {
         this.lastPushTime = System.currentTimeMillis();
         this.periodStartTime = System.currentTimeMillis();
         this.currentAggregates = new ConcurrentHashMap<>();
+        this.cooldownDuration = IpAttackStateConstant.COOLDOWN_DURATION_MS;
+        this.attackHistoryCount = 0;
+        this.confidence = 0;
+        this.uniqueUris = new HashSet<>();
+        this.attackRequestCount = 0;
     }
 
     public IpAttackStateEntry(String ip) {
@@ -120,6 +136,13 @@ public class IpAttackStateEntry implements Serializable {
         this.lastRequestTime = System.currentTimeMillis();
     }
 
+    public void incrementRequestCount(String uri) {
+        incrementRequestCount();
+        if (uri != null) {
+            this.uniqueUris.add(uri);
+        }
+    }
+
     public int incrementRateLimitCount() {
         return incrementRateLimitCount(60000);
     }
@@ -165,6 +188,17 @@ public class IpAttackStateEntry implements Serializable {
         this.stateStartTime = System.currentTimeMillis();
     }
 
+    public void updateState(int newState, String eventId, String reason) {
+        this.previousState = this.state;
+        this.state = newState;
+        this.eventId = eventId;
+        this.transitionReason = reason;
+        this.stateUpdateTime = System.currentTimeMillis();
+        this.stateExpireTime = this.stateUpdateTime + IpAttackStateConstant.STATE_EXPIRE_MS;
+        this.stateRequestCount = 0;
+        this.stateStartTime = System.currentTimeMillis();
+    }
+
     public int getAndResetStateRequestCount() {
         int count = this.stateRequestCount;
         this.stateRequestCount = 0;
@@ -183,7 +217,50 @@ public class IpAttackStateEntry implements Serializable {
         if (state != IpAttackStateConstant.COOLDOWN) {
             return false;
         }
-        return (System.currentTimeMillis() - stateUpdateTime) < IpAttackStateConstant.COOLDOWN_DURATION_MS;
+        if (cooldownEndTime > 0) {
+            return System.currentTimeMillis() < cooldownEndTime;
+        }
+        return (System.currentTimeMillis() - stateUpdateTime) < cooldownDuration;
+    }
+
+    public long getRemainingCooldownTime() {
+        if (state != IpAttackStateConstant.COOLDOWN) {
+            return 0;
+        }
+        if (cooldownEndTime > 0) {
+            return Math.max(0, cooldownEndTime - System.currentTimeMillis());
+        }
+        return Math.max(0, cooldownDuration - (System.currentTimeMillis() - stateUpdateTime));
+    }
+
+    public void setDynamicCooldownDuration(long duration) {
+        this.cooldownDuration = duration;
+        this.cooldownEndTime = System.currentTimeMillis() + duration;
+    }
+
+    public void startAttackTracking() {
+        this.attackStartTime = System.currentTimeMillis();
+        this.attackRequestCount = 0;
+        this.uniqueUris.clear();
+    }
+
+    public void incrementAttackRequestCount() {
+        this.attackRequestCount++;
+    }
+
+    public long getAttackDuration() {
+        if (attackStartTime > 0) {
+            return System.currentTimeMillis() - attackStartTime;
+        }
+        return 0;
+    }
+
+    public int getUniqueUriCount() {
+        return uniqueUris.size();
+    }
+
+    public Set<String> getUniqueUris() {
+        return uniqueUris;
     }
 
     public boolean shouldSkipTrafficPush() {
@@ -196,5 +273,16 @@ public class IpAttackStateEntry implements Serializable {
 
     public boolean isInAttackState() {
         return state == IpAttackStateConstant.ATTACKING || state == IpAttackStateConstant.DEFENDED;
+    }
+
+    public AttackContext toAttackContext() {
+        AttackContext context = new AttackContext();
+        context.setIp(this.ip);
+        context.setConfidence(this.confidence);
+        context.setDuration(getAttackDuration());
+        context.setRequestCount(this.attackRequestCount);
+        context.setUniqueUriCount(getUniqueUriCount());
+        context.setAttackHistoryCount(this.attackHistoryCount);
+        return context;
     }
 }
