@@ -177,6 +177,11 @@ public class TrafficMonitorDTO implements Serializable {
     private Long avgProcessingTime;
 
     /**
+     * 峰值请求数/秒（聚合统计）
+     */
+    private Long peakRps;
+
+    /**
      * 构造函数（用于创建新的流量监控记录）
      *
      * @param requestId 请求 ID

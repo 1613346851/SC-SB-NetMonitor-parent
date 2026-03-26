@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>告警管理 - 网络监测系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .alert-critical { background-color: #fef2f2; border-left: 4px solid #ef4444; }
+        .alert-high { background-color: #fff7ed; border-left: 4px solid #f97316; }
+        .alert-medium { background-color: #fefce8; border-left: 4px solid #eab308; }
+        .alert-low { background-color: #eff6ff; border-left: 4px solid #3b82f6; }
+        .level-badge-critical { background-color: #ef4444; color: white; }
+        .level-badge-high { background-color: #f97316; color: white; }
+        .level-badge-medium { background-color: #eab308; color: #1f2937; }
+        .level-badge-low { background-color: #3b82f6; color: white; }
+        .stats-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .stat-critical .stat-value { color: #ef4444; }
+        .stat-high .stat-value { color: #f97316; }
+        .stat-medium .stat-value { color: #eab308; }
+        .stat-low .stat-value { color: #3b82f6; }
+        .tab-container {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .tab-item {
+            padding: 12px 24px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: #6b7280;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .tab-item:hover {
+            color: #4f46e5;
+        }
+        .tab-item.active {
+            color: #4f46e5;
+            border-bottom-color: #4f46e5;
+        }
+        .batch-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .checkbox-cell {
+            width: 40px;
+        }
+        .alert-detail-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .alert-detail-label {
+            width: 100px;
+            font-weight: 500;
+            color: #6b7280;
+        }
+        .alert-detail-value {
+            flex: 1;
+            color: #1f2937;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <div th:replace="~{fragments/common :: mobileMenuToggle}"></div>
+                    <h2>告警管理</h2>
+                </div>
+                <div class="header-right">
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+
+            <main class="content">
+                <div class="stats-card">
+                    <div class="stats-grid">
+                        <div class="stat-item stat-critical">
+                            <div class="stat-value" id="statCritical">0</div>
+                            <div class="stat-label">严重告警</div>
+                        </div>
+                        <div class="stat-item stat-high">
+                            <div class="stat-value" id="statHigh">0</div>
+                            <div class="stat-label">高危告警</div>
+                        </div>
+                        <div class="stat-item stat-medium">
+                            <div class="stat-value" id="statMedium">0</div>
+                            <div class="stat-label">中危告警</div>
+                        </div>
+                        <div class="stat-item stat-low">
+                            <div class="stat-value" id="statLow">0</div>
+                            <div class="stat-label">低危告警</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="statPending">0</div>
+                            <div class="stat-label">待处理</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-container">
+                    <div class="tab-item active" data-status="" onclick="switchTab(this, '')">全部告警</div>
+                    <div class="tab-item" data-status="0" onclick="switchTab(this, 0)">待处理</div>
+                    <div class="tab-item" data-status="1" onclick="switchTab(this, 1)">已确认</div>
+                    <div class="tab-item" data-status="2" onclick="switchTab(this, 2)">已忽略</div>
+                </div>
+
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">告警级别</label>
+                            <select class="form-control" id="alertLevel">
+                                <option value="">全部</option>
+                                <option value="CRITICAL">严重</option>
+                                <option value="HIGH">高危</option>
+                                <option value="MEDIUM">中危</option>
+                                <option value="LOW">低危</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">源 IP</label>
+                            <input type="text" class="form-control" id="sourceIp" placeholder="请输入源 IP">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">攻击类型</label>
+                            <select class="form-control" id="attackType">
+                                <option value="">全部</option>
+                                <option value="SQL_INJECTION">SQL 注入</option>
+                                <option value="XSS">XSS 攻击</option>
+                                <option value="COMMAND_INJECTION">命令注入</option>
+                                <option value="DDOS">DDoS 攻击</option>
+                                <option value="BRUTE_FORCE">暴力破解</option>
+                                <option value="RATE_LIMIT">限流触发</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">开始日期</label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">结束日期</label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="searchAlerts()">查询</button>
+                            <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3 class="table-title">告警列表</h3>
+                        <div class="batch-actions">
+                            <button class="btn btn-sm btn-primary" onclick="batchConfirm()">批量确认</button>
+                            <button class="btn btn-sm btn-danger" onclick="batchDelete()">批量删除</button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper" style="position: relative;">
+                        <table class="data-table has-fixed-action">
+                            <thead>
+                                <tr>
+                                    <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                    <th data-sort="id" style="min-width: 60px;">ID</th>
+                                    <th data-sort="alertLevel" style="min-width: 80px;">级别</th>
+                                    <th data-sort="sourceIp" style="min-width: 120px;">源 IP</th>
+                                    <th style="min-width: 200px;">告警标题</th>
+                                    <th data-sort="attackType" style="min-width: 100px;">攻击类型</th>
+                                    <th data-sort="aggregateCount" style="min-width: 80px;">聚合次数</th>
+                                    <th data-sort="firstOccurTime" style="min-width: 150px;">首次发生</th>
+                                    <th data-sort="status" style="min-width: 80px;">状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alertTableBody">
+                                <tr>
+                                    <td colspan="10" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-container" style="padding: 16px 24px;">
+                        <div class="pagination" id="pagination"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="alertDetailModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 700px;">
+            <div class="modal-header">
+                <h3 class="modal-title">告警详情</h3>
+                <span class="modal-close" onclick="closeAlertDetail()">&times;</span>
+            </div>
+            <div class="modal-body" id="alertDetailContent">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeAlertDetail()">关闭</button>
+                <button class="btn btn-warning" onclick="ignoreAlert()" id="ignoreBtn">忽略</button>
+                <button class="btn btn-primary" onclick="confirmAlert()" id="confirmBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ignoreReasonModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">忽略原因</h3>
+                <span class="modal-close" onclick="closeIgnoreModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">请输入忽略原因</label>
+                    <textarea class="form-control" id="ignoreReason" rows="3" placeholder="请输入忽略此告警的原因"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeIgnoreModal()">取消</button>
+                <button class="btn btn-warning" onclick="submitIgnore()">确认忽略</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/alert-manage.js}"></script>
+    <script>
+        PageInit.init({
+            requireAuth: true,
+            highlightMenu: true
+        });
+    </script>
+</body>
+</html>

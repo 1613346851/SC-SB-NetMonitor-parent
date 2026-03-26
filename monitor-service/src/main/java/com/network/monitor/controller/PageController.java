@@ -66,6 +66,21 @@ public class PageController {
         return "blacklist-manage";
     }
 
+    @GetMapping("/alert")
+    public String alertManage() {
+        return "alert-manage";
+    }
+
+    @GetMapping("/trace")
+    public String traceSearch() {
+        return "trace-search";
+    }
+
+    @GetMapping("/ip-profile")
+    public String ipProfile() {
+        return "ip-profile";
+    }
+
     @GetMapping("/config")
     public String sysConfig() {
         return "sys-config";

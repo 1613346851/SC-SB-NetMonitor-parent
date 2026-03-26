@@ -1,8 +1,10 @@
 package com.network.monitor.controller.outer;
 
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.dto.ConfigSyncStatusDTO;
 import com.network.monitor.dto.GatewayConfigDTO;
 import com.network.monitor.service.AuthService;
+import com.network.monitor.service.ConfigSyncService;
 import com.network.monitor.service.GatewayConfigService;
 import com.network.monitor.service.OperLogService;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,9 @@ public class GatewayConfigManageController {
 
     @Autowired
     private GatewayConfigService gatewayConfigService;
+
+    @Autowired
+    private ConfigSyncService configSyncService;
 
     @Autowired
     private AuthService authService;
@@ -46,6 +51,37 @@ public class GatewayConfigManageController {
             result.put("success", false);
             result.put("message", e.getMessage());
             return ApiResponse.success(result);
+        }
+    }
+
+    @GetMapping("/config/sync/status")
+    public ApiResponse<ConfigSyncStatusDTO> getSyncStatus(HttpServletRequest request) {
+        try {
+            ConfigSyncStatusDTO status = configSyncService.getSyncStatus();
+            
+            operLogService.logOperation(authService.getCurrentUsername(), "QUERY", "网关配置", 
+                "查询配置同步状态", "syncStatus", "/api/gateway/config/sync/status", getClientIp(request), 0);
+            
+            return ApiResponse.success(status);
+        } catch (Exception e) {
+            log.error("获取同步状态失败", e);
+            return ApiResponse.error("获取同步状态失败: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/config/sync/all")
+    public ApiResponse<ConfigSyncStatusDTO> syncAllConfigs(HttpServletRequest request) {
+        try {
+            log.info("手动触发同步所有配置到网关");
+            ConfigSyncStatusDTO result = configSyncService.syncAllToGateway();
+            
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "网关配置", 
+                "手动同步所有配置到网关", "syncAll", "/api/gateway/config/sync/all", getClientIp(request), 0);
+            
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("同步所有配置失败", e);
+            return ApiResponse.error("同步配置失败: " + e.getMessage());
         }
     }
 

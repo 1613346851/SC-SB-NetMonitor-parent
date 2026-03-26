@@ -11,9 +11,14 @@ public class IpAttackStateConstant {
     public static final long COOLDOWN_DURATION_MS = 300_000L;
     public static final long STATE_EXPIRE_MS = 600_000L;
 
-    public static final int SUSPICIOUS_RATE_LIMIT_THRESHOLD = 2;
+    public static final int SUSPICIOUS_RATE_LIMIT_THRESHOLD = 3;
     public static final int ATTACKING_RATE_LIMIT_THRESHOLD = 5;
-    public static final long ATTACKING_DURATION_MS = 30_000L;
+    public static final long ATTACKING_DURATION_MS = 0L;
+
+    public static final long PERIOD_PUSH_INTERVAL_MS = 3000L;
+    public static final int MAX_SAMPLE_SIZE = 5;
+    public static final long ATTACK_STOP_THRESHOLD_MS = 10000L;
+    public static final long SUSPICIOUS_RECOVERY_MS = 60000L;
 
     public static String getStateName(int state) {
         switch (state) {

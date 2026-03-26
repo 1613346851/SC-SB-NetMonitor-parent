@@ -229,8 +229,17 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
     private void recordDefenseLog(DefenseCommandDTO commandDTO, AttackEventEntity event, AttackMonitorDTO attackDTO) {
         try {
+            String eventId = commandDTO.getEventId();
+            if (eventId != null && !eventId.isEmpty()) {
+                int existingCount = defenseLogMapper.countByEventId(eventId);
+                if (existingCount > 0) {
+                    log.info("防御日志已存在，跳过重复记录：eventId={}, target={}", eventId, commandDTO.getSourceIp());
+                    return;
+                }
+            }
+            
             DefenseLogEntity logEntity = new DefenseLogEntity();
-            logEntity.setEventId(commandDTO.getEventId());
+            logEntity.setEventId(eventId);
             logEntity.setDefenseType(convertDefenseType(commandDTO.getDefenseType()));
             logEntity.setDefenseTarget(commandDTO.getSourceIp());
             logEntity.setDefenseReason(commandDTO.getDescription());
@@ -262,7 +271,7 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
             defenseLogMapper.insert(logEntity);
             
             log.info("记录防御日志成功：eventId={}, defenseType={}, target={}, isFirst=1", 
-                commandDTO.getEventId(), logEntity.getDefenseType(), logEntity.getDefenseTarget());
+                eventId, logEntity.getDefenseType(), logEntity.getDefenseTarget());
         } catch (Exception e) {
             log.error("记录防御日志失败：eventId={}, target={}", 
                 commandDTO.getEventId(), commandDTO.getSourceIp(), e);

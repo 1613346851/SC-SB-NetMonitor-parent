@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.AlertMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.AlertEntity">
+        <id column="id" property="id"/>
+        <result column="alert_id" property="alertId"/>
+        <result column="event_id" property="eventId"/>
+        <result column="source_ip" property="sourceIp"/>
+        <result column="attack_type" property="attackType"/>
+        <result column="alert_level" property="alertLevel"/>
+        <result column="alert_title" property="alertTitle"/>
+        <result column="alert_content" property="alertContent"/>
+        <result column="status" property="status"/>
+        <result column="is_suppressed" property="isSuppressed"/>
+        <result column="suppress_until" property="suppressUntil"/>
+        <result column="notify_channels" property="notifyChannels"/>
+        <result column="notify_status" property="notifyStatus"/>
+        <result column="notify_time" property="notifyTime"/>
+        <result column="confirm_by" property="confirmBy"/>
+        <result column="confirm_time" property="confirmTime"/>
+        <result column="ignore_reason" property="ignoreReason"/>
+        <result column="ignore_by" property="ignoreBy"/>
+        <result column="ignore_time" property="ignoreTime"/>
+        <result column="aggregate_count" property="aggregateCount"/>
+        <result column="first_occur_time" property="firstOccurTime"/>
+        <result column="last_occur_time" property="lastOccurTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, alert_id, event_id, source_ip, attack_type, alert_level, alert_title, alert_content,
+        status, is_suppressed, suppress_until, notify_channels, notify_status, notify_time,
+        confirm_by, confirm_time, ignore_reason, ignore_by, ignore_time, aggregate_count,
+        first_occur_time, last_occur_time, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.AlertEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_alert (
+            alert_id, event_id, source_ip, attack_type, alert_level, alert_title, alert_content,
+            status, is_suppressed, suppress_until, notify_channels, notify_status, notify_time,
+            confirm_by, confirm_time, ignore_reason, ignore_by, ignore_time, aggregate_count,
+            first_occur_time, last_occur_time, create_time, update_time
+        ) VALUES (
+            #{alertId}, #{eventId}, #{sourceIp}, #{attackType}, #{alertLevel}, #{alertTitle}, #{alertContent},
+            #{status}, #{isSuppressed}, #{suppressUntil}, #{notifyChannels}, #{notifyStatus}, #{notifyTime},
+            #{confirmBy}, #{confirmTime}, #{ignoreReason}, #{ignoreBy}, #{ignoreTime}, #{aggregateCount},
+            #{firstOccurTime}, #{lastOccurTime}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.network.monitor.entity.AlertEntity">
+        UPDATE sys_alert
+        <set>
+            <if test="eventId != null">event_id = #{eventId},</if>
+            <if test="sourceIp != null">source_ip = #{sourceIp},</if>
+            <if test="attackType != null">attack_type = #{attackType},</if>
+            <if test="alertLevel != null">alert_level = #{alertLevel},</if>
+            <if test="alertTitle != null">alert_title = #{alertTitle},</if>
+            <if test="alertContent != null">alert_content = #{alertContent},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="isSuppressed != null">is_suppressed = #{isSuppressed},</if>
+            <if test="suppressUntil != null">suppress_until = #{suppressUntil},</if>
+            <if test="notifyChannels != null">notify_channels = #{notifyChannels},</if>
+            <if test="notifyStatus != null">notify_status = #{notifyStatus},</if>
+            <if test="notifyTime != null">notify_time = #{notifyTime},</if>
+            <if test="confirmBy != null">confirm_by = #{confirmBy},</if>
+            <if test="confirmTime != null">confirm_time = #{confirmTime},</if>
+            <if test="ignoreReason != null">ignore_reason = #{ignoreReason},</if>
+            <if test="ignoreBy != null">ignore_by = #{ignoreBy},</if>
+            <if test="ignoreTime != null">ignore_time = #{ignoreTime},</if>
+            <if test="aggregateCount != null">aggregate_count = #{aggregateCount},</if>
+            <if test="lastOccurTime != null">last_occur_time = #{lastOccurTime},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByAlertId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert
+        WHERE alert_id = #{alertId}
+    </select>
+
+    <select id="selectByEventId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert
+        WHERE event_id = #{eventId}
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert
+        <where>
+            <if test="alertLevel != null and alertLevel != ''">
+                AND alert_level = #{alertLevel}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="sourceIp != null and sourceIp != ''">
+                AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="isSuppressed != null">
+                AND is_suppressed = #{isSuppressed}
+            </if>
+            <if test="startTime != null">
+                AND create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND create_time &lt;= #{endTime}
+            </if>
+        </where>
+        <choose>
+            <when test="orderBy != null and orderBy != ''">
+                ORDER BY ${orderBy}
+            </when>
+            <otherwise>
+                ORDER BY id DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_alert
+        <where>
+            <if test="alertLevel != null and alertLevel != ''">
+                AND alert_level = #{alertLevel}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="sourceIp != null and sourceIp != ''">
+                AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="isSuppressed != null">
+                AND is_suppressed = #{isSuppressed}
+            </if>
+            <if test="startTime != null">
+                AND create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND create_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <select id="selectPendingAlerts" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert
+        WHERE status = 0
+        ORDER BY alert_level, id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectUnnotifiedAlerts" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert
+        WHERE notify_status = 0 AND status = 0 AND is_suppressed = 0
+        ORDER BY alert_level, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE sys_alert
+        SET status = #{status}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateNotifyStatus">
+        UPDATE sys_alert
+        SET notify_status = #{notifyStatus}, notify_time = #{notifyTime}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="confirm">
+        UPDATE sys_alert
+        SET status = 1, confirm_by = #{confirmBy}, confirm_time = #{confirmTime}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="ignore">
+        UPDATE sys_alert
+        SET status = 2, ignore_by = #{ignoreBy}, ignore_reason = #{ignoreReason}, ignore_time = #{ignoreTime}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="batchConfirm">
+        UPDATE sys_alert
+        SET status = 1, confirm_by = #{confirmBy}, confirm_time = #{confirmTime}, update_time = NOW()
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="incrementAggregateCount">
+        UPDATE sys_alert
+        SET aggregate_count = aggregate_count + 1, last_occur_time = #{lastOccurTime}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="setSuppressed">
+        UPDATE sys_alert
+        SET is_suppressed = 1, suppress_until = #{suppressUntil}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="countByAlertLevel" resultType="com.network.monitor.mapper.AlertMapper$LevelCountStat">
+        SELECT alert_level AS alertLevel, COUNT(*) AS count
+        FROM sys_alert
+        <where>
+            <if test="startTime != null">
+                AND create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND create_time &lt;= #{endTime}
+            </if>
+        </where>
+        GROUP BY alert_level
+    </select>
+
+    <select id="countByStatus" resultType="com.network.monitor.mapper.AlertMapper$StatusCountStat">
+        SELECT status, COUNT(*) AS count
+        FROM sys_alert
+        GROUP BY status
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM sys_alert WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByIds">
+        DELETE FROM sys_alert WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

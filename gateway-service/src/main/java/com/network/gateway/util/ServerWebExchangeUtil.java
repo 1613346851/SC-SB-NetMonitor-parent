@@ -132,25 +132,48 @@ public class ServerWebExchangeUtil {
      * @return 目标IP地址
      */
     public static String extractTargetIp(ServerHttpRequest request) {
-        // 从X-Forwarded-Host头部获取
         String xForwardedHost = request.getHeaders().getFirst(GatewayHttpConstant.Header.X_FORWARDED_HOST);
         if (StringUtils.hasText(xForwardedHost)) {
-            return xForwardedHost.trim();
+            String host = xForwardedHost.trim();
+            if (host.contains(":")) {
+                host = host.split(":")[0].trim();
+            }
+            if ("localhost".equalsIgnoreCase(host)) {
+                return "127.0.0.1";
+            }
+            return host;
         }
 
-        // 从Host头部获取
-        String host = request.getHeaders().getFirst(GatewayHttpConstant.Header.CONTENT_LENGTH);
+        String host = request.getHeaders().getFirst(GatewayHttpConstant.Header.HOST);
         if (StringUtils.hasText(host)) {
+            if (host.contains(":")) {
+                host = host.split(":")[0].trim();
+            }
+            if ("localhost".equalsIgnoreCase(host)) {
+                return "127.0.0.1";
+            }
+            if (isValidIpAddress(host)) {
+                return IpNormalizeUtil.normalize(host);
+            }
             return host.trim();
         }
 
-        // 从本地地址获取
         InetSocketAddress localAddress = request.getLocalAddress();
         if (localAddress != null) {
-            return localAddress.getAddress().getHostAddress();
+            String localIp = localAddress.getAddress().getHostAddress();
+            return IpNormalizeUtil.normalize(localIp);
         }
 
-        return "unknown";
+        return "0.0.0.0";
+    }
+
+    private static boolean isValidIpAddress(String ip) {
+        if (ip == null || ip.isEmpty()) {
+            return false;
+        }
+        String ipv4Pattern = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
+        String ipv6Pattern = "^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::$|^([0-9a-fA-F]{1,4}:){1,7}:$|^:([0-9a-fA-F]{1,4}:){1,7}$|^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$";
+        return ip.matches(ipv4Pattern) || ip.matches(ipv6Pattern) || ip.equals("0.0.0.0");
     }
 
     /**

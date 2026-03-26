@@ -33,4 +33,6 @@ public interface IpBlacklistMapper {
     long countAll();
 
     long countBanning();
+
+    List<IpBlacklistEntity> selectActiveByIp(@Param("ip") String ip);
 }

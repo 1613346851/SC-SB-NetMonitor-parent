@@ -256,7 +256,7 @@ CREATE TABLE `sys_defense_log` (
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    KEY `idx_event_id` (`event_id`),
+    UNIQUE KEY `uk_event_id` (`event_id`),
     KEY `idx_defense_type` (`defense_type`),
     KEY `idx_defense_action` (`defense_action`),
     KEY `idx_defense_target` (`defense_target`),
@@ -630,7 +630,6 @@ INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`,
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('blacklist.default.expire.seconds', '86400', '黑名单默认过期时间（秒）'),
-('alert.enabled', 'true', '是否启用告警通知'),
 ('alert.push.interval', '5000', '告警推送间隔（毫秒）'),
 ('alert.heartbeat.interval', '10000', '告警心跳间隔（毫秒）');
 
@@ -825,6 +824,134 @@ INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
 -- 首次启动后请查看应用日志获取初始密码
 -- 生产环境请务必在首次登录后修改密码
 -- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- 4.8 告警相关表结构（第三阶段新增）
+-- ------------------------------------------------------------
+
+-- 告警表
+DROP TABLE IF EXISTS `sys_alert`;
+CREATE TABLE `sys_alert` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '告警ID',
+    `alert_id` VARCHAR(64) NOT NULL COMMENT '告警唯一标识(UUID)',
+    `event_id` VARCHAR(64) DEFAULT NULL COMMENT '关联事件ID',
+    `source_ip` VARCHAR(128) NOT NULL COMMENT '攻击源IP',
+    `attack_type` VARCHAR(50) NOT NULL COMMENT '攻击类型',
+    `alert_level` VARCHAR(20) NOT NULL COMMENT '告警级别(CRITICAL/HIGH/MEDIUM/LOW)',
+    `alert_title` VARCHAR(255) NOT NULL COMMENT '告警标题',
+    `alert_content` TEXT DEFAULT NULL COMMENT '告警详情',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态(0-待处理，1-已确认，2-已忽略)',
+    `is_suppressed` TINYINT DEFAULT 0 COMMENT '是否被抑制(0-否，1-是)',
+    `suppress_until` DATETIME DEFAULT NULL COMMENT '抑制截止时间',
+    `notify_channels` VARCHAR(100) DEFAULT NULL COMMENT '通知渠道(EMAIL/FEISHU，逗号分隔)',
+    `notify_status` TINYINT DEFAULT 0 COMMENT '通知状态(0-未发送，1-已发送，2-发送失败)',
+    `notify_time` DATETIME DEFAULT NULL COMMENT '通知发送时间',
+    `confirm_by` VARCHAR(64) DEFAULT NULL COMMENT '确认人',
+    `confirm_time` DATETIME DEFAULT NULL COMMENT '确认时间',
+    `ignore_reason` VARCHAR(500) DEFAULT NULL COMMENT '忽略原因',
+    `ignore_by` VARCHAR(64) DEFAULT NULL COMMENT '忽略人',
+    `ignore_time` DATETIME DEFAULT NULL COMMENT '忽略时间',
+    `aggregate_count` INT DEFAULT 1 COMMENT '聚合的告警数量',
+    `first_occur_time` DATETIME NOT NULL COMMENT '首次发生时间',
+    `last_occur_time` DATETIME NOT NULL COMMENT '最近发生时间',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_alert_id` (`alert_id`),
+    KEY `idx_event_id` (`event_id`),
+    KEY `idx_source_ip` (`source_ip`),
+    KEY `idx_alert_level` (`alert_level`),
+    KEY `idx_status` (`status`),
+    KEY `idx_is_suppressed` (`is_suppressed`),
+    KEY `idx_notify_status` (`notify_status`),
+    KEY `idx_first_occur_time` (`first_occur_time`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警表';
+
+-- 告警规则表
+DROP TABLE IF EXISTS `sys_alert_rule`;
+CREATE TABLE `sys_alert_rule` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '规则ID',
+    `rule_name` VARCHAR(100) NOT NULL COMMENT '规则名称',
+    `rule_code` VARCHAR(50) NOT NULL COMMENT '规则编码',
+    `attack_type` VARCHAR(50) DEFAULT NULL COMMENT '攻击类型(为空表示所有类型)',
+    `risk_level` VARCHAR(20) DEFAULT NULL COMMENT '风险等级条件(HIGH/MEDIUM/LOW)',
+    `alert_level` VARCHAR(20) NOT NULL COMMENT '触发告警级别(CRITICAL/HIGH/MEDIUM/LOW)',
+    `threshold_count` INT DEFAULT 1 COMMENT '触发阈值(次数)',
+    `threshold_window_seconds` INT DEFAULT 60 COMMENT '阈值时间窗口(秒)',
+    `suppress_duration_seconds` INT DEFAULT 300 COMMENT '抑制时长(秒)',
+    `notify_channels` VARCHAR(100) DEFAULT 'EMAIL,FEISHU' COMMENT '通知渠道',
+    `enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '启用状态(0-禁用，1-启用)',
+    `priority` INT DEFAULT 100 COMMENT '规则优先级(数字越小优先级越高)',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '规则描述',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_rule_code` (`rule_code`),
+    KEY `idx_attack_type` (`attack_type`),
+    KEY `idx_risk_level` (`risk_level`),
+    KEY `idx_enabled` (`enabled`),
+    KEY `idx_priority` (`priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警规则表';
+
+-- ------------------------------------------------------------
+-- 4.9 告警配置项
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('alert.enabled', 'true', '是否启用告警功能'),
+('alert.suppress.duration-seconds', '300', '告警抑制时长(秒)'),
+('alert.aggregate.window-seconds', '60', '告警聚合时间窗口(秒)'),
+('alert.email.enabled', 'false', '是否启用邮件通知'),
+('alert.email.smtp.host', '', 'SMTP服务器地址'),
+('alert.email.smtp.port', '465', 'SMTP端口'),
+('alert.email.smtp.username', '', 'SMTP用户名'),
+('alert.email.smtp.password', '', 'SMTP密码'),
+('alert.email.smtp.ssl-enabled', 'true', '是否启用SSL'),
+('alert.email.from-address', '', '发件人地址'),
+('alert.email.to-addresses', '', '收件人地址(逗号分隔)'),
+('alert.feishu.enabled', 'false', '是否启用飞书通知'),
+('alert.feishu.webhook-url', '', '飞书机器人Webhook地址'),
+('alert.feishu.secret', '', '飞书机器人签名密钥'),
+('alert.sound.enabled', 'true', '是否启用告警声音提示'),
+('alert.sound.level-threshold', 'HIGH', '触发声音提示的最低告警级别');
+
+-- ------------------------------------------------------------
+-- 4.10 初始化告警规则
+-- ------------------------------------------------------------
+INSERT INTO `sys_alert_rule` (`rule_name`, `rule_code`, `attack_type`, `risk_level`, `alert_level`, `threshold_count`, `threshold_window_seconds`, `suppress_duration_seconds`, `notify_channels`, `enabled`, `priority`, `description`) VALUES
+('高危攻击告警', 'HIGH_RISK_ATTACK', NULL, 'HIGH', 'HIGH', 1, 60, 300, 'EMAIL,FEISHU', 1, 10, '检测到高危攻击时立即告警'),
+('严重攻击告警', 'CRITICAL_ATTACK', NULL, 'CRITICAL', 'CRITICAL', 1, 60, 600, 'EMAIL,FEISHU', 1, 5, '检测到严重攻击时立即告警'),
+('DDoS攻击告警', 'DDOS_ATTACK', 'DDOS', NULL, 'HIGH', 1, 30, 180, 'EMAIL,FEISHU', 1, 15, '检测到DDoS攻击时告警'),
+('SQL注入攻击告警', 'SQL_INJECTION_ATTACK', 'SQL_INJECTION', NULL, 'HIGH', 1, 60, 300, 'EMAIL,FEISHU', 1, 20, '检测到SQL注入攻击时告警'),
+('XSS攻击告警', 'XSS_ATTACK', 'XSS', NULL, 'MEDIUM', 3, 60, 180, 'FEISHU', 1, 30, '检测到XSS攻击时告警'),
+('命令注入攻击告警', 'COMMAND_INJECTION_ATTACK', 'COMMAND_INJECTION', NULL, 'CRITICAL', 1, 60, 600, 'EMAIL,FEISHU', 1, 10, '检测到命令注入攻击时告警'),
+('暴力破解告警', 'BRUTE_FORCE_ATTACK', 'BRUTE_FORCE', NULL, 'MEDIUM', 5, 60, 300, 'FEISHU', 1, 25, '检测到暴力破解行为时告警');
+
+-- ------------------------------------------------------------
+-- 4.11 告警相关菜单权限
+-- ------------------------------------------------------------
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(8, 0, '告警管理', 0, 'alert', '/alert', NULL, 'bell', 8, 0, 0, 'system');
+
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(81, 8, '告警列表', 1, 'alert:list', '/alert/list', '/alert-list', 'list', 1, 0, 0, 'system'),
+(82, 8, '告警配置', 1, 'alert:config', '/alert/config', '/alert-config', 'setting', 2, 0, 0, 'system');
+
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(811, 81, '确认告警', 2, 'alert:confirm', NULL, 1, 0, 0, 'system'),
+(812, 81, '忽略告警', 2, 'alert:ignore', NULL, 2, 0, 0, 'system'),
+(813, 81, '批量确认', 2, 'alert:batch-confirm', NULL, 3, 0, 0, 'system'),
+(821, 82, '编辑邮件配置', 2, 'alert:config:email', NULL, 1, 0, 0, 'system'),
+(822, 82, '编辑飞书配置', 2, 'alert:config:feishu', NULL, 2, 0, 0, 'system'),
+(823, 82, '测试通知', 2, 'alert:config:test', NULL, 3, 0, 0, 'system');
+
+-- 安全管理员告警权限
+INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
+(2, 8), (2, 81), (2, 82), (2, 811), (2, 812), (2, 813), (2, 821), (2, 822), (2, 823);
+
+-- 审计管理员告警权限（仅查看）
+INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
+(3, 8), (3, 81);
 
 -- ============================================================
 -- 5. 完成提示

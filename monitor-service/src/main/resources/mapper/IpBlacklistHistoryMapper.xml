@@ -90,4 +90,11 @@
     <select id="countByBlacklistId" resultType="long">
         SELECT COUNT(*) FROM sys_ip_blacklist_history WHERE blacklist_id = #{blacklistId}
     </select>
+
+    <select id="countByIp" resultType="int">
+        SELECT COUNT(h.id) 
+        FROM sys_ip_blacklist_history h
+        INNER JOIN sys_ip_blacklist b ON h.blacklist_id = b.id
+        WHERE b.ip_address = #{ip}
+    </select>
 </mapper>

@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -26,16 +27,10 @@ public class TrafficReceiveController {
     private RuleEngineService ruleEngineService;
 
     @Autowired
-    private DDoSDetectService ddosDetectService;
-
-    @Autowired
     private VulnerabilityVerifyService vulnerabilityVerifyService;
 
     @Autowired
     private VulnerabilityStatService vulnerabilityStatService;
-
-    @Autowired
-    private AttackDetectService attackDetectService;
 
     @Autowired
     private DefenseDecisionService defenseDecisionService;
@@ -45,9 +40,6 @@ public class TrafficReceiveController {
 
     @Autowired
     private AttackStoreService attackStoreService;
-
-    @Autowired
-    private AttackDetectService attackDetectServiceImpl;
 
     @Autowired
     private IpAttackStateCache attackStateCache;
@@ -110,10 +102,8 @@ public class TrafficReceiveController {
                 trafficId, trafficDTO.getSourceIp(), trafficEntity.getSourceIp());
 
             List<AttackMonitorDTO> detectedAttacks = ruleEngineService.executeMatching(trafficDTO);
-
-            AttackMonitorDTO ddosAttack = ddosDetectService.detect(trafficDTO);
-            if (ddosAttack != null) {
-                detectedAttacks.add(ddosAttack);
+            if (detectedAttacks == null) {
+                detectedAttacks = new ArrayList<>();
             }
 
             if (!detectedAttacks.isEmpty()) {
@@ -143,24 +133,6 @@ public class TrafficReceiveController {
                 trafficDTO.getSourceIp(), e.getMessage(), e);
             throw new RuntimeException("处理流量数据失败", e);
         }
-    }
-
-    private boolean isActiveScanTraffic(TrafficMonitorDTO trafficDTO) {
-        if (trafficDTO == null) {
-            return false;
-        }
-
-        if (trafficDTO.getUserAgent() != null && trafficDTO.getUserAgent().contains("NetworkMonitorActiveScanner")) {
-            return true;
-        }
-
-        if (trafficDTO.getRequestHeaders() == null || trafficDTO.getRequestHeaders().isEmpty()) {
-            return false;
-        }
-
-        return trafficDTO.getRequestHeaders().entrySet().stream()
-                .anyMatch(entry -> "X-Scan-Source".equalsIgnoreCase(entry.getKey())
-                        && "active-vuln-scan".equalsIgnoreCase(entry.getValue()));
     }
 }
 

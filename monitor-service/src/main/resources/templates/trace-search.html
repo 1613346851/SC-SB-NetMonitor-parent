@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>溯源查询 - 网络监测系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .search-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+        .search-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        .search-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+        .form-group input,
+        .form-group select {
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        .search-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .btn-search {
+            background: #4f46e5;
+            color: white;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-search:hover {
+            background: #4338ca;
+        }
+        .btn-reset {
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-reset:hover {
+            background: #e5e7eb;
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .result-count {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .ip-link {
+            color: #4f46e5;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .ip-link:hover {
+            text-decoration: underline;
+        }
+        
+        .trace-btn {
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        .trace-btn:hover {
+            background: #e5e7eb;
+        }
+        
+        .quick-search {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .quick-btn {
+            padding: 6px 16px;
+            border-radius: 20px;
+            border: 1px solid #e5e7eb;
+            background: white;
+            color: #6b7280;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .quick-btn:hover {
+            border-color: #4f46e5;
+            color: #4f46e5;
+        }
+        .quick-btn.active {
+            background: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <h1 class="page-title">溯源查询</h1>
+                </div>
+            </header>
+
+            <main class="main-content">
+                <div class="search-card">
+                    <div class="search-title">查询条件</div>
+                    <form class="search-form" id="searchForm">
+                        <div class="form-group">
+                            <label>IP地址</label>
+                            <input type="text" id="searchIp" placeholder="输入IP地址">
+                        </div>
+                        <div class="form-group">
+                            <label>攻击类型</label>
+                            <select id="searchAttackType">
+                                <option value="">全部</option>
+                                <option value="DDOS">DDoS攻击</option>
+                                <option value="SQL_INJECTION">SQL注入</option>
+                                <option value="XSS">XSS攻击</option>
+                                <option value="PATH_TRAVERSAL">路径遍历</option>
+                                <option value="COMMAND_INJECTION">命令注入</option>
+                                <option value="RATE_LIMIT">限流触发</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>风险等级</label>
+                            <select id="searchRiskLevel">
+                                <option value="">全部</option>
+                                <option value="CRITICAL">严重</option>
+                                <option value="HIGH">高危</option>
+                                <option value="MEDIUM">中危</option>
+                                <option value="LOW">低危</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>开始时间</label>
+                            <input type="datetime-local" id="searchStartTime">
+                        </div>
+                        <div class="form-group">
+                            <label>结束时间</label>
+                            <input type="datetime-local" id="searchEndTime">
+                        </div>
+                    </form>
+                    <div class="search-actions">
+                        <button type="button" class="btn-search" onclick="doSearch()">查询</button>
+                        <button type="button" class="btn-reset" onclick="resetSearch()">重置</button>
+                    </div>
+                </div>
+
+                <div class="quick-search" id="quickSearch">
+                    <span style="color: #6b7280; line-height: 32px;">快捷筛选：</span>
+                    <button class="quick-btn active" onclick="quickSearch('today')">今天</button>
+                    <button class="quick-btn" onclick="quickSearch('yesterday')">昨天</button>
+                    <button class="quick-btn" onclick="quickSearch('week')">近7天</button>
+                    <button class="quick-btn" onclick="quickSearch('month')">近30天</button>
+                </div>
+
+                <div class="result-header">
+                    <div class="result-count" id="resultCount">共 0 条记录</div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>来源IP</th>
+                                <th>攻击类型</th>
+                                <th>目标URI</th>
+                                <th>风险等级</th>
+                                <th>处理状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center">请输入查询条件</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pagination" id="pagination"></div>
+            </main>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/trace-search.js}"></script>
+</body>
+</html>

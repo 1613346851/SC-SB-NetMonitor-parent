@@ -66,65 +66,60 @@ public class IpAttackStateCache {
         result.setPreviousState(currentState);
         result.setNewState(currentState);
         
-        switch (currentState) {
-            case IpAttackStateConstant.NORMAL:
-                if (rateLimitCount >= suspiciousThreshold) {
-                    entry.updateState(IpAttackStateConstant.SUSPICIOUS);
-                    result.setNewState(IpAttackStateConstant.SUSPICIOUS);
-                    result.setTransitioned(true);
-                    result.setReason("请求频率异常，进入可疑状态");
-                    logger.warn("IP状态转换: ip={}, NORMAL -> SUSPICIOUS, rateLimitCount={}", normalizedIp, rateLimitCount);
-                }
-                break;
-                
-            case IpAttackStateConstant.SUSPICIOUS:
-                if (rateLimitCount >= attackingThreshold) {
-                    entry.updateState(IpAttackStateConstant.ATTACKING);
-                    result.setNewState(IpAttackStateConstant.ATTACKING);
-                    result.setTransitioned(true);
-                    result.setReason("持续高频请求，确认为攻击");
-                    logger.warn("IP状态转换: ip={}, SUSPICIOUS -> ATTACKING, rateLimitCount={}", normalizedIp, rateLimitCount);
-                } else if (rateLimitCount < suspiciousThreshold) {
-                    long suspiciousDuration = entry.getStateDuration();
-                    if (suspiciousDuration > 60000) {
-                        entry.updateState(IpAttackStateConstant.NORMAL);
+        if (rateLimitCount >= attackingThreshold) {
+            if (currentState != IpAttackStateConstant.DEFENDED && currentState != IpAttackStateConstant.COOLDOWN) {
+                entry.updateState(IpAttackStateConstant.DEFENDED);
+                result.setNewState(IpAttackStateConstant.DEFENDED);
+                result.setTransitioned(true);
+                result.setReason("连续限流达到阈值，执行防御");
+                logger.warn("IP状态转换: ip={}, {} -> DEFENDED, rateLimitCount={}, 达到防御阈值", 
+                    normalizedIp, IpAttackStateConstant.getStateNameZh(currentState), rateLimitCount);
+            }
+        } else {
+            switch (currentState) {
+                case IpAttackStateConstant.NORMAL:
+                    if (rateLimitCount >= suspiciousThreshold) {
+                        entry.updateState(IpAttackStateConstant.SUSPICIOUS);
+                        result.setNewState(IpAttackStateConstant.SUSPICIOUS);
+                        result.setTransitioned(true);
+                        result.setReason("请求频率异常，进入可疑状态");
+                        logger.warn("IP状态转换: ip={}, NORMAL -> SUSPICIOUS, rateLimitCount={}", normalizedIp, rateLimitCount);
+                    }
+                    break;
+                    
+                case IpAttackStateConstant.SUSPICIOUS:
+                    if (rateLimitCount < suspiciousThreshold) {
+                        long suspiciousDuration = entry.getStateDuration();
+                        if (suspiciousDuration > 60000) {
+                            entry.updateState(IpAttackStateConstant.NORMAL);
+                            result.setNewState(IpAttackStateConstant.NORMAL);
+                            result.setTransitioned(true);
+                            result.setReason("可疑行为停止，恢复正常");
+                            logger.info("IP状态转换: ip={}, SUSPICIOUS -> NORMAL, 恢复正常", normalizedIp);
+                        }
+                    }
+                    break;
+                    
+                case IpAttackStateConstant.DEFENDED:
+                    if (!isStillAttacking(normalizedIp)) {
+                        entry.updateState(IpAttackStateConstant.COOLDOWN);
+                        result.setNewState(IpAttackStateConstant.COOLDOWN);
+                        result.setTransitioned(true);
+                        result.setReason("攻击停止，进入冷却期");
+                        logger.info("IP状态转换: ip={}, DEFENDED -> COOLDOWN, 攻击停止", normalizedIp);
+                    }
+                    break;
+                    
+                case IpAttackStateConstant.COOLDOWN:
+                    if (!entry.isInCooldownPeriod()) {
+                        stateMap.remove(normalizedIp);
                         result.setNewState(IpAttackStateConstant.NORMAL);
                         result.setTransitioned(true);
-                        result.setReason("可疑行为停止，恢复正常");
-                        logger.info("IP状态转换: ip={}, SUSPICIOUS -> NORMAL, 恢复正常", normalizedIp);
+                        result.setReason("冷却期结束，恢复正常");
+                        logger.info("IP状态转换: ip={}, COOLDOWN -> NORMAL, 冷却结束", normalizedIp);
                     }
-                }
-                break;
-                
-            case IpAttackStateConstant.ATTACKING:
-                if (entry.getStateDuration() > IpAttackStateConstant.ATTACKING_DURATION_MS) {
-                    entry.updateState(IpAttackStateConstant.DEFENDED);
-                    result.setNewState(IpAttackStateConstant.DEFENDED);
-                    result.setTransitioned(true);
-                    result.setReason("攻击确认，执行防御");
-                    logger.warn("IP状态转换: ip={}, ATTACKING -> DEFENDED, 执行防御", normalizedIp);
-                }
-                break;
-                
-            case IpAttackStateConstant.DEFENDED:
-                if (!isStillAttacking(normalizedIp)) {
-                    entry.updateState(IpAttackStateConstant.COOLDOWN);
-                    result.setNewState(IpAttackStateConstant.COOLDOWN);
-                    result.setTransitioned(true);
-                    result.setReason("攻击停止，进入冷却期");
-                    logger.info("IP状态转换: ip={}, DEFENDED -> COOLDOWN, 攻击停止", normalizedIp);
-                }
-                break;
-                
-            case IpAttackStateConstant.COOLDOWN:
-                if (!entry.isInCooldownPeriod()) {
-                    stateMap.remove(normalizedIp);
-                    result.setNewState(IpAttackStateConstant.NORMAL);
-                    result.setTransitioned(true);
-                    result.setReason("冷却期结束，恢复正常");
-                    logger.info("IP状态转换: ip={}, COOLDOWN -> NORMAL, 冷却结束", normalizedIp);
-                }
-                break;
+                    break;
+            }
         }
         
         result.setStateRequestCount(entry.getAndResetStateRequestCount());
@@ -239,6 +234,15 @@ public class IpAttackStateCache {
 
     public int size() {
         return stateMap.size();
+    }
+
+    public Map<String, IpAttackStateEntry> getAllEntries() {
+        return new ConcurrentHashMap<>(stateMap);
+    }
+
+    public IpAttackStateEntry getEntry(String ip) {
+        String normalizedIp = IpNormalizeUtil.normalize(ip);
+        return stateMap.get(normalizedIp);
     }
 
     @Scheduled(fixedRate = 60000)

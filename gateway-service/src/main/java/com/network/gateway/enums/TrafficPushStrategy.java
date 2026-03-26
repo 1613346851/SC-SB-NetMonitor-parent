@@ -8,7 +8,13 @@ public enum TrafficPushStrategy {
     
     BATCH("batch", "批量推送"),
     
-    SKIP("skip", "跳过推送");
+    SKIP("skip", "跳过推送"),
+    
+    DELAYED_BATCH("delayed_batch", "延迟批量推送"),
+    
+    COUNTER_ONLY("counter_only", "仅计数推送"),
+    
+    AGGREGATE("aggregate", "聚合推送");
 
     private final String code;
     private final String description;

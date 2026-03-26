@@ -43,6 +43,8 @@ public class GatewayHttpConstant {
         public static final String CONTENT_TYPE = "Content-Type";
         /** 内容长度 */
         public static final String CONTENT_LENGTH = "Content-Length";
+        /** 主机头 */
+        public static final String HOST = "Host";
     }
 
     /**

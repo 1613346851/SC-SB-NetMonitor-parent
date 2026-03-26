@@ -5,6 +5,7 @@ import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.event.BlacklistSyncEvent;
 import com.network.monitor.mapper.DefenseLogMapper;
+import com.network.monitor.mapper.IpBlacklistHistoryMapper;
 import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.DefenseLogService;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,9 @@ public class DefenseLogServiceImpl implements DefenseLogService {
 
     @Autowired
     private DefenseLogMapper defenseLogMapper;
+
+    @Autowired
+    private IpBlacklistHistoryMapper ipBlacklistHistoryMapper;
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
@@ -139,7 +143,20 @@ public class DefenseLogServiceImpl implements DefenseLogService {
             }
         }
 
-        if (entity.getEventId() != null) {
+        boolean isBlacklistAction = "ADD_BLACKLIST".equals(dto.getDefenseAction()) || 
+                                    "BLACKLIST".equals(dto.getDefenseAction()) ||
+                                    "BLOCK_IP".equals(dto.getDefenseType());
+        
+        if (isBlacklistAction && dto.getDefenseTarget() != null && !dto.getDefenseTarget().isEmpty()) {
+            int historyCount = ipBlacklistHistoryMapper.countByIp(dto.getDefenseTarget());
+            entity.setIsFirst(historyCount == 0 ? 1 : 0);
+            
+            if (historyCount > 0) {
+                entity.setDefenseAction("ADD_BLACKLIST_REPEAT");
+                log.info("IP重复封禁，设置defenseAction=ADD_BLACKLIST_REPEAT: ip={}, historyCount={}", 
+                    dto.getDefenseTarget(), historyCount);
+            }
+        } else if (entity.getEventId() != null) {
             int existingCount = defenseLogMapper.countByEventId(entity.getEventId());
             entity.setIsFirst(existingCount == 0 ? 1 : 0);
         } else {

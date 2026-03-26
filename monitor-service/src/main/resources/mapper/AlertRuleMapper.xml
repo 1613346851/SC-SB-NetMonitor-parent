@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.AlertRuleMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.AlertRuleEntity">
+        <id column="id" property="id"/>
+        <result column="rule_name" property="ruleName"/>
+        <result column="rule_code" property="ruleCode"/>
+        <result column="attack_type" property="attackType"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="alert_level" property="alertLevel"/>
+        <result column="threshold_count" property="thresholdCount"/>
+        <result column="threshold_window_seconds" property="thresholdWindowSeconds"/>
+        <result column="suppress_duration_seconds" property="suppressDurationSeconds"/>
+        <result column="notify_channels" property="notifyChannels"/>
+        <result column="enabled" property="enabled"/>
+        <result column="priority" property="priority"/>
+        <result column="description" property="description"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, rule_name, rule_code, attack_type, risk_level, alert_level, threshold_count,
+        threshold_window_seconds, suppress_duration_seconds, notify_channels, enabled,
+        priority, description, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.AlertRuleEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_alert_rule (
+            rule_name, rule_code, attack_type, risk_level, alert_level, threshold_count,
+            threshold_window_seconds, suppress_duration_seconds, notify_channels, enabled,
+            priority, description, create_time, update_time
+        ) VALUES (
+            #{ruleName}, #{ruleCode}, #{attackType}, #{riskLevel}, #{alertLevel}, #{thresholdCount},
+            #{thresholdWindowSeconds}, #{suppressDurationSeconds}, #{notifyChannels}, #{enabled},
+            #{priority}, #{description}, #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.network.monitor.entity.AlertRuleEntity">
+        UPDATE sys_alert_rule
+        <set>
+            <if test="ruleName != null">rule_name = #{ruleName},</if>
+            <if test="ruleCode != null">rule_code = #{ruleCode},</if>
+            <if test="attackType != null">attack_type = #{attackType},</if>
+            <if test="riskLevel != null">risk_level = #{riskLevel},</if>
+            <if test="alertLevel != null">alert_level = #{alertLevel},</if>
+            <if test="thresholdCount != null">threshold_count = #{thresholdCount},</if>
+            <if test="thresholdWindowSeconds != null">threshold_window_seconds = #{thresholdWindowSeconds},</if>
+            <if test="suppressDurationSeconds != null">suppress_duration_seconds = #{suppressDurationSeconds},</if>
+            <if test="notifyChannels != null">notify_channels = #{notifyChannels},</if>
+            <if test="enabled != null">enabled = #{enabled},</if>
+            <if test="priority != null">priority = #{priority},</if>
+            <if test="description != null">description = #{description},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert_rule
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByRuleCode" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert_rule
+        WHERE rule_code = #{ruleCode}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert_rule
+        ORDER BY priority ASC
+    </select>
+
+    <select id="selectEnabled" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert_rule
+        WHERE enabled = 1
+        ORDER BY priority ASC
+    </select>
+
+    <select id="selectByAttackType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert_rule
+        WHERE enabled = 1 AND (attack_type = #{attackType} OR attack_type IS NULL)
+        ORDER BY priority ASC
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert_rule
+        <where>
+            <if test="ruleName != null and ruleName != ''">
+                AND rule_name LIKE CONCAT('%', #{ruleName}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+        ORDER BY priority ASC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_alert_rule
+        <where>
+            <if test="ruleName != null and ruleName != ''">
+                AND rule_name LIKE CONCAT('%', #{ruleName}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+    </select>
+
+    <update id="updateEnabled">
+        UPDATE sys_alert_rule
+        SET enabled = #{enabled}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_alert_rule WHERE id = #{id}
+    </delete>
+</mapper>

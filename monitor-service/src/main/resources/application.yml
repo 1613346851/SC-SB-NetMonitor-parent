@@ -104,3 +104,26 @@ blacklist:
 jwt:
   secret: NetworkMonitor2026SecretKeyForJwtTokenGenerationMustBeLongEnough
   expiration: 86400000  # Token 有效期：24小时（毫秒）
+
+# 告警配置
+alert:
+  enabled: true
+  notification:
+    interval-ms: 30000  # 告警通知发送间隔（毫秒）
+  aggregate:
+    window-seconds: 60  # 告警聚合时间窗口（秒）
+  suppress:
+    duration-seconds: 300  # 告警抑制时长（秒）
+  email:
+    enabled: false
+    smtp-host: smtp.example.com
+    smtp-port: 465
+    smtp-username: your-email@example.com
+    smtp-password: your-password
+    ssl-enabled: true
+    from-address: noreply@example.com
+    to-addresses: admin@example.com
+  feishu:
+    enabled: false
+    webhook-url: https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-url
+    secret: your-feishu-secret

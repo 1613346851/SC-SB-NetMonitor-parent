@@ -559,13 +559,25 @@ async function checkGatewayStatus() {
     statusEl.className = 'gateway-badge';
     
     try {
-        const response = await http.get('/gateway/config/health');
-        if (response.success) {
-            statusEl.textContent = '在线';
-            statusEl.classList.add('online');
-            countEl.textContent = response.configCount || '--';
-            lastSyncEl.textContent = formatTime(response.timestamp);
-            resultEl.textContent = '正常';
+        const syncStatus = await http.get('/gateway/config/sync/status');
+        const healthResponse = await http.get('/gateway/config/health');
+        
+        if (healthResponse.success) {
+            statusEl.textContent = syncStatus.gatewayConnected ? '在线' : '离线';
+            statusEl.classList.add(syncStatus.gatewayConnected ? 'online' : 'offline');
+            countEl.textContent = syncStatus.totalConfigCount || healthResponse.configCount || '--';
+            
+            if (syncStatus.lastSyncTime) {
+                lastSyncEl.textContent = formatTime(new Date(syncStatus.lastSyncTime).getTime());
+            } else {
+                lastSyncEl.textContent = '--';
+            }
+            
+            let resultText = syncStatus.syncStatus || '正常';
+            if (syncStatus.syncSuccessCount !== undefined && syncStatus.syncFailureCount !== undefined) {
+                resultText += ` (成功:${syncStatus.syncSuccessCount}/失败:${syncStatus.syncFailureCount})`;
+            }
+            resultEl.textContent = resultText;
         } else {
             throw new Error('健康检查失败');
         }
@@ -594,7 +606,7 @@ async function pushSingleConfig(id) {
             configValue: config.configValue
         });
         
-        if (response.success) {
+        if (response.code === 200) {
             message.success('配置推送成功');
             checkGatewayStatus();
         } else {
@@ -626,7 +638,7 @@ async function pushGatewayConfigs() {
         
         const response = await http.post('/gateway/config/sync', { configs });
         
-        if (response.success) {
+        if (response.code === 200) {
             message.success(`成功推送 ${gatewayConfigs.length} 项网关配置`);
             checkGatewayStatus();
         } else {
@@ -642,10 +654,15 @@ async function pushAllToGateway() {
     if (!confirm('确定要将所有配置推送到网关吗？这将同步所有网关配置项。')) return;
     
     try {
-        const response = await http.post('/gateway/config/refresh');
+        const response = await http.post('/gateway/config/sync/all');
         
-        if (response.success) {
-            message.success('配置已成功推送到网关');
+        if (response.code === 200 && response.data) {
+            const result = response.data;
+            if (result.syncStatus === 'SUCCESS') {
+                message.success(`配置已成功推送到网关，共${result.syncedConfigCount || 0}项`);
+            } else {
+                message.warning('配置推送完成：' + (result.message || '状态未知'));
+            }
             checkGatewayStatus();
         } else {
             message.error('推送配置失败：' + (response.message || '未知错误'));

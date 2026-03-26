@@ -4,6 +4,10 @@ import com.network.gateway.constant.IpAttackStateConstant;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Data
 public class IpAttackStateEntry implements Serializable {
@@ -26,6 +30,13 @@ public class IpAttackStateEntry implements Serializable {
     private long stateStartTime;
     private int previousState;
 
+    private long lastPushTime;
+    private long periodStartTime;
+    private Map<String, RequestAggregate> currentAggregates;
+
+    private static final int MAX_SAMPLE_SIZE = 5;
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     public IpAttackStateEntry() {
         this.state = IpAttackStateConstant.NORMAL;
         this.stateUpdateTime = System.currentTimeMillis();
@@ -37,6 +48,9 @@ public class IpAttackStateEntry implements Serializable {
         this.stateRequestCount = 0;
         this.stateStartTime = System.currentTimeMillis();
         this.previousState = IpAttackStateConstant.NORMAL;
+        this.lastPushTime = System.currentTimeMillis();
+        this.periodStartTime = System.currentTimeMillis();
+        this.currentAggregates = new ConcurrentHashMap<>();
     }
 
     public IpAttackStateEntry(String ip) {
@@ -44,6 +58,60 @@ public class IpAttackStateEntry implements Serializable {
         this.ip = ip;
         this.firstRequestTime = System.currentTimeMillis();
         this.lastRequestTime = this.firstRequestTime;
+    }
+
+    public void addAggregateRequest(String aggregateKey, com.network.gateway.dto.TrafficMonitorDTO traffic) {
+        RequestAggregate aggregate = currentAggregates.computeIfAbsent(aggregateKey, 
+            k -> new RequestAggregate(aggregateKey, MAX_SAMPLE_SIZE));
+        aggregate.addRequest(traffic);
+        this.lastRequestTime = System.currentTimeMillis();
+    }
+
+    public Map<String, RequestAggregate> getAndResetAggregates() {
+        Map<String, RequestAggregate> result = new ConcurrentHashMap<>();
+        for (Map.Entry<String, RequestAggregate> entry : currentAggregates.entrySet()) {
+            result.put(entry.getKey(), entry.getValue().copy());
+        }
+        currentAggregates.clear();
+        this.periodStartTime = System.currentTimeMillis();
+        return result;
+    }
+
+    public Map<String, RequestAggregate> getCurrentAggregates() {
+        return currentAggregates;
+    }
+
+    public int getTotalAggregateCount() {
+        return currentAggregates.values().stream()
+            .mapToInt(RequestAggregate::getCount)
+            .sum();
+    }
+
+    public int getAggregateGroupCount() {
+        return currentAggregates.size();
+    }
+
+    public long getPeriodDuration() {
+        return System.currentTimeMillis() - this.periodStartTime;
+    }
+
+    public boolean shouldPushByPeriod(long periodIntervalMs) {
+        return System.currentTimeMillis() - this.lastPushTime >= periodIntervalMs;
+    }
+
+    public void updateLastPushTime() {
+        this.lastPushTime = System.currentTimeMillis();
+    }
+
+    public LocalDateTime getPeriodStartTimeAsDateTime() {
+        return LocalDateTime.ofInstant(
+            java.time.Instant.ofEpochMilli(periodStartTime),
+            java.time.ZoneId.systemDefault()
+        );
+    }
+
+    public LocalDateTime getPeriodEndTimeAsDateTime() {
+        return LocalDateTime.now();
     }
 
     public void incrementRequestCount() {
