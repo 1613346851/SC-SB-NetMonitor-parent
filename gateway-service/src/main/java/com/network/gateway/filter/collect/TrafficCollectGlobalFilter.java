@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -54,6 +53,12 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
 
     @Autowired
     private PushDegradationHandler degradationHandler;
+
+    @Autowired
+    private TrafficEventProcessor eventProcessor;
+
+    @Autowired
+    private TrafficActivityService activityService;
 
     private boolean useNewQueueSystem = true;
 
@@ -154,6 +159,15 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
             sample.setError(statusCode >= 400);
             
             queueManager.addRequest(sourceIp, sample);
+            
+            activityService.onTrafficReceived(sourceIp);
+            
+            if (queueManager.shouldPushImmediately()) {
+                TrafficAggregateData data = queueManager.flushIpQueueImmediately(sourceIp);
+                if (data != null && data.getTotalRequests() > 0) {
+                    pushAggregateData(data);
+                }
+            }
             
             logger.debug("流量采集完成（新队列）：ip={} uri={} 耗时{}ms 状态码{}", 
                         sourceIp, sample.getRequestUri(), endTime - startTime, statusCode);
@@ -349,38 +363,9 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         sb.append(String.format("  - 队列管理器: %s\n", queueManager.getStatistics()));
         sb.append(String.format("  - 重试队列: %s\n", retryQueue.getStats()));
         sb.append(String.format("  - 降级状态: %s\n", degradationHandler.getStats()));
+        sb.append(String.format("  - 事件处理器: %s\n", eventProcessor.getStatus()));
         sb.append(strategyManager.getAllStats());
         return sb.toString();
-    }
-
-    @Scheduled(fixedRateString = "${traffic.push.batch-interval-ms:5000}")
-    public void flushAllHandlers() {
-        try {
-            logger.debug("开始定时刷新所有推送处理器");
-            strategyManager.flushAll();
-        } catch (Exception e) {
-            logger.error("定时刷新推送处理器失败", e);
-        }
-    }
-
-    @Scheduled(fixedRateString = "${traffic.queue.flush-interval-ms:5000}")
-    public void flushQueueManager() {
-        try {
-            logger.debug("开始定时刷新流量队列管理器");
-            
-            List<TrafficAggregateData> flushData = queueManager.flushPeriodic();
-            
-            for (TrafficAggregateData data : flushData) {
-                pushAggregateData(data);
-            }
-            
-            queueManager.cleanupExpiredQueues(300000);
-            
-            processRetryTasks();
-            
-        } catch (Exception e) {
-            logger.error("定时刷新流量队列管理器失败", e);
-        }
     }
 
     private void pushAggregateData(TrafficAggregateData data) {
@@ -417,24 +402,9 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         return task;
     }
 
-    private void processRetryTasks() {
-        List<RetryTask> readyTasks = retryQueue.getReadyTasks(10);
-        
-        for (RetryTask retryTask : readyTasks) {
-            PushTask task = retryTask.getTask();
-            try {
-                TrafficAggregatePushDTO dto = new TrafficAggregatePushDTO(task.getData());
-                trafficClient.pushAggregateTraffic(dto);
-                retryQueue.recordSuccess(task);
-                degradationHandler.handlePushSuccess();
-            } catch (Exception e) {
-                retryQueue.recordFailure(task, e);
-            }
-        }
-    }
-
     public void recordStateTransition(String ip, int fromState, int toState, String reason, int confidence) {
         queueManager.recordStateTransition(ip, fromState, toState, reason, confidence);
+        activityService.onStateTransition(ip, fromState, toState);
     }
 
     public void setUseNewQueueSystem(boolean useNewQueueSystem) {

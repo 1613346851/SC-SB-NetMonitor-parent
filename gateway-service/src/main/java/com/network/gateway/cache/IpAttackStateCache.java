@@ -8,11 +8,11 @@ import com.network.gateway.constant.IpAttackStateConstant;
 import com.network.gateway.event.StateTransitionEventPublisher;
 import com.network.gateway.service.AttackIntensityCalculator;
 import com.network.gateway.service.CooldownDurationCalculator;
+import com.network.gateway.traffic.TrafficActivityService;
 import com.network.gateway.util.IpNormalizeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
@@ -42,6 +42,9 @@ public class IpAttackStateCache {
 
     @Autowired
     private ConfidenceService confidenceService;
+
+    @Autowired
+    private TrafficActivityService activityService;
 
     public IpAttackStateEntry getOrCreate(String ip) {
         String normalizedIp = IpNormalizeUtil.normalize(ip);
@@ -476,8 +479,11 @@ public class IpAttackStateCache {
         return stateMap.get(normalizedIp);
     }
 
-    @Scheduled(fixedRate = 60000)
     public void cleanExpiredEntries() {
+        if (!activityService.isActive()) {
+            return;
+        }
+        
         int removedCount = 0;
         for (Map.Entry<String, IpAttackStateEntry> entry : stateMap.entrySet()) {
             if (entry.getValue().isStateExpired()) {

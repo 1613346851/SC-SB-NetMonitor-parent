@@ -46,7 +46,14 @@ public class TrafficQueueManager {
         IpTrafficQueue queue = getOrCreateQueue(ip);
         
         if (fromState != toState) {
-            TrafficAggregateData preTransitionData = queue.toAggregateData();
+            if (!isValidStateTransition(fromState, toState)) {
+                logger.warn("无效的状态转换: ip={}, {} -> {}, 忽略", 
+                    ip, IpAttackStateConstant.getStateNameZh(fromState), 
+                    IpAttackStateConstant.getStateNameZh(toState));
+                return;
+            }
+            
+            TrafficAggregateData preTransitionData = queue.toAggregateDataAndClear();
             preTransitionData.setTransition(new StateTransitionDTO());
             preTransitionData.getTransition().setFromState(fromState);
             preTransitionData.getTransition().setToState(toState);
@@ -56,12 +63,44 @@ public class TrafficQueueManager {
             
             queue.transitionTo(toState, reason, confidence);
             
-            PushTask task = createPushTask(PushTaskType.STATE_TRANSITION, ip, preTransitionData);
-            addToPushQueue(task);
+            if (preTransitionData.getTotalRequests() > 0) {
+                PushTask task = createPushTask(PushTaskType.STATE_TRANSITION, ip, preTransitionData);
+                addToPushQueue(task);
+            }
             
-            logger.info("状态转换已记录: ip={}, {} -> {}, reason={}", 
+            logger.info("状态转换已记录: ip={}, {} -> {}, reason={}, preStateRequests={}", 
                 ip, IpAttackStateConstant.getStateNameZh(fromState), 
-                IpAttackStateConstant.getStateNameZh(toState), reason);
+                IpAttackStateConstant.getStateNameZh(toState), reason,
+                preTransitionData.getTotalRequests());
+        }
+    }
+
+    private boolean isValidStateTransition(int fromState, int toState) {
+        if (fromState == toState) {
+            return false;
+        }
+        
+        switch (fromState) {
+            case IpAttackStateConstant.NORMAL:
+                return toState == IpAttackStateConstant.SUSPICIOUS;
+            
+            case IpAttackStateConstant.SUSPICIOUS:
+                return toState == IpAttackStateConstant.ATTACKING || 
+                       toState == IpAttackStateConstant.NORMAL;
+            
+            case IpAttackStateConstant.ATTACKING:
+                return toState == IpAttackStateConstant.DEFENDED;
+            
+            case IpAttackStateConstant.DEFENDED:
+                return toState == IpAttackStateConstant.COOLDOWN;
+            
+            case IpAttackStateConstant.COOLDOWN:
+                return toState == IpAttackStateConstant.NORMAL ||
+                       toState == IpAttackStateConstant.SUSPICIOUS ||
+                       toState == IpAttackStateConstant.ATTACKING;
+            
+            default:
+                return false;
         }
     }
 
@@ -149,14 +188,18 @@ public class TrafficQueueManager {
             String ip = entry.getKey();
             IpTrafficQueue queue = entry.getValue();
             
-            if (queue.getTimeSinceLastFlush() >= flushIntervalMs && queue.getTotalRequestCount() > 0) {
-                TrafficAggregateData data = queue.toAggregateData();
-                flushData.add(data);
+            int currentRequestCount = queue.getCurrentBucket().getTotalCount();
+            
+            if (currentRequestCount > 0 && queue.getTimeSinceLastFlush() >= flushIntervalMs) {
+                TrafficAggregateData data = queue.toAggregateDataAndClear();
                 
-                queue.markFlushed();
-                queue.clearFlushedBuckets();
-                
-                logger.debug("周期性刷新: ip={}, requests={}", ip, data.getTotalRequests());
+                if (data.getTotalRequests() > 0) {
+                    flushData.add(data);
+                    queue.markFlushed();
+                    
+                    logger.debug("周期性刷新: ip={}, state={}, requests={}", 
+                        ip, IpAttackStateConstant.getStateNameZh(queue.getCurrentState()), data.getTotalRequests());
+                }
             }
         }
         
@@ -174,6 +217,25 @@ public class TrafficQueueManager {
         queue.clearFlushedBuckets();
         
         logger.debug("IP队列刷新: ip={}, requests={}", ip, data.getTotalRequests());
+        return data;
+    }
+
+    public TrafficAggregateData flushIpQueueImmediately(String ip) {
+        IpTrafficQueue queue = ipQueues.get(ip);
+        if (queue == null) {
+            return null;
+        }
+        
+        int currentCount = queue.getCurrentBucket().getTotalCount();
+        if (currentCount == 0) {
+            return null;
+        }
+        
+        TrafficAggregateData data = queue.toAggregateDataAndClear();
+        queue.markFlushed();
+        
+        logger.debug("IP队列即时刷新: ip={}, state={}, requests={}", 
+            ip, IpAttackStateConstant.getStateNameZh(queue.getCurrentState()), data.getTotalRequests());
         return data;
     }
 
@@ -199,6 +261,59 @@ public class TrafficQueueManager {
             ipQueues.size(), 
             pushQueue.size(),
             ipQueues.values().stream().mapToInt(IpTrafficQueue::getTotalRequestCount).sum());
+    }
+
+    public boolean hasAnyTraffic() {
+        return ipQueues.values().stream()
+            .anyMatch(queue -> queue.getCurrentBucket().getTotalCount() > 0);
+    }
+
+    public boolean hasPendingPushTasks() {
+        return !pushQueue.isEmpty();
+    }
+
+    public int getTotalCurrentRequestCount() {
+        return ipQueues.values().stream()
+            .mapToInt(queue -> queue.getCurrentBucket().getTotalCount())
+            .sum();
+    }
+
+    public int getActiveIpCount() {
+        return (int) ipQueues.values().stream()
+            .filter(queue -> queue.getCurrentBucket().getTotalCount() > 0)
+            .count();
+    }
+
+    public boolean isHighLoad() {
+        int activeIps = getActiveIpCount();
+        int totalRequests = getTotalCurrentRequestCount();
+        return activeIps > 10 || totalRequests > 100;
+    }
+
+    public boolean shouldPushImmediately() {
+        return !isHighLoad() && getTotalCurrentRequestCount() <= 5 && getActiveIpCount() <= 3;
+    }
+
+    public List<TrafficAggregateData> flushAll() {
+        List<TrafficAggregateData> allData = new ArrayList<>();
+        
+        for (Map.Entry<String, IpTrafficQueue> entry : ipQueues.entrySet()) {
+            IpTrafficQueue queue = entry.getValue();
+            int currentCount = queue.getCurrentBucket().getTotalCount();
+            
+            if (currentCount > 0) {
+                TrafficAggregateData data = queue.toAggregateDataAndClear();
+                if (data.getTotalRequests() > 0) {
+                    allData.add(data);
+                    logger.debug("刷新所有队列: ip={}, state={}, requests={}", 
+                        entry.getKey(), 
+                        IpAttackStateConstant.getStateNameZh(queue.getCurrentState()), 
+                        data.getTotalRequests());
+                }
+            }
+        }
+        
+        return allData;
     }
 
     public void setMaxSampleSize(int maxSampleSize) {

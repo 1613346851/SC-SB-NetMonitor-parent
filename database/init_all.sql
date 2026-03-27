@@ -924,19 +924,7 @@ CREATE TABLE `sys_alert_rule` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警规则表';
 
 -- ------------------------------------------------------------
--- 4.8.1 动态冷却时长配置项（新增）
--- 攻击越猛冷却期越长，支持历史攻击加成
--- ------------------------------------------------------------
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('cooldown.dynamic.enabled', 'true', '是否启用动态冷却时长'),
-('cooldown.base-duration-ms', '180000', '基础冷却时长(毫秒)'),
-('cooldown.max-duration-ms', '600000', '最大冷却时长(毫秒)'),
-('cooldown.intensity-multiplier', '0.5', '攻击强度系数(秒/强度点)'),
-('cooldown.history-multiplier', '0.2', '历史攻击加成系数(每次增加比例)'),
-('cooldown.history-max-multiplier', '2.0', '历史攻击最大加成倍数');
-
--- ------------------------------------------------------------
--- 4.8.2 置信度计算配置项（新增）
+-- 4.8.1 置信度计算配置项（新增）
 -- 基于多因素科学计算置信度
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
@@ -978,7 +966,6 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 -- 周期性推送
 ('traffic.push.interval-ms', '3000', '流量推送周期(毫秒)'),
-('traffic.push.enabled', 'true', '是否启用流量推送'),
 
 -- 样本保留
 ('traffic.sample.max-per-uri', '3', '每个URI模式保留的最大样本数'),

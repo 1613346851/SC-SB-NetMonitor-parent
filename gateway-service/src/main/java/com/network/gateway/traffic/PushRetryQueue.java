@@ -134,6 +134,10 @@ public class PushRetryQueue {
         return retryQueue.isEmpty();
     }
 
+    public boolean hasPendingTasks() {
+        return !retryQueue.isEmpty();
+    }
+
     public void clear() {
         int size = retryQueue.size();
         retryQueue.clear();

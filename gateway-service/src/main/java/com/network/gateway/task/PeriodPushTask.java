@@ -6,9 +6,9 @@ import com.network.gateway.cache.RequestAggregate;
 import com.network.gateway.client.MonitorServiceTrafficClient;
 import com.network.gateway.constant.IpAttackStateConstant;
 import com.network.gateway.dto.TrafficMonitorDTO;
+import com.network.gateway.traffic.TrafficActivityService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -27,11 +27,17 @@ public class PeriodPushTask {
     @Autowired
     private MonitorServiceTrafficClient trafficClient;
 
+    @Autowired
+    private TrafficActivityService activityService;
+
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    @Scheduled(fixedRate = 1000)
     public void checkAndPushPeriodData() {
         try {
+            if (!activityService.isActive()) {
+                return;
+            }
+            
             Map<String, IpAttackStateEntry> allEntries = ipAttackStateCache.getAllEntries();
             
             for (Map.Entry<String, IpAttackStateEntry> entry : allEntries.entrySet()) {

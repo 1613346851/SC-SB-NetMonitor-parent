@@ -176,6 +176,19 @@ public class IpTrafficQueue implements Serializable {
         return data;
     }
 
+    public TrafficAggregateData toAggregateDataAndClear() {
+        TrafficAggregateData data = toAggregateData();
+        clearCurrentBucket();
+        return data;
+    }
+
+    public void clearCurrentBucket() {
+        StateTrafficBucket currentBucket = stateBuckets.get(currentState);
+        if (currentBucket != null) {
+            currentBucket.reset();
+        }
+    }
+
     private List<TrafficSampleDTO> convertSamples(List<TrafficSample> samples) {
         List<TrafficSampleDTO> dtos = new ArrayList<>();
         for (TrafficSample sample : samples) {

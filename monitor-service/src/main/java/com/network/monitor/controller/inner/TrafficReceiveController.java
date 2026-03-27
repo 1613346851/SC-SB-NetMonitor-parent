@@ -3,6 +3,7 @@ package com.network.monitor.controller.inner;
 import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.dto.AttackMonitorDTO;
+import com.network.monitor.dto.TrafficAggregateDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;
 import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.TrafficMonitorEntity;
@@ -133,6 +134,76 @@ public class TrafficReceiveController {
                 trafficDTO.getSourceIp(), e.getMessage(), e);
             throw new RuntimeException("处理流量数据失败", e);
         }
+    }
+
+    @PostMapping("/aggregate")
+    public ApiResponse<Void> receiveAggregateTraffic(@RequestBody TrafficAggregateDTO aggregateDTO) {
+        try {
+            log.info("接收到聚合流量数据: ip={}, state={}, totalRequests={}, uriGroups={}, samples={}", 
+                aggregateDTO.getIp(), 
+                aggregateDTO.getStateName(),
+                aggregateDTO.getTotalRequests(),
+                aggregateDTO.getUriGroupCount(),
+                aggregateDTO.getSampleCount());
+
+            if (aggregateDTO.hasTransition()) {
+                log.info("检测到状态转换: ip={}, {} -> {}, reason={}", 
+                    aggregateDTO.getIp(),
+                    aggregateDTO.getTransition().getFromState(),
+                    aggregateDTO.getTransition().getToState(),
+                    aggregateDTO.getTransition().getReason());
+            }
+
+            List<TrafficAggregateDTO.UriGroupStatsDTO> uriGroups = aggregateDTO.getUriGroups();
+            if (uriGroups != null && !uriGroups.isEmpty()) {
+                for (TrafficAggregateDTO.UriGroupStatsDTO uriGroup : uriGroups) {
+                    TrafficMonitorDTO trafficDTO = convertUriGroupToTrafficDTO(aggregateDTO, uriGroup);
+                    
+                    trafficAnalyzeService.preprocessTraffic(trafficDTO);
+                    
+                    TrafficMonitorEntity trafficEntity = trafficStoreService.convertToEntity(trafficDTO);
+                    Long trafficId = trafficStoreService.saveTraffic(trafficEntity);
+                    
+                    if (trafficId != null) {
+                        log.debug("聚合流量分组已保存: trafficId={}, ip={}, uri={}, count={}", 
+                            trafficId, aggregateDTO.getIp(), uriGroup.getUriPattern(), uriGroup.getCount());
+                    }
+                }
+            }
+
+            log.info("聚合流量数据处理完成: ip={}, totalRequests={}, rps={}", 
+                aggregateDTO.getIp(), aggregateDTO.getTotalRequests(), aggregateDTO.getRps());
+            
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("接收聚合流量数据失败: ip={}, error={}", 
+                aggregateDTO.getIp(), e.getMessage(), e);
+            return ApiResponse.error("接收聚合流量数据失败：" + e.getMessage());
+        }
+    }
+
+    private TrafficMonitorDTO convertUriGroupToTrafficDTO(TrafficAggregateDTO aggregate, TrafficAggregateDTO.UriGroupStatsDTO uriGroup) {
+        TrafficMonitorDTO dto = new TrafficMonitorDTO();
+        
+        dto.setRequestId(aggregate.getRequestId());
+        dto.setRequestTime(aggregate.getRequestTime());
+        dto.setSourceIp(aggregate.getIp());
+        dto.setTargetIp("0.0.0.0");
+        dto.setRequestUri(uriGroup.getUriPattern());
+        dto.setHttpMethod(uriGroup.getHttpMethod());
+        dto.setStateTag(aggregate.getStateName());
+        
+        dto.setRequestCount(uriGroup.getCount());
+        dto.setErrorCount(uriGroup.getErrorCount());
+        dto.setAvgProcessingTime(uriGroup.getAvgProcessingTime());
+        dto.setIsAggregated(true);
+        dto.setAggregateStartTime(aggregate.getStartTime());
+        dto.setAggregateEndTime(aggregate.getEndTime());
+        
+        dto.setResponseStatus(200);
+        dto.setResponseTime(uriGroup.getAvgProcessingTime());
+        
+        return dto;
     }
 }
 
