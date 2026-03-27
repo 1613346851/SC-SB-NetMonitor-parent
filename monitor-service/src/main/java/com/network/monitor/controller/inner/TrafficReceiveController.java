@@ -192,6 +192,13 @@ public class TrafficReceiveController {
         dto.setRequestUri(uriGroup.getUriPattern());
         dto.setHttpMethod(uriGroup.getHttpMethod());
         dto.setStateTag(aggregate.getStateName());
+        dto.setStateValue(aggregate.getState());
+        
+        if (aggregate.getTransition() != null) {
+            dto.setConfidence(aggregate.getTransition().getConfidence());
+        } else {
+            dto.setConfidence(aggregate.getConfidence());
+        }
         
         dto.setRequestCount(uriGroup.getCount());
         dto.setErrorCount(uriGroup.getErrorCount());

@@ -23,9 +23,11 @@ public class DefenseLogAggregator {
     private final Map<String, List<DefenseAction>> attackDefenseMap = new ConcurrentHashMap<>();
     private final Map<String, RateLimitCounter> rateLimitCounters = new ConcurrentHashMap<>();
     private final Map<String, DefenseLogDTO> pendingLogs = new ConcurrentHashMap<>();
+    private final Map<String, Long> deduplicationCache = new ConcurrentHashMap<>();
 
     private long aggregationWindowMs = 60000;
     private int maxPendingLogs = 10000;
+    private long deduplicationWindowMs = 60000;
 
     public void addDefenseAction(String eventId, DefenseAction action) {
         if (eventId == null || action == null) {
@@ -74,6 +76,24 @@ public class DefenseLogAggregator {
             logger.debug("获取并重置限流计数器: ip={}, count={}", ip, counter.getCount());
         }
         return counter;
+    }
+
+    public boolean isDuplicate(DefenseLogDTO log) {
+        if (log == null || log.getDeduplicationKey() == null) {
+            return false;
+        }
+        
+        String dedupeKey = log.getDeduplicationKey();
+        Long lastTime = deduplicationCache.get(dedupeKey);
+        long now = System.currentTimeMillis();
+        
+        if (lastTime != null && (now - lastTime) < deduplicationWindowMs) {
+            logger.debug("检测到重复日志: key={}, elapsed={}ms", dedupeKey, now - lastTime);
+            return true;
+        }
+        
+        deduplicationCache.put(dedupeKey, now);
+        return false;
     }
 
     public DefenseLogDTO generateAggregatedLog(String eventId, String ip, Long attackId, 
@@ -148,6 +168,11 @@ public class DefenseLogAggregator {
             return;
         }
 
+        if (isDuplicate(log)) {
+            logger.debug("跳过重复日志: eventId={}, type={}", eventId, log.getDefenseType());
+            return;
+        }
+
         if (pendingLogs.size() >= maxPendingLogs) {
             cleanupExpiredPendingLogs();
         }
@@ -193,7 +218,13 @@ public class DefenseLogAggregator {
         rateLimitCounters.entrySet().removeIf(entry -> 
             entry.getValue().isExpired());
         
-        logger.debug("清理过期限流计数器，剩余: {}", rateLimitCounters.size());
+        long now = System.currentTimeMillis();
+        long dedupeThreshold = now - deduplicationWindowMs * 2;
+        deduplicationCache.entrySet().removeIf(entry -> 
+            entry.getValue() < dedupeThreshold);
+        
+        logger.debug("清理过期限流计数器，剩余: {}, 去重缓存: {}", 
+            rateLimitCounters.size(), deduplicationCache.size());
     }
 
     public int getAttackDefenseCount(String eventId) {
@@ -219,8 +250,12 @@ public class DefenseLogAggregator {
         this.maxPendingLogs = maxPendingLogs;
     }
 
+    public void setDeduplicationWindowMs(long deduplicationWindowMs) {
+        this.deduplicationWindowMs = deduplicationWindowMs;
+    }
+
     public String getStats() {
-        return String.format("防御日志聚合统计 - 攻击事件数:%d, 限流计数器:%d, 待推送日志:%d",
-            attackDefenseMap.size(), rateLimitCounters.size(), pendingLogs.size());
+        return String.format("防御日志聚合统计 - 攻击事件数:%d, 限流计数器:%d, 待推送日志:%d, 去重缓存:%d",
+            attackDefenseMap.size(), rateLimitCounters.size(), pendingLogs.size(), deduplicationCache.size());
     }
 }

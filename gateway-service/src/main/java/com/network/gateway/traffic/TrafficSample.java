@@ -20,9 +20,18 @@ public class TrafficSample implements Serializable {
     private long timestamp;
     private boolean error;
     private String errorMessage;
+    private boolean isAbnormal;
+    private String traceId;
+    private boolean blocked;
+    private int state;
+    private String stateName;
+    private int confidence;
 
     public TrafficSample() {
         this.timestamp = System.currentTimeMillis();
+        this.traceId = generateTraceId();
+        this.state = 0;
+        this.stateName = "NORMAL";
     }
 
     public TrafficSample(String requestId, String requestUri, String httpMethod) {
@@ -32,12 +41,25 @@ public class TrafficSample implements Serializable {
         this.httpMethod = httpMethod;
     }
 
+    private String generateTraceId() {
+        return java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    }
+
     public boolean isError() {
         return responseStatus >= 400 || error;
     }
 
     public boolean isSuccess() {
         return !isError();
+    }
+
+    public boolean isAbnormalSample() {
+        return responseStatus == 429 || responseStatus >= 500 || blocked;
+    }
+
+    public void setStateInfo(int state, String stateName) {
+        this.state = state;
+        this.stateName = stateName;
     }
 
     public static TrafficSample from(TrafficSampleDTO dto) {
@@ -51,6 +73,10 @@ public class TrafficSample implements Serializable {
         sample.setProcessingTime(dto.getProcessingTime());
         sample.setError(dto.isError());
         sample.setErrorMessage(dto.getErrorMessage());
+        sample.setState(dto.getState());
+        sample.setStateName(dto.getStateName());
+        sample.setConfidence(dto.getConfidence());
+        sample.setAbnormal(sample.isAbnormalSample());
         return sample;
     }
 }

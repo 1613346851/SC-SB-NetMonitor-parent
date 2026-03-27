@@ -86,13 +86,17 @@ public class ConfidenceSmoother {
     }
 
     private int smoothOnlyUp(String ip, int rawConfidence, int lastConfidence) {
+        int minConfidence = configCache.getConfidenceMinValue();
         int result = Math.max(rawConfidence, lastConfidence);
+        result = Math.max(result, minConfidence);
         return Math.min(100, Math.max(0, result));
     }
 
     private int smoothSlidingAverage(String ip, int rawConfidence, int lastConfidence) {
         double alpha = getAlpha();
         int smoothed = (int) (alpha * rawConfidence + (1 - alpha) * lastConfidence);
+        int minConfidence = configCache.getConfidenceMinValue();
+        smoothed = Math.max(smoothed, minConfidence);
         return Math.min(100, Math.max(0, smoothed));
     }
 

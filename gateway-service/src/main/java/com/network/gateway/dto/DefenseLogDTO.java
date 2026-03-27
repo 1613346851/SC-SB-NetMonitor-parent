@@ -6,14 +6,6 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 
-/**
- * 防御日志DTO
- * 网关向监控服务推送防御执行日志的数据传输对象
- * 字段与监控服务 DefenseLogDTO 保持一致
- *
- * @author network-monitor
- * @since 1.0.0
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -25,120 +17,100 @@ public class DefenseLogDTO implements Serializable {
 
     private Long attackId;
 
-    /**
-     * 关联流量 ID
-     */
     private Long trafficId;
 
-    /**
-     * 防御类型
-     */
     private String defenseType;
 
-    /**
-     * 防御动作
-     */
     private String defenseAction;
 
-    /**
-     * 防御对象（IP地址）
-     */
     private String defenseTarget;
 
-    /**
-     * 防御原因
-     */
     private String defenseReason;
 
-    /**
-     * 防御过期时间（字符串格式）
-     */
     private String expireTime;
 
-    /**
-     * 执行状态（0-失败，1-成功）
-     */
     private Integer executeStatus;
 
-    /**
-     * 执行结果信息
-     */
     private String executeResult;
 
-    /**
-     * 操作人
-     */
     private String operator;
 
-    /**
-     * 置信度
-     */
     private Integer confidence;
 
-    /**
-     * 执行时间（时间戳）
-     */
     private Long executeTime;
 
-    /**
-     * 处理耗时（毫秒）
-     */
     private Long processingTime;
 
-    /**
-     * 请求URI
-     */
     private String requestUri;
 
-    /**
-     * HTTP方法
-     */
     private String httpMethod;
 
-    /**
-     * 限流次数（用于聚合日志）
-     */
     private Integer rateLimitCount;
 
-    /**
-     * 时间窗口（用于聚合日志）
-     */
     private String timeWindow;
 
-    /**
-     * 构造函数（用于创建防御日志）
-     *
-     * @param defenseType 防御类型
-     * @param defenseTarget 防御对象
-     * @param defenseReason 防御原因
-     */
+    private String traceId;
+
+    private String deduplicationKey;
+
+    private int fromState;
+
+    private int toState;
+
+    private int totalRequests;
+
+    private int blockedRequests;
+
+    private String stateDuration;
+
+    private int retryCount;
+
+    private String batchId;
+
     public DefenseLogDTO(String defenseType, String defenseTarget, String defenseReason) {
         this.defenseType = defenseType;
         this.defenseTarget = defenseTarget;
         this.defenseReason = defenseReason;
         this.executeStatus = 1;
         this.operator = "SYSTEM";
+        this.traceId = generateTraceId();
+        this.deduplicationKey = generateDeduplicationKey();
+        this.retryCount = 0;
     }
 
-    /**
-     * 设置执行结果
-     *
-     * @param success 是否成功
-     * @param executeResult 执行结果描述
-     */
+    private String generateTraceId() {
+        return java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    }
+
+    private String generateDeduplicationKey() {
+        return defenseTarget + "_" + defenseType + "_" + System.currentTimeMillis() / 60000;
+    }
+
     public void setExecutionResult(boolean success, String executeResult) {
         this.executeStatus = success ? 1 : 0;
         this.executeResult = executeResult;
     }
 
-    /**
-     * 设置过期时间
-     *
-     * @param expireTimestamp 过期时间戳（毫秒）
-     */
     public void setExpireTimestamp(Long expireTimestamp) {
         if (expireTimestamp != null) {
             this.expireTime = String.valueOf(expireTimestamp);
         }
+    }
+
+    public void incrementRetryCount() {
+        this.retryCount++;
+    }
+
+    public boolean isDuplicate(DefenseLogDTO other) {
+        if (other == null) {
+            return false;
+        }
+        return this.deduplicationKey != null && 
+               this.deduplicationKey.equals(other.deduplicationKey);
+    }
+
+    public String getSummary() {
+        return String.format("DefenseLogDTO{eventId=%s, type=%s, target=%s, confidence=%d, traceId=%s}",
+            eventId, defenseType, defenseTarget, confidence != null ? confidence : 0, traceId);
     }
 }

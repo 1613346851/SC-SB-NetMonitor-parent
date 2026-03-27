@@ -115,6 +115,16 @@ public class TrafficMonitorDTO {
     private String stateTag;
 
     /**
+     * 状态值（数字）
+     */
+    private Integer stateValue;
+
+    /**
+     * 置信度（0-100）
+     */
+    private Integer confidence;
+
+    /**
      * 是否为聚合记录
      */
     private Boolean isAggregated;

@@ -15,8 +15,12 @@ public class StateTransitionDTO implements Serializable {
     private long transitionTime;
     private String reason;
     private int confidence;
+    private String operator;
+    private String resetReason;
+    private String traceId;
 
     public StateTransitionDTO() {
+        this.traceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     }
 
     public String getFromStateName() {
@@ -34,6 +38,7 @@ public class StateTransitionDTO implements Serializable {
             case 2: return "攻击中";
             case 3: return "已防御";
             case 4: return "冷却期";
+            case 5: return "人工重置";
             default: return "未知";
         }
     }

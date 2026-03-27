@@ -31,6 +31,15 @@ public class TrafficQueueManager {
     @Autowired
     private GatewayConfigCache configCache;
 
+    @javax.annotation.PostConstruct
+    public void init() {
+        this.maxSampleSize = configCache.getTrafficSampleMaxPerUri();
+        this.flushIntervalMs = configCache.getTrafficPushIntervalMs();
+        this.maxQueueSize = configCache.getTrafficPushRetryMaxQueueSize();
+        logger.info("TrafficQueueManager初始化: maxSampleSize={}, flushIntervalMs={}, maxQueueSize={}", 
+            maxSampleSize, flushIntervalMs, maxQueueSize);
+    }
+
     public TrafficQueueManager() {
     }
 

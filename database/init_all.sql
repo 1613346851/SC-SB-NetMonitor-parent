@@ -59,6 +59,8 @@ CREATE TABLE `sys_traffic_monitor` (
   `cookie` TEXT DEFAULT NULL COMMENT 'Cookie 信息',
   `request_count` INT DEFAULT 1 COMMENT '请求次数(聚合统计)',
   `state_tag` VARCHAR(20) DEFAULT 'NORMAL' COMMENT 'IP状态标签',
+  `state_value` INT DEFAULT 0 COMMENT '状态值(数字: 0-正常, 1-可疑, 2-攻击中, 3-已防御, 4-冷却期)',
+  `confidence` INT DEFAULT 0 COMMENT '置信度(0-100)',
   `is_aggregated` TINYINT DEFAULT 0 COMMENT '是否为聚合记录(0-否,1-是)',
   `aggregate_start_time` DATETIME DEFAULT NULL COMMENT '聚合开始时间',
   `aggregate_end_time` DATETIME DEFAULT NULL COMMENT '聚合结束时间',
@@ -74,6 +76,7 @@ CREATE TABLE `sys_traffic_monitor` (
   KEY `idx_http_method` (`http_method`),
   KEY `idx_request_uri` (`request_uri`(255)),
   KEY `idx_state_tag` (`state_tag`),
+  KEY `idx_state_value` (`state_value`),
   KEY `idx_is_aggregated` (`is_aggregated`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='流量监测表';
 

@@ -2,6 +2,7 @@ package com.network.gateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
@@ -13,7 +14,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * @since 1.0.0
  */
 @SpringBootApplication
-@EnableScheduling  // 启用定时任务（用于缓存清理）
+@EnableScheduling
+@EnableAsync
 public class GatewayServiceApplication {
 
 	public static void main(String[] args) {

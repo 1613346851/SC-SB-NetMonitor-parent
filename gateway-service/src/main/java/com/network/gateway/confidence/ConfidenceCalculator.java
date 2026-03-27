@@ -41,13 +41,16 @@ public class ConfidenceCalculator {
         breakdown.setPersistenceScore(calculatePersistenceScore(context));
         breakdown.setPatternScore(calculatePatternScore(context));
         breakdown.setNormalBehaviorDeduction(calculateNormalBehaviorDeduction(context));
+        breakdown.setSlowAttackScore(calculateSlowAttackScore(context));
+        breakdown.setDistributedAttackScore(calculateDistributedAttackScore(context));
+        breakdown.setPeakAdaptationScore(calculatePeakAdaptationScore(context));
+        breakdown.setStateDurationScore(calculateStateDurationScore(context));
 
         return breakdown;
     }
 
     private int calculateBaseScore() {
-        int baseScore = configCache.getConfidenceBaseScore();
-        return Math.min(30, Math.max(0, baseScore));
+        return 0;
     }
 
     private int calculateFrequencyScore(ConfidenceContext context) {
@@ -122,12 +125,62 @@ public class ConfidenceCalculator {
         return Math.min(maxDeduction, totalDeduction);
     }
 
+    private int calculateSlowAttackScore(ConfidenceContext context) {
+        int maxScore = 15;
+        
+        if (!context.isSlowAttackPattern()) {
+            return 0;
+        }
+        
+        double durationMinutes = context.getStateDurationSeconds() / 60.0;
+        int score = (int) Math.min(maxScore, durationMinutes * 2);
+        
+        return Math.max(0, score);
+    }
+
+    private int calculateDistributedAttackScore(ConfidenceContext context) {
+        int maxScore = 15;
+        
+        if (!context.isDistributedAttackPattern()) {
+            return 0;
+        }
+        
+        int uriCount = context.getUniqueUriCount();
+        int score = Math.min(maxScore, (uriCount - 10) / 2);
+        
+        return Math.max(0, score);
+    }
+
+    private int calculatePeakAdaptationScore(ConfidenceContext context) {
+        if (!context.isInPeakPeriod()) {
+            return 0;
+        }
+        
+        int adaptationFactor = context.getPeakAdaptationFactor();
+        return -Math.min(10, adaptationFactor);
+    }
+
+    private int calculateStateDurationScore(ConfidenceContext context) {
+        int maxScore = 10;
+        
+        double stateDurationSeconds = context.getStateDurationSeconds();
+        if (stateDurationSeconds < 30) {
+            return 0;
+        }
+        
+        int duration30s = (int) Math.floor(stateDurationSeconds / 30);
+        int score = Math.min(maxScore, duration30s);
+        
+        return Math.max(0, score);
+    }
+
     public ConfidenceResult calculateWithBreakdown(ConfidenceContext context) {
         ConfidenceResult result = new ConfidenceResult();
         result.setIp(context.getIp());
         result.setRawConfidence(calculate(context));
         result.setBreakdown(calculateBreakdown(context));
         result.setTimestamp(System.currentTimeMillis());
+        result.setTraceId(context.getTraceId());
         return result;
     }
 }

@@ -13,6 +13,7 @@ public class TrafficAggregateData implements Serializable {
     private String ip;
     private int state;
     private String stateName;
+    private int confidence;
     
     private long startTime;
     private long endTime;
@@ -20,6 +21,7 @@ public class TrafficAggregateData implements Serializable {
     
     private int totalRequests;
     private int errorRequests;
+    private int blockedRequests;
     private long avgProcessingTime;
     private long peakRps;
     
@@ -27,8 +29,10 @@ public class TrafficAggregateData implements Serializable {
     private List<TrafficSampleDTO> samples;
     
     private StateTransitionDTO transition;
+    private String traceId;
 
     public TrafficAggregateData() {
+        this.traceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     }
 
     public String getStateName() {
@@ -45,12 +49,17 @@ public class TrafficAggregateData implements Serializable {
             case 2: return "攻击中";
             case 3: return "已防御";
             case 4: return "冷却期";
+            case 5: return "人工重置";
             default: return "未知";
         }
     }
 
     public double getErrorRate() {
         return totalRequests > 0 ? (double) errorRequests / totalRequests : 0.0;
+    }
+
+    public double getBlockedRate() {
+        return totalRequests > 0 ? (double) blockedRequests / totalRequests : 0.0;
     }
 
     public double getRps() {

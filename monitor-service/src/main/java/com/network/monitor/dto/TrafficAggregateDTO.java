@@ -14,6 +14,7 @@ public class TrafficAggregateDTO implements Serializable {
     private String ip;
     private int state;
     private String stateName;
+    private int confidence;
     
     private String startTime;
     private String endTime;
@@ -56,6 +57,9 @@ public class TrafficAggregateDTO implements Serializable {
         private long timestamp;
         private boolean error;
         private String errorMessage;
+        private int state;
+        private String stateName;
+        private int confidence;
     }
 
     @Data

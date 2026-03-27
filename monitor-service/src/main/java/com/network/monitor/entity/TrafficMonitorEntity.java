@@ -117,6 +117,16 @@ public class TrafficMonitorEntity {
     private String stateTag;
 
     /**
+     * 状态值（数字）
+     */
+    private Integer stateValue;
+
+    /**
+     * 置信度（0-100）
+     */
+    private Integer confidence;
+
+    /**
      * 是否为聚合记录（0-否，1-是）
      */
     private Integer isAggregated;

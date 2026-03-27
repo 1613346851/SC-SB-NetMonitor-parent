@@ -17,10 +17,12 @@ public class StateTrafficBucket implements Serializable {
 
     private int state;
     private long startTime;
+    private long endTime;
     private long lastUpdateTime;
     private final Map<String, UriTrafficGroup> uriGroups = new ConcurrentHashMap<>();
     private final AtomicInteger totalCount = new AtomicInteger(0);
     private final AtomicInteger errorCount = new AtomicInteger(0);
+    private final AtomicInteger blockedCount = new AtomicInteger(0);
     private final AtomicLong totalProcessingTime = new AtomicLong(0);
     private final AtomicLong peakRps = new AtomicLong(0);
     private int maxSampleSize;
@@ -30,6 +32,7 @@ public class StateTrafficBucket implements Serializable {
     public StateTrafficBucket() {
         this.maxSampleSize = 3;
         this.startTime = System.currentTimeMillis();
+        this.endTime = 0;
         this.lastUpdateTime = this.startTime;
         this.rpsWindowStart = this.startTime;
     }
@@ -54,6 +57,10 @@ public class StateTrafficBucket implements Serializable {
         
         if (sample.isError()) {
             errorCount.incrementAndGet();
+        }
+        
+        if (sample.isBlocked()) {
+            blockedCount.incrementAndGet();
         }
         
         updatePeakRps();
@@ -110,6 +117,14 @@ public class StateTrafficBucket implements Serializable {
         return errorCount.get();
     }
 
+    public int getBlockedCount() {
+        return blockedCount.get();
+    }
+
+    public void markEnded() {
+        this.endTime = System.currentTimeMillis();
+    }
+
     public long getAverageProcessingTime() {
         int c = totalCount.get();
         return c > 0 ? totalProcessingTime.get() / c : 0;
@@ -120,7 +135,15 @@ public class StateTrafficBucket implements Serializable {
         return c > 0 ? (double) errorCount.get() / c : 0.0;
     }
 
+    public double getBlockedRate() {
+        int c = totalCount.get();
+        return c > 0 ? (double) blockedCount.get() / c : 0.0;
+    }
+
     public long getDuration() {
+        if (endTime > 0) {
+            return endTime - startTime;
+        }
         return lastUpdateTime - startTime;
     }
 
@@ -168,9 +191,11 @@ public class StateTrafficBucket implements Serializable {
         StateTrafficBucket copy = new StateTrafficBucket(this.state, this.maxSampleSize);
         copy.totalCount.set(this.totalCount.get());
         copy.errorCount.set(this.errorCount.get());
+        copy.blockedCount.set(this.blockedCount.get());
         copy.totalProcessingTime.set(this.totalProcessingTime.get());
         copy.peakRps.set(this.peakRps.get());
         copy.startTime = this.startTime;
+        copy.endTime = this.endTime;
         copy.lastUpdateTime = this.lastUpdateTime;
         
         for (Map.Entry<String, UriTrafficGroup> entry : uriGroups.entrySet()) {

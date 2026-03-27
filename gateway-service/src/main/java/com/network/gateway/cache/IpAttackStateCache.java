@@ -193,6 +193,7 @@ public class IpAttackStateCache {
         int minRequests = configCache.getStateSuspiciousToAttackingMinRequests();
         int uriDiversityThreshold = configCache.getStateSuspiciousToAttackingUriDiversityThreshold();
         long quietDuration = configCache.getStateSuspiciousToNormalQuietDurationMs();
+        long stateTimeout = configCache.getStateSuspiciousTimeoutMs();
         
         boolean shouldAttack = suspiciousDuration >= durationThreshold &&
                                entry.getStateRequestCount() >= minRequests &&
@@ -220,6 +221,19 @@ public class IpAttackStateCache {
             logger.warn("IP状态转换: ip={}, SUSPICIOUS -> ATTACKING, duration={}ms, requests={}, uris={}, confidence={}",
                     ip, suspiciousDuration, entry.getStateRequestCount(), entry.getUniqueUriCount(),
                     confidenceResult.getSmoothedConfidence());
+        } else if (suspiciousDuration >= stateTimeout) {
+            confidenceService.resetConfidence(ip);
+            
+            entry.updateState(IpAttackStateConstant.NORMAL);
+            
+            result.setNewState(IpAttackStateConstant.NORMAL);
+            result.setTransitioned(true);
+            result.setReason(IpAttackStateConstant.TRANSITION_REASON_SYSTEM_RESET);
+            
+            eventPublisher.publishRecovery(ip, IpAttackStateConstant.SUSPICIOUS,
+                    IpAttackStateConstant.TRANSITION_REASON_SYSTEM_RESET);
+            
+            logger.info("IP状态转换: ip={}, SUSPICIOUS -> NORMAL, 状态超时自动恢复, duration={}ms", ip, suspiciousDuration);
         } else if (rateLimitCount < suspiciousThreshold && isQuietPeriod(entry, quietDuration)) {
             confidenceService.resetConfidence(ip);
             
@@ -241,19 +255,34 @@ public class IpAttackStateCache {
 
     private StateTransitionResult handleAttackingState(String ip, IpAttackStateEntry entry,
                                                         StateTransitionResult result) {
-        long quietDuration = configCache.getStateDefendedToCooldownQuietDurationMs();
+        long attackDuration = entry.getStateDuration();
+        long minAttackDuration = 10000L;
+        int confidence = entry.getConfidence();
+        int confidenceThreshold = 80;
         
-        if (isQuietPeriod(entry, quietDuration)) {
-            entry.updateState(IpAttackStateConstant.NORMAL);
+        boolean shouldDefend = (attackDuration >= minAttackDuration && confidence >= confidenceThreshold);
+        
+        if (shouldDefend) {
+            ConfidenceContext context = buildConfidenceContext(ip, entry, 0, 
+                configCache.getStateNormalToSuspiciousThresholdRps());
+            ConfidenceResult confidenceResult = confidenceService.calculateForStateTransition(
+                ip, IpAttackStateConstant.ATTACKING, IpAttackStateConstant.DEFENDED,
+                context, IpAttackStateConstant.TRANSITION_REASON_DEFENSE_EXECUTED);
             
-            result.setNewState(IpAttackStateConstant.NORMAL);
+            int previousState = entry.getState();
+            entry.updateState(IpAttackStateConstant.DEFENDED);
+            entry.setConfidence(confidenceResult.getSmoothedConfidence());
+            
+            result.setNewState(IpAttackStateConstant.DEFENDED);
             result.setTransitioned(true);
-            result.setReason(IpAttackStateConstant.TRANSITION_REASON_RECOVERY);
+            result.setReason(IpAttackStateConstant.TRANSITION_REASON_DEFENSE_EXECUTED);
             
-            eventPublisher.publishRecovery(ip, IpAttackStateConstant.ATTACKING,
-                    IpAttackStateConstant.TRANSITION_REASON_RECOVERY);
+            eventPublisher.publishStateTransition(ip, previousState, IpAttackStateConstant.DEFENDED,
+                    IpAttackStateConstant.TRANSITION_REASON_DEFENSE_EXECUTED,
+                    entry.getEventId(), confidenceResult.getSmoothedConfidence());
             
-            logger.info("IP状态转换: ip={}, ATTACKING -> NORMAL, 攻击停止", ip);
+            logger.warn("IP状态转换: ip={}, ATTACKING -> DEFENDED, attackDuration={}ms, confidence={}", 
+                    ip, attackDuration, confidenceResult.getSmoothedConfidence());
         }
         
         result.setStateRequestCount(entry.getAndResetStateRequestCount());
@@ -291,6 +320,8 @@ public class IpAttackStateCache {
                                                        StateTransitionResult result,
                                                        int rateLimitCount) {
         int reattackThreshold = configCache.getStateCooldownToAttackingThresholdRps();
+        long cooldownTimeout = configCache.getStateCooldownTimeoutMs();
+        long cooldownDuration = entry.getStateDuration();
         
         if (rateLimitCount >= reattackThreshold) {
             ConfidenceContext context = buildConfidenceContext(ip, entry, rateLimitCount, 
@@ -314,6 +345,19 @@ public class IpAttackStateCache {
             
             logger.warn("IP状态转换: ip={}, COOLDOWN -> ATTACKING, 冷却期内再次攻击, confidence={}", 
                 ip, confidenceResult.getSmoothedConfidence());
+        } else if (cooldownDuration >= cooldownTimeout) {
+            confidenceService.resetConfidenceOnCooldownEnd(ip);
+            
+            stateMap.remove(ip);
+            
+            result.setNewState(IpAttackStateConstant.NORMAL);
+            result.setTransitioned(true);
+            result.setReason(IpAttackStateConstant.TRANSITION_REASON_SYSTEM_RESET);
+            
+            eventPublisher.publishRecovery(ip, IpAttackStateConstant.COOLDOWN,
+                    IpAttackStateConstant.TRANSITION_REASON_SYSTEM_RESET);
+            
+            logger.info("IP状态转换: ip={}, COOLDOWN -> NORMAL, 状态超时强制恢复, duration={}ms", ip, cooldownDuration);
         } else if (!entry.isInCooldownPeriod()) {
             confidenceService.resetConfidenceOnCooldownEnd(ip);
             
@@ -386,6 +430,43 @@ public class IpAttackStateCache {
         logger.debug("IP状态重置为NORMAL: ip={}", normalizedIp);
     }
 
+    public StateTransitionResult manualReset(String ip, String operator, String reason) {
+        String normalizedIp = IpNormalizeUtil.normalize(ip);
+        IpAttackStateEntry entry = stateMap.get(normalizedIp);
+        
+        StateTransitionResult result = new StateTransitionResult();
+        
+        if (entry == null) {
+            result.setNewState(IpAttackStateConstant.NORMAL);
+            result.setTransitioned(false);
+            return result;
+        }
+        
+        int previousState = entry.getState();
+        
+        entry.updateState(IpAttackStateConstant.MANUAL_RESET);
+        
+        confidenceService.resetConfidence(normalizedIp);
+        
+        result.setPreviousState(previousState);
+        result.setNewState(IpAttackStateConstant.MANUAL_RESET);
+        result.setTransitioned(true);
+        result.setReason(IpAttackStateConstant.TRANSITION_REASON_MANUAL_RESET);
+        
+        eventPublisher.publishStateTransition(normalizedIp, previousState, 
+                IpAttackStateConstant.MANUAL_RESET,
+                IpAttackStateConstant.TRANSITION_REASON_MANUAL_RESET,
+                entry.getEventId(), 0);
+        
+        stateMap.remove(normalizedIp);
+        
+        logger.info("IP状态人工重置: ip={}, {} -> MANUAL_RESET -> NORMAL, operator={}, reason={}", 
+                normalizedIp, IpAttackStateConstant.getStateNameZh(previousState), operator, reason);
+        
+        result.setNewState(IpAttackStateConstant.NORMAL);
+        return result;
+    }
+
     public void incrementRequestCount(String ip) {
         IpAttackStateEntry entry = getOrCreate(ip);
         entry.incrementRequestCount();
@@ -425,6 +506,11 @@ public class IpAttackStateCache {
     public void incrementAttackCount(String ip) {
         IpAttackStateEntry entry = getOrCreate(ip);
         entry.incrementAttackCount();
+    }
+
+    public int getConfidence(String ip) {
+        IpAttackStateEntry entry = get(ip);
+        return entry != null ? entry.getConfidence() : 0;
     }
 
     public boolean isInDefendedState(String ip) {

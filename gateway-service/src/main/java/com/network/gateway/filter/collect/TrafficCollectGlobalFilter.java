@@ -106,7 +106,7 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
     private Mono<Void> handleWithNewQueueSystem(ServerWebExchange exchange, GatewayFilterChain chain,
                                                 RawTrafficBO rawTraffic, String sourceIp, 
                                                 int currentState, long startTime) {
-        TrafficSample sample = createTrafficSample(rawTraffic);
+        TrafficSample sample = createTrafficSample(rawTraffic, currentState, sourceIp);
         
         return chain.filter(exchange)
                 .doOnSuccess(unused -> {
@@ -136,7 +136,7 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
                 });
     }
 
-    private TrafficSample createTrafficSample(RawTrafficBO rawTraffic) {
+    private TrafficSample createTrafficSample(RawTrafficBO rawTraffic, int currentState, String sourceIp) {
         TrafficSample sample = new TrafficSample();
         sample.setRequestId(rawTraffic.getRequestId());
         sample.setRequestUri(rawTraffic.getUri());
@@ -144,6 +144,9 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         sample.setHeaders(rawTraffic.getHeaders());
         sample.setRequestBody(rawTraffic.getRequestBody());
         sample.setTimestamp(System.currentTimeMillis());
+        sample.setState(currentState);
+        sample.setStateName(IpAttackStateConstant.getStateNameZh(currentState));
+        sample.setConfidence(attackStateCache.getConfidence(sourceIp));
         return sample;
     }
 
@@ -154,23 +157,22 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
             int statusCode = exchange.getResponse().getStatusCode() != null ? 
                            exchange.getResponse().getStatusCode().value() : 200;
             
+            int currentState = attackStateCache.getState(sourceIp);
             sample.setResponseStatus(statusCode);
             sample.setProcessingTime(endTime - startTime);
             sample.setError(statusCode >= 400);
+            sample.setState(currentState);
+            sample.setStateName(IpAttackStateConstant.getStateNameZh(currentState));
+            sample.setConfidence(attackStateCache.getConfidence(sourceIp));
+            sample.setBlocked(statusCode == 429 || statusCode == 403);
             
             queueManager.addRequest(sourceIp, sample);
             
             activityService.onTrafficReceived(sourceIp);
             
-            if (queueManager.shouldPushImmediately()) {
-                TrafficAggregateData data = queueManager.flushIpQueueImmediately(sourceIp);
-                if (data != null && data.getTotalRequests() > 0) {
-                    pushAggregateData(data);
-                }
-            }
-            
-            logger.debug("流量采集完成（新队列）：ip={} uri={} 耗时{}ms 状态码{}", 
-                        sourceIp, sample.getRequestUri(), endTime - startTime, statusCode);
+            logger.debug("流量采集完成（新队列）：ip={} uri={} 耗时{}ms 状态码{} 状态={}", 
+                        sourceIp, sample.getRequestUri(), endTime - startTime, statusCode,
+                        IpAttackStateConstant.getStateNameZh(currentState));
 
         } catch (Exception e) {
             logger.error("处理请求成功回调时发生异常（新队列）", e);
@@ -184,15 +186,20 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
             int statusCode = exchange.getResponse().getStatusCode() != null ? 
                            exchange.getResponse().getStatusCode().value() : 500;
             
+            int currentState = attackStateCache.getState(sourceIp);
             sample.setResponseStatus(statusCode);
             sample.setProcessingTime(endTime - startTime);
             sample.setError(true);
             sample.setErrorMessage(throwable.getMessage());
+            sample.setState(currentState);
+            sample.setStateName(IpAttackStateConstant.getStateNameZh(currentState));
+            sample.setConfidence(attackStateCache.getConfidence(sourceIp));
             
             queueManager.addRequest(sourceIp, sample);
             
-            logger.warn("流量采集记录错误（新队列）：ip={} uri={} 耗时{}ms 错误：{}", 
-                       sourceIp, sample.getRequestUri(), endTime - startTime, throwable.getMessage());
+            logger.warn("流量采集记录错误（新队列）：ip={} uri={} 耗时{}ms 状态={} 错误：{}", 
+                       sourceIp, sample.getRequestUri(), endTime - startTime,
+                       IpAttackStateConstant.getStateNameZh(currentState), throwable.getMessage());
 
         } catch (Exception e) {
             logger.error("处理请求错误回调时发生异常（新队列）", e);

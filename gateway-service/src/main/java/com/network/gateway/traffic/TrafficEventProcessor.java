@@ -34,7 +34,6 @@ public class TrafficEventProcessor {
     private ScheduledFuture<?> flushTask;
     
     private static final long IDLE_TIMEOUT_MS = 60000;
-    private static final long FLUSH_INTERVAL_MS = 5000;
 
     @Autowired
     private TrafficQueueManager queueManager;
@@ -62,12 +61,13 @@ public class TrafficEventProcessor {
 
     @PostConstruct
     public void init() {
-        logger.info("流量事件处理器已初始化（事件驱动模式）");
+        long flushIntervalMs = configCache.getTrafficPushIntervalMs();
+        logger.info("流量事件处理器已初始化（事件驱动模式），刷新间隔={}ms", flushIntervalMs);
         
         flushTask = scheduler.scheduleWithFixedDelay(
             this::processFlush,
-            FLUSH_INTERVAL_MS,
-            FLUSH_INTERVAL_MS,
+            flushIntervalMs,
+            flushIntervalMs,
             TimeUnit.MILLISECONDS
         );
     }

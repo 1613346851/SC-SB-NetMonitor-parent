@@ -17,16 +17,19 @@ public class UriTrafficGroup implements Serializable {
     private String httpMethod;
     private final AtomicInteger count = new AtomicInteger(0);
     private final AtomicInteger errorCount = new AtomicInteger(0);
+    private final AtomicInteger blockedCount = new AtomicInteger(0);
     private final AtomicLong totalProcessingTime = new AtomicLong(0);
     private final List<TrafficSample> samples = new ArrayList<>();
     private int maxSampleSize;
     private long startTime;
     private long lastUpdateTime;
+    private boolean abnormalPriority;
 
     public UriTrafficGroup() {
         this.maxSampleSize = 3;
         this.startTime = System.currentTimeMillis();
         this.lastUpdateTime = this.startTime;
+        this.abnormalPriority = true;
     }
 
     public UriTrafficGroup(String uriPattern, String httpMethod) {
@@ -52,6 +55,10 @@ public class UriTrafficGroup implements Serializable {
             errorCount.incrementAndGet();
         }
         
+        if (sample.isBlocked()) {
+            blockedCount.incrementAndGet();
+        }
+        
         addSample(sample);
     }
 
@@ -60,11 +67,24 @@ public class UriTrafficGroup implements Serializable {
             samples.add(sample);
         } else {
             boolean replaced = false;
-            for (int i = 0; i < samples.size(); i++) {
-                if (samples.get(i).isSuccess() && sample.isError()) {
-                    samples.set(i, sample);
-                    replaced = true;
-                    break;
+            
+            if (abnormalPriority && sample.isAbnormalSample()) {
+                for (int i = 0; i < samples.size(); i++) {
+                    if (!samples.get(i).isAbnormalSample()) {
+                        samples.set(i, sample);
+                        replaced = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!replaced) {
+                for (int i = 0; i < samples.size(); i++) {
+                    if (samples.get(i).isSuccess() && sample.isError()) {
+                        samples.set(i, sample);
+                        replaced = true;
+                        break;
+                    }
                 }
             }
             
@@ -82,6 +102,10 @@ public class UriTrafficGroup implements Serializable {
         return errorCount.get();
     }
 
+    public int getBlockedCount() {
+        return blockedCount.get();
+    }
+
     public long getAverageProcessingTime() {
         int c = count.get();
         return c > 0 ? totalProcessingTime.get() / c : 0;
@@ -90,6 +114,11 @@ public class UriTrafficGroup implements Serializable {
     public double getErrorRate() {
         int c = count.get();
         return c > 0 ? (double) errorCount.get() / c : 0.0;
+    }
+
+    public double getBlockedRate() {
+        int c = count.get();
+        return c > 0 ? (double) blockedCount.get() / c : 0.0;
     }
 
     public long getDuration() {
@@ -111,6 +140,7 @@ public class UriTrafficGroup implements Serializable {
     public synchronized void reset() {
         count.set(0);
         errorCount.set(0);
+        blockedCount.set(0);
         totalProcessingTime.set(0);
         samples.clear();
         startTime = System.currentTimeMillis();
@@ -121,9 +151,11 @@ public class UriTrafficGroup implements Serializable {
         UriTrafficGroup copy = new UriTrafficGroup(this.uriPattern, this.httpMethod, this.maxSampleSize);
         copy.count.set(this.count.get());
         copy.errorCount.set(this.errorCount.get());
+        copy.blockedCount.set(this.blockedCount.get());
         copy.totalProcessingTime.set(this.totalProcessingTime.get());
         copy.startTime = this.startTime;
         copy.lastUpdateTime = this.lastUpdateTime;
+        copy.abnormalPriority = this.abnormalPriority;
         synchronized (this) {
             copy.samples.addAll(this.samples);
         }
@@ -136,6 +168,7 @@ public class UriTrafficGroup implements Serializable {
         stats.setHttpMethod(this.httpMethod);
         stats.setCount(this.count.get());
         stats.setErrorCount(this.errorCount.get());
+        stats.setBlockedCount(this.blockedCount.get());
         stats.setAvgProcessingTime(getAverageProcessingTime());
         stats.setSampleCount(samples.size());
         return stats;

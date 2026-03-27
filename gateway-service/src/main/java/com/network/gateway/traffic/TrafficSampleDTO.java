@@ -20,6 +20,9 @@ public class TrafficSampleDTO implements Serializable {
     private long timestamp;
     private boolean error;
     private String errorMessage;
+    private int state;
+    private String stateName;
+    private int confidence;
 
     public TrafficSampleDTO() {
     }
@@ -35,5 +38,8 @@ public class TrafficSampleDTO implements Serializable {
         this.timestamp = sample.getTimestamp();
         this.error = sample.isError();
         this.errorMessage = sample.getErrorMessage();
+        this.state = sample.getState();
+        this.stateName = sample.getStateName();
+        this.confidence = sample.getConfidence();
     }
 }

@@ -7,11 +7,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Data
 public class IpTrafficQueue implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static final int SLIDING_WINDOW_SIZE_MS = 1000;
+    private static final int SLIDING_WINDOW_STEP_MS = 100;
 
     private String ip;
     private int currentState;
@@ -20,11 +24,19 @@ public class IpTrafficQueue implements Serializable {
     private long lastFlushTime;
     private int maxSampleSize;
     private long createTime;
+    private String traceId;
+    
+    private final long[] slidingWindowCounts = new long[SLIDING_WINDOW_SIZE_MS / SLIDING_WINDOW_STEP_MS];
+    private long slidingWindowStart;
+    private final AtomicLong currentWindowCount = new AtomicLong(0);
+    private final AtomicLong peakSlidingRps = new AtomicLong(0);
 
     public IpTrafficQueue() {
         this.maxSampleSize = 3;
         this.createTime = System.currentTimeMillis();
         this.lastFlushTime = this.createTime;
+        this.traceId = generateTraceId();
+        this.slidingWindowStart = this.createTime;
     }
 
     public IpTrafficQueue(String ip) {
@@ -43,15 +55,73 @@ public class IpTrafficQueue implements Serializable {
         this.maxSampleSize = maxSampleSize;
     }
 
+    private String generateTraceId() {
+        return java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    }
+
     public void addRequest(TrafficSample sample) {
         StateTrafficBucket bucket = getOrCreateBucket(currentState);
         bucket.addRequest(sample);
+        updateSlidingWindowRps();
+    }
+
+    private synchronized void updateSlidingWindowRps() {
+        long now = System.currentTimeMillis();
+        long elapsed = now - slidingWindowStart;
+        
+        if (elapsed >= SLIDING_WINDOW_SIZE_MS) {
+            int slotsToShift = (int) (elapsed / SLIDING_WINDOW_STEP_MS);
+            if (slotsToShift >= slidingWindowCounts.length) {
+                for (int i = 0; i < slidingWindowCounts.length; i++) {
+                    slidingWindowCounts[i] = 0;
+                }
+                slidingWindowCounts[0] = currentWindowCount.getAndSet(1);
+            } else {
+                for (int i = 0; i < slotsToShift; i++) {
+                    long totalRps = 0;
+                    for (int j = 0; j < slidingWindowCounts.length; j++) {
+                        totalRps += slidingWindowCounts[j];
+                    }
+                    if (totalRps > peakSlidingRps.get()) {
+                        peakSlidingRps.set(totalRps);
+                    }
+                    
+                    for (int j = slidingWindowCounts.length - 1; j > 0; j--) {
+                        slidingWindowCounts[j] = slidingWindowCounts[j - 1];
+                    }
+                    slidingWindowCounts[0] = 0;
+                }
+                slidingWindowCounts[0] = currentWindowCount.getAndSet(1);
+            }
+            slidingWindowStart = now;
+        } else {
+            currentWindowCount.incrementAndGet();
+            int currentSlot = (int) ((now - slidingWindowStart) / SLIDING_WINDOW_STEP_MS);
+            if (currentSlot < slidingWindowCounts.length) {
+                slidingWindowCounts[currentSlot]++;
+            }
+        }
+    }
+
+    public long getSlidingWindowRps() {
+        long total = 0;
+        for (long count : slidingWindowCounts) {
+            total += count;
+        }
+        return total;
+    }
+
+    public long getPeakSlidingRps() {
+        return peakSlidingRps.get();
     }
 
     public void transitionTo(int newState, String reason, int confidence) {
         if (newState == currentState) {
             return;
         }
+        
+        StateTrafficBucket oldBucket = getOrCreateBucket(currentState);
+        oldBucket.markEnded();
         
         StateTransition transition = new StateTransition(
             currentState, newState, System.currentTimeMillis(), reason, confidence);
@@ -154,6 +224,7 @@ public class IpTrafficQueue implements Serializable {
         TrafficAggregateData data = new TrafficAggregateData();
         data.setIp(this.ip);
         data.setState(this.currentState);
+        data.setTraceId(this.traceId);
         
         StateTrafficBucket currentBucket = getCurrentBucket();
         data.setStartTime(currentBucket.getStartTime());
@@ -162,8 +233,9 @@ public class IpTrafficQueue implements Serializable {
         
         data.setTotalRequests(currentBucket.getTotalCount());
         data.setErrorRequests(currentBucket.getErrorCount());
+        data.setBlockedRequests(currentBucket.getBlockedCount());
         data.setAvgProcessingTime(currentBucket.getAverageProcessingTime());
-        data.setPeakRps(currentBucket.getPeakRps());
+        data.setPeakRps(getPeakSlidingRps());
         
         data.setUriGroups(currentBucket.getUriGroupStats());
         data.setSamples(convertSamples(currentBucket.getAllSamples()));
@@ -171,6 +243,13 @@ public class IpTrafficQueue implements Serializable {
         StateTransition lastTransition = getLastTransition();
         if (lastTransition != null) {
             data.setTransition(lastTransition.toDTO());
+            data.setConfidence(lastTransition.getConfidence());
+        } else {
+            List<TrafficSample> samples = currentBucket.getAllSamples();
+            if (!samples.isEmpty()) {
+                TrafficSample lastSample = samples.get(samples.size() - 1);
+                data.setConfidence(lastSample.getConfidence());
+            }
         }
         
         return data;
@@ -206,11 +285,16 @@ public class IpTrafficQueue implements Serializable {
         private long transitionTime;
         private String reason;
         private int confidence;
+        private String operator;
+        private String resetReason;
+        private String traceId;
 
         public StateTransition() {
+            this.traceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         }
 
         public StateTransition(int fromState, int toState, long transitionTime, String reason, int confidence) {
+            this();
             this.fromState = fromState;
             this.toState = toState;
             this.transitionTime = transitionTime;
@@ -225,6 +309,9 @@ public class IpTrafficQueue implements Serializable {
             dto.setTransitionTime(transitionTime);
             dto.setReason(reason);
             dto.setConfidence(confidence);
+            dto.setOperator(operator);
+            dto.setResetReason(resetReason);
+            dto.setTraceId(traceId);
             return dto;
         }
     }

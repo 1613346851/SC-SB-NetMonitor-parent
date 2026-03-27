@@ -16,8 +16,10 @@ public class ConfidenceResult implements Serializable {
     private ScoreBreakdown breakdown;
     private long timestamp;
     private String reason;
+    private String traceId;
 
     public ConfidenceResult() {
+        this.traceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     }
 
     public int getDelta() {
@@ -36,7 +38,7 @@ public class ConfidenceResult implements Serializable {
 
     @Override
     public String toString() {
-        return String.format("ConfidenceResult{ip=%s, raw=%d, smoothed=%d, total=%d}",
-            ip, rawConfidence, smoothedConfidence, breakdown != null ? breakdown.getTotalScore() : 0);
+        return String.format("ConfidenceResult{ip=%s, raw=%d, smoothed=%d, total=%d, traceId=%s}",
+            ip, rawConfidence, smoothedConfidence, breakdown != null ? breakdown.getTotalScore() : 0, traceId);
     }
 }

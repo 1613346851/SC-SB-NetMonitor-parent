@@ -115,6 +115,18 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
             entity.setStateTag("NORMAL");
         }
         
+        if (dto.getStateValue() != null) {
+            entity.setStateValue(dto.getStateValue());
+        } else {
+            entity.setStateValue(0);
+        }
+        
+        if (dto.getConfidence() != null) {
+            entity.setConfidence(dto.getConfidence());
+        } else {
+            entity.setConfidence(0);
+        }
+        
         if (dto.getIsAggregated() != null && dto.getIsAggregated()) {
             entity.setIsAggregated(1);
         } else {

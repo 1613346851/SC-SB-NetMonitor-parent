@@ -23,11 +23,23 @@ public class ConfidenceContext implements Serializable {
     private boolean hasAttackHistory;
     private int normalRequestCount;
     private int attackHistoryCount;
+    private long stateDurationMs;
+    private int stateRequestCount;
+    private int slidingWindowRps;
+    private int errorRate;
+    private int blockedRate;
+    private boolean isSlowAttack;
+    private boolean isDistributedAttack;
+    private boolean isPeakPeriod;
+    private int peakAdaptationFactor;
+    private String traceId;
 
     public ConfidenceContext() {
+        this.traceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     }
 
     public ConfidenceContext(String ip) {
+        this();
         this.ip = ip;
     }
 
@@ -40,6 +52,10 @@ public class ConfidenceContext implements Serializable {
 
     public double getDurationSeconds() {
         return durationMs / 1000.0;
+    }
+
+    public double getStateDurationSeconds() {
+        return stateDurationMs / 1000.0;
     }
 
     public boolean isHighFrequency() {
@@ -56,5 +72,17 @@ public class ConfidenceContext implements Serializable {
 
     public boolean hasNormalHistory() {
         return normalRequestCount > 100;
+    }
+
+    public boolean isSlowAttackPattern() {
+        return isSlowAttack || (slidingWindowRps > 0 && slidingWindowRps < thresholdRps * 0.5 && durationMs > 60000);
+    }
+
+    public boolean isDistributedAttackPattern() {
+        return isDistributedAttack || (uniqueUriCount > 10 && errorRate < 20);
+    }
+
+    public boolean isInPeakPeriod() {
+        return isPeakPeriod;
     }
 }
