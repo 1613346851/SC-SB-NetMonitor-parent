@@ -4,7 +4,6 @@ import com.network.gateway.cache.GatewayConfigCache;
 import com.network.gateway.cache.IpAttackStateCache;
 import com.network.gateway.client.MonitorServiceTrafficClient;
 import com.network.gateway.constant.IpAttackStateConstant;
-import com.network.gateway.task.PeriodPushTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,27 +12,33 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 public class TrafficEventProcessor {
 
     private static final Logger logger = LoggerFactory.getLogger(TrafficEventProcessor.class);
 
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
+    private final ExecutorService pushExecutor = Executors.newFixedThreadPool(4,
         r -> {
-            Thread t = new Thread(r, "traffic-event-processor");
+            Thread t = new Thread(r, "traffic-push-worker");
             t.setDaemon(true);
             return t;
         }
     );
-
-    private ScheduledFuture<?> flushTask;
     
-    private static final long IDLE_TIMEOUT_MS = 60000;
+    private final ExecutorService retryExecutor = Executors.newSingleThreadExecutor(
+        r -> {
+            Thread t = new Thread(r, "traffic-retry-worker");
+            t.setDaemon(true);
+            return t;
+        }
+    );
+    
+    private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
     @Autowired
     private TrafficQueueManager queueManager;
@@ -51,109 +56,108 @@ public class TrafficEventProcessor {
     private GatewayConfigCache configCache;
 
     @Autowired
-    private PeriodPushTask periodPushTask;
-
-    @Autowired
     private IpAttackStateCache ipAttackStateCache;
 
     @Autowired
     private TrafficActivityService activityService;
 
+    @Autowired
+    private NetworkCongestionDetector congestionDetector;
+
     @PostConstruct
     public void init() {
-        long flushIntervalMs = configCache.getTrafficPushIntervalMs();
-        logger.info("流量事件处理器已初始化（事件驱动模式），刷新间隔={}ms", flushIntervalMs);
-        
-        flushTask = scheduler.scheduleWithFixedDelay(
-            this::processFlush,
-            flushIntervalMs,
-            flushIntervalMs,
-            TimeUnit.MILLISECONDS
-        );
+        logger.info("流量事件处理器已初始化（实时推送模式 + 动态拥塞控制）");
+        startRetryProcessor();
     }
 
     @PreDestroy
     public void shutdown() {
         logger.info("流量事件处理器正在关闭...");
+        isShutdown.set(true);
         
         flushAndPush();
         
-        scheduler.shutdown();
+        pushExecutor.shutdown();
+        retryExecutor.shutdown();
         try {
-            if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-                scheduler.shutdownNow();
+            if (!pushExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                pushExecutor.shutdownNow();
+            }
+            if (!retryExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                retryExecutor.shutdownNow();
             }
         } catch (InterruptedException e) {
-            scheduler.shutdownNow();
+            pushExecutor.shutdownNow();
+            retryExecutor.shutdownNow();
             Thread.currentThread().interrupt();
         }
         
         logger.info("流量事件处理器已关闭");
     }
 
-    private void processFlush() {
-        try {
-            if (!activityService.isActive()) {
-                return;
-            }
+    public void onTrafficReceived(String ip) {
+        if (isShutdown.get()) {
+            return;
+        }
+        
+        activityService.onTrafficReceived(ip);
+        
+        tryImmediatePush(ip);
+    }
+
+    public void onStateTransition(String ip, int fromState, int toState) {
+        if (isShutdown.get()) {
+            return;
+        }
+        
+        activityService.onStateTransition(ip, fromState, toState);
+        
+        if (fromState != toState) {
+            logger.info("状态转换触发即时推送: ip={}, {} -> {}", 
+                ip, IpAttackStateConstant.getStateNameZh(fromState), IpAttackStateConstant.getStateNameZh(toState));
             
-            long idleTime = activityService.getIdleTime();
-            
-            if (idleTime > IDLE_TIMEOUT_MS && !hasPendingWork()) {
-                activityService.deactivate();
-                return;
-            }
-            
-            if (!queueManager.hasAnyTraffic() && !queueManager.hasPendingPushTasks()) {
-                return;
-            }
-            
-            logger.debug("开始处理流量数据刷新");
-            
-            periodPushTask.checkAndPushPeriodData();
-            
-            ipAttackStateCache.cleanExpiredEntries();
-            
-            List<TrafficAggregateData> flushData = queueManager.flushPeriodic();
-            
-            for (TrafficAggregateData data : flushData) {
-                pushAggregateData(data);
-            }
-            
-            queueManager.cleanupExpiredQueues(300000);
-            
-            processRetryTasks();
-            
-        } catch (Exception e) {
-            logger.error("处理流量数据刷新失败", e);
+            pushImmediately(ip);
         }
     }
 
-    private boolean hasPendingWork() {
-        return queueManager.hasAnyTraffic() || 
-               queueManager.hasPendingPushTasks() ||
-               retryQueue.hasPendingTasks();
-    }
-
-    public void flushAndPush() {
-        try {
-            logger.info("执行最终刷新，推送所有待处理数据");
-            
-            List<TrafficAggregateData> flushData = queueManager.flushAll();
-            
-            for (TrafficAggregateData data : flushData) {
-                pushAggregateData(data);
-            }
-            
-            processRetryTasks();
-            
-        } catch (Exception e) {
-            logger.error("最终刷新失败", e);
+    private void tryImmediatePush(String ip) {
+        if (congestionDetector.canPushImmediately()) {
+            pushImmediately(ip);
+        } else {
+            logger.debug("网络拥塞，流量进入队列等待: ip={}, inFlight={}, window={}", 
+                ip, congestionDetector.getCurrentInflight(), congestionDetector.getCongestionWindow());
         }
     }
 
-    private void pushAggregateData(TrafficAggregateData data) {
+    private void pushImmediately(String ip) {
+        if (isShutdown.get()) {
+            return;
+        }
+        
+        TrafficAggregateData data = queueManager.flushIpQueueImmediately(ip);
+        if (data == null || data.getTotalRequests() == 0) {
+            return;
+        }
+        
+        congestionDetector.recordPushStart();
+        
+        pushExecutor.submit(() -> {
+            long startTime = System.currentTimeMillis();
+            try {
+                doPush(data);
+                long rtt = System.currentTimeMillis() - startTime;
+                congestionDetector.recordPushSuccess(rtt);
+            } catch (Exception e) {
+                long rtt = System.currentTimeMillis() - startTime;
+                congestionDetector.recordPushFailure(rtt, e);
+            }
+        });
+    }
+
+    private void doPush(TrafficAggregateData data) {
         if (degradationHandler.isInDegradationMode()) {
+            logger.warn("系统处于降级模式，跳过推送: ip={}, requests={}", 
+                data.getIp(), data.getTotalRequests());
             degradationHandler.handlePushFailure(
                 createPushTask(data), 
                 new Exception("系统处于降级模式"));
@@ -164,17 +168,79 @@ public class TrafficEventProcessor {
             TrafficAggregatePushDTO dto = new TrafficAggregatePushDTO(data);
             trafficClient.pushAggregateTraffic(dto);
             degradationHandler.handlePushSuccess();
-            logger.debug("推送聚合流量数据成功: ip={}, state={}, requests={}", 
+            logger.info("推送流量数据成功: ip={}, state={}, requests={}, uriGroups={}", 
                 data.getIp(), 
                 IpAttackStateConstant.getStateNameZh(data.getState()),
-                data.getTotalRequests());
+                data.getTotalRequests(),
+                data.getUriGroups() != null ? data.getUriGroups().size() : 0);
         } catch (Exception e) {
-            logger.warn("推送聚合流量数据失败: ip={}, error={}", 
-                data.getIp(), e.getMessage());
+            logger.error("推送流量数据失败: ip={}, requests={}, error={}", 
+                data.getIp(), data.getTotalRequests(), e.getMessage());
             
             degradationHandler.handlePushFailure(createPushTask(data), e);
-            
             retryQueue.addRetryTask(createPushTask(data), e);
+            
+            throw new RuntimeException("推送失败", e);
+        }
+    }
+
+    private void startRetryProcessor() {
+        retryExecutor.submit(() -> {
+            while (!isShutdown.get() && !Thread.currentThread().isInterrupted()) {
+                try {
+                    processRetryTasks();
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    logger.error("重试处理器异常", e);
+                }
+            }
+        });
+    }
+
+    private void processRetryTasks() {
+        if (!congestionDetector.canPushImmediately()) {
+            return;
+        }
+        
+        List<RetryTask> readyTasks = retryQueue.getReadyTasks(5);
+        
+        for (RetryTask retryTask : readyTasks) {
+            PushTask task = retryTask.getTask();
+            congestionDetector.recordPushStart();
+            
+            long startTime = System.currentTimeMillis();
+            try {
+                TrafficAggregatePushDTO dto = new TrafficAggregatePushDTO(task.getData());
+                trafficClient.pushAggregateTraffic(dto);
+                retryQueue.recordSuccess(task);
+                degradationHandler.handlePushSuccess();
+                congestionDetector.recordPushSuccess(System.currentTimeMillis() - startTime);
+            } catch (Exception e) {
+                congestionDetector.recordPushFailure(System.currentTimeMillis() - startTime, e);
+                retryQueue.recordFailure(task, e);
+            }
+        }
+    }
+
+    public void flushAndPush() {
+        try {
+            logger.info("执行最终刷新，推送所有待处理数据");
+            
+            List<TrafficAggregateData> flushData = queueManager.flushAll();
+            
+            for (TrafficAggregateData data : flushData) {
+                try {
+                    doPush(data);
+                } catch (Exception e) {
+                    logger.error("最终刷新推送失败: ip={}", data.getIp(), e);
+                }
+            }
+            
+        } catch (Exception e) {
+            logger.error("最终刷新失败", e);
         }
     }
 
@@ -188,22 +254,6 @@ public class TrafficEventProcessor {
         return task;
     }
 
-    private void processRetryTasks() {
-        List<RetryTask> readyTasks = retryQueue.getReadyTasks(10);
-        
-        for (RetryTask retryTask : readyTasks) {
-            PushTask task = retryTask.getTask();
-            try {
-                TrafficAggregatePushDTO dto = new TrafficAggregatePushDTO(task.getData());
-                trafficClient.pushAggregateTraffic(dto);
-                retryQueue.recordSuccess(task);
-                degradationHandler.handlePushSuccess();
-            } catch (Exception e) {
-                retryQueue.recordFailure(task, e);
-            }
-        }
-    }
-
     public boolean isActive() {
         return activityService.isActive();
     }
@@ -213,7 +263,13 @@ public class TrafficEventProcessor {
     }
 
     public String getStatus() {
-        return String.format("TrafficEventProcessor{active=%s, idleTime=%dms, pendingWork=%s}", 
-            activityService.isActive(), activityService.getIdleTime(), hasPendingWork());
+        return String.format("TrafficEventProcessor{active=%s, idleTime=%dms, congestion=%s}", 
+            activityService.isActive(), 
+            activityService.getIdleTime(),
+            congestionDetector.getStatistics());
+    }
+    
+    public NetworkCongestionDetector getCongestionDetector() {
+        return congestionDetector;
     }
 }

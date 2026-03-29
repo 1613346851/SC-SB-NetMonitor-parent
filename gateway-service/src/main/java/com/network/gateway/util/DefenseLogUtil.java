@@ -240,4 +240,130 @@ public class DefenseLogUtil {
             Instant.ofEpochMilli(timestamp), ZoneId.systemDefault());
         return dateTime.format(FORMATTER);
     }
+
+    public static DefenseLogDTO buildManualBanLog(String targetIp, String eventId,
+                                                  String operator, String reason,
+                                                  Long expireTimestamp) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.MANUAL_BAN.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.MANUAL_BAN.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("管理员手动封禁IP");
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        if (expireTimestamp != null) {
+            LocalDateTime expireDateTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(expireTimestamp), ZoneId.systemDefault());
+            logDTO.setExpireTime(expireDateTime.format(FORMATTER));
+        }
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildManualUnbanLog(String targetIp, String eventId,
+                                                    String operator, String reason) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.MANUAL_UNBAN.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.MANUAL_UNBAN.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("管理员手动解封IP");
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildTempBanLog(String targetIp, String eventId,
+                                                String reason, Integer confidence,
+                                                Long expireTimestamp) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.TEMP_BAN.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.TEMP_BAN.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("临时封禁IP，到期自动解封");
+        logDTO.setOperator("SYSTEM");
+        logDTO.setConfidence(confidence);
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        if (expireTimestamp != null) {
+            LocalDateTime expireDateTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(expireTimestamp), ZoneId.systemDefault());
+            logDTO.setExpireTime(expireDateTime.format(FORMATTER));
+        }
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildStateResetLog(String targetIp, String eventId,
+                                                   String operator, String reason,
+                                                   int fromState, int toState) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.STATE_RESET.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.STATE_RESET.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult(String.format("状态重置: %s -> %s", 
+            getStateNameZh(fromState), getStateNameZh(toState)));
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        logDTO.setFromState(fromState);
+        logDTO.setToState(toState);
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildWhitelistAddLog(String targetIp, String eventId,
+                                                     String operator, String reason) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.WHITELIST_ADD.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.WHITELIST_ADD.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("IP已加入白名单");
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildWhitelistRemoveLog(String targetIp, String eventId,
+                                                        String operator, String reason) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.WHITELIST_REMOVE.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.WHITELIST_REMOVE.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("IP已从白名单移除");
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        return logDTO;
+    }
+
+    private static String getStateNameZh(int state) {
+        switch (state) {
+            case 0: return "正常";
+            case 1: return "可疑";
+            case 2: return "攻击中";
+            case 3: return "已防御";
+            case 4: return "冷却期";
+            default: return "未知";
+        }
+    }
 }

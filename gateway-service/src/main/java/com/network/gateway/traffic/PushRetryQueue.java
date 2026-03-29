@@ -138,6 +138,15 @@ public class PushRetryQueue {
         return !retryQueue.isEmpty();
     }
 
+    public boolean hasUrgentTasks() {
+        for (RetryTask task : retryQueue) {
+            if (task.isReadyToRetry()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void clear() {
         int size = retryQueue.size();
         retryQueue.clear();

@@ -3,6 +3,8 @@ package com.network.gateway.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.gateway.cache.GatewayConfigCache;
+import com.network.gateway.entity.ConfigSyncState;
+import com.network.gateway.service.ConfigSyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,9 @@ public class GatewayConfigSyncController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private ConfigSyncService configSyncService;
 
     @PostMapping("/push")
     public ResponseEntity<Map<String, Object>> pushConfig(@RequestBody String requestBody) {
@@ -219,5 +224,109 @@ public class GatewayConfigSyncController {
         result.put("configCount", configCache.size());
         result.put("timestamp", System.currentTimeMillis());
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/notify")
+    public ResponseEntity<Map<String, Object>> onConfigChange(
+            @RequestBody Map<String, Object> notification) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            String newVersion = (String) notification.get("version");
+            String source = (String) notification.get("source");
+            
+            logger.info("收到配置变更通知: version={}, source={}", newVersion, source);
+            
+            boolean triggered = configSyncService.onConfigChangeNotification(newVersion);
+            
+            result.put("success", true);
+            result.put("message", triggered ? "已触发配置同步" : "无需同步");
+            result.put("gatewayId", configSyncService.getGatewayId());
+            result.put("currentVersion", configSyncService.getCurrentVersion());
+            result.put("triggered", triggered);
+            result.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("处理配置变更通知失败", e);
+            result.put("success", false);
+            result.put("message", "处理失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    @GetMapping("/sync/status")
+    public ResponseEntity<Map<String, Object>> getSyncStatus() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            ConfigSyncState state = configSyncService.getSyncState();
+            
+            if (state != null) {
+                result.put("success", true);
+                result.put("gatewayId", state.getGatewayId());
+                result.put("currentVersion", state.getCurrentVersion());
+                result.put("syncStatus", state.getSyncStatus());
+                result.put("lastSyncTime", state.getLastSyncTime());
+                result.put("failCount", state.getSyncFailCount());
+                result.put("handshakeStep", state.getHandshakeStep());
+            } else {
+                result.put("success", false);
+                result.put("message", "无同步状态");
+            }
+            
+            result.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("获取同步状态失败", e);
+            result.put("success", false);
+            result.put("message", "获取失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    @PostMapping("/sync/force")
+    public ResponseEntity<Map<String, Object>> forceSync() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            configSyncService.forceSync();
+            
+            result.put("success", true);
+            result.put("message", "已触发强制同步");
+            result.put("gatewayId", configSyncService.getGatewayId());
+            result.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("强制同步失败", e);
+            result.put("success", false);
+            result.put("message", "强制同步失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    @GetMapping("/sync/stats")
+    public ResponseEntity<Map<String, Object>> getSyncStats() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            result.put("success", true);
+            result.put("syncStats", configSyncService.getStats());
+            result.put("cacheStats", configCache.getStats());
+            result.put("configCount", configCache.size());
+            result.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("获取同步统计失败", e);
+            result.put("success", false);
+            result.put("message", "获取失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
     }
 }

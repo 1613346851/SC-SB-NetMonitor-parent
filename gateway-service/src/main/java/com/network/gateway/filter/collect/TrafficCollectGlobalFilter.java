@@ -23,8 +23,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
-
 @Component
 public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
 
@@ -60,7 +58,8 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
     @Autowired
     private TrafficActivityService activityService;
 
-    private boolean useNewQueueSystem = true;
+    @Autowired
+    private TrafficAggregateService aggregateService;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -82,7 +81,7 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
             }
 
             int currentState = attackStateCache.getState(sourceIp);
-            TrafficPushStrategy pushStrategy = getPushStrategy(currentState, sourceIp);
+            TrafficPushStrategy pushStrategy = getPushStrategy(currentState);
 
             attackStateCache.incrementRequestCount(sourceIp);
             
@@ -91,11 +90,7 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
                 IpAttackStateConstant.getStateName(currentState),
                 pushStrategy);
 
-            if (useNewQueueSystem) {
-                return handleWithNewQueueSystem(exchange, chain, rawTraffic, sourceIp, currentState, startTime);
-            } else {
-                return handleWithOldSystem(exchange, chain, rawTraffic, requestId, pushStrategy, startTime);
-            }
+            return handleTraffic(exchange, chain, rawTraffic, sourceIp, currentState, pushStrategy, startTime);
 
         } catch (Exception e) {
             logger.error("流量采集过程中发生异常", e);
@@ -103,37 +98,124 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         }
     }
 
-    private Mono<Void> handleWithNewQueueSystem(ServerWebExchange exchange, GatewayFilterChain chain,
-                                                RawTrafficBO rawTraffic, String sourceIp, 
-                                                int currentState, long startTime) {
+    private Mono<Void> handleTraffic(ServerWebExchange exchange, GatewayFilterChain chain,
+                                     RawTrafficBO rawTraffic, String sourceIp, 
+                                     int currentState, TrafficPushStrategy pushStrategy, 
+                                     long startTime) {
+        
+        if (pushStrategy == TrafficPushStrategy.REALTIME) {
+            return handleRealtimePush(exchange, chain, rawTraffic, sourceIp, currentState, startTime);
+        } else if (pushStrategy == TrafficPushStrategy.AGGREGATE) {
+            return handleAggregatePush(exchange, chain, rawTraffic, sourceIp, currentState, startTime);
+        } else if (pushStrategy == TrafficPushStrategy.SAMPLING) {
+            return handleSamplingPush(exchange, chain, rawTraffic, sourceIp, currentState, startTime);
+        } else {
+            return chain.filter(exchange);
+        }
+    }
+
+    private Mono<Void> handleRealtimePush(ServerWebExchange exchange, GatewayFilterChain chain,
+                                          RawTrafficBO rawTraffic, String sourceIp, 
+                                          int currentState, long startTime) {
+        TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
+        monitorDTO.setIsAggregated(false);
+        
+        return chain.filter(exchange)
+                .doOnSuccess(unused -> {
+                    try {
+                        long endTime = System.currentTimeMillis();
+                        int statusCode = exchange.getResponse().getStatusCode() != null ? 
+                                       exchange.getResponse().getStatusCode().value() : 200;
+                        
+                        monitorDTO.setResponseInfo(statusCode, "", endTime - startTime);
+                        monitorDTO.setStateTag(IpAttackStateConstant.getStateName(currentState));
+                        
+                        doRealtimePush(monitorDTO);
+                        
+                        logger.debug("实时推送完成：ip={}, uri={}, 耗时{}ms", 
+                            sourceIp, rawTraffic.getUri(), endTime - startTime);
+                    } catch (Exception e) {
+                        logger.error("实时推送失败：ip={}", sourceIp, e);
+                    }
+                })
+                .doOnError(throwable -> {
+                    logger.warn("请求处理错误：ip={}, error={}", sourceIp, throwable.getMessage());
+                });
+    }
+
+    private Mono<Void> handleAggregatePush(ServerWebExchange exchange, GatewayFilterChain chain,
+                                           RawTrafficBO rawTraffic, String sourceIp, 
+                                           int currentState, long startTime) {
         TrafficSample sample = createTrafficSample(rawTraffic, currentState, sourceIp);
         
         return chain.filter(exchange)
                 .doOnSuccess(unused -> {
-                    handleNewQueueSuccess(exchange, sample, sourceIp, startTime);
+                    try {
+                        long endTime = System.currentTimeMillis();
+                        int statusCode = exchange.getResponse().getStatusCode() != null ? 
+                                       exchange.getResponse().getStatusCode().value() : 200;
+                        
+                        sample.setResponseStatus(statusCode);
+                        sample.setProcessingTime(endTime - startTime);
+                        sample.setError(statusCode >= 400);
+                        
+                        aggregateService.addSample(sourceIp, sample);
+                        
+                        logger.debug("流量已加入聚合队列：ip={}, uri={}, state={}", 
+                            sourceIp, sample.getRequestUri(), 
+                            IpAttackStateConstant.getStateNameZh(currentState));
+                    } catch (Exception e) {
+                        logger.error("聚合处理失败：ip={}", sourceIp, e);
+                    }
                 })
                 .doOnError(throwable -> {
-                    handleNewQueueError(exchange, sample, sourceIp, startTime, throwable);
+                    try {
+                        sample.setError(true);
+                        sample.setErrorMessage(throwable.getMessage());
+                        aggregateService.addSample(sourceIp, sample);
+                    } catch (Exception e) {
+                        logger.error("聚合处理错误失败：ip={}", sourceIp, e);
+                    }
                 });
     }
 
-    private Mono<Void> handleWithOldSystem(ServerWebExchange exchange, GatewayFilterChain chain,
-                                          RawTrafficBO rawTraffic, String requestId,
-                                          TrafficPushStrategy pushStrategy, long startTime) {
-        TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
-        monitorDTO.setSkipPush(pushStrategy == TrafficPushStrategy.SKIP);
+    private Mono<Void> handleSamplingPush(ServerWebExchange exchange, GatewayFilterChain chain,
+                                          RawTrafficBO rawTraffic, String sourceIp, 
+                                          int currentState, long startTime) {
+        int samplingRate = configCache.getTrafficPushSamplingRate();
+        
+        if (shouldSample(samplingRate)) {
+            TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
+            monitorDTO.setIsAggregated(false);
+            
+            return chain.filter(exchange)
+                    .doOnSuccess(unused -> {
+                        try {
+                            long endTime = System.currentTimeMillis();
+                            int statusCode = exchange.getResponse().getStatusCode() != null ? 
+                                           exchange.getResponse().getStatusCode().value() : 200;
+                            
+                            monitorDTO.setResponseInfo(statusCode, "", endTime - startTime);
+                            monitorDTO.setStateTag(IpAttackStateConstant.getStateName(currentState));
+                            
+                            doRealtimePush(monitorDTO);
+                            
+                            logger.debug("采样推送完成：ip={}, uri={}", sourceIp, rawTraffic.getUri());
+                        } catch (Exception e) {
+                            logger.error("采样推送失败：ip={}", sourceIp, e);
+                        }
+                    });
+        } else {
+            logger.debug("采样跳过：ip={}, rate=1/{}", sourceIp, samplingRate);
+            return chain.filter(exchange);
+        }
+    }
 
-        trafficTempCache.putTraffic(requestId, monitorDTO);
-
-        final TrafficPushStrategy finalPushStrategy = pushStrategy;
-
-        return chain.filter(exchange)
-                .doOnSuccess(unused -> {
-                    handleRequestSuccess(exchange, monitorDTO, startTime, finalPushStrategy);
-                })
-                .doOnError(throwable -> {
-                    handleRequestError(exchange, monitorDTO, throwable, startTime, finalPushStrategy);
-                });
+    private boolean shouldSample(int samplingRate) {
+        if (samplingRate <= 1) {
+            return true;
+        }
+        return (System.currentTimeMillis() % samplingRate) == 0;
     }
 
     private TrafficSample createTrafficSample(RawTrafficBO rawTraffic, int currentState, String sourceIp) {
@@ -150,77 +232,21 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         return sample;
     }
 
-    private void handleNewQueueSuccess(ServerWebExchange exchange, TrafficSample sample, 
-                                       String sourceIp, long startTime) {
-        try {
-            long endTime = System.currentTimeMillis();
-            int statusCode = exchange.getResponse().getStatusCode() != null ? 
-                           exchange.getResponse().getStatusCode().value() : 200;
-            
-            int currentState = attackStateCache.getState(sourceIp);
-            sample.setResponseStatus(statusCode);
-            sample.setProcessingTime(endTime - startTime);
-            sample.setError(statusCode >= 400);
-            sample.setState(currentState);
-            sample.setStateName(IpAttackStateConstant.getStateNameZh(currentState));
-            sample.setConfidence(attackStateCache.getConfidence(sourceIp));
-            sample.setBlocked(statusCode == 429 || statusCode == 403);
-            
-            queueManager.addRequest(sourceIp, sample);
-            
-            activityService.onTrafficReceived(sourceIp);
-            
-            logger.debug("流量采集完成（新队列）：ip={} uri={} 耗时{}ms 状态码{} 状态={}", 
-                        sourceIp, sample.getRequestUri(), endTime - startTime, statusCode,
-                        IpAttackStateConstant.getStateNameZh(currentState));
-
-        } catch (Exception e) {
-            logger.error("处理请求成功回调时发生异常（新队列）", e);
-        }
-    }
-
-    private void handleNewQueueError(ServerWebExchange exchange, TrafficSample sample, 
-                                     String sourceIp, long startTime, Throwable throwable) {
-        try {
-            long endTime = System.currentTimeMillis();
-            int statusCode = exchange.getResponse().getStatusCode() != null ? 
-                           exchange.getResponse().getStatusCode().value() : 500;
-            
-            int currentState = attackStateCache.getState(sourceIp);
-            sample.setResponseStatus(statusCode);
-            sample.setProcessingTime(endTime - startTime);
-            sample.setError(true);
-            sample.setErrorMessage(throwable.getMessage());
-            sample.setState(currentState);
-            sample.setStateName(IpAttackStateConstant.getStateNameZh(currentState));
-            sample.setConfidence(attackStateCache.getConfidence(sourceIp));
-            
-            queueManager.addRequest(sourceIp, sample);
-            
-            logger.warn("流量采集记录错误（新队列）：ip={} uri={} 耗时{}ms 状态={} 错误：{}", 
-                       sourceIp, sample.getRequestUri(), endTime - startTime,
-                       IpAttackStateConstant.getStateNameZh(currentState), throwable.getMessage());
-
-        } catch (Exception e) {
-            logger.error("处理请求错误回调时发生异常（新队列）", e);
-        }
-    }
-
-    private TrafficPushStrategy getPushStrategy(int state, String sourceIp) {
+    private TrafficPushStrategy getPushStrategy(int state) {
         switch (state) {
-            case IpAttackStateConstant.DEFENDED:
-                return TrafficPushStrategy.COUNTER_ONLY;
+            case IpAttackStateConstant.NORMAL:
+                return TrafficPushStrategy.REALTIME;
             
             case IpAttackStateConstant.SUSPICIOUS:
+            case IpAttackStateConstant.ATTACKING:
+            case IpAttackStateConstant.DEFENDED:
+                return TrafficPushStrategy.AGGREGATE;
+            
             case IpAttackStateConstant.COOLDOWN:
                 return TrafficPushStrategy.SAMPLING;
             
-            case IpAttackStateConstant.ATTACKING:
-                return TrafficPushStrategy.AGGREGATE;
-            
-            case IpAttackStateConstant.NORMAL:
             default:
-                return TrafficPushStrategy.DELAYED_BATCH;
+                return TrafficPushStrategy.REALTIME;
         }
     }
 
@@ -240,108 +266,14 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         return false;
     }
 
-    private void handleRequestSuccess(ServerWebExchange exchange, 
-                                    TrafficMonitorDTO monitorDTO, 
-                                    long startTime,
-                                    TrafficPushStrategy pushStrategy) {
-        try {
-            long endTime = System.currentTimeMillis();
-            int statusCode = exchange.getResponse().getStatusCode() != null ? 
-                           exchange.getResponse().getStatusCode().value() : 200;
-            
-            monitorDTO.setResponseInfo(statusCode, "", endTime - startTime);
-
-            trafficTempCache.putTraffic(monitorDTO.getRequestId(), monitorDTO);
-
-            executePushStrategy(monitorDTO, pushStrategy);
-
-            logger.debug("流量采集完成：{} 耗时{}ms 状态码{} 策略={}", 
-                        monitorDTO.getRequestId(), 
-                        endTime - startTime, 
-                        statusCode,
-                        pushStrategy);
-
-        } catch (Exception e) {
-            logger.error("处理请求成功回调时发生异常", e);
-        }
-    }
-
-    private void handleRequestError(ServerWebExchange exchange, 
-                                  TrafficMonitorDTO monitorDTO, 
-                                  Throwable throwable, 
-                                  long startTime,
-                                  TrafficPushStrategy pushStrategy) {
-        try {
-            long endTime = System.currentTimeMillis();
-            
-            int statusCode = exchange.getResponse().getStatusCode() != null ? 
-                           exchange.getResponse().getStatusCode().value() : 500;
-            
-            monitorDTO.markAsFailed(throwable.getMessage());
-            monitorDTO.setResponseInfo(statusCode, "", endTime - startTime);
-
-            trafficTempCache.putTraffic(monitorDTO.getRequestId(), monitorDTO);
-
-            executePushStrategy(monitorDTO, pushStrategy);
-
-            logger.warn("流量采集记录错误：{} 耗时{}ms 错误：{} 状态码{} 策略={}", 
-                       monitorDTO.getRequestId(), 
-                       endTime - startTime, 
-                       throwable.getMessage(),
-                       statusCode,
-                       pushStrategy);
-
-        } catch (Exception e) {
-            logger.error("处理请求错误回调时发生异常", e);
-        }
-    }
-
-    private void executePushStrategy(TrafficMonitorDTO monitorDTO, TrafficPushStrategy strategy) {
-        switch (strategy) {
-            case SKIP:
-                logger.debug("跳过流量推送: ip={}", monitorDTO.getSourceIp());
-                break;
-            
-            case REALTIME:
-                doRealtimePush(monitorDTO);
-                break;
-            
-            case DELAYED_BATCH:
-            case COUNTER_ONLY:
-            case AGGREGATE:
-            case SAMPLING:
-                doHandlerPush(monitorDTO, strategy);
-                break;
-            
-            case BATCH:
-            default:
-                doRealtimePush(monitorDTO);
-                break;
-        }
-    }
-
     private void doRealtimePush(TrafficMonitorDTO monitorDTO) {
         try {
             trafficClient.pushTraffic(monitorDTO);
-            logger.debug("实时推送流量数据成功：请求ID[{}]", monitorDTO.getRequestId());
+            logger.info("实时推送流量成功：ip={}, uri={}, isAggregated=false", 
+                monitorDTO.getSourceIp(), monitorDTO.getRequestUri());
         } catch (Exception e) {
-            logger.warn("实时推送流量数据失败：请求ID[{}], 错误：{}", 
-                       monitorDTO.getRequestId(), e.getMessage());
-        }
-    }
-
-    private void doHandlerPush(TrafficMonitorDTO monitorDTO, TrafficPushStrategy strategy) {
-        try {
-            var handler = strategyManager.getHandler(strategy);
-            if (handler != null) {
-                handler.handle(monitorDTO);
-            } else {
-                logger.warn("未找到策略处理器: {}, 使用实时推送", strategy);
-                doRealtimePush(monitorDTO);
-            }
-        } catch (Exception e) {
-            logger.warn("策略处理失败: {}, 错误: {}, 使用实时推送", strategy, e.getMessage());
-            doRealtimePush(monitorDTO);
+            logger.error("实时推送流量失败：ip={}, uri={}, error={}", 
+                monitorDTO.getSourceIp(), monitorDTO.getRequestUri(), e.getMessage());
         }
     }
 
@@ -354,67 +286,13 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         return "TrafficCollectGlobalFilter";
     }
 
-    public int getCachedTrafficCount() {
-        return trafficTempCache.getSize();
-    }
-
-    public void cleanupExpiredTraffics() {
-        trafficTempCache.cleanupExpired();
-    }
-
     public String getStatistics() {
         StringBuilder sb = new StringBuilder();
         sb.append("流量采集过滤器统计:\n");
-        sb.append(String.format("  - 缓存流量数: %d\n", getCachedTrafficCount()));
+        sb.append(String.format("  - 缓存流量数: %d\n", trafficTempCache.getSize()));
         sb.append(String.format("  - 缓存统计: %s\n", trafficTempCache.getStats()));
-        sb.append(String.format("  - 队列管理器: %s\n", queueManager.getStatistics()));
-        sb.append(String.format("  - 重试队列: %s\n", retryQueue.getStats()));
-        sb.append(String.format("  - 降级状态: %s\n", degradationHandler.getStats()));
+        sb.append(String.format("  - 聚合服务: %s\n", aggregateService.getStatistics()));
         sb.append(String.format("  - 事件处理器: %s\n", eventProcessor.getStatus()));
-        sb.append(strategyManager.getAllStats());
         return sb.toString();
-    }
-
-    private void pushAggregateData(TrafficAggregateData data) {
-        if (degradationHandler.isInDegradationMode()) {
-            degradationHandler.handlePushFailure(
-                createPushTask(data), 
-                new Exception("系统处于降级模式"));
-            return;
-        }
-        
-        try {
-            TrafficAggregatePushDTO dto = new TrafficAggregatePushDTO(data);
-            trafficClient.pushAggregateTraffic(dto);
-            degradationHandler.handlePushSuccess();
-            logger.debug("推送聚合流量数据成功: ip={}, requests={}", 
-                data.getIp(), data.getTotalRequests());
-        } catch (Exception e) {
-            logger.warn("推送聚合流量数据失败: ip={}, error={}", 
-                data.getIp(), e.getMessage());
-            
-            degradationHandler.handlePushFailure(createPushTask(data), e);
-            
-            retryQueue.addRetryTask(createPushTask(data), e);
-        }
-    }
-
-    private PushTask createPushTask(TrafficAggregateData data) {
-        PushTask task = new PushTask();
-        task.setTaskId(System.currentTimeMillis());
-        task.setType(PushTaskType.PERIODIC_FLUSH);
-        task.setIp(data.getIp());
-        task.setData(data);
-        task.setCreateTime(System.currentTimeMillis());
-        return task;
-    }
-
-    public void recordStateTransition(String ip, int fromState, int toState, String reason, int confidence) {
-        queueManager.recordStateTransition(ip, fromState, toState, reason, confidence);
-        activityService.onStateTransition(ip, fromState, toState);
-    }
-
-    public void setUseNewQueueSystem(boolean useNewQueueSystem) {
-        this.useNewQueueSystem = useNewQueueSystem;
     }
 }

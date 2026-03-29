@@ -630,6 +630,15 @@ INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`,
 
 -- ------------------------------------------------------------
 -- 4.3 初始化系统配置
+-- 按监测服务配置、AI配置、网关配置的顺序排列
+-- ------------------------------------------------------------
+
+-- ============================================================
+-- 一、监测服务配置
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1.1 基础配置项
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('blacklist.default.expire.seconds', '86400', '黑名单默认过期时间（秒）'),
@@ -637,15 +646,7 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('alert.heartbeat.interval', '10000', '告警心跳间隔（毫秒）');
 
 -- ------------------------------------------------------------
--- 4.3.0 初始化AI配置项
--- AI模型配置，用于漏洞扫描、攻击分析与智能研判
--- ------------------------------------------------------------
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('ai.model.url', '', 'AI大模型接口地址'),
-('ai.model.apiKey', '', 'AI大模型API密钥');
-
--- ------------------------------------------------------------
--- 4.3.1 DDoS防护配置项
+-- 1.2 DDoS防护配置项
 -- 统一时间单位为"次/秒"，使用毫秒级时间窗口
 -- 优化后提高阈值，增加各阶段区分度
 -- ------------------------------------------------------------
@@ -657,7 +658,7 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('ddos.peak-rps.record.enabled', 'true', '是否记录峰值RPS');
 
 -- ------------------------------------------------------------
--- 4.3.2 防御策略配置项
+-- 1.3 防御策略配置项
 -- 不同风险等级的封禁时长配置
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
@@ -669,86 +670,119 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('defense.blacklist.repeat-offender.max-multiplier', '8', '最大封禁时长倍数');
 
 -- ------------------------------------------------------------
--- 4.3.3 流量推送策略配置项
+-- 1.4 流量推送策略配置项
 -- 根据IP状态决定流量数据处理策略
+-- realtime: 实时推送（单条流量直接推送，不聚合）
+-- aggregate: 聚合推送（按统计周期聚合相同流量后批量推送）
+-- sampling: 采样推送（按比例采样后推送）
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('traffic.push.normal.strategy', 'realtime', 'NORMAL状态推送策略: realtime/sampling'),
-('traffic.push.suspicious.strategy', 'sampling', 'SUSPICIOUS状态推送策略'),
-('traffic.push.attacking.strategy', 'batch', 'ATTACKING状态推送策略'),
-('traffic.push.defended.strategy', 'skip', 'DEFENDED状态推送策略: skip/sampling'),
-('traffic.push.cooldown.strategy', 'sampling', 'COOLDOWN状态推送策略'),
-('traffic.push.batch-interval-ms', '5000', '批量推送间隔(毫秒)'),
+('traffic.push.normal.strategy', 'realtime', 'NORMAL状态推送策略: realtime - 实时推送，不聚合'),
+('traffic.push.suspicious.strategy', 'aggregate', 'SUSPICIOUS状态推送策略: aggregate - 聚合推送'),
+('traffic.push.attacking.strategy', 'aggregate', 'ATTACKING状态推送策略: aggregate - 聚合推送'),
+('traffic.push.defended.strategy', 'aggregate', 'DEFENDED状态推送策略: aggregate - 聚合推送'),
+('traffic.push.cooldown.strategy', 'sampling', 'COOLDOWN状态推送策略: sampling - 采样推送'),
+('traffic.push.aggregate-interval-ms', '5000', '聚合推送统计周期(毫秒)'),
 ('traffic.push.sampling-rate', '10', '采样推送比例(1/N)'),
 ('traffic.push.enabled', 'true', '是否启用流量推送');
 
 -- ------------------------------------------------------------
--- 4.3.1 初始化网关配置项
--- 网关服务统一配置，由监测服务管理
--- ------------------------------------------------------------
--- 网关防御开关配置
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('gateway.defense.blacklist.enabled', 'true', '网关-黑名单防御开关'),
-('gateway.defense.rate-limit.enabled', 'true', '网关-限流防御开关'),
-('gateway.defense.malicious-request.enabled', 'true', '网关-恶意请求拦截开关');
-
--- 限流配置
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('gateway.defense.rate-limit.default-threshold', '30', '网关-默认限流阈值(次/秒) -- 提高阈值增加测试空间'),
-('gateway.defense.rate-limit.window-size', '1000', '网关-限流时间窗口(毫秒)');
-
--- 黑名单配置
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('gateway.defense.blacklist.default-expire-seconds', '600', '网关-黑名单默认过期时间(秒)');
-
--- 恶意请求检测配置
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('gateway.defense.malicious.user-agents', 'sqlmap,nessus,nmap,burp suite,zaproxy,nikto,w3af,arachni,skipfish,wvs,dirb,gobuster,ffuf,hydra,medusa', '网关-恶意User-Agent列表(逗号分隔)'),
-('gateway.defense.malicious.uri-patterns', '/admin,/manager,/console,/wp-admin,/phpmyadmin,/mysql,/dbadmin,/webdav,/.git/config,/.env,/config/database.yml,/backup,/dump,/export,/download', '网关-恶意URI模式列表(逗号分隔)');
-
--- 缓存配置
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('gateway.cache.traffic-expire-ms', '3600000', '网关-流量缓存过期时间(毫秒)'),
-('gateway.cache.blacklist-expire-ms', '600000', '网关-黑名单缓存过期时间(毫秒)'),
-('gateway.cache.cleanup-interval-ms', '60000', '网关-缓存清理间隔(毫秒)');
-
--- 攻击状态配置
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('gateway.attack-state.cooldown-duration-ms', '300000', '网关-冷却持续时间(毫秒)'),
-('gateway.attack-state.state-expire-ms', '600000', '网关-攻击状态过期时间(毫秒)');
-
--- ------------------------------------------------------------
--- 4.3.2 状态转换配置项（新增）
+-- 1.5 状态转换配置项
 -- 定义IP状态机各状态之间的转换条件
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 -- NORMAL -> SUSPICIOUS 触发条件
 ('state.normal-to-suspicious.threshold-rps', '30', 'NORMAL到SUSPICIOUS的RPS阈值(次/秒)'),
 ('state.normal-to-suspicious.window-ms', '1000', 'NORMAL到SUSPICIOUS的检测窗口(毫秒)'),
-
 -- SUSPICIOUS -> ATTACKING 触发条件
 ('state.suspicious-to-attacking.duration-ms', '5000', 'SUSPICIOUS持续多久转为ATTACKING(毫秒)'),
 ('state.suspicious-to-attacking.min-requests', '50', 'SUSPICIOUS期间最小请求数'),
 ('state.suspicious-to-attacking.uri-diversity-threshold', '3', 'URI多样性阈值(不同URI数量)'),
-
 -- SUSPICIOUS -> NORMAL 恢复条件
 ('state.suspicious-to-normal.quiet-duration-ms', '10000', 'SUSPICIOUS静止多久恢复NORMAL(毫秒)'),
-
 -- DEFENDED -> COOLDOWN 触发条件
 ('state.defended-to-cooldown.quiet-duration-ms', '30000', 'DEFENDED静止多久进入COOLDOWN(毫秒)'),
-
 -- COOLDOWN -> NORMAL 恢复条件（动态时长基础配置）
 ('state.cooldown.base-duration-ms', '180000', 'COOLDOWN基础时长(毫秒)，默认3分钟'),
 ('state.cooldown.max-duration-ms', '600000', 'COOLDOWN最大时长(毫秒)，默认10分钟'),
 ('state.cooldown.attack-intensity-multiplier', '0.5', '攻击强度系数，用于计算动态时长'),
-
 -- COOLDOWN -> ATTACKING 重新攻击条件
 ('state.cooldown-to-attacking.threshold-rps', '20', 'COOLDOWN期间重新攻击的RPS阈值');
 
--- 请求限制配置
+-- ============================================================
+-- 二、AI配置
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 2.1 AI模型配置项
+-- AI模型配置，用于漏洞扫描、攻击分析与智能研判
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('ai.model.url', '', 'AI大模型接口地址'),
+('ai.model.apiKey', '', 'AI大模型API密钥');
+
+-- ============================================================
+-- 三、网关配置
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 3.1 网关防御开关配置
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.blacklist.enabled', 'true', '网关-黑名单防御开关'),
+('gateway.defense.rate-limit.enabled', 'true', '网关-限流防御开关'),
+('gateway.defense.malicious-request.enabled', 'true', '网关-恶意请求拦截开关');
+
+-- ------------------------------------------------------------
+-- 3.2 限流配置
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.rate-limit.default-threshold', '30', '网关-默认限流阈值(次/秒) -- 提高阈值增加测试空间'),
+('gateway.defense.rate-limit.window-size', '1000', '网关-限流时间窗口(毫秒)');
+
+-- ------------------------------------------------------------
+-- 3.3 黑名单配置
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.blacklist.default-expire-seconds', '600', '网关-黑名单默认过期时间(秒)');
+
+-- ------------------------------------------------------------
+-- 3.4 恶意请求检测配置
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.malicious.user-agents', 'sqlmap,nessus,nmap,burp suite,zaproxy,nikto,w3af,arachni,skipfish,wvs,dirb,gobuster,ffuf,hydra,medusa', '网关-恶意User-Agent列表(逗号分隔)'),
+('gateway.defense.malicious.uri-patterns', '/admin,/manager,/console,/wp-admin,/phpmyadmin,/mysql,/dbadmin,/webdav,/.git/config,/.env,/config/database.yml,/backup,/dump,/export,/download', '网关-恶意URI模式列表(逗号分隔)');
+
+-- ------------------------------------------------------------
+-- 3.5 缓存配置
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.cache.traffic-expire-ms', '3600000', '网关-流量缓存过期时间(毫秒)'),
+('gateway.cache.blacklist-expire-ms', '600000', '网关-黑名单缓存过期时间(毫秒)'),
+('gateway.cache.cleanup-interval-ms', '60000', '网关-缓存清理间隔(毫秒)');
+
+-- ------------------------------------------------------------
+-- 3.6 攻击状态配置
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.attack-state.cooldown-duration-ms', '300000', '网关-冷却持续时间(毫秒)'),
+('gateway.attack-state.state-expire-ms', '600000', '网关-攻击状态过期时间(毫秒)');
+
+-- ------------------------------------------------------------
+-- 3.7 请求限制配置
+-- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('gateway.request.max-body-size', '102400', '网关-最大请求体大小(字节)'),
 ('gateway.request.abnormal-response-threshold-ms', '3000', '网关-异常响应时间阈值(毫秒)');
+
+-- ------------------------------------------------------------
+-- 3.8 防御增强配置
+-- 业务高峰期防御阈值调整
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('gateway.defense.rate-limit.peak-threshold', '60', '业务高峰期限流阈值(次/秒)'),
+('gateway.defense.ban.duration-base-ms', '300000', '封禁基础时长(毫秒)，默认5分钟'),
+('gateway.defense.ban.duration-multiplier', '6', '重复违规封禁时长倍数');
 
 -- ------------------------------------------------------------
 -- 4.4 初始化角色数据
@@ -927,35 +961,24 @@ CREATE TABLE `sys_alert_rule` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警规则表';
 
 -- ------------------------------------------------------------
--- 4.8.1 置信度计算配置项（新增）
+-- 1.6 置信度计算配置项
 -- 基于多因素科学计算置信度
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
--- 基础分
 ('confidence.base-score', '30', '置信度基础分'),
-
--- 频率异常评分
 ('confidence.frequency.max-score', '25', '频率异常最高分'),
 ('confidence.frequency.per-exceed-score', '5', '每超过阈值1倍的得分'),
-
--- 多样性评分
 ('confidence.diversity.max-score', '20', '多样性最高分'),
 ('confidence.diversity.per-uri-score', '3', '每个不同URI的得分'),
-
--- 持续时间评分
 ('confidence.persistence.max-score', '15', '持续时间最高分'),
 ('confidence.persistence.per-10s-score', '3', '每持续10秒的得分'),
-
--- 攻击模式评分
 ('confidence.pattern.max-score', '10', '攻击模式匹配最高分'),
-
--- 正常行为抵扣
 ('confidence.normal-behavior.max-deduction', '20', '正常行为最高抵扣'),
 ('confidence.normal-behavior.no-history-deduction', '5', '无历史攻击记录抵扣'),
 ('confidence.normal-behavior.normal-requests-deduction', '15', '历史正常请求多抵扣');
 
 -- ------------------------------------------------------------
--- 4.8.3 置信度平滑配置项（新增）
+-- 1.7 置信度平滑配置项
 -- 避免置信度跳变，采用只升不降策略
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
@@ -963,42 +986,113 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('confidence.smooth.alpha', '0.4', '滑动平均系数(仅SLIDING_AVERAGE策略使用)');
 
 -- ------------------------------------------------------------
--- 4.8.4 流量推送配置项（新增）
+-- 1.8 流量推送配置项
 -- 周期性推送、样本保留、聚合配置
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
--- 周期性推送
 ('traffic.push.interval-ms', '3000', '流量推送周期(毫秒)'),
-
--- 样本保留
 ('traffic.sample.max-per-uri', '3', '每个URI模式保留的最大样本数'),
 ('traffic.sample.max-total', '20', '单次推送保留的最大样本总数'),
-
--- 聚合配置
 ('traffic.aggregate.uri-pattern-depth', '2', 'URI模式聚合深度(路径段数)'),
 ('traffic.aggregate.max-uri-groups', '50', '单次推送最大URI分组数');
 
 -- ------------------------------------------------------------
--- 4.8.5 推送重试与降级配置项（新增）
+-- 1.9 推送重试与降级配置项
 -- 失败重试、内存保护、降级策略
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
--- 重试配置
 ('traffic.push.retry.max-count', '3', '推送失败最大重试次数'),
 ('traffic.push.retry.delay-ms', '1000', '重试延迟基础时间(毫秒)'),
 ('traffic.push.retry.max-queue-size', '10000', '重试队列最大大小'),
-
--- 内存保护
 ('traffic.push.memory.max-usage-percent', '80', '内存使用上限百分比'),
 ('traffic.push.memory.force-flush-threshold', '90', '强制推送内存阈值百分比'),
-
--- 降级配置
 ('traffic.push.degradation.enabled', 'true', '是否启用降级模式'),
 ('traffic.push.degradation.local-cache-size', '50000', '降级模式本地缓存大小'),
 ('traffic.push.degradation.health-check-interval-ms', '30000', '下游服务健康检查间隔(毫秒)');
 
 -- ------------------------------------------------------------
--- 4.9 告警配置项
+-- 1.10 状态超时配置项
+-- 防止状态卡死，确保状态机能够自动恢复
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('state.suspicious.timeout-ms', '30000', 'SUSPICIOUS状态超时时间(毫秒)，超时后自动恢复NORMAL'),
+('state.cooldown.timeout-ms', '600000', 'COOLDOWN状态超时时间(毫秒)，超时后自动恢复NORMAL'),
+('state.normal-to-suspicious.slide-step-ms', '100', '滑动窗口步进(毫秒)，用于RPS计算');
+
+-- ------------------------------------------------------------
+-- 1.11 队列容量配置项
+-- 流量采集队列容量与溢出策略
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('traffic.push.interval-low-ms', '10000', '低谷期流量推送间隔(毫秒)'),
+('traffic.sample.abnormal-priority', 'true', '是否优先保留异常样本(429/5xx响应)'),
+('traffic.sample.desensitize-enabled', 'true', '是否启用样本脱敏'),
+('traffic.aggregate.batch-threshold', '10', '批量聚合推送阈值(多少个IP同状态时触发)'),
+('traffic.queue.single-ip-capacity', '50', '单个IP流量队列容量上限'),
+('traffic.queue.global-capacity', '1000', '全局流量队列容量上限'),
+('traffic.queue.overflow-strategy', 'DROP_OLDEST_SAMPLE', '队列溢出策略: DROP_OLDEST_SAMPLE(丢弃最旧样本)/DROP_NEWEST(丢弃最新)'),
+('traffic.push.retry-interval-ms', '500,1000,2000', '推送重试间隔序列(毫秒，逗号分隔)'),
+('traffic.push.fallback-enabled', 'true', '是否启用推送失败降级');
+
+-- ------------------------------------------------------------
+-- 1.12 业务高峰配置项
+-- 业务高峰时段动态调整阈值
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('traffic.business-peak.enabled', 'true', '是否启用业务高峰模式'),
+('traffic.business-peak.threshold-multiplier', '2', '业务高峰期RPS阈值倍数'),
+('traffic.business-peak.time-ranges', '09:00-12:00,14:00-18:00', '业务高峰时段(逗号分隔)');
+
+-- ------------------------------------------------------------
+-- 1.13 置信度历史行为配置项
+-- 基于历史行为的置信度调整
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('confidence.history.max-score', '10', '历史行为最高分'),
+('confidence.history.no-attack-deduction', '5', '无历史攻击记录抵扣'),
+('confidence.history.has-attack-score', '10', '历史有攻击记录得分'),
+('confidence.history.normal-rate-deduction', '10', '近1小时正常请求占比>90%抵扣'),
+('confidence.no-decrease.enabled', 'true', '是否启用置信度只升不降策略'),
+('confidence.min-value', '10', '置信度最小值');
+
+-- ------------------------------------------------------------
+-- 1.14 慢速攻击配置项
+-- 低频持续攻击检测
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('confidence.slow-attack.max-score', '10', '慢速攻击最高分'),
+('confidence.slow-attack.per-minute-score', '5', '慢速攻击每分钟得分'),
+('state.slow-attack.duration-ms', '60000', '慢速攻击判定持续时间(毫秒)'),
+('state.slow-attack.threshold-rps', '5', '慢速攻击RPS阈值(低于此值但持续访问)'),
+('ddos.slow-attack.threshold-rps', '5', 'DDoS慢速攻击检测阈值');
+
+-- ------------------------------------------------------------
+-- 1.15 分布式攻击配置项
+-- 多IP协同攻击检测
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('confidence.global-attack.max-score', '10', '分布式攻击最高分'),
+('confidence.global-attack.per-ip-score', '2', '每个关联IP得分'),
+('state.global-attack.related-ip-threshold', '5', '触发分布式攻击判定的关联IP数量阈值'),
+('state.global-attack.network-mask', '24', '关联IP网络掩码(用于判断同网段)'),
+('ddos.global-attack.related-ip-threshold', '5', 'DDoS分布式攻击关联IP阈值');
+
+-- ------------------------------------------------------------
+-- 1.16 攻击模式部分匹配配置项
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('confidence.pattern.partial-score', '5', '攻击模式部分匹配得分');
+
+-- ------------------------------------------------------------
+-- 1.17 人工干预配置项
+-- 管理员手动重置状态
+-- ------------------------------------------------------------
+INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
+('state.manual-reset.log-required', 'true', '人工重置是否必须记录日志'),
+('state.manual-reset.operator-required', 'true', '人工重置是否必须填写操作人');
+
+-- ------------------------------------------------------------
+-- 1.18 告警配置项
 -- ------------------------------------------------------------
 INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('alert.enabled', 'true', '是否启用告警功能'),
@@ -1017,6 +1111,41 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('alert.feishu.secret', '', '飞书机器人签名密钥'),
 ('alert.sound.enabled', 'true', '是否启用告警声音提示'),
 ('alert.sound.level-threshold', 'HIGH', '触发声音提示的最低告警级别');
+
+-- ------------------------------------------------------------
+-- 4.8.15 配置版本管理表
+-- 用于配置同步机制
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_config_version`;
+CREATE TABLE `sys_config_version` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `version` VARCHAR(32) NOT NULL COMMENT '配置版本号（格式：vYYYYMMDDNNN）',
+    `change_type` VARCHAR(20) NOT NULL COMMENT '变更类型（ADD/UPDATE/DELETE）',
+    `change_count` INT DEFAULT 0 COMMENT '变更配置项数量',
+    `change_detail` TEXT DEFAULT NULL COMMENT '变更详情（JSON格式）',
+    `operator` VARCHAR(64) DEFAULT NULL COMMENT '操作人',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_version` (`version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='配置版本表';
+
+-- ------------------------------------------------------------
+-- 4.8.16 网关同步状态表
+-- 记录网关配置同步状态
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_config_sync_status`;
+CREATE TABLE `sys_config_sync_status` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `service_name` VARCHAR(50) NOT NULL COMMENT '服务名称',
+    `service_instance` VARCHAR(100) NOT NULL COMMENT '服务实例标识',
+    `sync_version` VARCHAR(32) NOT NULL COMMENT '已同步的配置版本',
+    `sync_time` DATETIME NOT NULL COMMENT '同步时间',
+    `sync_status` VARCHAR(20) NOT NULL COMMENT '同步状态（SUCCESS/FAILED）',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_service_instance` (`service_name`, `service_instance`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='网关同步状态表';
 
 -- ------------------------------------------------------------
 -- 4.10 初始化告警规则

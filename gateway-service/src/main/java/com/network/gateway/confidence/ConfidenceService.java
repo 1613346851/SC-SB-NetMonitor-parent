@@ -129,4 +129,47 @@ public class ConfidenceService {
         return String.format("置信度服务统计 - %s, %s", 
             smoother.getStats(), recordManager.getStats());
     }
+
+    public ConfidenceResult calculateOnBlocked(String ip, String blockType) {
+        Integer lastConfidence = smoother.getLastConfidence(ip);
+        int currentConfidence = lastConfidence != null ? lastConfidence : 0;
+        
+        int blockedScore = getBlockedScore(blockType);
+        int newRawConfidence = currentConfidence + blockedScore;
+        
+        ConfidenceResult result = new ConfidenceResult();
+        result.setIp(ip);
+        result.setRawConfidence(newRawConfidence);
+        
+        int smoothedConfidence = smoother.smooth(ip, newRawConfidence, 
+            com.network.gateway.constant.IpAttackStateConstant.DEFENDED);
+        result.setSmoothedConfidence(smoothedConfidence);
+        result.setReason("被拦截请求: " + blockType);
+        result.setTimestamp(System.currentTimeMillis());
+        
+        ScoreBreakdown breakdown = new ScoreBreakdown();
+        breakdown.setBaseScore(blockedScore);
+        result.setBreakdown(breakdown);
+        
+        recordManager.record(result, 
+            com.network.gateway.constant.IpAttackStateConstant.DEFENDED, 
+            "被拦截请求增加置信度: " + blockType);
+        
+        logger.info("被拦截请求置信度计算: ip={}, blockType={}, score={}, newConfidence={}", 
+            ip, blockType, blockedScore, smoothedConfidence);
+        
+        return result;
+    }
+
+    private int getBlockedScore(String blockType) {
+        int rateLimitScore = configCache.getInt("confidence.blocked.rate-limit-score", 3);
+        int blacklistScore = configCache.getInt("confidence.blocked.blacklist-score", 5);
+        
+        if ("RATE_LIMIT".equals(blockType)) {
+            return rateLimitScore;
+        } else if ("BLACKLIST".equals(blockType)) {
+            return blacklistScore;
+        }
+        return 2;
+    }
 }

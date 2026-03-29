@@ -4,22 +4,11 @@ import com.network.gateway.cache.GatewayConfigCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * 配置同步定时任务
- * 定期从监测服务同步配置，确保配置一致性
- *
- * @author network-monitor
- * @since 1.0.0
- */
 @Component
-@EnableScheduling
 public class ConfigSyncTask {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigSyncTask.class);
@@ -31,17 +20,13 @@ public class ConfigSyncTask {
     private final AtomicLong syncSuccessCount = new AtomicLong(0);
     private final AtomicLong syncFailureCount = new AtomicLong(0);
 
-    @Value("${gateway.config.sync.enabled:true}")
-    private boolean syncEnabled;
+    private volatile boolean syncEnabled = true;
+    private long syncInterval = 300000;
 
-    @Value("${gateway.config.sync.interval:300000}")
-    private long syncInterval;
-
-    @Scheduled(fixedDelayString = "${gateway.config.sync.interval:300000}", initialDelay = 60000)
-    public void syncConfigTask() {
+    public boolean syncConfig() {
         if (!syncEnabled) {
             logger.debug("配置同步任务已禁用");
-            return;
+            return false;
         }
 
         try {
@@ -58,10 +43,29 @@ public class ConfigSyncTask {
                 logger.warn("配置同步任务执行失败，使用本地缓存配置");
             }
             
+            return success;
+            
         } catch (Exception e) {
             syncFailureCount.incrementAndGet();
             logger.error("配置同步任务执行异常: {}", e.getMessage(), e);
+            return false;
         }
+    }
+
+    public boolean shouldSync() {
+        if (!syncEnabled) {
+            return false;
+        }
+        
+        long now = System.currentTimeMillis();
+        long lastSync = lastSyncTime.get();
+        
+        return (now - lastSync) >= syncInterval;
+    }
+
+    public void onConfigChangeNotification(String newVersion) {
+        logger.info("收到配置变更通知，触发同步: newVersion={}", newVersion);
+        syncConfig();
     }
 
     public long getLastSyncTime() {
@@ -83,6 +87,10 @@ public class ConfigSyncTask {
     public void setSyncEnabled(boolean enabled) {
         this.syncEnabled = enabled;
         logger.info("配置同步任务状态已更新: {}", enabled ? "启用" : "禁用");
+    }
+
+    public void setSyncInterval(long interval) {
+        this.syncInterval = interval;
     }
 
     public String getSyncStatistics() {

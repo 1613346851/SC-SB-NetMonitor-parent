@@ -49,9 +49,9 @@ public class GatewayConfigCache {
         configCache.put("gateway.defense.blacklist.enabled", "true");
         configCache.put("gateway.defense.rate-limit.enabled", "true");
         configCache.put("gateway.defense.malicious-request.enabled", "true");
-        configCache.put("gateway.defense.rate-limit.default-threshold", "5");
+        configCache.put("gateway.defense.rate-limit.default-threshold", "30");
         configCache.put("gateway.defense.rate-limit.window-size", "1000");
-        configCache.put("gateway.defense.blacklist.default-expire-seconds", "120");
+        configCache.put("gateway.defense.blacklist.default-expire-seconds", "600");
         configCache.put("gateway.defense.malicious.user-agents", 
                 "sqlmap,nessus,nmap,burp suite,zaproxy,nikto,w3af,arachni,skipfish,wvs,dirb,gobuster,ffuf,hydra,medusa");
         configCache.put("gateway.defense.malicious.uri-patterns", 
@@ -73,53 +73,53 @@ public class GatewayConfigCache {
         configCache.put("traffic.push.sampling-rate", "10");
         configCache.put("traffic.push.enabled", "true");
 
-        configCache.put("ddos.threshold", "10");
+        configCache.put("ddos.threshold", "50");
         configCache.put("ddos.detection.window-ms", "1000");
-        configCache.put("ddos.rate-limit-trigger-count", "15");
-        configCache.put("ddos.rate-limit-trigger-window-seconds", "10");
+        configCache.put("ddos.rate-limit-trigger-count", "5");
+        configCache.put("ddos.rate-limit-trigger-window-seconds", "30");
 
-        configCache.put("state.normal-to-suspicious.threshold-rps", "5");
+        configCache.put("state.normal-to-suspicious.threshold-rps", "30");
         configCache.put("state.normal-to-suspicious.window-ms", "1000");
-        configCache.put("state.suspicious-to-attacking.duration-ms", "3000");
-        configCache.put("state.suspicious-to-attacking.min-requests", "10");
-        configCache.put("state.suspicious-to-attacking.uri-diversity-threshold", "1");
-        configCache.put("state.suspicious-to-normal.quiet-duration-ms", "5000");
-        configCache.put("state.defended-to-cooldown.quiet-duration-ms", "5000");
-        configCache.put("state.cooldown.base-duration-ms", "30000");
-        configCache.put("state.cooldown.max-duration-ms", "120000");
+        configCache.put("state.suspicious-to-attacking.duration-ms", "5000");
+        configCache.put("state.suspicious-to-attacking.min-requests", "50");
+        configCache.put("state.suspicious-to-attacking.uri-diversity-threshold", "3");
+        configCache.put("state.suspicious-to-normal.quiet-duration-ms", "10000");
+        configCache.put("state.defended-to-cooldown.quiet-duration-ms", "30000");
+        configCache.put("state.cooldown.base-duration-ms", "180000");
+        configCache.put("state.cooldown.max-duration-ms", "600000");
         configCache.put("state.cooldown.attack-intensity-multiplier", "0.5");
-        configCache.put("state.cooldown-to-attacking.threshold-rps", "5");
+        configCache.put("state.cooldown-to-attacking.threshold-rps", "20");
 
         configCache.put("cooldown.dynamic.enabled", "true");
-        configCache.put("cooldown.base-duration-ms", "30000");
-        configCache.put("cooldown.max-duration-ms", "120000");
+        configCache.put("cooldown.base-duration-ms", "180000");
+        configCache.put("cooldown.max-duration-ms", "600000");
         configCache.put("cooldown.intensity-multiplier", "0.5");
-        configCache.put("cooldown.history-multiplier", "0.3");
+        configCache.put("cooldown.history-multiplier", "0.2");
         configCache.put("cooldown.history-max-multiplier", "2.0");
 
-        configCache.put("confidence.base-score", "10");
-        configCache.put("confidence.frequency.max-score", "40");
-        configCache.put("confidence.frequency.per-exceed-score", "8");
-        configCache.put("confidence.diversity.max-score", "15");
-        configCache.put("confidence.diversity.per-uri-score", "5");
-        configCache.put("confidence.persistence.max-score", "30");
-        configCache.put("confidence.persistence.per-10s-score", "10");
-        configCache.put("confidence.pattern.max-score", "15");
-        configCache.put("confidence.normal-behavior.max-deduction", "5");
-        configCache.put("confidence.normal-behavior.no-history-deduction", "0");
-        configCache.put("confidence.normal-behavior.normal-requests-deduction", "0");
+        configCache.put("confidence.base-score", "30");
+        configCache.put("confidence.frequency.max-score", "25");
+        configCache.put("confidence.frequency.per-exceed-score", "5");
+        configCache.put("confidence.diversity.max-score", "20");
+        configCache.put("confidence.diversity.per-uri-score", "3");
+        configCache.put("confidence.persistence.max-score", "15");
+        configCache.put("confidence.persistence.per-10s-score", "3");
+        configCache.put("confidence.pattern.max-score", "10");
+        configCache.put("confidence.normal-behavior.max-deduction", "20");
+        configCache.put("confidence.normal-behavior.no-history-deduction", "5");
+        configCache.put("confidence.normal-behavior.normal-requests-deduction", "15");
         configCache.put("confidence.smooth.strategy", "ONLY_UP");
-        configCache.put("confidence.smooth.alpha", "0.6");
+        configCache.put("confidence.smooth.alpha", "0.4");
         configCache.put("confidence.min-value", "10");
 
-        configCache.put("traffic.push.interval-ms", "2000");
-        configCache.put("traffic.sample.max-per-uri", "5");
-        configCache.put("traffic.sample.max-total", "30");
+        configCache.put("traffic.push.interval-ms", "3000");
+        configCache.put("traffic.sample.max-per-uri", "3");
+        configCache.put("traffic.sample.max-total", "20");
         configCache.put("traffic.aggregate.uri-pattern-depth", "2");
         configCache.put("traffic.aggregate.max-uri-groups", "50");
 
         configCache.put("traffic.push.retry.max-count", "3");
-        configCache.put("traffic.push.retry.delay-ms", "500");
+        configCache.put("traffic.push.retry.delay-ms", "1000");
         configCache.put("traffic.push.retry.max-queue-size", "10000");
         configCache.put("traffic.push.memory.max-usage-percent", "80");
         configCache.put("traffic.push.memory.force-flush-threshold", "90");
@@ -127,16 +127,16 @@ public class GatewayConfigCache {
         configCache.put("traffic.push.degradation.local-cache-size", "50000");
         configCache.put("traffic.push.degradation.health-check-interval-ms", "30000");
 
-        configCache.put("state.suspicious.timeout-ms", "15000");
-        configCache.put("state.cooldown.timeout-ms", "60000");
+        configCache.put("state.suspicious.timeout-ms", "30000");
+        configCache.put("state.cooldown.timeout-ms", "600000");
         configCache.put("state.normal-to-suspicious.slide-step-ms", "100");
 
-        configCache.put("traffic.push.interval-low-ms", "5000");
+        configCache.put("traffic.push.interval-low-ms", "10000");
         configCache.put("traffic.sample.abnormal-priority", "true");
         configCache.put("traffic.sample.desensitize-enabled", "true");
-        configCache.put("traffic.aggregate.batch-threshold", "5");
-        configCache.put("traffic.queue.single-ip-capacity", "100");
-        configCache.put("traffic.queue.global-capacity", "2000");
+        configCache.put("traffic.aggregate.batch-threshold", "10");
+        configCache.put("traffic.queue.single-ip-capacity", "50");
+        configCache.put("traffic.queue.global-capacity", "1000");
         configCache.put("traffic.queue.overflow-strategy", "DROP_OLDEST_SAMPLE");
 
         configCache.put("traffic.push.retry-interval-ms", "500,1000,2000");
@@ -144,20 +144,24 @@ public class GatewayConfigCache {
 
         configCache.put("traffic.business-peak.enabled", "true");
         configCache.put("traffic.business-peak.threshold-multiplier", "2");
+        configCache.put("traffic.business-peak.time-ranges", "09:00-12:00,14:00-18:00");
 
-        configCache.put("confidence.history.max-score", "15");
-        configCache.put("confidence.history.no-attack-deduction", "3");
-        configCache.put("confidence.history.has-attack-score", "15");
-        configCache.put("confidence.history.normal-rate-deduction", "5");
+        configCache.put("confidence.history.max-score", "10");
+        configCache.put("confidence.history.no-attack-deduction", "5");
+        configCache.put("confidence.history.has-attack-score", "10");
+        configCache.put("confidence.history.normal-rate-deduction", "10");
         configCache.put("confidence.slow-attack.max-score", "10");
         configCache.put("confidence.slow-attack.per-minute-score", "5");
         configCache.put("confidence.global-attack.max-score", "10");
-        configCache.put("confidence.global-attack.per-ip-score", "3");
-        configCache.put("confidence.pattern.partial-score", "8");
+        configCache.put("confidence.global-attack.per-ip-score", "2");
+        configCache.put("confidence.pattern.partial-score", "5");
         configCache.put("confidence.no-decrease.enabled", "true");
+        configCache.put("confidence.blocked.rate-limit-score", "3");
+        configCache.put("confidence.blocked.blacklist-score", "5");
+        configCache.put("confidence.blocked.max-daily-score", "30");
 
-        configCache.put("state.slow-attack.duration-ms", "30000");
-        configCache.put("state.slow-attack.threshold-rps", "3");
+        configCache.put("state.slow-attack.duration-ms", "60000");
+        configCache.put("state.slow-attack.threshold-rps", "5");
         configCache.put("state.global-attack.related-ip-threshold", "5");
         configCache.put("state.global-attack.network-mask", "24");
 
@@ -201,6 +205,8 @@ public class GatewayConfigCache {
                key.startsWith("traffic.push.") ||
                key.startsWith("traffic.sample.") ||
                key.startsWith("traffic.aggregate.") ||
+               key.startsWith("traffic.queue.") ||
+               key.startsWith("traffic.business-peak.") ||
                key.startsWith("ddos.") ||
                key.startsWith("defense.") ||
                key.startsWith("state.") ||
@@ -522,6 +528,10 @@ public class GatewayConfigCache {
         return getLong("traffic.push.interval-ms", 3000L);
     }
 
+    public long getTrafficPushAggregateIntervalMs() {
+        return getLong("traffic.push.aggregate-interval-ms", 5000L);
+    }
+
     public int getTrafficSampleMaxPerUri() {
         return getInt("traffic.sample.max-per-uri", 3);
     }
@@ -601,6 +611,22 @@ public class GatewayConfigCache {
 
     public long getSlidingWindowStepMs() {
         return getLong("state.normal-to-suspicious.slide-step-ms", 100L);
+    }
+
+    public long getStateSlowAttackDurationMs() {
+        return getLong("state.slow-attack.duration-ms", 60000L);
+    }
+
+    public int getStateSlowAttackThresholdRps() {
+        return getInt("state.slow-attack.threshold-rps", 5);
+    }
+
+    public int getStateGlobalAttackRelatedIpThreshold() {
+        return getInt("state.global-attack.related-ip-threshold", 5);
+    }
+
+    public int getStateGlobalAttackNetworkMask() {
+        return getInt("state.global-attack.network-mask", 24);
     }
 
     public long getTrafficPushIntervalLowMs() {
@@ -729,5 +755,13 @@ public class GatewayConfigCache {
 
     public int getDdosGlobalAttackRelatedIpThreshold() {
         return getInt("ddos.global-attack.related-ip-threshold", 5);
+    }
+
+    public String getBusinessPeakTimeRanges() {
+        return getString("traffic.business-peak.time-ranges", "09:00-12:00,14:00-18:00");
+    }
+
+    public List<String> getPushRetryIntervals() {
+        return getList("traffic.push.retry-interval-ms", "500,1000,2000");
     }
 }

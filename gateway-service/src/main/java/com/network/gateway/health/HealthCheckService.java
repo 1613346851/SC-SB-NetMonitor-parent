@@ -5,12 +5,12 @@ import com.network.gateway.metrics.GatewayMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class HealthCheckService {
@@ -26,6 +26,8 @@ public class HealthCheckService {
     private volatile boolean healthy = true;
     private volatile String lastHealthCheck = "OK";
     private volatile long lastHealthCheckTime = System.currentTimeMillis();
+    
+    private final AtomicLong lastTrafficTime = new AtomicLong(System.currentTimeMillis());
     
     private long maxMemoryMB = Runtime.getRuntime().maxMemory() / (1024 * 1024);
     private double memoryWarningThreshold = 0.85;
@@ -48,6 +50,18 @@ public class HealthCheckService {
         this.lastHealthCheck = status.isHealthy() ? "OK" : "DEGRADED";
         
         return status;
+    }
+
+    public void onTrafficReceived() {
+        lastTrafficTime.set(System.currentTimeMillis());
+        
+        long idleTime = System.currentTimeMillis() - lastHealthCheckTime;
+        if (idleTime > 30000) {
+            HealthStatus status = checkHealth();
+            if (!status.isHealthy()) {
+                logger.warn("健康检查发现问题: {}", status.getSummary());
+            }
+        }
     }
 
     private void checkMemoryStatus(HealthStatus status) {
@@ -145,16 +159,6 @@ public class HealthCheckService {
         }
         
         status.setMetricsStatus(metricsHealth);
-    }
-
-    @Scheduled(fixedRate = 30000)
-    public void scheduledHealthCheck() {
-        HealthStatus status = checkHealth();
-        if (!status.isHealthy()) {
-            logger.warn("健康检查发现问题: {}", status.getSummary());
-        } else {
-            logger.debug("健康检查正常: {}", status.getSummary());
-        }
     }
 
     public boolean isHealthy() {

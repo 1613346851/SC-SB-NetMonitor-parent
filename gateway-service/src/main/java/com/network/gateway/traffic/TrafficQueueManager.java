@@ -206,9 +206,14 @@ public class TrafficQueueManager {
                     flushData.add(data);
                     queue.markFlushed();
                     
-                    logger.debug("周期性刷新: ip={}, state={}, requests={}", 
-                        ip, IpAttackStateConstant.getStateNameZh(queue.getCurrentState()), data.getTotalRequests());
+                    logger.info("周期性刷新: ip={}, state={}, requests={}, timeSinceLastFlush={}ms", 
+                        ip, IpAttackStateConstant.getStateNameZh(queue.getCurrentState()), 
+                        data.getTotalRequests(), queue.getTimeSinceLastFlush());
                 }
+            } else if (currentRequestCount > 0) {
+                logger.debug("IP队列未到刷新时间: ip={}, state={}, requests={}, timeSinceLastFlush={}ms", 
+                    ip, IpAttackStateConstant.getStateNameZh(queue.getCurrentState()),
+                    currentRequestCount, queue.getTimeSinceLastFlush());
             }
         }
         

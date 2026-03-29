@@ -5,21 +5,25 @@ import com.network.gateway.dto.DefenseLogDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class DefenseLogService {
 
     private static final Logger logger = LoggerFactory.getLogger(DefenseLogService.class);
 
+    private static final long CLEANUP_INTERVAL_MS = 60000;
+
     private final DefenseLogAggregator aggregator;
     private final MonitorServiceDefenseClient defenseClient;
     private final ExecutorService executorService;
+    
+    private final AtomicLong lastCleanupTime = new AtomicLong(0);
 
     @Autowired
     public DefenseLogService(DefenseLogAggregator aggregator, 
@@ -31,10 +35,12 @@ public class DefenseLogService {
 
     public void recordRateLimit(String ip) {
         aggregator.recordRateLimit(ip);
+        checkAndCleanup();
     }
 
     public void addDefenseAction(String eventId, DefenseAction action) {
         aggregator.addDefenseAction(eventId, action);
+        checkAndCleanup();
     }
 
     public void pushDefenseLog(String eventId, String ip, Long attackId,
@@ -116,7 +122,17 @@ public class DefenseLogService {
         return aggregator.getAttackDefenseCount(eventId);
     }
 
-    @Scheduled(fixedRate = 60000)
+    private void checkAndCleanup() {
+        long now = System.currentTimeMillis();
+        long lastCleanup = lastCleanupTime.get();
+        
+        if (now - lastCleanup >= CLEANUP_INTERVAL_MS) {
+            if (lastCleanupTime.compareAndSet(lastCleanup, now)) {
+                cleanupExpiredData();
+            }
+        }
+    }
+
     public void cleanupExpiredData() {
         aggregator.cleanupExpiredCounters();
         logger.debug("防御日志服务定时清理完成: {}", aggregator.getStats());
