@@ -34,6 +34,7 @@ public class TrafficAggregatePushDTO implements Serializable {
     private StateTransitionDTO transition;
     
     private String requestId;
+    private String eventId;
     private String requestTime;
     private String batchId;
     private long pushTimestamp;

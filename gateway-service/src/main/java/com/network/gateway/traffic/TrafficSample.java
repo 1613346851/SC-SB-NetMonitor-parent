@@ -11,6 +11,7 @@ public class TrafficSample implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private String requestId;
+    private String eventId;
     private String requestUri;
     private String httpMethod;
     private Map<String, String> headers;

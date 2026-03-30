@@ -22,6 +22,11 @@ public class TrafficMonitorEntity {
     private String trafficId;
 
     /**
+     * 关联攻击事件ID
+     */
+    private String eventId;
+
+    /**
      * 请求时间
      */
     private LocalDateTime requestTime;

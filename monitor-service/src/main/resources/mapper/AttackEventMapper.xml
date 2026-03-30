@@ -172,6 +172,13 @@
         WHERE id = #{id}
     </update>
 
+    <update id="updateTotalRequests">
+        UPDATE sys_attack_event
+        SET total_requests = #{totalRequests},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
     <update id="markAsEnded">
         UPDATE sys_attack_event
         SET end_time = #{endTime},

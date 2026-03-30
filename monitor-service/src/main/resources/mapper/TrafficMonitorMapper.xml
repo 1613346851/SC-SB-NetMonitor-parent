@@ -5,6 +5,7 @@
     <resultMap id="BaseResultMap" type="com.network.monitor.entity.TrafficMonitorEntity">
         <id column="id" property="id"/>
         <result column="traffic_id" property="trafficId"/>
+        <result column="event_id" property="eventId"/>
         <result column="request_time" property="requestTime"/>
         <result column="source_ip" property="sourceIp"/>
         <result column="target_ip" property="targetIp"/>
@@ -36,7 +37,7 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, traffic_id, request_time, source_ip, target_ip, source_port, target_port, http_method, protocol,
+        id, traffic_id, event_id, request_time, source_ip, target_ip, source_port, target_port, http_method, protocol,
         request_uri, query_params, request_headers, request_body, response_status, 
         response_body, response_time, content_type, user_agent, cookie, 
         request_count, state_tag, state_value, confidence, is_aggregated, aggregate_start_time, aggregate_end_time, 
@@ -45,13 +46,13 @@
 
     <insert id="insert" parameterType="com.network.monitor.entity.TrafficMonitorEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_traffic_monitor (
-            traffic_id, request_time, source_ip, target_ip, source_port, target_port, http_method, protocol,
+            traffic_id, event_id, request_time, source_ip, target_ip, source_port, target_port, http_method, protocol,
             request_uri, query_params, request_headers, request_body, response_status,
             response_body, response_time, content_type, user_agent, cookie, 
             request_count, state_tag, state_value, confidence, is_aggregated, aggregate_start_time, aggregate_end_time,
             error_count, avg_processing_time, create_time, update_time
         ) VALUES (
-            #{trafficId}, #{requestTime}, #{sourceIp}, #{targetIp}, #{sourcePort}, #{targetPort}, #{httpMethod}, #{protocol},
+            #{trafficId}, #{eventId}, #{requestTime}, #{sourceIp}, #{targetIp}, #{sourcePort}, #{targetPort}, #{httpMethod}, #{protocol},
             #{requestUri}, #{queryParams}, #{requestHeaders}, #{requestBody}, #{responseStatus},
             #{responseBody}, #{responseTime}, #{contentType}, #{userAgent}, #{cookie},
             #{requestCount}, #{stateTag}, #{stateValue}, #{confidence}, #{isAggregated}, #{aggregateStartTime}, #{aggregateEndTime},

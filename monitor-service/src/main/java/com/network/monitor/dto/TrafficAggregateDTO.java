@@ -31,6 +31,7 @@ public class TrafficAggregateDTO implements Serializable {
     private StateTransitionDTO transition;
     
     private String requestId;
+    private String eventId;
     private String requestTime;
 
     @Data

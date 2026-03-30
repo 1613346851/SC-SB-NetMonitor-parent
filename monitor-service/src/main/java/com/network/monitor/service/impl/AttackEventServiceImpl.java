@@ -55,7 +55,21 @@ public class AttackEventServiceImpl implements AttackEventService {
     @Override
     @Transactional
     public AttackEventEntity getOrCreateEvent(String sourceIp, String attackType, String riskLevel, int confidence) {
+        return getOrCreateEventWithEventId(sourceIp, attackType, riskLevel, confidence, null);
+    }
+
+    @Override
+    @Transactional
+    public AttackEventEntity getOrCreateEventWithEventId(String sourceIp, String attackType, String riskLevel, int confidence, String eventId) {
         String normalizedIp = IpNormalizeUtil.normalize(sourceIp);
+
+        if (eventId != null && !eventId.isEmpty()) {
+            AttackEventEntity existingByEventId = attackEventMapper.selectByEventId(eventId);
+            if (existingByEventId != null) {
+                log.debug("事件ID已存在：eventId={}, ip={}", eventId, normalizedIp);
+                return existingByEventId;
+            }
+        }
 
         AttackEventEntity existingEvent = attackEventMapper.selectOngoingEventByIp(normalizedIp);
         if (existingEvent != null) {
@@ -63,10 +77,10 @@ public class AttackEventServiceImpl implements AttackEventService {
             return existingEvent;
         }
 
-        String eventId = generateEventId();
+        String finalEventId = (eventId != null && !eventId.isEmpty()) ? eventId : generateEventId();
 
         AttackEventEntity entity = new AttackEventEntity();
-        entity.setEventId(eventId);
+        entity.setEventId(finalEventId);
         entity.setSourceIp(normalizedIp);
         entity.setAttackType(attackType);
         entity.setRiskLevel(riskLevel);
@@ -81,7 +95,7 @@ public class AttackEventServiceImpl implements AttackEventService {
 
         attackEventMapper.insert(entity);
 
-        log.info("创建新攻击事件：eventId={}, sourceIp={}, attackType={}", eventId, normalizedIp, attackType);
+        log.info("创建新攻击事件：eventId={}, sourceIp={}, attackType={}", finalEventId, normalizedIp, attackType);
 
         return entity;
     }
@@ -129,6 +143,27 @@ public class AttackEventServiceImpl implements AttackEventService {
             return;
         }
         attackEventMapper.incrementAttackCount(eventId);
+    }
+
+    @Override
+    @Transactional
+    public void addTotalRequests(String eventId, int count) {
+        if (eventId == null || eventId.isEmpty() || count <= 0) {
+            return;
+        }
+        
+        AttackEventEntity event = attackEventMapper.selectByEventId(eventId);
+        if (event == null) {
+            log.debug("事件不存在，无法更新总请求数：eventId={}", eventId);
+            return;
+        }
+        
+        int currentTotal = event.getTotalRequests() != null ? event.getTotalRequests() : 0;
+        int newTotal = currentTotal + count;
+        
+        attackEventMapper.updateTotalRequests(event.getId(), newTotal);
+        log.debug("更新事件总请求数：eventId={}, currentTotal={}, addCount={}, newTotal={}", 
+            eventId, currentTotal, count, newTotal);
     }
 
     @Override

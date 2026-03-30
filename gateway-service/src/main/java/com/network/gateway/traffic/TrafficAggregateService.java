@@ -210,6 +210,10 @@ public class TrafficAggregateService {
         dto.setErrorRequests(entry.getErrorCount());
         dto.setConfidence(entry.getConfidence());
         
+        if (entry.getEventId() != null && !entry.getEventId().isEmpty()) {
+            dto.setEventId(entry.getEventId());
+        }
+        
         List<UriGroupStats> uriGroups = new ArrayList<>();
         UriGroupStats uriGroup = new UriGroupStats();
         uriGroup.setUriPattern(entry.getUriPattern());
@@ -291,6 +295,7 @@ public class TrafficAggregateService {
         private final String httpMethod;
         private final int state;
         private final TrafficSample firstSample;
+        private final String eventId;
         private final AtomicInteger count = new AtomicInteger(0);
         private final AtomicInteger errorCount = new AtomicInteger(0);
         private final AtomicLong totalProcessingTime = new AtomicLong(0);
@@ -301,6 +306,7 @@ public class TrafficAggregateService {
             this.httpMethod = sample.getHttpMethod();
             this.state = sample.getState();
             this.firstSample = sample;
+            this.eventId = sample.getEventId();
             this.confidence = sample.getConfidence();
         }
         
@@ -317,6 +323,7 @@ public class TrafficAggregateService {
         public String getHttpMethod() { return httpMethod; }
         public int getState() { return state; }
         public TrafficSample getFirstSample() { return firstSample; }
+        public String getEventId() { return eventId; }
         public int getCount() { return count.get(); }
         public int getErrorCount() { return errorCount.get(); }
         public int getConfidence() { return confidence; }

@@ -120,6 +120,11 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
         monitorDTO.setIsAggregated(false);
         
+        String eventId = attackStateCache.getEventId(sourceIp);
+        if (eventId != null && !eventId.isEmpty()) {
+            monitorDTO.setEventId(eventId);
+        }
+        
         return chain.filter(exchange)
                 .doOnSuccess(unused -> {
                     try {
@@ -229,6 +234,12 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         sample.setState(currentState);
         sample.setStateName(IpAttackStateConstant.getStateNameZh(currentState));
         sample.setConfidence(attackStateCache.getConfidence(sourceIp));
+        
+        String eventId = attackStateCache.getEventId(sourceIp);
+        if (eventId != null && !eventId.isEmpty()) {
+            sample.setEventId(eventId);
+        }
+        
         return sample;
     }
 

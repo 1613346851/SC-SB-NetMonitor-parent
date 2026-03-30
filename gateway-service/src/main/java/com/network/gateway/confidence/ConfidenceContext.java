@@ -33,6 +33,7 @@ public class ConfidenceContext implements Serializable {
     private boolean isPeakPeriod;
     private int peakAdaptationFactor;
     private String traceId;
+    private int rateLimitCount;
 
     public ConfidenceContext() {
         this.traceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);

@@ -15,6 +15,11 @@ public class TrafficMonitorDTO {
     private String requestId;
 
     /**
+     * 关联攻击事件ID
+     */
+    private String eventId;
+
+    /**
      * 请求时间
      */
     private String requestTime;

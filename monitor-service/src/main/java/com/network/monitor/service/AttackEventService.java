@@ -13,6 +13,8 @@ public interface AttackEventService {
 
     AttackEventEntity getOrCreateEvent(String sourceIp, String attackType, String riskLevel, int confidence);
 
+    AttackEventEntity getOrCreateEventWithEventId(String sourceIp, String attackType, String riskLevel, int confidence, String eventId);
+
     AttackEventEntity getEventById(Long id);
 
     AttackEventEntity getEventByEventId(String eventId);
@@ -22,6 +24,8 @@ public interface AttackEventService {
     void updateEventStatistics(Long eventId, int totalRequests, int peakRps, int confidence);
 
     void incrementAttackCount(Long eventId);
+
+    void addTotalRequests(String eventId, int count);
 
     void markEventAsEnded(Long eventId);
 

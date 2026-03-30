@@ -54,6 +54,11 @@ public interface AttackEventMapper {
             @Param("confidenceEnd") Integer confidenceEnd
     );
 
+    int updateTotalRequests(
+            @Param("id") Long id,
+            @Param("totalRequests") Integer totalRequests
+    );
+
     int markAsEnded(
             @Param("id") Long id,
             @Param("endTime") LocalDateTime endTime,

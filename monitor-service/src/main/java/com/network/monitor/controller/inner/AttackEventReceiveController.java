@@ -42,15 +42,17 @@ public class AttackEventReceiveController {
             String userAgent = (String) eventData.get("userAgent");
             String description = (String) eventData.get("description");
             String reason = (String) eventData.get("reason");
+            String gatewayEventId = (String) eventData.get("eventId");
             
-            log.info("接收到DDoS攻击事件：ip={}, attackType={}, riskLevel={}, rateLimitCount={}, reason={}", 
-                sourceIp, attackType, riskLevel, rateLimitCount, reason);
+            log.info("接收到DDoS攻击事件：ip={}, attackType={}, riskLevel={}, rateLimitCount={}, reason={}, eventId={}", 
+                sourceIp, attackType, riskLevel, rateLimitCount, reason, gatewayEventId);
             
-            AttackEventEntity event = attackEventService.getOrCreateEvent(
+            AttackEventEntity event = attackEventService.getOrCreateEventWithEventId(
                 sourceIp, 
                 attackType != null ? attackType : "DDOS", 
                 riskLevel != null ? riskLevel : "HIGH", 
-                confidence
+                confidence,
+                gatewayEventId
             );
             
             String eventId = event != null ? event.getEventId() : null;

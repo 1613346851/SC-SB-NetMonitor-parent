@@ -71,6 +71,11 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
             entity.setTrafficId(dto.getRequestId());
         }
         
+        // 设置关联事件ID
+        if (dto.getEventId() != null) {
+            entity.setEventId(dto.getEventId());
+        }
+        
         // 转换时间字段
         if (dto.getRequestTime() != null && !dto.getRequestTime().isEmpty()) {
             try {

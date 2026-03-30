@@ -27,6 +27,11 @@ public class TrafficMonitorDTO implements Serializable {
     private String requestId;
 
     /**
+     * 关联攻击事件ID
+     */
+    private String eventId;
+
+    /**
      * 源IP地址
      */
     private String sourceIp;

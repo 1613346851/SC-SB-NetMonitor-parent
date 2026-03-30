@@ -43,6 +43,9 @@ public class TrafficReceiveController {
     private AttackStoreService attackStoreService;
 
     @Autowired
+    private AttackEventService attackEventService;
+
+    @Autowired
     private IpAttackStateCache attackStateCache;
 
     @PostMapping("/receive")
@@ -171,6 +174,15 @@ public class TrafficReceiveController {
                 }
             }
 
+            if (aggregateDTO.getEventId() != null && !aggregateDTO.getEventId().isEmpty()) {
+                int totalRequests = aggregateDTO.getTotalRequests();
+                if (totalRequests > 0) {
+                    attackEventService.addTotalRequests(aggregateDTO.getEventId(), totalRequests);
+                    log.debug("更新事件总请求数：eventId={}, addCount={}", 
+                        aggregateDTO.getEventId(), totalRequests);
+                }
+            }
+
             log.info("聚合流量数据处理完成: ip={}, totalRequests={}, rps={}", 
                 aggregateDTO.getIp(), aggregateDTO.getTotalRequests(), aggregateDTO.getRps());
             
@@ -193,6 +205,10 @@ public class TrafficReceiveController {
         dto.setHttpMethod(uriGroup.getHttpMethod());
         dto.setStateTag(aggregate.getStateName());
         dto.setStateValue(aggregate.getState());
+        
+        if (aggregate.getEventId() != null && !aggregate.getEventId().isEmpty()) {
+            dto.setEventId(aggregate.getEventId());
+        }
         
         if (aggregate.getTransition() != null) {
             dto.setConfidence(aggregate.getTransition().getConfidence());
