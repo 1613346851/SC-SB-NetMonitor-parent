@@ -158,7 +158,9 @@
 
     <update id="incrementAttackCount">
         UPDATE sys_attack_event
-        SET attack_count = attack_count + 1, update_time = NOW()
+        SET attack_count = attack_count + 1,
+            total_requests = total_requests + 1,
+            update_time = NOW()
         WHERE id = #{id}
     </update>
 

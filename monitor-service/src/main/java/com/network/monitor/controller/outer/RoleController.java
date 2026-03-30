@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +71,7 @@ public class RoleController {
         String roleCode = (String) params.get("roleCode");
         String roleDesc = (String) params.get("roleDesc");
         String remark = (String) params.get("remark");
-        List<Long> menuIds = (List<Long>) params.get("menuIds");
+        List<Long> menuIds = extractLongList(params.get("menuIds"));
         
         if (roleName == null || roleName.trim().isEmpty()) {
             return ApiResponse.badRequest("角色名称不能为空");
@@ -105,7 +106,7 @@ public class RoleController {
         String roleName = (String) params.get("roleName");
         String roleDesc = (String) params.get("roleDesc");
         String remark = (String) params.get("remark");
-        List<Long> menuIds = (List<Long>) params.get("menuIds");
+        List<Long> menuIds = extractLongList(params.get("menuIds"));
         
         RoleEntity role = new RoleEntity();
         role.setId(id);
@@ -145,6 +146,30 @@ public class RoleController {
             return ApiResponse.success();
         }
         return ApiResponse.error("分配权限失败");
+    }
+    
+    @SuppressWarnings("unchecked")
+    private List<Long> extractLongList(Object obj) {
+        if (obj == null) {
+            return new ArrayList<>();
+        }
+        if (obj instanceof List) {
+            List<?> list = (List<?>) obj;
+            List<Long> result = new ArrayList<>(list.size());
+            for (Object item : list) {
+                if (item instanceof Number) {
+                    result.add(((Number) item).longValue());
+                } else if (item instanceof String) {
+                    try {
+                        result.add(Long.parseLong((String) item));
+                    } catch (NumberFormatException e) {
+                        // 忽略无效数字
+                    }
+                }
+            }
+            return result;
+        }
+        return new ArrayList<>();
     }
     
     private String getClientIp(HttpServletRequest request) {

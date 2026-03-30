@@ -8,6 +8,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
+import java.util.List;
+
 @Slf4j
 @Component
 public class GatewayConfigSyncListener {
@@ -17,6 +20,15 @@ public class GatewayConfigSyncListener {
 
     @Autowired
     private GatewayApiClient gatewayApiClient;
+    
+    private static final List<String> SYNC_CONFIG_PREFIXES = Arrays.asList(
+        "gateway.",
+        "ddos.",
+        "state.",
+        "cooldown.",
+        "confidence.",
+        "traffic."
+    );
 
     @Async
     @EventListener
@@ -24,7 +36,7 @@ public class GatewayConfigSyncListener {
         String configKey = event.getConfigKey();
         String configValue = event.getConfigValue();
 
-        if (!isGatewayConfig(configKey)) {
+        if (!isSyncableConfig(configKey)) {
             return;
         }
 
@@ -42,7 +54,10 @@ public class GatewayConfigSyncListener {
         }
     }
 
-    private boolean isGatewayConfig(String configKey) {
-        return configKey != null && configKey.startsWith("gateway.");
+    private boolean isSyncableConfig(String configKey) {
+        if (configKey == null) {
+            return false;
+        }
+        return SYNC_CONFIG_PREFIXES.stream().anyMatch(configKey::startsWith);
     }
 }

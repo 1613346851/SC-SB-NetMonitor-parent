@@ -183,9 +183,12 @@ public class GatewayApiClient {
                 log.info("推送单个配置到网关成功：configKey={}", configKey);
                 return true;
             } else {
-                log.error("推送单个配置到网关失败：configKey={}, statusCode={}", configKey, response.getStatusCode());
+                log.warn("推送单个配置到网关失败：configKey={}, statusCode={}", configKey, response.getStatusCode());
                 return false;
             }
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            log.warn("推送单个配置到网关失败，网关服务未就绪：configKey={}, error={}", configKey, e.getMessage());
+            return false;
         } catch (Exception e) {
             log.error("推送单个配置到网关异常：configKey={}", configKey, e);
             return false;
@@ -219,9 +222,12 @@ public class GatewayApiClient {
                 log.info("批量推送配置到网关成功，共{}项", configs.size());
                 return true;
             } else {
-                log.error("批量推送配置到网关失败：statusCode={}", response.getStatusCode());
+                log.warn("批量推送配置到网关失败：statusCode={}", response.getStatusCode());
                 return false;
             }
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            log.warn("批量推送配置到网关失败，网关服务未就绪：{}", e.getMessage());
+            return false;
         } catch (Exception e) {
             log.error("批量推送配置到网关异常", e);
             return false;

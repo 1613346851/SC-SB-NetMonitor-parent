@@ -50,7 +50,7 @@ public class ConfidenceCalculator {
     }
 
     private int calculateBaseScore() {
-        return 0;
+        return configCache.getConfidenceBaseScore();
     }
 
     private int calculateFrequencyScore(ConfidenceContext context) {

@@ -51,6 +51,7 @@ public class ConfigSyncService {
     private String gatewayId;
     private final AtomicBoolean syncInProgress = new AtomicBoolean(false);
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean initialSyncCompleted = new AtomicBoolean(false);
 
     @PostConstruct
     public void init() {
@@ -74,27 +75,33 @@ public class ConfigSyncService {
     }
 
     private void performInitialSync() {
-        logger.info("开始初始配置同步...");
-        int retry = 0;
-        while (retry < maxRetryCount) {
+        logger.info("网关服务启动，等待监测服务就绪后同步配置...");
+        long retryInterval = 10000;
+        int retryCount = 0;
+        
+        while (!initialSyncCompleted.get() && !Thread.currentThread().isInterrupted()) {
             try {
                 boolean success = performTcpLikeHandshake();
                 if (success) {
-                    logger.info("初始配置同步成功");
+                    initialSyncCompleted.set(true);
+                    logger.info("配置同步成功");
                     return;
                 }
             } catch (Exception e) {
-                logger.warn("初始配置同步失败, retry={}: {}", retry, e.getMessage());
+                logger.debug("配置同步重试, retry={}: {}", retryCount, e.getMessage());
             }
-            retry++;
+            retryCount++;
             try {
-                Thread.sleep(5000);
+                Thread.sleep(retryInterval);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
             }
         }
-        logger.error("初始配置同步失败，使用本地默认配置");
+        
+        if (!initialSyncCompleted.get()) {
+            logger.warn("配置同步被中断，使用本地默认配置");
+        }
     }
 
     public boolean performTcpLikeHandshake() {
@@ -120,19 +127,19 @@ public class ConfigSyncService {
     private boolean doHandshake(ConfigSyncState state) {
         String requestId = generateRequestId();
         
-        logger.info("开始TCP-like三次握手配置同步: requestId={}", requestId);
+        logger.debug("开始TCP-like三次握手配置同步: requestId={}", requestId);
 
         ConfigSyncRequest step1Request = ConfigSyncRequest.createSyncRequest(gatewayId, state.getCurrentVersion());
         step1Request.setRequestId(requestId);
         
         state.markSyncing(null, requestId);
         state.advanceHandshake();
-        logger.info("握手步骤1: 发送同步请求, requestId={}, currentVersion={}", requestId, state.getCurrentVersion());
+        logger.debug("握手步骤1: 发送同步请求, requestId={}, currentVersion={}", requestId, state.getCurrentVersion());
 
         ConfigSyncResponse step1Response = sendSyncRequest(step1Request);
         if (step1Response == null || !step1Response.isSuccess()) {
             state.markFailed();
-            logger.error("握手步骤1失败: {}", step1Response != null ? step1Response.getMessage() : "无响应");
+            logger.debug("握手步骤1失败: {}", step1Response != null ? step1Response.getMessage() : "无响应");
             return false;
         }
 
@@ -144,7 +151,7 @@ public class ConfigSyncService {
         }
 
         state.advanceHandshake();
-        logger.info("握手步骤2: 收到服务端响应, latestVersion={}, 准备确认", step1Response.getLatestVersion());
+        logger.debug("握手步骤2: 收到服务端响应, latestVersion={}, 准备确认", step1Response.getLatestVersion());
 
         ConfigSyncRequest step2Request = new ConfigSyncRequest();
         step2Request.setGatewayId(gatewayId);
@@ -156,12 +163,12 @@ public class ConfigSyncService {
         ConfigSyncResponse step2Response = sendSyncRequest(step2Request);
         if (step2Response == null || !step2Response.isSuccess()) {
             state.markFailed();
-            logger.error("握手步骤2失败: {}", step2Response != null ? step2Response.getMessage() : "无响应");
+            logger.debug("握手步骤2失败: {}", step2Response != null ? step2Response.getMessage() : "无响应");
             return false;
         }
 
         state.advanceHandshake();
-        logger.info("握手步骤3: 发送ACK确认, 开始应用配置");
+        logger.debug("握手步骤3: 发送ACK确认, 开始应用配置");
 
         if (step2Response.getConfigs() != null && !step2Response.getConfigs().isEmpty()) {
             configCache.updateConfigs(step2Response.getConfigs());
@@ -169,7 +176,7 @@ public class ConfigSyncService {
         }
 
         state.markSynced(step2Response.getLatestVersion());
-        logger.info("TCP-like三次握手配置同步完成: version={}", state.getCurrentVersion());
+        logger.info("配置同步完成: version={}", state.getCurrentVersion());
 
         return true;
     }
@@ -183,7 +190,7 @@ public class ConfigSyncService {
             }
             return ConfigSyncResponse.failure("无法获取配置");
         } catch (Exception e) {
-            logger.error("发送同步请求失败: {}", e.getMessage());
+            logger.debug("发送同步请求失败: {}", e.getMessage());
             return ConfigSyncResponse.failure(e.getMessage());
         }
     }

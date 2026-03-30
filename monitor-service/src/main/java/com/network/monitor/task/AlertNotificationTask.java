@@ -25,9 +25,13 @@ public class AlertNotificationTask {
 
     @Scheduled(fixedRateString = "${alert.notification.interval-ms:30000}")
     public void sendPendingNotifications() {
-        logger.debug("开始处理待发送告警通知");
-        
         List<AlertEntity> alerts = alertMapper.selectUnnotifiedAlerts(10);
+        
+        if (alerts.isEmpty()) {
+            return;
+        }
+        
+        logger.info("开始处理待发送告警通知，共{}条", alerts.size());
         
         for (AlertEntity alert : alerts) {
             try {
@@ -43,9 +47,7 @@ public class AlertNotificationTask {
             }
         }
         
-        if (!alerts.isEmpty()) {
-            logger.info("本次处理告警通知: {} 条", alerts.size());
-        }
+        logger.info("本次处理告警通知完成: {} 条", alerts.size());
     }
 
     private boolean sendNotification(AlertEntity alert) {

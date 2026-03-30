@@ -74,6 +74,20 @@ public class AttackEventReceiveController {
                 
                 if (event != null) {
                     attackEventService.incrementAttackCount(event.getId());
+                    
+                    Object slidingWindowRpsObj = eventData.get("slidingWindowRps");
+                    int slidingWindowRps = slidingWindowRpsObj != null ? 
+                        ((Number) slidingWindowRpsObj).intValue() : rateLimitCount;
+                    
+                    Integer currentPeakRps = event.getPeakRps();
+                    int newPeakRps = Math.max(currentPeakRps != null ? currentPeakRps : 0, slidingWindowRps);
+                    
+                    attackEventService.updateEventStatistics(
+                        event.getId(), 
+                        event.getTotalRequests() != null ? event.getTotalRequests() : 1, 
+                        newPeakRps, 
+                        confidence
+                    );
                 }
             }
             

@@ -20,7 +20,6 @@ public class AttackEventExpireTask {
     @Scheduled(cron = "${event.expire.check.cron:0 */1 * * * ?}")
     public void checkAndEndExpiredEvents() {
         try {
-            log.debug("开始检查过期事件...");
             int endedCount = attackEventService.endExpiredEvents(expireMinutes);
             if (endedCount > 0) {
                 log.info("过期事件检查完成：共结束{}个事件", endedCount);
