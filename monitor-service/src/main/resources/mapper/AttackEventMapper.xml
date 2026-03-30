@@ -166,8 +166,7 @@
 
     <update id="updateStatistics">
         UPDATE sys_attack_event
-        SET total_requests = #{totalRequests},
-            peak_rps = #{peakRps},
+        SET peak_rps = GREATEST(peak_rps, #{peakRps}),
             confidence_end = #{confidenceEnd},
             update_time = NOW()
         WHERE id = #{id}

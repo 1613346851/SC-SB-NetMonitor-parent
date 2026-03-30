@@ -134,7 +134,9 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                 confidence,
                 eventId);
         
-        if (newState == IpAttackStateConstant.ATTACKING) {
+        if (newState == IpAttackStateConstant.SUSPICIOUS) {
+            pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "频率异常", confidence, eventId);
+        } else if (newState == IpAttackStateConstant.ATTACKING) {
             pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "攻击确认", confidence, eventId);
         } else if (newState == IpAttackStateConstant.DEFENDED) {
             pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "执行防御", confidence, eventId);
