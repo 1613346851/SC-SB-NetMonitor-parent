@@ -23,6 +23,10 @@ public class TrafficSampleDTO implements Serializable {
     private int state;
     private String stateName;
     private int confidence;
+    private String targetIp;
+    private Integer targetPort;
+    private String protocol;
+    private String userAgent;
 
     public TrafficSampleDTO() {
     }
@@ -41,5 +45,9 @@ public class TrafficSampleDTO implements Serializable {
         this.state = sample.getState();
         this.stateName = sample.getStateName();
         this.confidence = sample.getConfidence();
+        this.targetIp = sample.getTargetIp();
+        this.targetPort = sample.getTargetPort();
+        this.protocol = sample.getProtocol();
+        this.userAgent = sample.getUserAgent();
     }
 }

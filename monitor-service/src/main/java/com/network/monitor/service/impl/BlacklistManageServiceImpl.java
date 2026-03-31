@@ -49,6 +49,11 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
 
     @Override
     public void addToBlacklist(String ip, String reason, LocalDateTime expireTime, String operator) {
+        addToBlacklist(ip, reason, expireTime, operator, null);
+    }
+
+    @Override
+    public void addToBlacklist(String ip, String reason, LocalDateTime expireTime, String operator, String eventId) {
         if (ip == null || ip.isEmpty()) {
             throw new IllegalArgumentException("IP 地址不能为空");
         }
@@ -56,10 +61,10 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
         String normalizedIp = IpNormalizeUtil.normalize(ip);
 
         try {
-            ipBlacklistService.addToBlacklist(normalizedIp, reason, expireTime, operator, "SYSTEM", null, null, null);
+            ipBlacklistService.addToBlacklist(normalizedIp, reason, expireTime, operator, "SYSTEM", null, null, null, eventId);
 
-            log.info("添加 IP 到黑名单成功：ip={}, reason={}, expireTime={}, operator={}",
-                    normalizedIp, reason, expireTime != null ? expireTime.format(TIME_FORMATTER) : "永久", operator);
+            log.info("添加 IP 到黑名单成功：ip={}, reason={}, expireTime={}, operator={}, eventId={}",
+                    normalizedIp, reason, expireTime != null ? expireTime.format(TIME_FORMATTER) : "永久", operator, eventId);
         } catch (Exception e) {
             log.error("添加 IP 到黑名单失败：ip={}", normalizedIp, e);
             throw new RuntimeException("添加黑名单失败：" + e.getMessage(), e);

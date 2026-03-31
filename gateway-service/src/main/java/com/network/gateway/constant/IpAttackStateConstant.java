@@ -12,7 +12,7 @@ public class IpAttackStateConstant {
     public static final long COOLDOWN_DURATION_MS = 300_000L;
     public static final long STATE_EXPIRE_MS = 600_000L;
 
-    public static final int SUSPICIOUS_RATE_LIMIT_THRESHOLD = 5;
+    public static final int SUSPICIOUS_RATE_LIMIT_THRESHOLD = 1;
     public static final int ATTACKING_RATE_LIMIT_THRESHOLD = 10;
     public static final long ATTACKING_DURATION_MS = 0L;
 

@@ -21,8 +21,8 @@ public class BlacklistEventController {
     @PostMapping("/event")
     public ApiResponse<Void> receiveBlacklistEvent(@RequestBody BlacklistEventDTO event) {
         try {
-            log.info("接收到黑名单事件: ip={}, banType={}, reason={}, duration={}", 
-                event.getIp(), event.getBanType(), event.getBanReason(), event.getDuration());
+            log.info("接收到黑名单事件: ip={}, banType={}, reason={}, duration={}, eventId={}", 
+                event.getIp(), event.getBanType(), event.getBanReason(), event.getDuration(), event.getEventId());
             
             validateEvent(event);
             
@@ -34,7 +34,8 @@ public class BlacklistEventController {
                 event.getIp(),
                 event.getBanReason(),
                 expireTime,
-                operator
+                operator,
+                event.getEventId()
             );
             
             log.info("黑名单事件处理成功: ip={}, expireTime={}", event.getIp(), expireTime);
@@ -64,7 +65,8 @@ public class BlacklistEventController {
                         event.getIp(),
                         event.getBanReason(),
                         expireTime,
-                        operator
+                        operator,
+                        event.getEventId()
                     );
                     successCount++;
                 } catch (Exception e) {

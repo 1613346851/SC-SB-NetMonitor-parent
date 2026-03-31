@@ -35,12 +35,15 @@ public class DefenseLogServiceImpl implements DefenseLogService {
         }
 
         try {
+            log.info("接收防御日志：defenseType={}, defenseTarget={}, defenseAction={}, eventId={}", 
+                logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getDefenseAction(), logDTO.getEventId());
+            
             DefenseLogEntity entity = convertToEntity(logDTO);
             
             defenseLogMapper.insert(entity);
             
-            log.info("接收并保存防御日志成功：defenseType={}, defenseTarget={}, defenseAction={}, executeStatus={}, isFirst={}", 
-                logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getDefenseAction(), logDTO.getExecuteStatus(), entity.getIsFirst());
+            log.info("接收并保存防御日志成功：defenseType={}, defenseTarget={}, defenseAction={}, executeStatus={}, isFirst={}, eventId={}", 
+                logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getDefenseAction(), logDTO.getExecuteStatus(), entity.getIsFirst(), entity.getEventId());
 
             if (logDTO.getExecuteStatus() != null && logDTO.getExecuteStatus() == 1 && entity.getIsFirst() == 1) {
                 publishBlacklistSyncEvent(logDTO);
@@ -49,7 +52,8 @@ public class DefenseLogServiceImpl implements DefenseLogService {
             }
             
         } catch (Exception e) {
-            log.error("接收防御日志失败：", e);
+            log.error("接收防御日志失败：defenseType={}, defenseTarget={}, eventId={}", 
+                logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getEventId(), e);
         }
     }
 

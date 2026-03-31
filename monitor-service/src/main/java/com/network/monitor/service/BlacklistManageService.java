@@ -22,6 +22,17 @@ public interface BlacklistManageService {
     void addToBlacklist(String ip, String reason, LocalDateTime expireTime, String operator);
 
     /**
+     * 添加 IP 到黑名单（带事件ID）
+     *
+     * @param ip         IP 地址
+     * @param reason     拉黑原因
+     * @param expireTime 过期时间
+     * @param operator   操作人
+     * @param eventId    事件ID
+     */
+    void addToBlacklist(String ip, String reason, LocalDateTime expireTime, String operator, String eventId);
+
+    /**
      * 从黑名单移除 IP
      *
      * @param ip IP 地址

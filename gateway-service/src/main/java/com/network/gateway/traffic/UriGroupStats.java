@@ -11,6 +11,11 @@ public class UriGroupStats implements Serializable {
 
     private String uriPattern;
     private String httpMethod;
+    private int responseStatus;
+    private String targetIp;
+    private Integer targetPort;
+    private String protocol;
+    private String userAgent;
     private int count;
     private int errorCount;
     private int blockedCount;
@@ -20,9 +25,10 @@ public class UriGroupStats implements Serializable {
     public UriGroupStats() {
     }
 
-    public UriGroupStats(String uriPattern, String httpMethod, int count, int errorCount, int blockedCount, long avgProcessingTime) {
+    public UriGroupStats(String uriPattern, String httpMethod, int responseStatus, int count, int errorCount, int blockedCount, long avgProcessingTime) {
         this.uriPattern = uriPattern;
         this.httpMethod = httpMethod;
+        this.responseStatus = responseStatus;
         this.count = count;
         this.errorCount = errorCount;
         this.blockedCount = blockedCount;

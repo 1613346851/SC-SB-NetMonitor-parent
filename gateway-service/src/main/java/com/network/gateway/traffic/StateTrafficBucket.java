@@ -65,9 +65,9 @@ public class StateTrafficBucket implements Serializable {
         
         updatePeakRps();
         
-        String uriKey = buildUriKey(sample.getRequestUri(), sample.getHttpMethod());
+        String uriKey = buildUriKey(sample.getRequestUri(), sample.getHttpMethod(), sample.getResponseStatus());
         UriTrafficGroup group = uriGroups.computeIfAbsent(uriKey, 
-            k -> new UriTrafficGroup(sample.getRequestUri(), sample.getHttpMethod(), maxSampleSize));
+            k -> new UriTrafficGroup(sample.getRequestUri(), sample.getHttpMethod(), sample.getResponseStatus(), maxSampleSize));
         group.addRequest(sample);
     }
 
@@ -92,9 +92,9 @@ public class StateTrafficBucket implements Serializable {
         }
     }
 
-    private String buildUriKey(String uri, String method) {
+    private String buildUriKey(String uri, String method, int responseStatus) {
         String pattern = extractUriPattern(uri);
-        return method + ":" + pattern;
+        return method + ":" + pattern + ":" + responseStatus;
     }
 
     private String extractUriPattern(String uri) {

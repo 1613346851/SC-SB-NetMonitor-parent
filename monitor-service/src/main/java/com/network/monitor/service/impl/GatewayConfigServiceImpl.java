@@ -91,6 +91,9 @@ public class GatewayConfigServiceImpl implements GatewayConfigService {
         "confidence.global-attack.per-ip-score",
         "confidence.no-decrease.enabled",
         "confidence.min-value",
+        "confidence.blocked.rate-limit-score",
+        "confidence.blocked.blacklist-score",
+        "confidence.blocked.max-daily-score",
         "traffic.push.normal.strategy",
         "traffic.push.suspicious.strategy",
         "traffic.push.attacking.strategy",
@@ -201,6 +204,9 @@ public class GatewayConfigServiceImpl implements GatewayConfigService {
         put("confidence.global-attack.per-ip-score", "每个关联IP得分");
         put("confidence.no-decrease.enabled", "是否启用置信度只升不降策略");
         put("confidence.min-value", "置信度最小值");
+        put("confidence.blocked.rate-limit-score", "限流拦截置信度加分");
+        put("confidence.blocked.blacklist-score", "黑名单拦截置信度加分");
+        put("confidence.blocked.max-daily-score", "每日拦截最高加分");
         put("traffic.push.normal.strategy", "NORMAL状态推送策略");
         put("traffic.push.suspicious.strategy", "SUSPICIOUS状态推送策略");
         put("traffic.push.attacking.strategy", "ATTACKING状态推送策略");
@@ -311,6 +317,9 @@ public class GatewayConfigServiceImpl implements GatewayConfigService {
         put("confidence.global-attack.per-ip-score", "2");
         put("confidence.no-decrease.enabled", "true");
         put("confidence.min-value", "10");
+        put("confidence.blocked.rate-limit-score", "3");
+        put("confidence.blocked.blacklist-score", "5");
+        put("confidence.blocked.max-daily-score", "30");
         put("traffic.push.normal.strategy", "realtime");
         put("traffic.push.suspicious.strategy", "sampling");
         put("traffic.push.attacking.strategy", "batch");
@@ -497,13 +506,6 @@ public class GatewayConfigServiceImpl implements GatewayConfigService {
 
     @Override
     public int getGatewayConfigCount() {
-        int count = 0;
-        for (String key : GATEWAY_CONFIG_KEYS) {
-            String value = sysConfigCache.getConfigValue(key);
-            if (value != null) {
-                count++;
-            }
-        }
-        return count;
+        return GATEWAY_CONFIG_KEYS.size();
     }
 }

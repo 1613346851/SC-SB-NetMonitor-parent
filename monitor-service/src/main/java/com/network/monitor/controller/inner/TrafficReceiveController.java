@@ -200,7 +200,10 @@ public class TrafficReceiveController {
         dto.setRequestId(aggregate.getRequestId());
         dto.setRequestTime(aggregate.getRequestTime());
         dto.setSourceIp(aggregate.getIp());
-        dto.setTargetIp("0.0.0.0");
+        dto.setTargetIp(uriGroup.getTargetIp() != null ? uriGroup.getTargetIp() : "0.0.0.0");
+        dto.setTargetPort(uriGroup.getTargetPort());
+        dto.setProtocol(uriGroup.getProtocol());
+        dto.setUserAgent(uriGroup.getUserAgent());
         dto.setRequestUri(uriGroup.getUriPattern());
         dto.setHttpMethod(uriGroup.getHttpMethod());
         dto.setStateTag(aggregate.getStateName());
@@ -223,7 +226,7 @@ public class TrafficReceiveController {
         dto.setAggregateStartTime(aggregate.getStartTime());
         dto.setAggregateEndTime(aggregate.getEndTime());
         
-        dto.setResponseStatus(200);
+        dto.setResponseStatus(uriGroup.getResponseStatus());
         dto.setResponseTime(uriGroup.getAvgProcessingTime());
         
         return dto;

@@ -96,6 +96,7 @@ public class IpAttackStateCache {
         StateTransitionResult result = new StateTransitionResult();
         result.setPreviousState(currentState);
         result.setNewState(currentState);
+        result.setEventId(entry.getEventId());
 
         switch (currentState) {
             case IpAttackStateConstant.NORMAL:

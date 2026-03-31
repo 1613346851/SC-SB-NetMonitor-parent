@@ -93,8 +93,8 @@ public class AttackEventReceiveController {
                 }
             }
             
-            if ("执行防御".equals(reason) || "攻击确认，自动拉黑".equals(description)) {
-                log.info("网关已执行防御操作，监测服务仅记录数据，不再生成防御决策：ip={}", sourceIp);
+            if ("执行防御".equals(reason) || "攻击确认".equals(reason) || "攻击确认，自动拉黑".equals(description)) {
+                log.info("网关已执行或正在执行防御操作，监测服务仅记录数据，不再生成防御决策：ip={}, reason={}", sourceIp, reason);
             } else {
                 defenseDecisionService.generateDefenseDecision(attackDTO);
                 log.info("DDoS攻击事件处理完成：ip={}, 已生成防御决策", sourceIp);

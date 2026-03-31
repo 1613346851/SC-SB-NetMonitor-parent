@@ -65,12 +65,24 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
             DefenseCommandDTO.RiskLevel riskLevel = parseRiskLevel(riskLevelStr);
 
-            AttackEventEntity event = attackEventService.getOrCreateEvent(
-                sourceIp, 
-                attackDTO.getAttackType(), 
-                riskLevelStr, 
-                attackDTO.getConfidence() != null ? attackDTO.getConfidence() : 80
-            );
+            String existingEventId = attackDTO.getEventId();
+            AttackEventEntity event;
+            if (existingEventId != null && !existingEventId.isEmpty()) {
+                event = attackEventService.getOrCreateEventWithEventId(
+                    sourceIp, 
+                    attackDTO.getAttackType(), 
+                    riskLevelStr, 
+                    attackDTO.getConfidence() != null ? attackDTO.getConfidence() : 80,
+                    existingEventId
+                );
+            } else {
+                event = attackEventService.getOrCreateEvent(
+                    sourceIp, 
+                    attackDTO.getAttackType(), 
+                    riskLevelStr, 
+                    attackDTO.getConfidence() != null ? attackDTO.getConfidence() : 80
+                );
+            }
 
             String eventId = event != null ? event.getEventId() : generateEventId();
 
@@ -230,12 +242,16 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
     private void recordDefenseLog(DefenseCommandDTO commandDTO, AttackEventEntity event, AttackMonitorDTO attackDTO) {
         try {
             String eventId = commandDTO.getEventId();
-            if (eventId != null && !eventId.isEmpty()) {
-                int existingCount = defenseLogMapper.countByEventId(eventId);
-                if (existingCount > 0) {
-                    log.info("防御日志已存在，跳过重复记录：eventId={}, target={}", eventId, commandDTO.getSourceIp());
-                    return;
-                }
+            
+            if (eventId == null || eventId.isEmpty()) {
+                log.info("eventId为空，跳过监控服务生成的防御日志，由网关负责记录：target={}", commandDTO.getSourceIp());
+                return;
+            }
+            
+            int existingCount = defenseLogMapper.countByEventId(eventId);
+            if (existingCount > 0) {
+                log.info("防御日志已存在，跳过重复记录：eventId={}, target={}", eventId, commandDTO.getSourceIp());
+                return;
             }
             
             DefenseLogEntity logEntity = new DefenseLogEntity();

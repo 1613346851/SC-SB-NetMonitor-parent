@@ -15,6 +15,7 @@ public class UriTrafficGroup implements Serializable {
 
     private String uriPattern;
     private String httpMethod;
+    private int responseStatus;
     private final AtomicInteger count = new AtomicInteger(0);
     private final AtomicInteger errorCount = new AtomicInteger(0);
     private final AtomicInteger blockedCount = new AtomicInteger(0);
@@ -41,6 +42,11 @@ public class UriTrafficGroup implements Serializable {
     public UriTrafficGroup(String uriPattern, String httpMethod, int maxSampleSize) {
         this(uriPattern, httpMethod);
         this.maxSampleSize = maxSampleSize;
+    }
+
+    public UriTrafficGroup(String uriPattern, String httpMethod, int responseStatus, int maxSampleSize) {
+        this(uriPattern, httpMethod, maxSampleSize);
+        this.responseStatus = responseStatus;
     }
 
     public void addRequest(TrafficSample sample) {
@@ -166,6 +172,7 @@ public class UriTrafficGroup implements Serializable {
         UriGroupStats stats = new UriGroupStats();
         stats.setUriPattern(this.uriPattern);
         stats.setHttpMethod(this.httpMethod);
+        stats.setResponseStatus(this.responseStatus);
         stats.setCount(this.count.get());
         stats.setErrorCount(this.errorCount.get());
         stats.setBlockedCount(this.blockedCount.get());

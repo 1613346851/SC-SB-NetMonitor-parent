@@ -261,7 +261,7 @@ CREATE TABLE `sys_defense_log` (
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_event_id` (`event_id`),
+    KEY `idx_event_id` (`event_id`),
     KEY `idx_defense_type` (`defense_type`),
     KEY `idx_defense_action` (`defense_action`),
     KEY `idx_defense_target` (`defense_target`),

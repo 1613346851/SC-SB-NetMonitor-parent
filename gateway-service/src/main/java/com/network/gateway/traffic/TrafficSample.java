@@ -27,6 +27,11 @@ public class TrafficSample implements Serializable {
     private int state;
     private String stateName;
     private int confidence;
+    
+    private String targetIp;
+    private Integer targetPort;
+    private String protocol;
+    private String userAgent;
 
     public TrafficSample() {
         this.timestamp = System.currentTimeMillis();
@@ -62,6 +67,53 @@ public class TrafficSample implements Serializable {
         this.state = state;
         this.stateName = stateName;
     }
+    
+    public String generateAggregateKey() {
+        StringBuilder key = new StringBuilder();
+        
+        key.append(nullToEmpty(requestUri)).append("|");
+        key.append(nullToEmpty(httpMethod)).append("|");
+        key.append(responseStatus).append("|");
+        key.append(nullToEmpty(targetIp)).append("|");
+        key.append(targetPort != null ? targetPort : 0).append("|");
+        key.append(nullToEmpty(protocol)).append("|");
+        key.append(nullToEmpty(simplifyUserAgent(userAgent)));
+        
+        return key.toString();
+    }
+    
+    private String nullToEmpty(String str) {
+        return str != null ? str : "";
+    }
+    
+    private String simplifyUserAgent(String ua) {
+        if (ua == null || ua.isEmpty()) {
+            return "unknown";
+        }
+        
+        if (ua.contains("Chrome") && ua.contains("Edg")) {
+            return "Edge";
+        } else if (ua.contains("Chrome")) {
+            return "Chrome";
+        } else if (ua.contains("Firefox")) {
+            return "Firefox";
+        } else if (ua.contains("Safari") && !ua.contains("Chrome")) {
+            return "Safari";
+        } else if (ua.contains("Opera") || ua.contains("OPR")) {
+            return "Opera";
+        } else if (ua.contains("MSIE") || ua.contains("Trident")) {
+            return "IE";
+        } else if (ua.toLowerCase().contains("bot") || ua.toLowerCase().contains("crawler") || ua.toLowerCase().contains("spider")) {
+            return "Bot";
+        } else if (ua.contains("curl") || ua.contains("wget") || ua.contains("python-requests")) {
+            return "Script";
+        } else {
+            if (ua.length() > 50) {
+                return ua.substring(0, 50);
+            }
+            return ua;
+        }
+    }
 
     public static TrafficSample from(TrafficSampleDTO dto) {
         TrafficSample sample = new TrafficSample();
@@ -78,6 +130,10 @@ public class TrafficSample implements Serializable {
         sample.setStateName(dto.getStateName());
         sample.setConfidence(dto.getConfidence());
         sample.setAbnormal(sample.isAbnormalSample());
+        sample.setTargetIp(dto.getTargetIp());
+        sample.setTargetPort(dto.getTargetPort());
+        sample.setProtocol(dto.getProtocol());
+        sample.setUserAgent(dto.getUserAgent());
         return sample;
     }
 }

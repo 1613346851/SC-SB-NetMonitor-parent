@@ -97,6 +97,8 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
         defenseResult.setRiskLevel(DefenseResultBO.RiskLevel.HIGH);
 
         try {
+            defenseResult.setSuccessResult(403, "Forbidden - IP Blocked");
+            
             if (!skipDefenseLog) {
                 DefenseLogDTO defenseLog = DefenseLogUtil.buildDefenseLog(defenseResult);
                 defenseClient.pushDefenseLog(defenseLog);
@@ -109,7 +111,6 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
                        existingEventId,
                        skipDefenseLog);
 
-            defenseResult.setSuccessResult(403, "Forbidden - IP Blocked");
             return DefenseResponseUtil.buildIpBlacklistResponse(response, blacklistedIp, defenseResult.getEventId());
 
         } catch (Exception e) {
