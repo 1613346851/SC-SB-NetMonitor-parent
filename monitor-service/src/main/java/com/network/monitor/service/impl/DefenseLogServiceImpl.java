@@ -82,21 +82,20 @@ public class DefenseLogServiceImpl implements DefenseLogService {
             String attackType = logDTO.getAttackType();
             String riskLevel = logDTO.getRiskLevel();
             
+            log.info("触发告警 - 原始数据: attackId={}, eventId={}, sourceIp={}, attackType={}, riskLevel={}", 
+                attackId, eventId, sourceIp, attackType, riskLevel);
+            
             if (attackType == null || attackType.isEmpty()) {
                 attackType = "UNKNOWN";
-            }
-            if (riskLevel == null || riskLevel.isEmpty()) {
-                riskLevel = "MEDIUM";
             }
             
             if (eventId != null && !eventId.isEmpty()) {
                 AttackEventEntity event = attackEventService.getEventByEventId(eventId);
                 if (event != null) {
-                    if (event.getAttackType() != null && !event.getAttackType().isEmpty()) {
-                        attackType = event.getAttackType();
-                    }
-                    if (event.getRiskLevel() != null && !event.getRiskLevel().isEmpty()) {
-                        riskLevel = event.getRiskLevel();
+                    if (attackType == null || attackType.isEmpty() || "UNKNOWN".equals(attackType)) {
+                        if (event.getAttackType() != null && !event.getAttackType().isEmpty()) {
+                            attackType = event.getAttackType();
+                        }
                     }
                 }
                 
@@ -104,28 +103,24 @@ public class DefenseLogServiceImpl implements DefenseLogService {
                     List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
                         eventId, null, null, null, null, null, null, 0, 1, "id DESC");
                     if (attacks != null && !attacks.isEmpty()) {
-                        attackId = attacks.get(0).getId();
+                        AttackMonitorEntity attack = attacks.get(0);
+                        attackId = attack.getId();
                         log.debug("根据eventId查找到攻击记录: eventId={}, attackId={}", eventId, attackId);
                     }
                 }
             }
             
-            if (attackId == null && sourceIp != null && !sourceIp.isEmpty()) {
-                AttackMonitorEntity newAttack = new AttackMonitorEntity();
-                newAttack.setEventId(eventId);
-                newAttack.setSourceIp(sourceIp);
-                newAttack.setAttackType(attackType);
-                newAttack.setRiskLevel(riskLevel);
-                newAttack.setAttackContent(logDTO.getDefenseReason());
-                newAttack.setHandled(0);
-                newAttack.setCreateTime(LocalDateTime.now());
-                newAttack.setUpdateTime(LocalDateTime.now());
-                
-                attackId = attackStoreService.saveAttack(newAttack);
-                if (attackId != null) {
-                    log.info("创建攻击记录: attackId={}, eventId={}, sourceIp={}, attackType={}", 
-                        attackId, eventId, sourceIp, attackType);
+            if (attackId != null) {
+                AttackMonitorEntity attack = attackMonitorMapper.selectById(attackId);
+                if (attack != null && attack.getRiskLevel() != null && !attack.getRiskLevel().isEmpty()) {
+                    riskLevel = attack.getRiskLevel();
+                    log.info("从攻击记录获取风险级别: attackId={}, riskLevel={}", attackId, riskLevel);
                 }
+            }
+            
+            if (riskLevel == null || riskLevel.isEmpty()) {
+                riskLevel = "MEDIUM";
+                log.warn("风险级别为空，使用默认值 MEDIUM");
             }
             
             AlertDTO alertDTO = AlertDTO.fromAttack(attackId, eventId, sourceIp, attackType, riskLevel);

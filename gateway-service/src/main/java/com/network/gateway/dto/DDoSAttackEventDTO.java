@@ -44,13 +44,25 @@ public class DDoSAttackEventDTO implements Serializable {
     public DDoSAttackEventDTO(String sourceIp, int rateLimitCount, int confidence) {
         this.sourceIp = sourceIp;
         this.attackType = "DDOS";
-        this.riskLevel = confidence >= 90 ? "HIGH" : (confidence >= 70 ? "MEDIUM" : "LOW");
+        this.riskLevel = calculateRiskLevel(confidence);
         this.confidence = confidence;
         this.rateLimitCount = rateLimitCount;
         this.description = String.format("连续触发限流%d次，置信度%d%%，自动升级为DDoS攻击", rateLimitCount, confidence);
         this.timestamp = System.currentTimeMillis();
         this.traceId = generateTraceId();
         this.eventId = generateEventId();
+    }
+    
+    private String calculateRiskLevel(int confidence) {
+        if (confidence >= 90) {
+            return "CRITICAL";
+        } else if (confidence >= 70) {
+            return "HIGH";
+        } else if (confidence >= 50) {
+            return "MEDIUM";
+        } else {
+            return "LOW";
+        }
     }
 
     private String generateTraceId() {

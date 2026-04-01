@@ -7,7 +7,7 @@ function init() {
     currentIp = urlParams.get('ip');
     
     if (!currentIp) {
-        Message.error('缺少IP参数');
+        message.error('缺少IP参数');
         return;
     }
     
@@ -17,17 +17,13 @@ function init() {
 }
 
 function loadIpProfile() {
-    Http.get('/api/trace/ip/' + currentIp)
-        .then(function(response) {
-            if (response.code === 200) {
-                renderProfile(response.data);
-            } else {
-                Message.error(response.message || '获取IP画像失败');
-            }
+    http.get('/trace/ip/' + currentIp)
+        .then(function(data) {
+            renderProfile(data);
         })
         .catch(function(error) {
             console.error('获取IP画像失败:', error);
-            Message.error('获取IP画像失败');
+            message.error('获取IP画像失败');
         });
 }
 
@@ -170,10 +166,10 @@ function renderHourlyChart(hourlyStats) {
 }
 
 function loadAttackChain() {
-    Http.get('/api/trace/chain/' + currentIp, { hours: 24 })
-        .then(function(response) {
-            if (response.code === 200) {
-                renderTimeline(response.data.timeline);
+    http.get('/trace/chain/' + currentIp, { hours: 24 })
+        .then(function(data) {
+            if (data && data.timeline) {
+                renderTimeline(data.timeline);
             }
         })
         .catch(function(error) {
@@ -206,11 +202,11 @@ function renderTimeline(timeline) {
 }
 
 function loadAttackRecords() {
-    Http.get('/api/trace/attacks/' + currentIp, { pageNum: attackPageNum, pageSize: attackPageSize })
-        .then(function(response) {
-            if (response.code === 200) {
-                renderAttackTable(response.data.list);
-                renderPagination(response.data.total, attackPageNum, attackPageSize);
+    http.get('/trace/attacks/' + currentIp, { pageNum: attackPageNum, pageSize: attackPageSize })
+        .then(function(data) {
+            if (data) {
+                renderAttackTable(data.list);
+                renderPagination(data.total, attackPageNum, attackPageSize);
             }
         })
         .catch(function(error) {

@@ -9,6 +9,7 @@ import com.network.monitor.mapper.AlertRuleMapper;
 import com.network.monitor.service.AlertService;
 import com.network.monitor.service.SysConfigService;
 import com.network.monitor.websocket.AlertPushService;
+import com.network.monitor.websocket.DataPushService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,9 @@ public class AlertServiceImpl implements AlertService {
     @Autowired
     private AlertPushService alertPushService;
 
+    @Autowired
+    private DataPushService dataPushService;
+
     @Override
     @Transactional
     public void generateAlert(AlertDTO alertDTO) {
@@ -48,6 +52,7 @@ public class AlertServiceImpl implements AlertService {
         alertMapper.insert(alert);
         
         alertPushService.pushAlert(alert);
+        dataPushService.pushAlertRecord(alert);
         
         logger.info("告警已生成: alertId={}, level={}, sourceIp={}, eventId={}", 
             alert.getAlertId(), alert.getAlertLevel(), alert.getSourceIp(), alert.getEventId());

@@ -22,7 +22,6 @@ function initAlertTable() {
         renderRow: function(item) {
             const cell = TableUtils.cell;
             
-            const levelBadge = getLevelBadge(item.alertLevel);
             const statusText = getStatusText(item.status);
             const statusClass = getStatusClass(item.status);
             const eventIdDisplay = item.eventId ? (item.eventId.length > 16 ? item.eventId.substring(0, 16) + '...' : item.eventId) : '-';
@@ -40,14 +39,14 @@ function initAlertTable() {
                 <tr>
                     <td class="checkbox-cell"><input type="checkbox" class="alert-checkbox" value="${item.id}" onchange="updateSelectedIds()"></td>
                     <td>${item.id || '-'}</td>
-                    <td><span class="badge ${levelBadge}">${item.alertLevelChinese || item.alertLevel}</span></td>
+                    <td>${cell.renderRiskLevel(item.alertLevel)}</td>
                     ${cell.renderCell(item.sourceIp, { maxLength: 20 })}
                     ${cell.renderCell(item.alertTitle, { maxLength: 40 })}
-                    <td>${item.attackTypeChinese || item.attackType || '-'}</td>
+                    <td>${cell.renderAttackType(item.attackType)}</td>
                     <td>${attackIdDisplay}</td>
                     ${cell.renderCell(item.eventId, { maxLength: 16 })}
                     <td>${formatDateTime(item.createTime)}</td>
-                    <td><span class="badge ${statusClass}">${statusText}</span></td>
+                    <td>${cell.renderStatus(item.status, 'handle')}</td>
                     ${cell.renderActionCell(buttons)}
                 </tr>
             `;
@@ -131,11 +130,14 @@ function viewAlert(id) {
 function showAlertDetail(alert) {
     const content = document.getElementById('alertDetailContent');
     
+    const levelClass = getLevelClass(alert.alertLevel);
+    const statusClass = getStatusClass(alert.status);
+    
     let html = '<div class="alert-detail-row"><div class="alert-detail-label">告警ID</div><div class="alert-detail-value">' + escapeHtml(alert.alertId) + '</div></div>';
-    html += '<div class="alert-detail-row"><div class="alert-detail-label">告警级别</div><div class="alert-detail-value"><span class="badge ' + getLevelBadge(alert.alertLevel) + '">' + alert.alertLevelChinese + '</span></div></div>';
+    html += '<div class="alert-detail-row"><div class="alert-detail-label">告警级别</div><div class="alert-detail-value"><span class="tag ' + levelClass + '">' + (alert.alertLevelChinese || alert.alertLevel) + '</span></div></div>';
     html += '<div class="alert-detail-row"><div class="alert-detail-label">告警标题</div><div class="alert-detail-value">' + escapeHtml(alert.alertTitle) + '</div></div>';
     html += '<div class="alert-detail-row"><div class="alert-detail-label">源IP</div><div class="alert-detail-value">' + escapeHtml(alert.sourceIp) + '</div></div>';
-    html += '<div class="alert-detail-row"><div class="alert-detail-label">攻击类型</div><div class="alert-detail-value">' + alert.attackTypeChinese + '</div></div>';
+    html += '<div class="alert-detail-row"><div class="alert-detail-label">攻击类型</div><div class="alert-detail-value"><span class="tag info">' + (alert.attackTypeChinese || alert.attackType || '-') + '</span></div></div>';
     if (alert.eventId) {
         html += '<div class="alert-detail-row"><div class="alert-detail-label">事件ID</div><div class="alert-detail-value">' + escapeHtml(alert.eventId) + '</div></div>';
     }
@@ -143,7 +145,7 @@ function showAlertDetail(alert) {
         html += '<div class="alert-detail-row"><div class="alert-detail-label">攻击记录</div><div class="alert-detail-value"><a href="/attack?attackId=' + alert.attackId + '" style="color: #4f46e5;">查看攻击记录</a></div></div>';
     }
     html += '<div class="alert-detail-row"><div class="alert-detail-label">创建时间</div><div class="alert-detail-value">' + formatDateTime(alert.createTime) + '</div></div>';
-    html += '<div class="alert-detail-row"><div class="alert-detail-label">状态</div><div class="alert-detail-value">' + alert.statusChinese + '</div></div>';
+    html += '<div class="alert-detail-row"><div class="alert-detail-label">状态</div><div class="alert-detail-value"><span class="tag ' + statusClass + '">' + (alert.statusChinese || getStatusText(alert.status)) + '</span></div></div>';
     
     if (alert.alertContent) {
         html += '<div class="alert-detail-row"><div class="alert-detail-label">详情</div><div class="alert-detail-value">' + escapeHtml(alert.alertContent).replace(/\n/g, '<br>') + '</div></div>';
@@ -305,13 +307,13 @@ function batchDelete() {
         });
 }
 
-function getLevelBadge(level) {
+function getLevelClass(level) {
     switch (level) {
-        case 'CRITICAL': return 'level-badge-critical';
-        case 'HIGH': return 'level-badge-high';
-        case 'MEDIUM': return 'level-badge-medium';
-        case 'LOW': return 'level-badge-low';
-        default: return '';
+        case 'CRITICAL': return 'danger';
+        case 'HIGH': return 'warning';
+        case 'MEDIUM': return 'info';
+        case 'LOW': return 'success';
+        default: return 'info';
     }
 }
 
@@ -326,10 +328,10 @@ function getStatusText(status) {
 
 function getStatusClass(status) {
     switch (status) {
-        case 0: return 'badge-warning';
-        case 1: return 'badge-success';
-        case 2: return 'badge-secondary';
-        default: return '';
+        case 0: return 'warning';
+        case 1: return 'success';
+        case 2: return 'secondary';
+        default: return 'info';
     }
 }
 

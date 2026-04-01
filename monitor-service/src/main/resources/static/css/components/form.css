@@ -171,3 +171,62 @@
 .search-bar .btn {
     white-space: nowrap;
 }
+
+/* ==================== 表单操作按钮 ==================== */
+.form-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+/* ==================== 快捷搜索 ==================== */
+.quick-search {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-light);
+}
+
+.quick-label {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.quick-btn {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.quick-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.quick-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+/* ==================== 搜索表单 ==================== */
+.search-form {
+    width: 100%;
+}
+
+.search-form .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.search-form .form-group {
+    margin-bottom: 0;
+}

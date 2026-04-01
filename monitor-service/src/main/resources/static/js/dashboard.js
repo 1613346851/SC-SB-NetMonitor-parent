@@ -17,13 +17,97 @@ document.addEventListener('DOMContentLoaded', async function() {
         loadRecentEvents()
     ]);
     
-    setInterval(() => {
-        if (recentAttacksTable) {
-            recentAttacksTable.loadData();
-        }
-    }, 5000);
-    setInterval(loadEventStats, 10000);
+    initDataUpdateHandler();
 });
+
+function initDataUpdateHandler() {
+    if (typeof DataUpdateHandler === 'undefined') {
+        console.warn('DataUpdateHandler未加载');
+        return;
+    }
+    
+    DataUpdateHandler.connect(
+        function() {
+            DataUpdateHandler.onDataUpdate(function(message) {
+                handleDataUpdate(message);
+            });
+        },
+        function() {
+            console.warn('数据更新WebSocket连接断开');
+        }
+    );
+}
+
+function handleDataUpdate(message) {
+    if (!message || !message.type) return;
+    
+    switch (message.type) {
+        case 'ALERT_RECORD':
+            handleAlertUpdate(message.data);
+            break;
+        case 'ATTACK_RECORD':
+            handleAttackUpdate(message.data);
+            break;
+        case 'STATS_UPDATE':
+            handleStatsUpdate(message.data);
+            break;
+        case 'EVENT_STATS_UPDATE':
+            handleEventStatsUpdate(message.data);
+            break;
+    }
+}
+
+function handleAlertUpdate(alertData) {
+    if (!alertData || !recentAttacksTable) return;
+    
+    const currentData = recentAttacksTable.getCurrentData() || [];
+    const existingIndex = currentData.findIndex(item => item.id === alertData.id);
+    
+    if (existingIndex >= 0) {
+        currentData[existingIndex] = alertData;
+    } else {
+        currentData.unshift(alertData);
+        if (currentData.length > 10) {
+            currentData.pop();
+        }
+    }
+    
+    recentAttacksTable.updateData(currentData);
+}
+
+function handleAttackUpdate(attackData) {
+    loadDashboardStats();
+}
+
+function handleStatsUpdate(statsData) {
+    if (statsData.totalTraffic !== undefined) {
+        document.getElementById('totalTraffic').textContent = statsData.totalTraffic;
+    }
+    if (statsData.totalAttack !== undefined) {
+        document.getElementById('totalAttack').textContent = statsData.totalAttack;
+    }
+    if (statsData.totalVulnerability !== undefined) {
+        document.getElementById('totalVulnerability').textContent = statsData.totalVulnerability;
+    }
+    if (statsData.totalDefense !== undefined) {
+        document.getElementById('totalDefense').textContent = statsData.totalDefense;
+    }
+}
+
+function handleEventStatsUpdate(eventStats) {
+    if (eventStats.totalEvents !== undefined) {
+        const el = document.getElementById('totalEvents');
+        if (el) el.textContent = eventStats.totalEvents;
+    }
+    if (eventStats.activeEvents !== undefined) {
+        const el = document.getElementById('activeEvents');
+        if (el) el.textContent = eventStats.activeEvents;
+    }
+    if (eventStats.criticalEvents !== undefined) {
+        const el = document.getElementById('criticalEvents');
+        if (el) el.textContent = eventStats.criticalEvents;
+    }
+}
 
 function initRecentAttacksTable() {
     recentAttacksTable = TableUtils.createInstance({

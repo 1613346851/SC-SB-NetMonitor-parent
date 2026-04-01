@@ -140,11 +140,19 @@
                 `<span class="tag">${level || '-'}</span>`;
         },
         
-        renderStatus(enabled, trueText = '启用', falseText = '禁用') {
-            if (enabled === 1 || enabled === true || enabled === '1') {
-                return `<span class="tag success">${trueText}</span>`;
+        renderStatus(status, type = 'enabled') {
+            if (window.TableRenderer) {
+                if (type === 'handle' || type === 'ban') {
+                    return window.TableRenderer.renderStatus(status, type);
+                }
             }
-            return `<span class="tag info">${falseText}</span>`;
+            if (type === 'enabled' || type === undefined) {
+                if (status === 1 || status === true || status === '1') {
+                    return '<span class="tag success">启用</span>';
+                }
+                return '<span class="tag info">禁用</span>';
+            }
+            return `<span class="tag info">${status}</span>`;
         },
         
         renderVerifyStatus(status) {
@@ -699,6 +707,60 @@
         getSortIcon(field) {
             if (this.sortField !== field) return '↕';
             return this.sortOrder === 'asc' ? '↑' : '↓';
+        }
+
+        getCurrentData() {
+            return this.data;
+        }
+
+        updateData(newData, resetPage = false) {
+            if (!Array.isArray(newData)) {
+                console.warn('updateData: 数据必须是数组');
+                return;
+            }
+            
+            this.data = newData;
+            
+            if (resetPage) {
+                this.currentPage = 1;
+            }
+            
+            this.renderTable();
+            
+            if (this.options.enableTooltip) {
+                TooltipManager.bindEvents(this.options.tableBodyEl);
+            }
+        }
+
+        prependData(item) {
+            if (!item) return;
+            
+            this.data = this.data || [];
+            this.data.unshift(item);
+            
+            if (this.data.length > this.options.pageSize) {
+                this.data.pop();
+            }
+            
+            this.renderTable();
+            
+            if (this.options.enableTooltip) {
+                TooltipManager.bindEvents(this.options.tableBodyEl);
+            }
+        }
+
+        updateDataItem(id, newItem) {
+            if (!newItem) return;
+            
+            const index = this.data.findIndex(item => item.id === id);
+            if (index >= 0) {
+                this.data[index] = newItem;
+                this.renderTable();
+                
+                if (this.options.enableTooltip) {
+                    TooltipManager.bindEvents(this.options.tableBodyEl);
+                }
+            }
         }
 
         async exportCSV(exportUrl, filename = 'export.csv') {

@@ -37,7 +37,7 @@ public class MonitorRuleEntity {
     private String description;
 
     /**
-     * 风险等级（HIGH/MEDIUM/LOW）
+     * 风险等级（CRITICAL/HIGH/MEDIUM/LOW）
      */
     private String riskLevel;
 

@@ -144,13 +144,47 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         
         aggregateService.onStateTransition(sourceIp, previousState, newState);
         
+        DefenseResultBO.RiskLevel riskLevel = calculateRiskLevelByConfidence(confidence);
+        
         if (newState == IpAttackStateConstant.SUSPICIOUS) {
             pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "频率异常", confidence, eventId);
+            pushStateTransitionDefenseLog(sourceIp, exchange, eventId, "SUSPICIOUS", "频率异常检测", riskLevel, confidence);
         } else if (newState == IpAttackStateConstant.ATTACKING) {
             pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "攻击确认", confidence, eventId);
+            pushStateTransitionDefenseLog(sourceIp, exchange, eventId, "ATTACKING", "攻击行为确认", riskLevel, confidence);
         } else if (newState == IpAttackStateConstant.DEFENDED) {
             pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "执行防御", confidence, eventId);
             pushBlacklistEvent(sourceIp, exchange, "攻击确认，自动拉黑", confidence, eventId);
+        }
+    }
+    
+    private void pushStateTransitionDefenseLog(String sourceIp, ServerWebExchange exchange, String eventId, 
+                                                String stateName, String reason, 
+                                                DefenseResultBO.RiskLevel riskLevel, int confidence) {
+        try {
+            DefenseResultBO defenseResult = new DefenseResultBO(
+                    DefenseResultBO.DefenseType.RATE_LIMIT,
+                    sourceIp,
+                    eventId,
+                    String.format("状态转换: %s, 原因: %s, 置信度: %d%%", stateName, reason, confidence)
+            );
+            
+            defenseResult.setRequestInfo(
+                    exchange.getRequest().getMethodValue(),
+                    exchange.getRequest().getURI().getPath(),
+                    ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest()))
+            );
+            defenseResult.setRiskLevel(riskLevel);
+            defenseResult.setAttackType("DDOS");
+            defenseResult.setSuccessResult(429, "Too Many Requests - " + stateName);
+            
+            DefenseLogDTO defenseLog = DefenseLogUtil.buildDefenseLog(defenseResult);
+            defenseClient.pushDefenseLog(defenseLog);
+            
+            logger.info("状态转换防御日志推送成功: ip={}, state={}, confidence={}, riskLevel={}, eventId={}", 
+                    sourceIp, stateName, confidence, riskLevel, eventId);
+        } catch (Exception e) {
+            logger.error("推送状态转换防御日志失败: ip={}, state={}, error={}", sourceIp, stateName, e.getMessage(), e);
         }
     }
 
@@ -159,12 +193,14 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         
         boolean skipDefenseLog = attackStateCache.shouldSkipDefenseAction(sourceIp);
         String existingEventId = attackStateCache.getEventId(sourceIp);
+        int confidence = attackStateCache.getConfidence(sourceIp);
+        DefenseResultBO.RiskLevel riskLevel = calculateRiskLevelByConfidence(confidence);
         
         DefenseResultBO defenseResult = new DefenseResultBO(
                 DefenseResultBO.DefenseType.BLACKLIST,
                 sourceIp,
                 existingEventId,
-                "IP已被防御系统拦截"
+                String.format("IP已被防御系统拦截, 置信度: %d%%", confidence)
         );
 
         defenseResult.setRequestInfo(
@@ -172,7 +208,7 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                 exchange.getRequest().getURI().getPath(),
                 ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest()))
         );
-        defenseResult.setRiskLevel(DefenseResultBO.RiskLevel.HIGH);
+        defenseResult.setRiskLevel(riskLevel);
         defenseResult.setAttackType("DDOS");
 
         try {
@@ -239,13 +275,15 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         if ((eventId == null || eventId.isEmpty()) && transitionResult != null) {
             eventId = transitionResult.getEventId();
         }
+        
+        int confidence = attackStateCache.getConfidence(sourceIp);
 
         DefenseResultBO defenseResult = new DefenseResultBO(
                 DefenseResultBO.DefenseType.RATE_LIMIT,
                 sourceIp,
                 eventId,
-                String.format("请求频率过高(%d次/秒 > %d次/秒), 状态: %s", 
-                        currentCount, threshold, IpAttackStateConstant.getStateNameZh(currentState))
+                String.format("请求频率过高(%d次/秒 > %d次/秒), 状态: %s, 置信度: %d%%", 
+                        currentCount, threshold, IpAttackStateConstant.getStateNameZh(currentState), confidence)
         );
 
         defenseResult.setRequestInfo(
@@ -253,8 +291,7 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                 exchange.getRequest().getURI().getPath(),
                 ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest()))
         );
-        defenseResult.setRiskLevel(currentCount > threshold * 2 ?
-                DefenseResultBO.RiskLevel.HIGH : DefenseResultBO.RiskLevel.MEDIUM);
+        defenseResult.setRiskLevel(calculateRiskLevelByConfidence(confidence));
         defenseResult.setAttackType("DDOS");
 
         try {
@@ -390,6 +427,18 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
             sourceIp, confidence, attackHistoryCount, duration);
         
         return duration;
+    }
+    
+    private DefenseResultBO.RiskLevel calculateRiskLevelByConfidence(int confidence) {
+        if (confidence >= 90) {
+            return DefenseResultBO.RiskLevel.CRITICAL;
+        } else if (confidence >= 70) {
+            return DefenseResultBO.RiskLevel.HIGH;
+        } else if (confidence >= 50) {
+            return DefenseResultBO.RiskLevel.MEDIUM;
+        } else {
+            return DefenseResultBO.RiskLevel.LOW;
+        }
     }
 
     @Override

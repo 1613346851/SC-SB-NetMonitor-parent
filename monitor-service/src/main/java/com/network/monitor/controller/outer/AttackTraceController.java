@@ -198,18 +198,22 @@ public class AttackTraceController {
             @RequestParam(required = false) String ip,
             @RequestParam(required = false) String attackType,
             @RequestParam(required = false) String riskLevel,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize) {
         try {
             int offset = (pageNum - 1) * pageSize;
+            
+            LocalDateTime startDateTime = parseDateTime(startTime);
+            LocalDateTime endDateTime = parseDateTime(endTime);
+            
             List<AttackMonitorEntity> list = attackMonitorMapper.selectByCondition(
-                    null, attackType, riskLevel, ip, null, startTime, endTime,
+                    null, attackType, riskLevel, ip, null, startDateTime, endDateTime,
                     offset, pageSize, "create_time DESC"
             );
             long total = attackMonitorMapper.countByCondition(
-                    null, attackType, riskLevel, ip, null, startTime, endTime
+                    null, attackType, riskLevel, ip, null, startDateTime, endDateTime
             );
 
             Map<String, Object> data = new HashMap<>();
@@ -221,6 +225,18 @@ public class AttackTraceController {
         } catch (Exception e) {
             log.error("溯源查询失败", e);
             return ApiResponse.error("溯源查询失败");
+        }
+    }
+    
+    private LocalDateTime parseDateTime(String dateTimeStr) {
+        if (dateTimeStr == null || dateTimeStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(dateTimeStr.replace(" ", "T"));
+        } catch (Exception e) {
+            log.warn("解析时间失败: {}", dateTimeStr, e);
+            return null;
         }
     }
 }

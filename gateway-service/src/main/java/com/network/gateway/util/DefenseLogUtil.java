@@ -36,6 +36,9 @@ public class DefenseLogUtil {
         logDTO.setExecuteResult("IP已被加入黑名单，拒绝访问");
         logDTO.setOperator("SYSTEM");
         logDTO.setExecuteTime(System.currentTimeMillis());
+        if (riskLevel != null) {
+            logDTO.setRiskLevel(riskLevel.name());
+        }
         
         return logDTO;
     }
@@ -54,6 +57,7 @@ public class DefenseLogUtil {
         logDTO.setOperator("SYSTEM");
         logDTO.setConfidence(confidence);
         logDTO.setExecuteTime(System.currentTimeMillis());
+        logDTO.setRiskLevel(DefenseResultBO.RiskLevel.HIGH.name());
         
         if (expireTimestamp != null) {
             LocalDateTime expireDateTime = LocalDateTime.ofInstant(
@@ -77,6 +81,9 @@ public class DefenseLogUtil {
         logDTO.setExecuteResult(String.format("请求频率过高(%d次/秒 > %d次/秒)，已实施限流措施", currentRate, limitRate));
         logDTO.setOperator("SYSTEM");
         logDTO.setExecuteTime(System.currentTimeMillis());
+        if (riskLevel != null) {
+            logDTO.setRiskLevel(riskLevel.name());
+        }
         
         return logDTO;
     }
@@ -93,6 +100,7 @@ public class DefenseLogUtil {
         logDTO.setExecuteStatus(1);
         logDTO.setConfidence(confidence);
         logDTO.setExecuteTime(System.currentTimeMillis());
+        logDTO.setRiskLevel(DefenseResultBO.RiskLevel.HIGH.name());
         
         if (counter != null) {
             logDTO.setRateLimitCount(counter.getCount());
@@ -119,6 +127,9 @@ public class DefenseLogUtil {
         logDTO.setExecuteResult("检测到恶意请求，已拦截");
         logDTO.setOperator("SYSTEM");
         logDTO.setExecuteTime(System.currentTimeMillis());
+        if (riskLevel != null) {
+            logDTO.setRiskLevel(riskLevel.name());
+        }
         
         return logDTO;
     }
@@ -139,6 +150,7 @@ public class DefenseLogUtil {
         logDTO.setExecuteTime(System.currentTimeMillis());
         logDTO.setRequestUri(requestUri);
         logDTO.setHttpMethod(httpMethod);
+        logDTO.setRiskLevel(DefenseResultBO.RiskLevel.HIGH.name());
         
         return logDTO;
     }
@@ -156,6 +168,7 @@ public class DefenseLogUtil {
         logDTO.setConfidence(confidence);
         logDTO.setExecuteTime(System.currentTimeMillis());
         logDTO.setOperator("SYSTEM");
+        logDTO.setRiskLevel(DefenseResultBO.RiskLevel.HIGH.name());
         
         logDTO.setDefenseAction(buildDefenseActionSummary(actions));
         logDTO.setExecuteResult(buildCompositeDescription(actions));

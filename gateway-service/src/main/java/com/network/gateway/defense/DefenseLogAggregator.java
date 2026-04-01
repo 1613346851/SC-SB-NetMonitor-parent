@@ -110,6 +110,7 @@ public class DefenseLogAggregator {
         log.setDefenseReason(defenseReason);
         log.setExecuteStatus(1);
         log.setOperator("SYSTEM");
+        log.setRiskLevel("HIGH");
 
         if (actions.size() == 1) {
             DefenseAction action = actions.get(0);

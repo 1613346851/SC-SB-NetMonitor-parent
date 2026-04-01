@@ -53,6 +53,7 @@ public class AttackRuleDTO implements Serializable {
 
     /**
      * 风险等级
+     * CRITICAL: 严重
      * HIGH: 高风险
      * MEDIUM: 中风险
      * LOW: 低风险
@@ -104,6 +105,7 @@ public class AttackRuleDTO implements Serializable {
     }
 
     public enum RiskLevel {
+        CRITICAL,
         HIGH,
         MEDIUM,
         LOW

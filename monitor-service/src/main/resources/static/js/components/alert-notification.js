@@ -20,16 +20,18 @@
             this._container.id = 'alert-notification-container';
             this._container.style.cssText = `
                 position: fixed;
-                top: 20px;
+                top: 80px;
                 right: 20px;
                 width: 380px;
-                max-height: calc(100vh - 40px);
+                max-height: calc(100vh - 100px);
                 overflow-y: auto;
+                overflow-x: hidden;
                 z-index: 99999;
                 pointer-events: none;
                 display: flex;
                 flex-direction: column;
                 gap: 12px;
+                padding-right: 4px;
             `;
             document.body.appendChild(this._container);
         },
@@ -67,6 +69,8 @@
                     animation: alertSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                     position: relative;
                     overflow: hidden;
+                    min-height: 180px;
+                    flex-shrink: 0;
                 }
                 
                 .alert-notification-card.removing {
@@ -247,10 +251,18 @@
 
         _connectWebSocket() {
             try {
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const host = window.location.host;
-                const socketUrl = `${protocol}//${host}/ws/alert`;
+                if (typeof SockJS === 'undefined') {
+                    console.error('[AlertNotification] SockJS 未加载，无法建立 WebSocket 连接');
+                    this._scheduleReconnect();
+                    return;
+                }
+                if (typeof Stomp === 'undefined') {
+                    console.error('[AlertNotification] Stomp 未加载，无法建立 WebSocket 连接');
+                    this._scheduleReconnect();
+                    return;
+                }
                 
+                console.log('[AlertNotification] 正在建立 WebSocket 连接...');
                 this._socket = new SockJS('/ws/alert');
                 const stompClient = Stomp.over(this._socket);
                 
@@ -258,27 +270,28 @@
                 
                 stompClient.connect({}, 
                     (frame) => {
-                        console.log('WebSocket连接成功');
+                        console.log('[AlertNotification] WebSocket 连接成功');
                         this._reconnectAttempts = 0;
                         
                         stompClient.subscribe('/topic/alerts', (message) => {
                             try {
                                 const alert = JSON.parse(message.body);
+                                console.log('[AlertNotification] 收到告警消息:', alert);
                                 this.addAlert(alert);
                             } catch (e) {
-                                console.error('解析告警消息失败:', e);
+                                console.error('[AlertNotification] 解析告警消息失败:', e);
                             }
                         });
                     },
                     (error) => {
-                        console.error('WebSocket连接失败:', error);
+                        console.error('[AlertNotification] WebSocket 连接失败:', error);
                         this._scheduleReconnect();
                     }
                 );
                 
                 this._stompClient = stompClient;
             } catch (e) {
-                console.error('WebSocket初始化失败:', e);
+                console.error('[AlertNotification] WebSocket 初始化失败:', e);
                 this._scheduleReconnect();
             }
         },
@@ -302,7 +315,9 @@
 
         _showAlert(alert, animate = true) {
             const card = document.createElement('div');
-            card.className = `alert-notification-card ${alert.alertLevelClass || 'alert-low'}`;
+            const levelClass = this._getLevelClass(alert.alertLevel);
+            const levelText = this._getLevelText(alert.alertLevel);
+            card.className = `alert-notification-card ${levelClass}`;
             card.dataset.alertId = alert.alertId;
             
             const time = alert.createTime ? this._formatTime(alert.createTime) : '刚刚';
@@ -314,14 +329,14 @@
                             <path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
                         </svg>
                     </div>
-                    <span class="alert-notification-level">${alert.alertLevelChinese || '低危'}</span>
+                    <span class="alert-notification-level">${levelText}</span>
                     <span class="alert-notification-time">${time}</span>
                 </div>
                 <div class="alert-notification-title">${this._escapeHtml(alert.alertTitle || '安全告警')}</div>
                 <div class="alert-notification-content">${this._escapeHtml(alert.alertContent || '')}</div>
                 <div class="alert-notification-meta">
                     <span>来源: ${this._escapeHtml(alert.sourceIp || '-')}</span>
-                    <span>类型: ${alert.attackTypeChinese || alert.attackType || '-'}</span>
+                    <span>类型: ${this._getAttackTypeText(alert.attackType)}</span>
                 </div>
                 <div class="alert-notification-actions">
                     <button class="alert-notification-btn alert-notification-btn-secondary" data-action="dismiss">知道了</button>
@@ -337,6 +352,41 @@
             });
             
             this._container.appendChild(card);
+        },
+        
+        _getLevelClass(level) {
+            switch (level) {
+                case 'CRITICAL': return 'alert-critical';
+                case 'HIGH': return 'alert-high';
+                case 'MEDIUM': return 'alert-medium';
+                case 'LOW': return 'alert-low';
+                default: return 'alert-medium';
+            }
+        },
+        
+        _getLevelText(level) {
+            switch (level) {
+                case 'CRITICAL': return '严重';
+                case 'HIGH': return '高风险';
+                case 'MEDIUM': return '中风险';
+                case 'LOW': return '低风险';
+                default: return '中风险';
+            }
+        },
+        
+        _getAttackTypeText(type) {
+            if (!type) return '-';
+            const typeMap = {
+                'SQL_INJECTION': 'SQL注入',
+                'XSS': '跨站脚本',
+                'COMMAND_INJECTION': '命令注入',
+                'PATH_TRAVERSAL': '路径遍历',
+                'FILE_INCLUSION': '文件包含',
+                'DDOS': 'DDoS攻击',
+                'BRUTE_FORCE': '暴力破解',
+                'SCANNER': '扫描器探测'
+            };
+            return typeMap[type] || type;
         },
 
         _handleAction(alert, action, card) {

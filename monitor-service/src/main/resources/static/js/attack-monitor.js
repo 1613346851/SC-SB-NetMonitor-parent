@@ -27,13 +27,59 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     }
     
-    setInterval(() => {
-        const handledSelect = document.getElementById('handled');
-        if (!handledSelect || handledSelect.value === '' || handledSelect.value === '0') {
-            attackTable.loadData();
-        }
-    }, 5000);
+    initDataUpdateHandler();
 });
+
+function initDataUpdateHandler() {
+    if (typeof DataUpdateHandler === 'undefined') {
+        console.warn('DataUpdateHandler未加载');
+        return;
+    }
+    
+    DataUpdateHandler.connect(
+        function() {
+            DataUpdateHandler.onDataUpdate(function(message) {
+                handleDataUpdate(message);
+            });
+        },
+        function() {
+            console.warn('数据更新WebSocket连接断开');
+        }
+    );
+}
+
+function handleDataUpdate(message) {
+    if (!message || !message.type) return;
+    
+    switch (message.type) {
+        case 'ATTACK_RECORD':
+            handleAttackRecordUpdate(message.data);
+            break;
+    }
+}
+
+function handleAttackRecordUpdate(attackData) {
+    if (!attackData || !attackTable) return;
+    
+    const handledSelect = document.getElementById('handled');
+    if (handledSelect && handledSelect.value === '1') {
+        return;
+    }
+    
+    const currentData = attackTable.getCurrentData() || [];
+    const existingIndex = currentData.findIndex(item => item.id === attackData.id);
+    
+    if (existingIndex >= 0) {
+        currentData[existingIndex] = attackData;
+    } else {
+        currentData.unshift(attackData);
+        if (currentData.length > attackTable.options.pageSize) {
+            currentData.pop();
+        }
+    }
+    
+    attackTable.updateData(currentData);
+}
 
 function initAttackTable() {
     attackTable = TableUtils.createInstance({
@@ -66,7 +112,7 @@ function initAttackTable() {
                     <td>${cell.renderAttackType(item.attackType)}</td>
                     <td>${cell.renderRiskLevel(item.riskLevel)}</td>
                     <td>${item.confidence ? item.confidence + '%' : '-'}</td>
-                    <td>${cell.renderStatus(item.handled, '已处理', '未处理')}</td>
+                    <td>${cell.renderStatus(item.handled, 'handle')}</td>
                     ${cell.renderActionCell(buttons)}
                 </tr>
             `;
