@@ -51,6 +51,18 @@ public interface TrafficMonitorMapper {
     );
 
     /**
+     * 统计总请求数（使用request_count字段求和）
+     */
+    long sumRequestCountByCondition(
+            @Param("sourceIp") String sourceIp,
+            @Param("targetIp") String targetIp,
+            @Param("httpMethod") String httpMethod,
+            @Param("requestUri") String requestUri,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
+
+    /**
      * 删除流量记录
      */
     int deleteById(@Param("id") Long id);

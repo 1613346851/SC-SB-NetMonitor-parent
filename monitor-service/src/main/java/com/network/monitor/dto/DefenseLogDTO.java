@@ -56,4 +56,14 @@ public class DefenseLogDTO {
      * 操作人
      */
     private String operator;
+
+    /**
+     * 攻击类型
+     */
+    private String attackType;
+
+    /**
+     * 风险等级
+     */
+    private String riskLevel;
 }

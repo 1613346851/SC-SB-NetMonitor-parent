@@ -5,6 +5,7 @@ import com.network.monitor.entity.MonitorRuleEntity;
 import com.network.monitor.mapper.MonitorRuleMapper;
 import com.network.monitor.service.AuthService;
 import com.network.monitor.service.OperLogService;
+import com.network.monitor.service.RuleSyncService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,9 @@ public class RuleManageController {
 
     @Autowired
     private OperLogService operLogService;
+
+    @Autowired
+    private RuleSyncService ruleSyncService;
 
     /**
      * 根据 ID 查询规则
@@ -118,6 +122,9 @@ public class RuleManageController {
             monitorRuleMapper.insert(rule);
             operLogService.logOperation(authService.getCurrentUsername(), "INSERT", "规则管理", 
                 "新增规则：" + rule.getRuleName(), "add", "/api/rule/add", getClientIp(request), 0);
+            
+            ruleSyncService.syncRuleToGatewayAsync(rule, "ADD");
+            
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("新增规则失败：", e);
@@ -135,6 +142,9 @@ public class RuleManageController {
             monitorRuleMapper.update(rule);
             operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理", 
                 "更新规则ID：" + rule.getId(), "update", "/api/rule/update", getClientIp(request), 0);
+            
+            ruleSyncService.syncRuleToGatewayAsync(rule, "UPDATE");
+            
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("更新规则失败：", e);
@@ -151,6 +161,9 @@ public class RuleManageController {
             monitorRuleMapper.deleteById(id);
             operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "规则管理", 
                 "删除规则ID：" + id, "delete", "/api/rule/" + id, getClientIp(request), 0);
+            
+            ruleSyncService.syncRuleDeleteToGatewayAsync(id);
+            
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("删除规则失败：", e);
@@ -173,6 +186,10 @@ public class RuleManageController {
             String action = newEnabled == 1 ? "启用" : "禁用";
             operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理", 
                 action + "规则ID：" + id, "toggle", "/api/rule/" + id + "/toggle", getClientIp(request), 0);
+            
+            rule.setEnabled(newEnabled);
+            ruleSyncService.syncRuleToGatewayAsync(rule, "UPDATE");
+            
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("切换规则状态失败：", e);
@@ -194,10 +211,34 @@ public class RuleManageController {
             String action = enabled == 1 ? "启用" : "禁用";
             operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理", 
                 action + "规则ID：" + id, "status", "/api/rule/status/" + id, getClientIp(request), 0);
+            
+            rule.setEnabled(enabled);
+            ruleSyncService.syncRuleToGatewayAsync(rule, "UPDATE");
+            
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("更新规则状态失败：", e);
             return ApiResponse.error("操作失败");
+        }
+    }
+    
+    /**
+     * 手动同步所有规则到网关
+     */
+    @PostMapping("/sync")
+    public ApiResponse<Void> syncAllRules(HttpServletRequest request) {
+        try {
+            boolean success = ruleSyncService.syncAllRulesToGateway();
+            if (success) {
+                operLogService.logOperation(authService.getCurrentUsername(), "SYNC", "规则管理", 
+                    "手动同步所有规则到网关", "sync", "/api/rule/sync", getClientIp(request), 0);
+                return ApiResponse.success();
+            } else {
+                return ApiResponse.error("同步失败");
+            }
+        } catch (Exception e) {
+            log.error("同步规则失败：", e);
+            return ApiResponse.error("同步失败");
         }
     }
     

@@ -62,7 +62,7 @@ public class ConfidenceCalculator {
             return 0;
         }
 
-        int exceedTimes = (int) Math.floor(exceedRatio - 1);
+        int exceedTimes = (int) Math.ceil(exceedRatio - 1);
         int score = exceedTimes * perExceedScore;
 
         return Math.min(maxScore, Math.max(0, score));

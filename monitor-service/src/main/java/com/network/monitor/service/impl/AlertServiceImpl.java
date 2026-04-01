@@ -7,8 +7,8 @@ import com.network.monitor.entity.AlertRuleEntity;
 import com.network.monitor.mapper.AlertMapper;
 import com.network.monitor.mapper.AlertRuleMapper;
 import com.network.monitor.service.AlertService;
-import com.network.monitor.service.AlertSuppressService;
 import com.network.monitor.service.SysConfigService;
+import com.network.monitor.websocket.AlertPushService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,10 +31,10 @@ public class AlertServiceImpl implements AlertService {
     private AlertRuleMapper alertRuleMapper;
 
     @Autowired
-    private AlertSuppressService suppressService;
+    private SysConfigService sysConfigService;
 
     @Autowired
-    private SysConfigService sysConfigService;
+    private AlertPushService alertPushService;
 
     @Override
     @Transactional
@@ -44,32 +44,20 @@ public class AlertServiceImpl implements AlertService {
             return;
         }
 
-        if (suppressService.shouldSuppress(alertDTO.getSourceIp(), alertDTO.getAttackType())) {
-            logger.info("告警被抑制: sourceIp={}, attackType={}", alertDTO.getSourceIp(), alertDTO.getAttackType());
-            return;
-        }
-
-        AlertEntity existingAlert = findExistingAlert(alertDTO.getSourceIp(), alertDTO.getAttackType());
-        if (existingAlert != null) {
-            alertMapper.incrementAggregateCount(existingAlert.getId(), LocalDateTime.now());
-            logger.info("告警已聚合: alertId={}, aggregateCount={}", existingAlert.getAlertId(), existingAlert.getAggregateCount() + 1);
-            return;
-        }
-
         AlertEntity alert = buildAlertEntity(alertDTO);
         alertMapper.insert(alert);
         
-        suppressService.recordAlert(alertDTO.getSourceIp(), alertDTO.getAttackType());
+        alertPushService.pushAlert(alert);
         
-        logger.info("告警已生成: alertId={}, level={}, sourceIp={}", 
-            alert.getAlertId(), alert.getAlertLevel(), alert.getSourceIp());
+        logger.info("告警已生成: alertId={}, level={}, sourceIp={}, eventId={}", 
+            alert.getAlertId(), alert.getAlertLevel(), alert.getSourceIp(), alert.getEventId());
     }
 
     @Override
     @Transactional
     public void generateAlertFromAttack(Long attackId, String eventId, String sourceIp, 
                                          String attackType, String riskLevel) {
-        AlertDTO alertDTO = AlertDTO.fromAttack(eventId, sourceIp, attackType, riskLevel);
+        AlertDTO alertDTO = AlertDTO.fromAttack(attackId, eventId, sourceIp, attackType, riskLevel);
         generateAlert(alertDTO);
     }
 
@@ -205,21 +193,11 @@ public class AlertServiceImpl implements AlertService {
         return "true".equalsIgnoreCase(enabled);
     }
 
-    private AlertEntity findExistingAlert(String sourceIp, String attackType) {
-        String suppressDurationStr = sysConfigService.getConfigValue("alert.aggregate.window-seconds");
-        int suppressDuration = suppressDurationStr != null ? Integer.parseInt(suppressDurationStr) : 60;
-        LocalDateTime threshold = LocalDateTime.now().minusSeconds(suppressDuration);
-        
-        PageResult<AlertEntity> result = queryAlerts(null, 0, sourceIp, attackType, 
-            threshold, null, 1, 1, "id DESC");
-        
-        return result.getList().isEmpty() ? null : result.getList().get(0);
-    }
-
     private AlertEntity buildAlertEntity(AlertDTO dto) {
         AlertEntity entity = new AlertEntity();
         entity.setAlertId(UUID.randomUUID().toString());
         entity.setEventId(dto.getEventId());
+        entity.setAttackId(dto.getAttackId());
         entity.setSourceIp(dto.getSourceIp());
         entity.setAttackType(dto.getAttackType());
         entity.setAlertLevel(dto.getAlertLevel());
@@ -229,9 +207,6 @@ public class AlertServiceImpl implements AlertService {
         entity.setIsSuppressed(0);
         entity.setNotifyChannels(dto.getNotifyChannels() != null ? dto.getNotifyChannels() : "EMAIL,FEISHU");
         entity.setNotifyStatus(0);
-        entity.setAggregateCount(1);
-        entity.setFirstOccurTime(LocalDateTime.now());
-        entity.setLastOccurTime(LocalDateTime.now());
         entity.setCreateTime(LocalDateTime.now());
         entity.setUpdateTime(LocalDateTime.now());
         return entity;

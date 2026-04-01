@@ -33,7 +33,7 @@ function initEventTable() {
         defaultSortOrder: 'desc',
         tableBodyEl: 'eventTableBody',
         paginationEl: 'pagination',
-        colspan: 10,
+        colspan: 12,
         fixedAction: true,
         enableTooltip: true,
         renderRow: function(item) {
@@ -43,6 +43,7 @@ function initEventTable() {
                 : '<span class="tag success">已结束</span>';
             
             const duration = formatDuration(item.durationSeconds);
+            const confidenceEnd = item.confidenceEnd || 0;
             
             return `
                 <tr onclick="loadEventDetail('${item.eventId}')" style="cursor: pointer;">
@@ -54,6 +55,8 @@ function initEventTable() {
                     <td>${duration}</td>
                     <td>${item.totalRequests || 0}</td>
                     <td>${item.peakRps || 0}</td>
+                    <td>${item.attackCount || 0}</td>
+                    <td><span class="tag ${getConfidenceTagClass(confidenceEnd)}">${confidenceEnd}%</span></td>
                     <td>${statusTag}</td>
                     ${cell.renderActionCell([
                         { text: '详情', type: 'primary', onClick: `event.stopPropagation(); loadEventDetail('${item.eventId}')` }
@@ -81,6 +84,13 @@ function formatDuration(seconds) {
     } else {
         return `${secs}s`;
     }
+}
+
+function getConfidenceTagClass(confidence) {
+    if (confidence >= 90) return 'danger';
+    if (confidence >= 70) return 'warning';
+    if (confidence >= 30) return 'info';
+    return 'success';
 }
 
 function searchEvents() {
@@ -202,9 +212,17 @@ async function loadEventDetail(eventId) {
                         <label>攻击节点数:</label>
                         <span>${event.attackCount || 0}</span>
                     </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h4>置信度变化</h4>
                     <div class="detail-item">
-                        <label>置信度:</label>
-                        <span>${event.confidenceEnd ? event.confidenceEnd + '%' : '-'}</span>
+                        <label>初始置信度:</label>
+                        <span>${event.confidenceStart ? event.confidenceStart + '%' : '0%'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>最终置信度:</label>
+                        <span><span class="tag ${getConfidenceTagClass(event.confidenceEnd || 0)}">${event.confidenceEnd || 0}%</span></span>
                     </div>
                 </div>
                 

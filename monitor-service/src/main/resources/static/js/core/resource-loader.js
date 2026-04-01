@@ -6,13 +6,26 @@
         cdnFallbacks: {
             echarts: [
                 '/js/lib/echarts.min.js',
-                'https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js',
                 'https://lib.baomitu.com/echarts/5.4.3/echarts.min.js',
-                'https://cdn.staticfile.org/echarts/5.4.3/echarts.min.js'
+                'https://cdn.staticfile.org/echarts/5.4.3/echarts.min.js',
+                'https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js'
+            ],
+            sockjs: [
+                '/js/lib/sockjs.min.js',
+                'https://lib.baomitu.com/sockjs-client/1.6.1/sockjs.min.js',
+                'https://cdn.staticfile.org/sockjs-client/1.6.1/sockjs.min.js',
+                'https://cdn.bootcdn.net/ajax/libs/sockjs-client/1.6.1/sockjs.min.js'
+            ],
+            stomp: [
+                '/js/lib/stomp.min.js',
+                'https://lib.baomitu.com/stomp.js/2.3.3/stomp.min.js',
+                'https://cdn.staticfile.org/stomp.js/2.3.3/stomp.min.js',
+                'https://cdn.bootcdn.net/ajax/libs/stomp.js/2.3.3/stomp.min.js'
             ]
         },
         
         async loadScript(src, options = {}) {
+            const timeout = options.timeout || 8000;
             return new Promise((resolve, reject) => {
                 if (this.loadedResources.has(src)) {
                     resolve(true);
@@ -24,13 +37,26 @@
                 script.async = options.async !== false;
                 script.defer = options.defer || false;
                 
+                const timeoutId = setTimeout(() => {
+                    script.onerror = null;
+                    script.onload = null;
+                    if (script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
+                    this.failedResources.add(src);
+                    console.warn(`[ResourceLoader] 加载超时: ${src}`);
+                    reject(new Error(`Timeout loading: ${src}`));
+                }, timeout);
+                
                 script.onload = () => {
+                    clearTimeout(timeoutId);
                     this.loadedResources.add(src);
                     console.log(`[ResourceLoader] 加载成功: ${src}`);
                     resolve(true);
                 };
                 
                 script.onerror = () => {
+                    clearTimeout(timeoutId);
                     this.failedResources.add(src);
                     console.warn(`[ResourceLoader] 加载失败: ${src}`);
                     reject(new Error(`Failed to load: ${src}`));
@@ -96,9 +122,26 @@
             return this.loadScriptWithFallback('echarts');
         },
         
+        async loadWebSocket() {
+            if (window.SockJS && window.Stomp) {
+                return true;
+            }
+            try {
+                await this.loadScriptWithFallback('sockjs');
+                await this.loadScriptWithFallback('stomp');
+                return true;
+            } catch (e) {
+                console.error('[ResourceLoader] WebSocket 资源加载失败:', e);
+                return false;
+            }
+        },
+        
         isLoaded(name) {
             if (name === 'echarts') {
                 return typeof window.echarts !== 'undefined';
+            }
+            if (name === 'websocket') {
+                return typeof window.SockJS !== 'undefined' && typeof window.Stomp !== 'undefined';
             }
             return false;
         }

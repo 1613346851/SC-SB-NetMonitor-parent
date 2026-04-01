@@ -224,7 +224,7 @@ public class IpProfileServiceImpl implements IpProfileService {
     }
 
     private Long countRequestsByIp(String ip) {
-        return trafficMonitorMapper.countByCondition(ip, null, null, null, null, null);
+        return trafficMonitorMapper.sumRequestCountByCondition(ip, null, null, null, null, null);
     }
 
     private LocalDateTime findFirstSeen(String ip) {

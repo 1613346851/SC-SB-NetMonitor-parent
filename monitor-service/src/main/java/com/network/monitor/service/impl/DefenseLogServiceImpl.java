@@ -1,11 +1,16 @@
 package com.network.monitor.service.impl;
 
+import com.network.monitor.dto.AlertDTO;
 import com.network.monitor.dto.DefenseLogDTO;
 import com.network.monitor.entity.AttackEventEntity;
+import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.event.BlacklistSyncEvent;
+import com.network.monitor.mapper.AttackMonitorMapper;
 import com.network.monitor.mapper.DefenseLogMapper;
+import com.network.monitor.service.AlertService;
 import com.network.monitor.service.AttackEventService;
+import com.network.monitor.service.AttackStoreService;
 import com.network.monitor.service.DefenseLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +33,15 @@ public class DefenseLogServiceImpl implements DefenseLogService {
     @Autowired
     private AttackEventService attackEventService;
 
+    @Autowired
+    private AlertService alertService;
+
+    @Autowired
+    private AttackMonitorMapper attackMonitorMapper;
+
+    @Autowired
+    private AttackStoreService attackStoreService;
+
     @Override
     public void receiveDefenseLog(DefenseLogDTO logDTO) {
         if (logDTO == null) {
@@ -45,8 +59,11 @@ public class DefenseLogServiceImpl implements DefenseLogService {
             log.info("接收并保存防御日志成功：defenseType={}, defenseTarget={}, defenseAction={}, executeStatus={}, isFirst={}, eventId={}", 
                 logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getDefenseAction(), logDTO.getExecuteStatus(), entity.getIsFirst(), entity.getEventId());
 
-            if (logDTO.getExecuteStatus() != null && logDTO.getExecuteStatus() == 1 && entity.getIsFirst() == 1) {
-                publishBlacklistSyncEvent(logDTO);
+            if (logDTO.getExecuteStatus() != null && logDTO.getExecuteStatus() == 1) {
+                if (entity.getIsFirst() == 1) {
+                    publishBlacklistSyncEvent(logDTO);
+                }
+                triggerAlert(logDTO, entity);
             } else if (entity.getIsFirst() == 0) {
                 log.debug("非首次防御日志，跳过黑名单事件发布：eventId={}", entity.getEventId());
             }
@@ -54,6 +71,70 @@ public class DefenseLogServiceImpl implements DefenseLogService {
         } catch (Exception e) {
             log.error("接收防御日志失败：defenseType={}, defenseTarget={}, eventId={}", 
                 logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getEventId(), e);
+        }
+    }
+
+    private void triggerAlert(DefenseLogDTO logDTO, DefenseLogEntity entity) {
+        try {
+            Long attackId = entity.getAttackId();
+            String eventId = entity.getEventId();
+            String sourceIp = logDTO.getDefenseTarget();
+            String attackType = logDTO.getAttackType();
+            String riskLevel = logDTO.getRiskLevel();
+            
+            if (attackType == null || attackType.isEmpty()) {
+                attackType = "UNKNOWN";
+            }
+            if (riskLevel == null || riskLevel.isEmpty()) {
+                riskLevel = "MEDIUM";
+            }
+            
+            if (eventId != null && !eventId.isEmpty()) {
+                AttackEventEntity event = attackEventService.getEventByEventId(eventId);
+                if (event != null) {
+                    if (event.getAttackType() != null && !event.getAttackType().isEmpty()) {
+                        attackType = event.getAttackType();
+                    }
+                    if (event.getRiskLevel() != null && !event.getRiskLevel().isEmpty()) {
+                        riskLevel = event.getRiskLevel();
+                    }
+                }
+                
+                if (attackId == null) {
+                    List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
+                        eventId, null, null, null, null, null, null, 0, 1, "id DESC");
+                    if (attacks != null && !attacks.isEmpty()) {
+                        attackId = attacks.get(0).getId();
+                        log.debug("根据eventId查找到攻击记录: eventId={}, attackId={}", eventId, attackId);
+                    }
+                }
+            }
+            
+            if (attackId == null && sourceIp != null && !sourceIp.isEmpty()) {
+                AttackMonitorEntity newAttack = new AttackMonitorEntity();
+                newAttack.setEventId(eventId);
+                newAttack.setSourceIp(sourceIp);
+                newAttack.setAttackType(attackType);
+                newAttack.setRiskLevel(riskLevel);
+                newAttack.setAttackContent(logDTO.getDefenseReason());
+                newAttack.setHandled(0);
+                newAttack.setCreateTime(LocalDateTime.now());
+                newAttack.setUpdateTime(LocalDateTime.now());
+                
+                attackId = attackStoreService.saveAttack(newAttack);
+                if (attackId != null) {
+                    log.info("创建攻击记录: attackId={}, eventId={}, sourceIp={}, attackType={}", 
+                        attackId, eventId, sourceIp, attackType);
+                }
+            }
+            
+            AlertDTO alertDTO = AlertDTO.fromAttack(attackId, eventId, sourceIp, attackType, riskLevel);
+            alertService.generateAlert(alertDTO);
+            
+            log.info("触发告警生成：attackId={}, eventId={}, sourceIp={}, attackType={}, riskLevel={}", 
+                attackId, eventId, sourceIp, attackType, riskLevel);
+        } catch (Exception e) {
+            log.error("触发告警失败：eventId={}, sourceIp={}", entity.getEventId(), logDTO.getDefenseTarget(), e);
         }
     }
 

@@ -118,7 +118,7 @@ public class NotificationServiceImpl implements NotificationService {
         testAlert.setAlertContent("这是一封测试告警邮件，用于验证邮件配置是否正确。");
         testAlert.setSourceIp("127.0.0.1");
         testAlert.setAttackType("TEST");
-        testAlert.setFirstOccurTime(LocalDateTime.now());
+        testAlert.setCreateTime(LocalDateTime.now());
         return sendEmail(testAlert);
     }
 
@@ -131,7 +131,7 @@ public class NotificationServiceImpl implements NotificationService {
         testAlert.setAlertContent("这是一条测试飞书告警消息，用于验证飞书配置是否正确。");
         testAlert.setSourceIp("127.0.0.1");
         testAlert.setAttackType("TEST");
-        testAlert.setFirstOccurTime(LocalDateTime.now());
+        testAlert.setCreateTime(LocalDateTime.now());
         return sendFeishu(testAlert);
     }
 
@@ -210,9 +210,7 @@ public class NotificationServiceImpl implements NotificationService {
         sb.append("<td style='padding: 8px; border-bottom: 1px solid #eee;'>").append(alert.getAttackTypeChinese()).append("</td></tr>");
         sb.append("<tr><td style='padding: 8px; border-bottom: 1px solid #eee;'><strong>发生时间</strong></td>");
         sb.append("<td style='padding: 8px; border-bottom: 1px solid #eee;'>")
-          .append(alert.getFirstOccurTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("</td></tr>");
-        sb.append("<tr><td style='padding: 8px; border-bottom: 1px solid #eee;'><strong>聚合次数</strong></td>");
-        sb.append("<td style='padding: 8px; border-bottom: 1px solid #eee;'>").append(alert.getAggregateCount()).append("</td></tr>");
+          .append(alert.getCreateTime() != null ? alert.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "-").append("</td></tr>");
         sb.append("</table>");
         
         if (alert.getAlertContent() != null) {
@@ -246,9 +244,7 @@ public class NotificationServiceImpl implements NotificationService {
         sb.append(",");
         sb.append(buildFeishuField("攻击类型", alert.getAttackTypeChinese()));
         sb.append(",");
-        sb.append(buildFeishuField("发生时间", alert.getFirstOccurTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))));
-        sb.append(",");
-        sb.append(buildFeishuField("聚合次数", String.valueOf(alert.getAggregateCount())));
+        sb.append(buildFeishuField("发生时间", alert.getCreateTime() != null ? alert.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "-"));
         
         if (alert.getAlertContent() != null) {
             sb.append(",{\"tag\":\"div\",\"text\":{\"tag\":\"plain_text\",\"content\":\"").append(escapeJson(alert.getAlertContent())).append("\"}}");

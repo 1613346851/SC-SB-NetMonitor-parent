@@ -17,6 +17,8 @@ public class AlertEntity {
 
     private String eventId;
 
+    private Long attackId;
+
     private String sourceIp;
 
     private String attackType;
@@ -48,12 +50,6 @@ public class AlertEntity {
     private String ignoreBy;
 
     private LocalDateTime ignoreTime;
-
-    private Integer aggregateCount;
-
-    private LocalDateTime firstOccurTime;
-
-    private LocalDateTime lastOccurTime;
 
     private LocalDateTime createTime;
 

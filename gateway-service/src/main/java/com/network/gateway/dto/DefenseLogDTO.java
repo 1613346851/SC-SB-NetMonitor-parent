@@ -67,6 +67,10 @@ public class DefenseLogDTO implements Serializable {
 
     private String batchId;
 
+    private String attackType;
+
+    private String riskLevel;
+
     public DefenseLogDTO(String defenseType, String defenseTarget, String defenseReason) {
         this.defenseType = defenseType;
         this.defenseTarget = defenseTarget;

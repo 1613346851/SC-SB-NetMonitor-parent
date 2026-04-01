@@ -28,22 +28,50 @@ document.addEventListener('DOMContentLoaded', async function() {
 function initRecentAttacksTable() {
     recentAttacksTable = TableUtils.createInstance({
         instanceName: 'recentAttacksTable',
-        apiUrl: '/attack/unhandled/high-risk',
+        apiUrl: '/alert/list?pageSize=10&sortField=createTime&sortOrder=desc',
         pageSize: 10,
-        defaultSortField: 'attackTime',
+        defaultSortField: 'createTime',
         defaultSortOrder: 'desc',
         tableBodyEl: 'recentAttacks',
         paginationEl: null,
         colspan: 5,
         enablePagination: false,
-        renderRow: function(attack) {
+        renderRow: function(alert) {
+            const levelClass = {
+                'CRITICAL': 'tag danger',
+                'HIGH': 'tag warning',
+                'MEDIUM': 'tag info',
+                'LOW': 'tag success'
+            }[alert.alertLevel] || 'tag';
+            
+            const levelText = {
+                'CRITICAL': '严重',
+                'HIGH': '高危',
+                'MEDIUM': '中危',
+                'LOW': '低危'
+            }[alert.alertLevel] || alert.alertLevel;
+            
+            const statusText = alert.status === 0 ? '待处理' : (alert.status === 1 ? '已确认' : '已忽略');
+            const statusClass = alert.status === 0 ? 'tag warning' : (alert.status === 1 ? 'tag success' : 'tag');
+            
+            const attackTypeText = {
+                'SQL_INJECTION': 'SQL注入',
+                'XSS': '跨站脚本',
+                'COMMAND_INJECTION': '命令注入',
+                'PATH_TRAVERSAL': '路径遍历',
+                'FILE_INCLUSION': '文件包含',
+                'DDOS': 'DDoS攻击',
+                'BRUTE_FORCE': '暴力破解',
+                'SCANNER': '扫描器探测'
+            }[alert.attackType] || alert.attackType;
+            
             return `
-                <tr>
-                    <td>${DateUtil.format(attack.attackTime)}</td>
-                    <td>${CellRenderer.renderText(attack.sourceIp)}</td>
-                    <td>${TableRenderer.renderAttackType(attack.attackType)}</td>
-                    <td>${TableRenderer.renderRiskLevel(attack.riskLevel)}</td>
-                    <td>${TableRenderer.renderStatus(attack.handled)}</td>
+                <tr onclick="window.location.href='/alert?alertId=${alert.alertId}'" style="cursor: pointer;">
+                    <td>${DateUtil.format(alert.createTime)}</td>
+                    <td>${CellRenderer.renderText(alert.sourceIp)}</td>
+                    <td>${attackTypeText}</td>
+                    <td><span class="${levelClass}">${levelText}</span></td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
                 </tr>
             `;
         }

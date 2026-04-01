@@ -173,6 +173,7 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                 ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest()))
         );
         defenseResult.setRiskLevel(DefenseResultBO.RiskLevel.HIGH);
+        defenseResult.setAttackType("DDOS");
 
         try {
             defenseResult.setSuccessResult(403, "Forbidden - IP Defended");
@@ -254,6 +255,7 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         );
         defenseResult.setRiskLevel(currentCount > threshold * 2 ?
                 DefenseResultBO.RiskLevel.HIGH : DefenseResultBO.RiskLevel.MEDIUM);
+        defenseResult.setAttackType("DDOS");
 
         try {
             defenseResult.setSuccessResult(429, "Too Many Requests");

@@ -125,25 +125,32 @@ public class IpAttackStateCache {
                                                      int rateLimitCount, int suspiciousThreshold, int attackingThreshold) {
         int thresholdRps = configCache.getStateNormalToSuspiciousThresholdRps();
         
-        if (rateLimitCount >= suspiciousThreshold) {
+        int currentConfidence = entry.getConfidence();
+        
+        if (rateLimitCount > 0) {
             ConfidenceContext context = buildConfidenceContext(ip, entry, rateLimitCount, thresholdRps);
             context.setRateLimitCount(rateLimitCount);
             ConfidenceResult confidenceResult = confidenceService.calculateForStateTransition(
-                ip, IpAttackStateConstant.NORMAL, IpAttackStateConstant.SUSPICIOUS,
+                ip, IpAttackStateConstant.NORMAL, IpAttackStateConstant.NORMAL,
                 context, IpAttackStateConstant.TRANSITION_REASON_FREQUENCY_ABNORMAL);
             
-            int confidence = confidenceResult.getSmoothedConfidence();
+            currentConfidence = confidenceResult.getSmoothedConfidence();
+            entry.setConfidence(currentConfidence);
             
-            if (confidence < 30) {
-                confidence = 30 + (rateLimitCount - suspiciousThreshold) * 5;
-                confidence = Math.min(confidence, 65);
-                confidenceResult.setSmoothedConfidence(confidence);
-            }
+            logger.debug("NORMAL状态置信度更新: ip={}, confidence={}, rateLimitCount={}", 
+                    ip, currentConfidence, rateLimitCount);
+        }
+        
+        boolean shouldEnterSuspicious = rateLimitCount >= suspiciousThreshold || currentConfidence >= 30;
+        
+        if (shouldEnterSuspicious) {
+            int suspiciousConfidence = Math.max(currentConfidence, 30);
+            suspiciousConfidence = Math.min(suspiciousConfidence, 65);
             
             String eventId = generateEventId(ip);
             entry.updateState(IpAttackStateConstant.SUSPICIOUS, eventId);
             entry.startAttackTracking();
-            entry.setConfidence(confidence);
+            entry.setConfidence(suspiciousConfidence);
             entry.resetRateLimitCount();
             
             result.setNewState(IpAttackStateConstant.SUSPICIOUS);
@@ -151,10 +158,10 @@ public class IpAttackStateCache {
             result.setReason(IpAttackStateConstant.TRANSITION_REASON_FREQUENCY_ABNORMAL);
             result.setEventId(eventId);
             
-            eventPublisher.publishAttackStart(ip, confidence);
+            eventPublisher.publishAttackStart(ip, suspiciousConfidence);
             
             logger.warn("IP状态转换: ip={}, NORMAL -> SUSPICIOUS, rateLimitCount={}, confidence={}, eventId={}", 
-                    ip, rateLimitCount, confidence, eventId);
+                    ip, rateLimitCount, suspiciousConfidence, eventId);
         }
         
         result.setStateRequestCount(entry.getAndResetStateRequestCount());
@@ -169,8 +176,8 @@ public class IpAttackStateCache {
         long quietDuration = configCache.getStateSuspiciousToNormalQuietDurationMs();
         
         int currentConfidence = entry.getConfidence();
-        int newConfidence = currentConfidence + rateLimitCount * 8;
-        newConfidence = Math.min(newConfidence, 100);
+        int newConfidence = currentConfidence + rateLimitCount * 5;
+        newConfidence = Math.min(newConfidence, 89);
         entry.setConfidence(newConfidence);
         
         logger.debug("SUSPICIOUS状态置信度更新: ip={}, currentConfidence={}, newConfidence={}, rateLimitCount={}", 
@@ -283,7 +290,7 @@ public class IpAttackStateCache {
                                                         StateTransitionResult result,
                                                         int rateLimitCount, int attackingThreshold) {
         int currentConfidence = entry.getConfidence();
-        int newConfidence = currentConfidence + rateLimitCount * 5;
+        int newConfidence = currentConfidence + rateLimitCount * 4;
         newConfidence = Math.min(newConfidence, 100);
         entry.setConfidence(newConfidence);
         

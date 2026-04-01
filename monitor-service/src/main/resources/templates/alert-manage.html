@@ -6,14 +6,13 @@
     <title>告警管理 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <style>
-        .alert-critical { background-color: #fef2f2; border-left: 4px solid #ef4444; }
-        .alert-high { background-color: #fff7ed; border-left: 4px solid #f97316; }
-        .alert-medium { background-color: #fefce8; border-left: 4px solid #eab308; }
-        .alert-low { background-color: #eff6ff; border-left: 4px solid #3b82f6; }
         .level-badge-critical { background-color: #ef4444; color: white; }
         .level-badge-high { background-color: #f97316; color: white; }
         .level-badge-medium { background-color: #eab308; color: #1f2937; }
         .level-badge-low { background-color: #3b82f6; color: white; }
+        .badge-warning { background-color: #f59e0b; color: white; }
+        .badge-success { background-color: #10b981; color: white; }
+        .badge-secondary { background-color: #6b7280; color: white; }
         .stats-card {
             background: white;
             border-radius: 8px;
@@ -200,8 +199,9 @@
                                     <th data-sort="sourceIp" style="min-width: 120px;">源 IP</th>
                                     <th style="min-width: 200px;">告警标题</th>
                                     <th data-sort="attackType" style="min-width: 100px;">攻击类型</th>
-                                    <th data-sort="aggregateCount" style="min-width: 80px;">聚合次数</th>
-                                    <th data-sort="firstOccurTime" style="min-width: 150px;">首次发生</th>
+                                    <th style="min-width: 100px;">攻击记录</th>
+                                    <th style="min-width: 140px;">事件ID</th>
+                                    <th data-sort="createTime" style="min-width: 150px;">创建时间</th>
                                     <th data-sort="status" style="min-width: 80px;">状态</th>
                                     <th>操作</th>
                                 </tr>
@@ -257,6 +257,7 @@
     </div>
 
     <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/core/resource-loader.js}"></script>
     <script th:src="@{/js/utils/storage.js}"></script>
     <script th:src="@{/js/utils/date.js}"></script>
     <script th:src="@{/js/utils/message.js}"></script>

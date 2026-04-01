@@ -36,7 +36,7 @@ public class DashboardStatServiceImpl implements DashboardStatService {
         Map<String, Object> stats = new HashMap<>();
 
         try {
-            long totalTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, null, null);
+            long totalTraffic = trafficMonitorMapper.sumRequestCountByCondition(null, null, null, null, null, null);
             stats.put("totalTraffic", totalTraffic);
 
             long totalAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, null, null);
@@ -46,14 +46,14 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             stats.put("highRiskAttacks", highRiskAttacks);
 
             LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
-            long todayTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, todayStart, null);
+            long todayTraffic = trafficMonitorMapper.sumRequestCountByCondition(null, null, null, null, todayStart, null);
             stats.put("todayTraffic", todayTraffic);
 
             long todayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, todayStart, null);
             stats.put("todayAttacks", todayAttacks);
 
             LocalDateTime yesterdayStart = todayStart.minusDays(1);
-            long yesterdayTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart);
+            long yesterdayTraffic = trafficMonitorMapper.sumRequestCountByCondition(null, null, null, null, yesterdayStart, todayStart);
             long yesterdayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, yesterdayStart, todayStart);
 
             double trafficChange = calculateGrowthRate(todayTraffic, yesterdayTraffic);
@@ -469,7 +469,7 @@ public class DashboardStatServiceImpl implements DashboardStatService {
         try {
             LocalDateTime startDateTime = parseDateTime(startTime);
             LocalDateTime endDateTime = parseDateTime(endTime);
-            return trafficMonitorMapper.countByCondition(null, null, null, null, startDateTime, endDateTime);
+            return trafficMonitorMapper.sumRequestCountByCondition(null, null, null, null, startDateTime, endDateTime);
         } catch (Exception e) {
             log.error("获取总流量数失败：", e);
             return 0;

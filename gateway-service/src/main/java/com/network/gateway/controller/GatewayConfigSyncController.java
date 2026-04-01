@@ -3,6 +3,8 @@ package com.network.gateway.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.gateway.cache.GatewayConfigCache;
+import com.network.gateway.cache.RuleCache;
+import com.network.gateway.dto.AttackRuleDTO;
 import com.network.gateway.entity.ConfigSyncState;
 import com.network.gateway.service.ConfigSyncService;
 import org.slf4j.Logger;
@@ -11,7 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,6 +33,9 @@ public class GatewayConfigSyncController {
 
     @Autowired
     private GatewayConfigCache configCache;
+
+    @Autowired
+    private RuleCache ruleCache;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -326,6 +333,142 @@ public class GatewayConfigSyncController {
             logger.error("获取同步统计失败", e);
             result.put("success", false);
             result.put("message", "获取失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    @PostMapping("/rule/sync")
+    public ResponseEntity<Map<String, Object>> syncRule(@RequestBody AttackRuleDTO ruleDTO) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            if (ruleDTO == null || ruleDTO.getId() == null) {
+                result.put("success", false);
+                result.put("message", "规则数据无效");
+                return ResponseEntity.badRequest().body(result);
+            }
+
+            String operation = ruleDTO.getOperation();
+            if ("DELETE".equals(operation)) {
+                ruleCache.removeRule(ruleDTO.getId());
+                logger.info("删除规则成功: id={}", ruleDTO.getId());
+            } else if ("ADD".equals(operation) || "UPDATE".equals(operation)) {
+                ruleCache.addRule(ruleDTO);
+                logger.info("同步规则成功: id={}, operation={}", ruleDTO.getId(), operation);
+            } else {
+                ruleCache.addRule(ruleDTO);
+                logger.info("同步规则成功: id={}", ruleDTO.getId());
+            }
+
+            result.put("success", true);
+            result.put("message", "规则同步成功");
+            result.put("ruleId", ruleDTO.getId());
+            result.put("totalRules", ruleCache.size());
+            result.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("规则同步失败", e);
+            result.put("success", false);
+            result.put("message", "规则同步失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    @PostMapping("/rule/sync/batch")
+    public ResponseEntity<Map<String, Object>> syncRulesBatch(@RequestBody List<AttackRuleDTO> rules) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            if (rules == null || rules.isEmpty()) {
+                result.put("success", false);
+                result.put("message", "规则列表为空");
+                return ResponseEntity.badRequest().body(result);
+            }
+
+            ruleCache.syncRules(rules);
+
+            result.put("success", true);
+            result.put("message", "批量同步规则成功");
+            result.put("syncedCount", rules.size());
+            result.put("totalRules", ruleCache.size());
+            result.put("timestamp", System.currentTimeMillis());
+            
+            logger.info("批量同步规则成功: count={}, totalRules={}", rules.size(), ruleCache.size());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("批量同步规则失败", e);
+            result.put("success", false);
+            result.put("message", "批量同步规则失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    @DeleteMapping("/rule/{id}")
+    public ResponseEntity<Map<String, Object>> deleteRule(@PathVariable Long id) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            ruleCache.removeRule(id);
+            
+            result.put("success", true);
+            result.put("message", "规则删除成功");
+            result.put("ruleId", id);
+            result.put("totalRules", ruleCache.size());
+            result.put("timestamp", System.currentTimeMillis());
+            
+            logger.info("删除规则成功: id={}", id);
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("删除规则失败", e);
+            result.put("success", false);
+            result.put("message", "删除规则失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    @GetMapping("/rule/list")
+    public ResponseEntity<Map<String, Object>> getRuleList() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            List<AttackRuleDTO> rules = ruleCache.getAllRules();
+            
+            result.put("success", true);
+            result.put("data", rules);
+            result.put("count", rules.size());
+            result.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("获取规则列表失败", e);
+            result.put("success", false);
+            result.put("message", "获取规则列表失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(result);
+        }
+    }
+
+    @GetMapping("/rule/stats")
+    public ResponseEntity<Map<String, Object>> getRuleStats() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            result.put("success", true);
+            result.put("ruleStats", ruleCache.getDetailedStats());
+            result.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("获取规则统计失败", e);
+            result.put("success", false);
+            result.put("message", "获取规则统计失败: " + e.getMessage());
             return ResponseEntity.status(500).body(result);
         }
     }

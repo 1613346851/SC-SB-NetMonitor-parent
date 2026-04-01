@@ -12,7 +12,8 @@
             const {
                 requireAuth = true,
                 onPageLoad = () => {},
-                highlightMenu = true
+                highlightMenu = true,
+                enableAlertNotification = true
             } = options;
             
             if (requireAuth && !AuthGuard.init()) {
@@ -32,8 +33,57 @@
             this.initMobileSidebar();
             this.saveScrollPositionOnLeave();
             
+            if (enableAlertNotification) {
+                this.initAlertNotification();
+            }
+            
             document.addEventListener('DOMContentLoaded', () => {
                 onPageLoad();
+            });
+        },
+        
+        async initAlertNotification() {
+            try {
+                if (typeof ResourceLoader === 'undefined') {
+                    await this._loadResourceLoader();
+                }
+                
+                if (typeof ResourceLoader === 'undefined') {
+                    console.warn('[PageInit] ResourceLoader 加载失败，跳过告警通知初始化');
+                    return;
+                }
+                
+                await ResourceLoader.loadWebSocket();
+                const script = document.createElement('script');
+                script.src = '/js/components/alert-notification.js';
+                script.onload = () => {
+                    console.log('[PageInit] 告警通知组件加载成功');
+                    if (window.AlertNotification) {
+                        window.AlertNotification.init();
+                    }
+                };
+                script.onerror = () => {
+                    console.error('[PageInit] 告警通知组件加载失败');
+                };
+                document.head.appendChild(script);
+            } catch (e) {
+                console.error('[PageInit] 初始化告警通知失败:', e);
+            }
+        },
+        
+        _loadResourceLoader() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = '/js/core/resource-loader.js';
+                script.onload = () => {
+                    console.log('[PageInit] ResourceLoader 加载成功');
+                    resolve();
+                };
+                script.onerror = () => {
+                    console.error('[PageInit] ResourceLoader 加载失败');
+                    reject(new Error('Failed to load ResourceLoader'));
+                };
+                document.head.appendChild(script);
             });
         },
         

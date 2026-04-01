@@ -468,7 +468,7 @@ public class GatewayConfigCache {
     }
 
     public int getConfidenceBaseScore() {
-        return getInt("confidence.base-score", 30);
+        return getInt("confidence.base-score", 0);
     }
 
     public int getConfidenceFrequencyMaxScore() {
@@ -710,7 +710,7 @@ public class GatewayConfigCache {
     }
 
     public int getConfidenceMinValue() {
-        return getInt("confidence.min-value", 10);
+        return getInt("confidence.min-value", 0);
     }
 
     public long getSlowAttackDurationMs() {

@@ -6,6 +6,7 @@
         <id column="id" property="id"/>
         <result column="alert_id" property="alertId"/>
         <result column="event_id" property="eventId"/>
+        <result column="attack_id" property="attackId"/>
         <result column="source_ip" property="sourceIp"/>
         <result column="attack_type" property="attackType"/>
         <result column="alert_level" property="alertLevel"/>
@@ -22,31 +23,25 @@
         <result column="ignore_reason" property="ignoreReason"/>
         <result column="ignore_by" property="ignoreBy"/>
         <result column="ignore_time" property="ignoreTime"/>
-        <result column="aggregate_count" property="aggregateCount"/>
-        <result column="first_occur_time" property="firstOccurTime"/>
-        <result column="last_occur_time" property="lastOccurTime"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, alert_id, event_id, source_ip, attack_type, alert_level, alert_title, alert_content,
+        id, alert_id, event_id, attack_id, source_ip, attack_type, alert_level, alert_title, alert_content,
         status, is_suppressed, suppress_until, notify_channels, notify_status, notify_time,
-        confirm_by, confirm_time, ignore_reason, ignore_by, ignore_time, aggregate_count,
-        first_occur_time, last_occur_time, create_time, update_time
+        confirm_by, confirm_time, ignore_reason, ignore_by, ignore_time, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.AlertEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_alert (
-            alert_id, event_id, source_ip, attack_type, alert_level, alert_title, alert_content,
+            alert_id, event_id, attack_id, source_ip, attack_type, alert_level, alert_title, alert_content,
             status, is_suppressed, suppress_until, notify_channels, notify_status, notify_time,
-            confirm_by, confirm_time, ignore_reason, ignore_by, ignore_time, aggregate_count,
-            first_occur_time, last_occur_time, create_time, update_time
+            confirm_by, confirm_time, ignore_reason, ignore_by, ignore_time, create_time, update_time
         ) VALUES (
-            #{alertId}, #{eventId}, #{sourceIp}, #{attackType}, #{alertLevel}, #{alertTitle}, #{alertContent},
+            #{alertId}, #{eventId}, #{attackId}, #{sourceIp}, #{attackType}, #{alertLevel}, #{alertTitle}, #{alertContent},
             #{status}, #{isSuppressed}, #{suppressUntil}, #{notifyChannels}, #{notifyStatus}, #{notifyTime},
-            #{confirmBy}, #{confirmTime}, #{ignoreReason}, #{ignoreBy}, #{ignoreTime}, #{aggregateCount},
-            #{firstOccurTime}, #{lastOccurTime}, #{createTime}, #{updateTime}
+            #{confirmBy}, #{confirmTime}, #{ignoreReason}, #{ignoreBy}, #{ignoreTime}, #{createTime}, #{updateTime}
         )
     </insert>
 
@@ -70,8 +65,6 @@
             <if test="ignoreReason != null">ignore_reason = #{ignoreReason},</if>
             <if test="ignoreBy != null">ignore_by = #{ignoreBy},</if>
             <if test="ignoreTime != null">ignore_time = #{ignoreTime},</if>
-            <if test="aggregateCount != null">aggregate_count = #{aggregateCount},</if>
-            <if test="lastOccurTime != null">last_occur_time = #{lastOccurTime},</if>
             update_time = NOW()
         </set>
         WHERE id = #{id}
@@ -207,12 +200,6 @@
         <foreach collection="ids" item="id" open="(" separator="," close=")">
             #{id}
         </foreach>
-    </update>
-
-    <update id="incrementAggregateCount">
-        UPDATE sys_alert
-        SET aggregate_count = aggregate_count + 1, last_occur_time = #{lastOccurTime}, update_time = NOW()
-        WHERE id = #{id}
     </update>
 
     <update id="setSuppressed">

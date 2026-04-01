@@ -36,6 +36,12 @@ public class GatewayFilterOrderConstant {
      */
     public static final int MALICIOUS_REQUEST_BLOCK_FILTER_ORDER = 20;
 
+    /**
+     * 攻击规则检测过滤器优先级
+     * 在限流过滤器之后，恶意请求拦截过滤器之前执行
+     */
+    public static final int ATTACK_RULE_FILTER_ORDER = 15;
+
     private GatewayFilterOrderConstant() {
         // 私有构造函数，防止实例化
     }

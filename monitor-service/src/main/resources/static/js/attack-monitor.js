@@ -13,11 +13,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const urlParams = new URLSearchParams(window.location.search);
     const eventIdFromUrl = urlParams.get('eventId');
+    const attackIdFromUrl = urlParams.get('attackId');
+    
     if (eventIdFromUrl) {
         document.getElementById('eventId').value = eventIdFromUrl;
     }
     
     initAttackTable();
+    
+    if (attackIdFromUrl) {
+        setTimeout(() => {
+            viewAttackDetail(attackIdFromUrl);
+        }, 500);
+    }
     
     setInterval(() => {
         const handledSelect = document.getElementById('handled');

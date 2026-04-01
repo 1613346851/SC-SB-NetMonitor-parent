@@ -10,6 +10,8 @@ public class AlertDTO {
 
     private String eventId;
 
+    private Long attackId;
+
     private String sourceIp;
 
     private String attackType;
@@ -22,8 +24,9 @@ public class AlertDTO {
 
     private String notifyChannels;
 
-    public static AlertDTO fromAttack(String eventId, String sourceIp, String attackType, String riskLevel) {
+    public static AlertDTO fromAttack(Long attackId, String eventId, String sourceIp, String attackType, String riskLevel) {
         AlertDTO dto = new AlertDTO();
+        dto.setAttackId(attackId);
         dto.setEventId(eventId);
         dto.setSourceIp(sourceIp);
         dto.setAttackType(attackType);

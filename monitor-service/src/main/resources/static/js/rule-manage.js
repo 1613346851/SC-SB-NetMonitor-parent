@@ -69,7 +69,7 @@ function toggleRuleStatus(id, currentStatus) {
         return;
     }
     
-    http.put('/rule/toggle', { id: id, enabled: newStatus })
+    http.put('/rule/' + id + '/toggle')
         .then(result => {
             message.success(`${actionText}成功`);
             ruleTable.refresh();
@@ -80,17 +80,17 @@ function toggleRuleStatus(id, currentStatus) {
 }
 
 function editRule(id) {
-    http.get('/rule/detail/' + id)
+    http.get('/rule/' + id)
         .then(result => {
             if (result) {
                 document.getElementById('ruleId').value = result.id;
                 document.getElementById('ruleNameInput').value = result.ruleName || '';
                 document.getElementById('attackTypeInput').value = result.attackType || '';
-                document.getElementById('ruleContentInput').value = result.ruleContent || '';
+                document.getElementById('ruleExpressionInput').value = result.ruleContent || '';
                 document.getElementById('descriptionInput').value = result.description || '';
                 document.getElementById('riskLevelInput').value = result.riskLevel || 'MEDIUM';
-                document.getElementById('enabledInput').value = result.enabled !== undefined ? result.enabled : 1;
                 document.getElementById('priorityInput').value = result.priority || 100;
+                document.getElementById('enabledInput').value = result.enabled !== undefined ? result.enabled : 1;
                 
                 document.getElementById('ruleModalTitle').textContent = '编辑规则';
                 document.getElementById('ruleModal').style.display = 'flex';
@@ -106,7 +106,7 @@ function deleteRule(id) {
         return;
     }
     
-    http.delete('/rule/delete/' + id)
+    http.delete('/rule/' + id)
         .then(result => {
             message.success('删除成功');
             ruleTable.refresh();
@@ -120,14 +120,18 @@ function openAddRuleModal() {
     document.getElementById('ruleId').value = '';
     document.getElementById('ruleNameInput').value = '';
     document.getElementById('attackTypeInput').value = '';
-    document.getElementById('ruleContentInput').value = '';
+    document.getElementById('ruleExpressionInput').value = '';
     document.getElementById('descriptionInput').value = '';
     document.getElementById('riskLevelInput').value = 'MEDIUM';
-    document.getElementById('enabledInput').value = '1';
     document.getElementById('priorityInput').value = '100';
+    document.getElementById('enabledInput').value = '1';
     
     document.getElementById('ruleModalTitle').textContent = '新增规则';
     document.getElementById('ruleModal').style.display = 'flex';
+}
+
+function showAddRuleModal() {
+    openAddRuleModal();
 }
 
 function closeRuleModal() {
@@ -138,11 +142,11 @@ function saveRule() {
     const id = document.getElementById('ruleId').value;
     const ruleName = document.getElementById('ruleNameInput').value.trim();
     const attackType = document.getElementById('attackTypeInput').value.trim();
-    const ruleContent = document.getElementById('ruleContentInput').value.trim();
+    const ruleContent = document.getElementById('ruleExpressionInput').value.trim();
     const description = document.getElementById('descriptionInput').value.trim();
     const riskLevel = document.getElementById('riskLevelInput').value;
-    const enabled = parseInt(document.getElementById('enabledInput').value);
     const priority = parseInt(document.getElementById('priorityInput').value) || 100;
+    const enabled = parseInt(document.getElementById('enabledInput').value);
     
     if (!ruleName) {
         message.error('请输入规则名称');
@@ -163,8 +167,8 @@ function saveRule() {
         ruleContent: ruleContent,
         description: description,
         riskLevel: riskLevel,
-        enabled: enabled,
-        priority: priority
+        priority: priority,
+        enabled: enabled
     };
     
     const isEdit = id && id !== '';

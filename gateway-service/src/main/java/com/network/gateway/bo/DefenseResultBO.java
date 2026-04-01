@@ -46,6 +46,8 @@ public class DefenseResultBO {
 
     private RiskLevel riskLevel;
 
+    private String attackType;
+
     private String method;
 
     private String uri;
@@ -138,6 +140,10 @@ public class DefenseResultBO {
         logDTO.setExecuteStatus(this.success ? 1 : 0);
         logDTO.setExecuteResult(buildResultDescription());
         logDTO.setOperator("SYSTEM");
+        logDTO.setAttackType(this.attackType);
+        if (this.riskLevel != null) {
+            logDTO.setRiskLevel(this.riskLevel.name());
+        }
         
         if (this.expireTimestamp != null) {
             LocalDateTime expireDateTime = LocalDateTime.ofInstant(

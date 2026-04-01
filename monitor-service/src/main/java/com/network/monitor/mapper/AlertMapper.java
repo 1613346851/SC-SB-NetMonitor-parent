@@ -60,8 +60,6 @@ public interface AlertMapper {
 
     int batchConfirm(@Param("ids") List<Long> ids, @Param("confirmBy") String confirmBy, @Param("confirmTime") LocalDateTime confirmTime);
 
-    int incrementAggregateCount(@Param("id") Long id, @Param("lastOccurTime") LocalDateTime lastOccurTime);
-
     int setSuppressed(@Param("id") Long id, @Param("suppressUntil") LocalDateTime suppressUntil);
 
     List<LevelCountStat> countByAlertLevel(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);

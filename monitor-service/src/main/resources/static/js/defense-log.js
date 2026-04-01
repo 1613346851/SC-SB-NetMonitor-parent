@@ -27,7 +27,7 @@ function initDefenseTable() {
         defaultSortOrder: 'desc',
         tableBodyEl: 'defenseTableBody',
         paginationEl: 'pagination',
-        colspan: 11,
+        colspan: 12,
         fixedAction: true,
         enableTooltip: true,
         renderRow: function(item) {
@@ -37,17 +37,18 @@ function initDefenseTable() {
                 : '-';
             
             const isFirstTag = item.isFirst === 1 
-                ? '<span class="tag info" style="margin-left: 4px;">首次</span>'
-                : '';
+                ? '<span class="tag info">是</span>'
+                : '<span class="tag">否</span>';
             
             return `
                 <tr>
                     <td>${item.id || '-'}</td>
                     <td>${dateFormat.format(item.createTime)}</td>
-                    <td>${renderDefenseType(item.defenseType)}${isFirstTag}</td>
+                    <td>${renderDefenseType(item.defenseType)}</td>
                     <td>${renderDefenseAction(item.defenseAction)}</td>
                     ${cell.renderCell(item.defenseTarget, { maxLength: 20 })}
                     ${cell.renderCell(item.defenseReason, { maxLength: 15 })}
+                    <td>${isFirstTag}</td>
                     <td>${item.expireTime ? dateFormat.format(item.expireTime) : (item.defenseType === 'BLOCK_IP' ? '永久' : '-')}</td>
                     <td>${eventIdLink}</td>
                     <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>

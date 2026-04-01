@@ -125,6 +125,31 @@
         </where>
     </select>
 
+    <select id="sumRequestCountByCondition" resultType="long">
+        SELECT COALESCE(SUM(request_count), 0)
+        FROM sys_traffic_monitor
+        <where>
+            <if test="sourceIp != null and sourceIp != ''">
+                AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
+            </if>
+            <if test="targetIp != null and targetIp != ''">
+                AND target_ip LIKE CONCAT('%', #{targetIp}, '%')
+            </if>
+            <if test="httpMethod != null and httpMethod != ''">
+                AND http_method = #{httpMethod}
+            </if>
+            <if test="requestUri != null and requestUri != ''">
+                AND request_uri LIKE CONCAT('%', #{requestUri}, '%')
+            </if>
+            <if test="startTime != null">
+                AND request_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND request_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
     <delete id="deleteById">
         DELETE FROM sys_traffic_monitor WHERE id = #{id}
     </delete>
@@ -150,7 +175,7 @@
     <select id="countHourlyTraffic" resultType="com.network.monitor.mapper.TrafficMonitorMapper$HourlyStat">
         SELECT 
             DATE_FORMAT(request_time, '%Y-%m-%d %H:00') as time,
-            COUNT(*) as count
+            COALESCE(SUM(request_count), 0) as count
         FROM sys_traffic_monitor
         WHERE request_time &gt;= #{startTime}
         AND request_time &lt;= #{endTime}
@@ -169,7 +194,7 @@
                     LPAD(FLOOR(MINUTE(request_time) / #{intervalMinutes}) * #{intervalMinutes}, 2, '0')
                 )
             END as time,
-            COUNT(*) as count
+            COALESCE(SUM(request_count), 0) as count
         FROM sys_traffic_monitor
         WHERE request_time &gt;= #{startTime}
         AND request_time &lt;= #{endTime}

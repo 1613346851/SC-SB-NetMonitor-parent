@@ -21,7 +21,7 @@ function initTrafficTable() {
         defaultSortOrder: 'desc',
         tableBodyEl: 'trafficTableBody',
         paginationEl: 'pagination',
-        colspan: 13,
+        colspan: 15,
         fixedAction: true,
         enableTooltip: true,
         renderRow: function(item) {
@@ -30,6 +30,7 @@ function initTrafficTable() {
             const isAggregated = item.isAggregated === 1 || item.isAggregated === true;
             const stateTag = item.stateTag || 'NORMAL';
             const requestCount = item.requestCount || 1;
+            const confidence = item.confidence || 0;
             
             return `
                 <tr>
@@ -41,10 +42,12 @@ function initTrafficTable() {
                     <td><span class="badge badge-${getHttpMethodBadge(item.httpMethod)}">${item.httpMethod || '-'}</span></td>
                     ${cell.renderCell(item.requestUri, { maxLength: 30 })}
                     <td><span class="badge badge-${getStateTagBadge(stateTag)}">${getStateTagText(stateTag)}</span></td>
+                    <td><span class="badge badge-${getConfidenceBadge(confidence)}">${confidence}%</span></td>
                     <td>${isAggregated ? '<span class="badge badge-info">是</span>' : '<span class="badge badge-default">否</span>'}</td>
                     <td>${requestCount}</td>
                     <td><span class="badge badge-${getStatusBadge(item.responseStatus)}">${item.responseStatus || '-'}</span></td>
                     <td>${item.responseTime || '-'}</td>
+                    <td>${item.eventId ? `<a href="javascript:void(0)" class="event-link" onclick="viewEventDetail('${item.eventId}')">${item.eventId.substring(0, 12)}...</a>` : '-'}</td>
                     ${cell.renderActionCell([
                         { text: '详情', type: 'primary', onClick: `viewTrafficDetail(${item.id})` }
                     ])}
@@ -99,6 +102,17 @@ function getStatusBadge(status) {
     return 'default';
 }
 
+function getConfidenceBadge(confidence) {
+    if (confidence >= 90) return 'danger';
+    if (confidence >= 70) return 'warning';
+    if (confidence >= 30) return 'info';
+    return 'success';
+}
+
+function viewEventDetail(eventId) {
+    window.location.href = `/attack-event?eventId=${eventId}`;
+}
+
 function searchTraffic() {
     const sourceIp = trafficTable.getSearchValue('sourceIp');
     const targetIp = trafficTable.getSearchValue('targetIp');
@@ -133,21 +147,32 @@ async function viewTrafficDetail(id) {
     try {
         const detail = await http.get(`/traffic/${id}`);
         
+        const isAggregated = detail.isAggregated === 1 || detail.isAggregated === true;
+        const stateTag = detail.stateTag || 'NORMAL';
+        const confidence = detail.confidence || 0;
+        
         const content = document.getElementById('trafficDetailContent');
         content.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div>
                     <p><strong>ID:</strong> ${detail.id}</p>
                     <p><strong>流量 ID:</strong> ${detail.trafficId || '-'}</p>
+                    <p><strong>关联事件:</strong> ${detail.eventId || '-'}</p>
                     <p><strong>请求时间:</strong> ${dateFormat.format(detail.requestTime)}</p>
                     <p><strong>源 IP:</strong> ${detail.sourceIp}</p>
-                    <p><strong>源端口:</strong> ${detail.sourcePort}</p>
+                    <p><strong>源端口:</strong> ${detail.sourcePort || '-'}</p>
                     <p><strong>目标 IP:</strong> ${detail.targetIp}</p>
-                    <p><strong>目标端口:</strong> ${detail.targetPort}</p>
+                    <p><strong>目标端口:</strong> ${detail.targetPort || '-'}</p>
                     <p><strong>HTTP 方法:</strong> ${detail.httpMethod}</p>
                     <p><strong>协议:</strong> ${detail.protocol || 'HTTP/1.1'}</p>
                 </div>
                 <div>
+                    <p><strong>IP状态:</strong> <span class="badge badge-${getStateTagBadge(stateTag)}">${getStateTagText(stateTag)}</span></p>
+                    <p><strong>置信度:</strong> <span class="badge badge-${getConfidenceBadge(confidence)}">${confidence}%</span></p>
+                    <p><strong>是否聚合:</strong> ${isAggregated ? '<span class="badge badge-info">是</span>' : '<span class="badge badge-default">否</span>'}</p>
+                    <p><strong>请求次数:</strong> ${detail.requestCount || 1}</p>
+                    <p><strong>错误次数:</strong> ${detail.errorCount || 0}</p>
+                    <p><strong>平均处理时间:</strong> ${detail.avgProcessingTime || '-'} ms</p>
                     <p><strong>请求 URI:</strong> ${detail.requestUri}</p>
                     <p><strong>查询参数:</strong> ${detail.queryParams || '-'}</p>
                     <p><strong>Content-Type:</strong> ${detail.contentType || '-'}</p>
@@ -156,6 +181,11 @@ async function viewTrafficDetail(id) {
                     <p><strong>User-Agent:</strong> ${detail.userAgent || '-'}</p>
                 </div>
             </div>
+            ${isAggregated ? `
+            <div class="mt-16" style="padding: 12px; background: #f0f9ff; border-radius: 4px;">
+                <p style="margin: 0; color: #0369a1;"><strong>聚合时间范围:</strong> ${dateFormat.format(detail.aggregateStartTime)} ~ ${dateFormat.format(detail.aggregateEndTime)}</p>
+            </div>
+            ` : ''}
             <div class="mt-24">
                 <p><strong>请求头:</strong></p>
                 <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 200px; overflow-y: auto;">${formatHeaders(detail.requestHeaders)}</pre>
