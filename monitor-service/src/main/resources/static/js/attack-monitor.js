@@ -6,6 +6,7 @@
 
 let attackTable;
 let currentAttackId = null;
+let currentEventId = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
@@ -99,7 +100,7 @@ function initAttackTable() {
             const buttons = [
                 { text: '详情', type: 'primary', onClick: `viewAttackDetail(${item.id})` },
                 { text: '处理', type: 'success', onClick: `handleAttackDirect(${item.id})`, visible: item.handled === 0 },
-                { text: '事件', type: 'info', onClick: `viewEventDetail('${item.eventId}')`, visible: !!item.eventId }
+                { text: '事件', type: 'info', onClick: `window.location.href='/event?id=${encodeURIComponent(item.eventId)}'`, visible: !!item.eventId }
             ];
             
             return `
@@ -169,6 +170,7 @@ async function viewAttackDetail(id) {
     try {
         const detail = await http.get(`/attack/${id}`);
         currentAttackId = id;
+        currentEventId = detail.eventId || null;
         
         const eventIdHtml = detail.eventId 
             ? `<a href="/event?id=${detail.eventId}" class="event-link">${detail.eventId}</a>`
@@ -178,6 +180,7 @@ async function viewAttackDetail(id) {
         content.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div>
+                    <p><strong>攻击记录 ID:</strong> ${detail.id || '-'}</p>
                     <p><strong>事件 ID:</strong> ${eventIdHtml}</p>
                     <p><strong>攻击时间:</strong> ${dateFormat.format(detail.createTime)}</p>
                     <p><strong>源 IP:</strong> ${detail.sourceIp}</p>
@@ -243,8 +246,12 @@ async function handleAttack() {
     }
 }
 
-function viewEventDetail(eventId) {
-    window.location.href = `/event?id=${eventId}`;
+function viewEventDetail() {
+    if (!currentEventId) {
+        message.error('事件ID不存在');
+        return;
+    }
+    window.location.href = `/event?id=${encodeURIComponent(currentEventId)}`;
 }
 
 document.getElementById('attackDetailModal')?.addEventListener('click', function(e) {

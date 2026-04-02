@@ -44,9 +44,9 @@ public class DefenseLogService {
     }
 
     public void pushDefenseLog(String eventId, String ip, Long attackId,
-                               String defenseReason, Integer confidence) {
+                               String defenseReason, Integer confidence, String riskLevel) {
         DefenseLogDTO log = aggregator.generateAggregatedLog(
-            eventId, ip, attackId, defenseReason, confidence);
+            eventId, ip, attackId, defenseReason, confidence, riskLevel);
         
         if (log == null) {
             logger.debug("无防御动作需要推送: eventId={}", eventId);

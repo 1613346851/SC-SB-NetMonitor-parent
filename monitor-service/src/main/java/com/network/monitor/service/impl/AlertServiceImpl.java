@@ -48,14 +48,60 @@ public class AlertServiceImpl implements AlertService {
             return;
         }
 
+        if (alertDTO.getAttackId() != null) {
+            AlertEntity existingAlert = alertMapper.selectByAttackId(alertDTO.getAttackId());
+            if (existingAlert != null) {
+                String existingLevel = existingAlert.getAlertLevel();
+                String newLevel = alertDTO.getAlertLevel();
+                
+                if (compareAlertLevel(newLevel, existingLevel) > 0) {
+                    logger.info("告警风险等级升级: attackId={}, oldLevel={}, newLevel={}", 
+                        alertDTO.getAttackId(), existingLevel, newLevel);
+                    
+                    alertMapper.updateAlertLevel(
+                        existingAlert.getId(), 
+                        alertDTO.getAlertLevel(),
+                        alertDTO.getAlertTitle(),
+                        alertDTO.getAlertContent(),
+                        LocalDateTime.now()
+                    );
+                    
+                    AlertEntity updatedAlert = alertMapper.selectById(existingAlert.getId());
+                    alertPushService.pushAlert(updatedAlert);
+                    dataPushService.pushAlertRecord(updatedAlert);
+                } else {
+                    logger.debug("告警已存在且风险等级未升级，跳过: attackId={}, level={}", 
+                        alertDTO.getAttackId(), existingLevel);
+                }
+                return;
+            }
+        }
+
         AlertEntity alert = buildAlertEntity(alertDTO);
         alertMapper.insert(alert);
         
         alertPushService.pushAlert(alert);
         dataPushService.pushAlertRecord(alert);
         
-        logger.info("告警已生成: alertId={}, level={}, sourceIp={}, eventId={}", 
-            alert.getAlertId(), alert.getAlertLevel(), alert.getSourceIp(), alert.getEventId());
+        logger.info("告警已生成: alertId={}, level={}, sourceIp={}, eventId={}, attackId={}", 
+            alert.getAlertId(), alert.getAlertLevel(), alert.getSourceIp(), alert.getEventId(), alert.getAttackId());
+    }
+
+    private int compareAlertLevel(String level1, String level2) {
+        int order1 = getAlertLevelOrder(level1);
+        int order2 = getAlertLevelOrder(level2);
+        return Integer.compare(order1, order2);
+    }
+
+    private int getAlertLevelOrder(String level) {
+        if (level == null) return 0;
+        switch (level) {
+            case "CRITICAL": return 4;
+            case "HIGH": return 3;
+            case "MEDIUM": return 2;
+            case "LOW": return 1;
+            default: return 0;
+        }
     }
 
     @Override

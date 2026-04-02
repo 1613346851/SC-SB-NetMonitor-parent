@@ -97,7 +97,8 @@ public class DefenseLogAggregator {
     }
 
     public DefenseLogDTO generateAggregatedLog(String eventId, String ip, Long attackId, 
-                                                String defenseReason, Integer confidence) {
+                                                String defenseReason, Integer confidence,
+                                                String riskLevel) {
         List<DefenseAction> actions = attackDefenseMap.remove(eventId);
         if (actions == null || actions.isEmpty()) {
             return null;
@@ -110,7 +111,7 @@ public class DefenseLogAggregator {
         log.setDefenseReason(defenseReason);
         log.setExecuteStatus(1);
         log.setOperator("SYSTEM");
-        log.setRiskLevel("HIGH");
+        log.setRiskLevel(riskLevel != null ? riskLevel : "HIGH");
 
         if (actions.size() == 1) {
             DefenseAction action = actions.get(0);

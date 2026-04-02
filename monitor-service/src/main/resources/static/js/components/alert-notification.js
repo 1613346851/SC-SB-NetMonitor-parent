@@ -7,33 +7,23 @@
         _maxReconnectAttempts: 5,
         _reconnectDelay: 3000,
         _storageKey: 'pending_alerts',
+        _stateKey: 'alert_notification_state',
+        _isCollapsed: false,
+        _isVisible: false,
+        _isShowingEmptyTip: false,
+        _toggleBtn: null,
+        _badge: null,
+        _emptyTip: null,
 
         init() {
-            this._createContainer();
             this._createStyles();
+            this._createContainer();
+            this._createToggleButton();
+            this._loadState();
             this._loadPendingAlerts();
             this._connectWebSocket();
-        },
-
-        _createContainer() {
-            this._container = document.createElement('div');
-            this._container.id = 'alert-notification-container';
-            this._container.style.cssText = `
-                position: fixed;
-                top: 80px;
-                right: 20px;
-                width: 380px;
-                max-height: calc(100vh - 100px);
-                overflow-y: auto;
-                overflow-x: hidden;
-                z-index: 99999;
-                pointer-events: none;
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
-                padding-right: 4px;
-            `;
-            document.body.appendChild(this._container);
+            this._updateBadge();
+            this._initVisibility();
         },
 
         _createStyles() {
@@ -59,6 +49,58 @@
                         opacity: 0;
                         transform: translateX(100%);
                     }
+                }
+                
+                @keyframes emptyTipSlideIn {
+                    from {
+                        opacity: 0;
+                        transform: translateX(100%);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(0);
+                    }
+                }
+                
+                @keyframes emptyTipSlideOut {
+                    from {
+                        opacity: 1;
+                        transform: translateX(0);
+                    }
+                    to {
+                        opacity: 0;
+                        transform: translateX(100%);
+                    }
+                }
+                
+                #alert-notification-container {
+                    position: fixed;
+                    top: 80px;
+                    right: 10px;
+                    width: 380px;
+                    max-height: calc(100vh - 100px);
+                    overflow-y: auto;
+                    overflow-x: hidden;
+                    z-index: 99998;
+                    pointer-events: auto;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    padding-right: 4px;
+                    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                    background: transparent;
+                }
+                
+                #alert-notification-container.hidden {
+                    display: none;
+                }
+                
+                #alert-notification-container.collapsed {
+                    transform: translateX(calc(100% - 10px));
+                }
+                
+                #alert-notification-container.collapsed .alert-notification-card {
+                    pointer-events: none;
                 }
                 
                 .alert-notification-card {
@@ -224,8 +266,182 @@
                     background: rgba(255, 255, 255, 0.3);
                     border-radius: 2px;
                 }
+                
+                .alert-empty-tip {
+                    background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+                    color: #9ca3af;
+                    border-radius: 12px;
+                    padding: 40px 20px;
+                    text-align: center;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                    animation: emptyTipSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                }
+                
+                .alert-empty-tip.removing {
+                    animation: emptyTipSlideOut 0.3s ease forwards;
+                }
+                
+                .alert-empty-tip-icon {
+                    font-size: 48px;
+                    margin-bottom: 12px;
+                    opacity: 0.5;
+                }
+                
+                .alert-empty-tip-text {
+                    font-size: 14px;
+                }
             `;
             document.head.appendChild(style);
+        },
+
+        _createContainer() {
+            this._container = document.createElement('div');
+            this._container.id = 'alert-notification-container';
+            this._container.classList.add('hidden');
+            document.body.appendChild(this._container);
+            
+            this._container.addEventListener('click', (e) => {
+                if (this._isCollapsed) {
+                    this.expand();
+                    this._saveState();
+                    e.stopPropagation();
+                }
+            });
+        },
+
+        _createToggleButton() {
+            this._toggleBtn = document.getElementById('notificationToggle');
+            this._badge = document.getElementById('notificationBadge');
+            
+            if (this._toggleBtn) {
+                this._toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggle();
+                });
+            }
+        },
+
+        _loadState() {
+            try {
+                const stateStr = localStorage.getItem(this._stateKey);
+                if (stateStr) {
+                    const state = JSON.parse(stateStr);
+                    this._isCollapsed = state.isCollapsed === true;
+                }
+            } catch (e) {
+                console.error('加载通知状态失败:', e);
+            }
+        },
+
+        _saveState() {
+            try {
+                const state = {
+                    isCollapsed: this._isCollapsed
+                };
+                localStorage.setItem(this._stateKey, JSON.stringify(state));
+            } catch (e) {
+                console.error('保存通知状态失败:', e);
+            }
+        },
+
+        _initVisibility() {
+            if (this._alerts.length > 0) {
+                this._container.classList.remove('hidden');
+                this._isVisible = true;
+                
+                if (this._isCollapsed) {
+                    this._container.classList.add('collapsed');
+                }
+            }
+        },
+
+        toggle() {
+            if (this._isShowingEmptyTip) {
+                this._hideEmptyTip();
+                this._isShowingEmptyTip = false;
+                this._isVisible = false;
+                this._container.classList.add('hidden');
+            } else if (this._alerts.length === 0) {
+                this._showEmptyTip();
+            } else if (this._isCollapsed) {
+                this.expand();
+                this._saveState();
+            } else {
+                this.collapse();
+                this._saveState();
+            }
+        },
+
+        show() {
+            this._isVisible = true;
+            this._container.classList.remove('hidden');
+            if (this._alerts.length === 0) {
+                this._showEmptyTip();
+            }
+        },
+
+        hide() {
+            this._isVisible = false;
+            this._container.classList.add('hidden');
+            if (this._isShowingEmptyTip) {
+                this._hideEmptyTip();
+            }
+        },
+
+        collapse() {
+            if (this._alerts.length === 0) {
+                this.hide();
+                return;
+            }
+            this._isCollapsed = true;
+            this._container.classList.add('collapsed');
+        },
+
+        expand() {
+            this._isCollapsed = false;
+            this._container.classList.remove('collapsed');
+        },
+
+        _showEmptyTip() {
+            this._isVisible = true;
+            this._isShowingEmptyTip = true;
+            this._container.classList.remove('hidden');
+            
+            if (!this._emptyTip || !this._container.contains(this._emptyTip)) {
+                this._emptyTip = document.createElement('div');
+                this._emptyTip.className = 'alert-empty-tip';
+                this._emptyTip.innerHTML = `
+                    <div class="alert-empty-tip-icon">🔔</div>
+                    <div class="alert-empty-tip-text">暂无告警通知</div>
+                `;
+                this._container.appendChild(this._emptyTip);
+            }
+        },
+
+        _hideEmptyTip() {
+            if (this._emptyTip && this._container.contains(this._emptyTip)) {
+                this._emptyTip.classList.add('removing');
+                const tip = this._emptyTip;
+                setTimeout(() => {
+                    if (tip && tip.parentNode) {
+                        tip.remove();
+                    }
+                }, 300);
+                this._emptyTip = null;
+            }
+            this._isShowingEmptyTip = false;
+        },
+
+        _updateBadge() {
+            if (!this._badge) return;
+            
+            const count = this._alerts.length;
+            if (count > 0) {
+                this._badge.textContent = count > 99 ? '99+' : count;
+                this._badge.style.display = 'flex';
+            } else {
+                this._badge.style.display = 'none';
+            }
         },
 
         _loadPendingAlerts() {
@@ -308,9 +524,24 @@
             const exists = this._alerts.some(a => a.alertId === alert.alertId);
             if (exists) return;
             
+            if (this._isShowingEmptyTip) {
+                this._hideEmptyTip();
+            }
+            
+            const wasCollapsed = this._isCollapsed;
+            
             this._alerts.push(alert);
             this._savePendingAlerts();
             this._showAlert(alert, true);
+            this._updateBadge();
+            
+            this._isVisible = true;
+            this._container.classList.remove('hidden');
+            
+            if (wasCollapsed) {
+                this.expand();
+                this._saveState();
+            }
         },
 
         _showAlert(alert, animate = true) {
@@ -396,10 +627,19 @@
                 card.remove();
                 this._alerts = this._alerts.filter(a => a.alertId !== alert.alertId);
                 this._savePendingAlerts();
+                this._updateBadge();
+                
+                if (this._alerts.length === 0) {
+                    this._isCollapsed = false;
+                    this._container.classList.remove('collapsed');
+                    this._saveState();
+                    this._container.classList.add('hidden');
+                    this._isVisible = false;
+                }
             }, 300);
             
             if (action === 'handle') {
-                window.location.href = '/alert-manage?alertId=' + alert.alertId;
+                window.location.href = '/alert?alertId=' + alert.id;
             }
         },
 
@@ -438,6 +678,12 @@
             });
             this._alerts = [];
             this._savePendingAlerts();
+            this._updateBadge();
+            this._isCollapsed = false;
+            this._container.classList.remove('collapsed');
+            this._saveState();
+            this._container.classList.add('hidden');
+            this._isVisible = false;
         }
     };
 

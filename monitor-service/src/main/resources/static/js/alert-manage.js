@@ -5,6 +5,14 @@ let currentAlertId = null;
 document.addEventListener('DOMContentLoaded', function() {
     loadStats();
     initAlertTable();
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const alertId = urlParams.get('alertId');
+    if (alertId) {
+        setTimeout(function() {
+            viewAlert(alertId);
+        }, 500);
+    }
 });
 
 function initAlertTable() {

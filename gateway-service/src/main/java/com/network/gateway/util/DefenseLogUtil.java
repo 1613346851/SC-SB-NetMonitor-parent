@@ -57,7 +57,7 @@ public class DefenseLogUtil {
         logDTO.setOperator("SYSTEM");
         logDTO.setConfidence(confidence);
         logDTO.setExecuteTime(System.currentTimeMillis());
-        logDTO.setRiskLevel(DefenseResultBO.RiskLevel.HIGH.name());
+        logDTO.setRiskLevel(calculateRiskLevelByConfidence(confidence).name());
         
         if (expireTimestamp != null) {
             LocalDateTime expireDateTime = LocalDateTime.ofInstant(
@@ -100,7 +100,7 @@ public class DefenseLogUtil {
         logDTO.setExecuteStatus(1);
         logDTO.setConfidence(confidence);
         logDTO.setExecuteTime(System.currentTimeMillis());
-        logDTO.setRiskLevel(DefenseResultBO.RiskLevel.HIGH.name());
+        logDTO.setRiskLevel(calculateRiskLevelByConfidence(confidence).name());
         
         if (counter != null) {
             logDTO.setRateLimitCount(counter.getCount());
@@ -150,7 +150,7 @@ public class DefenseLogUtil {
         logDTO.setExecuteTime(System.currentTimeMillis());
         logDTO.setRequestUri(requestUri);
         logDTO.setHttpMethod(httpMethod);
-        logDTO.setRiskLevel(DefenseResultBO.RiskLevel.HIGH.name());
+        logDTO.setRiskLevel(calculateRiskLevelByConfidence(confidence).name());
         
         return logDTO;
     }
@@ -168,7 +168,7 @@ public class DefenseLogUtil {
         logDTO.setConfidence(confidence);
         logDTO.setExecuteTime(System.currentTimeMillis());
         logDTO.setOperator("SYSTEM");
-        logDTO.setRiskLevel(DefenseResultBO.RiskLevel.HIGH.name());
+        logDTO.setRiskLevel(calculateRiskLevelByConfidence(confidence).name());
         
         logDTO.setDefenseAction(buildDefenseActionSummary(actions));
         logDTO.setExecuteResult(buildCompositeDescription(actions));
@@ -377,6 +377,21 @@ public class DefenseLogUtil {
             case 3: return "已防御";
             case 4: return "冷却期";
             default: return "未知";
+        }
+    }
+
+    private static DefenseResultBO.RiskLevel calculateRiskLevelByConfidence(Integer confidence) {
+        if (confidence == null) {
+            return DefenseResultBO.RiskLevel.MEDIUM;
+        }
+        if (confidence >= 90) {
+            return DefenseResultBO.RiskLevel.CRITICAL;
+        } else if (confidence >= 70) {
+            return DefenseResultBO.RiskLevel.HIGH;
+        } else if (confidence >= 50) {
+            return DefenseResultBO.RiskLevel.MEDIUM;
+        } else {
+            return DefenseResultBO.RiskLevel.LOW;
         }
     }
 }

@@ -23,6 +23,12 @@ public interface AlertMapper {
 
     AlertEntity selectByEventId(@Param("eventId") String eventId);
 
+    AlertEntity selectByAttackId(@Param("attackId") Long attackId);
+
+    int updateAlertLevel(@Param("id") Long id, @Param("alertLevel") String alertLevel, 
+                         @Param("alertTitle") String alertTitle, @Param("alertContent") String alertContent,
+                         @Param("updateTime") LocalDateTime updateTime);
+
     List<AlertEntity> selectByCondition(
             @Param("alertLevel") String alertLevel,
             @Param("status") Integer status,

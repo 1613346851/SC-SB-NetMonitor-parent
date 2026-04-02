@@ -88,6 +88,23 @@
         WHERE event_id = #{eventId}
     </select>
 
+    <select id="selectByAttackId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_alert
+        WHERE attack_id = #{attackId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <update id="updateAlertLevel">
+        UPDATE sys_alert
+        SET alert_level = #{alertLevel}, 
+            alert_title = #{alertTitle}, 
+            alert_content = #{alertContent},
+            update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
     <select id="selectByCondition" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM sys_alert

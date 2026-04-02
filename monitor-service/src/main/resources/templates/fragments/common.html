@@ -109,17 +109,26 @@
     </th:block>
     
     <th:block th:fragment="userDropdown">
-        <div class="user-info user-dropdown">
-            <div class="user-avatar">A</div>
-            <span class="user-name">管理员</span>
-            <div class="user-dropdown-menu">
-                <a class="user-dropdown-item" href="/profile">
-                    <span>👤 个人中心</span>
-                </a>
-                <div class="user-dropdown-divider"></div>
-                <a class="user-dropdown-item logout-btn">
-                    <span>🚪 退出登录</span>
-                </a>
+        <div class="header-right-actions">
+            <div class="user-info user-dropdown">
+                <div class="user-avatar">A</div>
+                <span class="user-name">管理员</span>
+                <div class="user-dropdown-menu">
+                    <a class="user-dropdown-item" href="/profile">
+                        <span>👤 个人中心</span>
+                    </a>
+                    <div class="user-dropdown-divider"></div>
+                    <a class="user-dropdown-item logout-btn">
+                        <span>🚪 退出登录</span>
+                    </a>
+                </div>
+            </div>
+            <div class="notification-toggle" id="notificationToggle" title="显示/隐藏告警通知">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
             </div>
         </div>
     </th:block>

@@ -9,6 +9,120 @@ const GATEWAY_CONFIG_PREFIX = 'gateway.';
 const DDOS_CONFIG_PREFIX = 'ddos.';
 const DEFENSE_CONFIG_PREFIX = 'defense.';
 const TRAFFIC_CONFIG_PREFIX = 'traffic.push.';
+
+const GATEWAY_SYNC_CONFIG_KEYS = [
+    'gateway.defense.blacklist.enabled',
+    'gateway.defense.rate-limit.enabled',
+    'gateway.defense.malicious-request.enabled',
+    'gateway.defense.rate-limit.default-threshold',
+    'gateway.defense.rate-limit.window-size',
+    'gateway.defense.blacklist.default-expire-seconds',
+    'gateway.defense.malicious.user-agents',
+    'gateway.defense.malicious.uri-patterns',
+    'gateway.cache.traffic-expire-ms',
+    'gateway.cache.blacklist-expire-ms',
+    'gateway.cache.cleanup-interval-ms',
+    'gateway.attack-state.cooldown-duration-ms',
+    'gateway.attack-state.state-expire-ms',
+    'gateway.request.max-body-size',
+    'gateway.request.abnormal-response-threshold-ms',
+    'gateway.defense.rate-limit.peak-threshold',
+    'gateway.defense.ban.duration-base-ms',
+    'gateway.defense.ban.duration-multiplier',
+    'ddos.threshold',
+    'ddos.detection.window-ms',
+    'ddos.rate-limit-trigger-count',
+    'ddos.rate-limit-trigger-window-seconds',
+    'ddos.slow-attack.threshold-rps',
+    'ddos.global-attack.related-ip-threshold',
+    'state.normal-to-suspicious.threshold-rps',
+    'state.normal-to-suspicious.window-ms',
+    'state.normal-to-suspicious.slide-step-ms',
+    'state.suspicious-to-attacking.duration-ms',
+    'state.suspicious-to-attacking.min-requests',
+    'state.suspicious-to-attacking.uri-diversity-threshold',
+    'state.suspicious-to-normal.quiet-duration-ms',
+    'state.suspicious.timeout-ms',
+    'state.defended-to-cooldown.quiet-duration-ms',
+    'state.cooldown.base-duration-ms',
+    'state.cooldown.max-duration-ms',
+    'state.cooldown.attack-intensity-multiplier',
+    'state.cooldown.timeout-ms',
+    'state.cooldown-to-attacking.threshold-rps',
+    'state.slow-attack.duration-ms',
+    'state.slow-attack.threshold-rps',
+    'state.global-attack.related-ip-threshold',
+    'state.global-attack.network-mask',
+    'state.manual-reset.log-required',
+    'state.manual-reset.operator-required',
+    'cooldown.dynamic.enabled',
+    'cooldown.base-duration-ms',
+    'cooldown.max-duration-ms',
+    'cooldown.intensity-multiplier',
+    'cooldown.history-multiplier',
+    'cooldown.history-max-multiplier',
+    'confidence.base-score',
+    'confidence.frequency.max-score',
+    'confidence.frequency.per-exceed-score',
+    'confidence.diversity.max-score',
+    'confidence.diversity.per-uri-score',
+    'confidence.persistence.max-score',
+    'confidence.persistence.per-10s-score',
+    'confidence.pattern.max-score',
+    'confidence.pattern.partial-score',
+    'confidence.normal-behavior.max-deduction',
+    'confidence.normal-behavior.no-history-deduction',
+    'confidence.normal-behavior.normal-requests-deduction',
+    'confidence.smooth.strategy',
+    'confidence.smooth.alpha',
+    'confidence.history.max-score',
+    'confidence.history.no-attack-deduction',
+    'confidence.history.has-attack-score',
+    'confidence.history.normal-rate-deduction',
+    'confidence.slow-attack.max-score',
+    'confidence.slow-attack.per-minute-score',
+    'confidence.global-attack.max-score',
+    'confidence.global-attack.per-ip-score',
+    'confidence.no-decrease.enabled',
+    'confidence.min-value',
+    'confidence.blocked.rate-limit-score',
+    'confidence.blocked.blacklist-score',
+    'confidence.blocked.max-daily-score',
+    'traffic.push.normal.strategy',
+    'traffic.push.suspicious.strategy',
+    'traffic.push.attacking.strategy',
+    'traffic.push.defended.strategy',
+    'traffic.push.cooldown.strategy',
+    'traffic.push.batch-interval-ms',
+    'traffic.push.sampling-rate',
+    'traffic.push.enabled',
+    'traffic.push.interval-ms',
+    'traffic.push.interval-low-ms',
+    'traffic.push.retry.max-count',
+    'traffic.push.retry.delay-ms',
+    'traffic.push.retry.max-queue-size',
+    'traffic.push.retry-interval-ms',
+    'traffic.push.memory.max-usage-percent',
+    'traffic.push.memory.force-flush-threshold',
+    'traffic.push.degradation.enabled',
+    'traffic.push.degradation.local-cache-size',
+    'traffic.push.degradation.health-check-interval-ms',
+    'traffic.push.fallback-enabled',
+    'traffic.sample.max-per-uri',
+    'traffic.sample.max-total',
+    'traffic.sample.abnormal-priority',
+    'traffic.sample.desensitize-enabled',
+    'traffic.aggregate.uri-pattern-depth',
+    'traffic.aggregate.max-uri-groups',
+    'traffic.aggregate.batch-threshold',
+    'traffic.queue.single-ip-capacity',
+    'traffic.queue.global-capacity',
+    'traffic.queue.overflow-strategy',
+    'traffic.business-peak.enabled',
+    'traffic.business-peak.threshold-multiplier',
+    'traffic.business-peak.time-ranges'
+];
+
 const GATEWAY_DEFENSE_KEYS = [
     'gateway.defense.blacklist.enabled',
     'gateway.defense.rate-limit.enabled',
@@ -217,18 +331,6 @@ function applyFilters() {
 
 function sortConfigList(list) {
     return list.sort((a, b) => {
-        const aGateway = a.configKey && a.configKey.startsWith(GATEWAY_CONFIG_PREFIX);
-        const bGateway = b.configKey && b.configKey.startsWith(GATEWAY_CONFIG_PREFIX);
-        const aAi = AI_CONFIG_KEYS.includes(a.configKey);
-        const bAi = AI_CONFIG_KEYS.includes(b.configKey);
-        
-        if (aGateway !== bGateway) {
-            return aGateway ? -1 : 1;
-        }
-        if (aAi !== bAi) {
-            return aAi ? -1 : 1;
-        }
-
         let valueA = a[sortField];
         let valueB = b[sortField];
 
@@ -254,7 +356,7 @@ function sortConfigList(list) {
 function renderOverview(list) {
     const latestConfig = [...configList].sort((a, b) => new Date(b.updateTime || 0) - new Date(a.updateTime || 0))[0];
     const aiConfigs = configList.filter(item => AI_CONFIG_KEYS.includes(item.configKey));
-    const gatewayConfigs = configList.filter(item => item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX));
+    const gatewayConfigs = configList.filter(item => GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
 
     setText('configTotalCount', configList.length);
     setText('configAiCount', aiConfigs.length);
@@ -375,7 +477,7 @@ function renderConfigTable(list) {
     
     tbody.innerHTML = list.map(config => {
         const isAiConfig = AI_CONFIG_KEYS.includes(config.configKey);
-        const isGatewayConfig = config.configKey && config.configKey.startsWith(GATEWAY_CONFIG_PREFIX);
+        const isGatewayConfig = GATEWAY_SYNC_CONFIG_KEYS.includes(config.configKey);
         const badgeHtml = isAiConfig ? '<span class="ai-badge">AI</span>' : 
                           isGatewayConfig ? '<span class="gateway-badge">网关</span>' : '';
         const actionButtons = getActionButtons(config);
@@ -410,7 +512,7 @@ function getActionButtons(config) {
         { text: '删除', type: 'danger', onClick: `deleteConfig(${config.id})` }
     ];
     
-    if (config.configKey && config.configKey.startsWith(GATEWAY_CONFIG_PREFIX)) {
+    if (GATEWAY_SYNC_CONFIG_KEYS.includes(config.configKey)) {
         buttons.splice(1, 0, { text: '推送', type: 'warning', onClick: `pushSingleConfig(${config.id})` });
     }
     
@@ -620,7 +722,7 @@ async function pushSingleConfig(id) {
 
 async function pushGatewayConfigs() {
     const gatewayConfigs = configList.filter(item => 
-        item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX)
+        GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey)
     );
     
     if (gatewayConfigs.length === 0) {
