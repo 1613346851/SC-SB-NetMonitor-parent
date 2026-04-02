@@ -32,10 +32,10 @@
         },
         
         RISK_LEVELS: {
-            HIGH: { text: '高风险', class: 'danger', color: '#f5222d' },
-            MEDIUM: { text: '中风险', class: 'warning', color: '#faad14' },
-            LOW: { text: '低风险', class: 'info', color: '#4f46e5' },
-            CRITICAL: { text: '严重', class: 'danger', color: '#a8071a' }
+            CRITICAL: { text: '严重', class: 'danger', color: '#a8071a' },
+            HIGH: { text: '高危', class: 'danger', color: '#f5222d' },
+            MEDIUM: { text: '中危', class: 'warning', color: '#faad14' },
+            LOW: { text: '低危', class: 'info', color: '#4f46e5' }
         },
         
         ATTACK_TYPES: {
@@ -67,9 +67,9 @@
         },
 
         STATUS: {
-
-            HANDLED: { text: '已处理', class: 'success', value: 1 },
-            UNHANDLED: { text: '未处理', class: 'warning', value: 0 },
+            HANDLED: { text: '已确认', class: 'success', value: 1 },
+            UNHANDLED: { text: '待处理', class: 'warning', value: 0 },
+            IGNORED: { text: '已忽略', class: 'secondary', value: 2 },
             BANNING: { text: '封禁中', class: 'danger', value: 1 },
             EXPIRED: { text: '已过期', class: 'info', value: 2 }
         }

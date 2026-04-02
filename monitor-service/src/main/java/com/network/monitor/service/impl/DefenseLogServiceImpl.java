@@ -1,16 +1,11 @@
 package com.network.monitor.service.impl;
 
-import com.network.monitor.dto.AlertDTO;
 import com.network.monitor.dto.DefenseLogDTO;
 import com.network.monitor.entity.AttackEventEntity;
-import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.event.BlacklistSyncEvent;
-import com.network.monitor.mapper.AttackMonitorMapper;
 import com.network.monitor.mapper.DefenseLogMapper;
-import com.network.monitor.service.AlertService;
 import com.network.monitor.service.AttackEventService;
-import com.network.monitor.service.AttackStoreService;
 import com.network.monitor.service.DefenseLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,15 +28,6 @@ public class DefenseLogServiceImpl implements DefenseLogService {
     @Autowired
     private AttackEventService attackEventService;
 
-    @Autowired
-    private AlertService alertService;
-
-    @Autowired
-    private AttackMonitorMapper attackMonitorMapper;
-
-    @Autowired
-    private AttackStoreService attackStoreService;
-
     @Override
     public void receiveDefenseLog(DefenseLogDTO logDTO) {
         if (logDTO == null) {
@@ -63,7 +49,6 @@ public class DefenseLogServiceImpl implements DefenseLogService {
                 if (entity.getIsFirst() == 1) {
                     publishBlacklistSyncEvent(logDTO);
                 }
-                triggerAlert(logDTO, entity);
             } else if (entity.getIsFirst() == 0) {
                 log.debug("非首次防御日志，跳过黑名单事件发布：eventId={}", entity.getEventId());
             }
@@ -71,65 +56,6 @@ public class DefenseLogServiceImpl implements DefenseLogService {
         } catch (Exception e) {
             log.error("接收防御日志失败：defenseType={}, defenseTarget={}, eventId={}", 
                 logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getEventId(), e);
-        }
-    }
-
-    private void triggerAlert(DefenseLogDTO logDTO, DefenseLogEntity entity) {
-        try {
-            Long attackId = entity.getAttackId();
-            String eventId = entity.getEventId();
-            String sourceIp = logDTO.getDefenseTarget();
-            String attackType = logDTO.getAttackType();
-            String riskLevel = logDTO.getRiskLevel();
-            
-            log.info("触发告警 - 原始数据: attackId={}, eventId={}, sourceIp={}, attackType={}, riskLevel={}", 
-                attackId, eventId, sourceIp, attackType, riskLevel);
-            
-            if (attackType == null || attackType.isEmpty()) {
-                attackType = "UNKNOWN";
-            }
-            
-            if (eventId != null && !eventId.isEmpty()) {
-                AttackEventEntity event = attackEventService.getEventByEventId(eventId);
-                if (event != null) {
-                    if (attackType == null || attackType.isEmpty() || "UNKNOWN".equals(attackType)) {
-                        if (event.getAttackType() != null && !event.getAttackType().isEmpty()) {
-                            attackType = event.getAttackType();
-                        }
-                    }
-                }
-                
-                if (attackId == null) {
-                    List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-                        eventId, null, null, null, null, null, null, 0, 1, "id DESC");
-                    if (attacks != null && !attacks.isEmpty()) {
-                        AttackMonitorEntity attack = attacks.get(0);
-                        attackId = attack.getId();
-                        log.debug("根据eventId查找到攻击记录: eventId={}, attackId={}", eventId, attackId);
-                    }
-                }
-            }
-            
-            if (attackId != null) {
-                AttackMonitorEntity attack = attackMonitorMapper.selectById(attackId);
-                if (attack != null && attack.getRiskLevel() != null && !attack.getRiskLevel().isEmpty()) {
-                    riskLevel = attack.getRiskLevel();
-                    log.info("从攻击记录获取风险级别: attackId={}, riskLevel={}", attackId, riskLevel);
-                }
-            }
-            
-            if (riskLevel == null || riskLevel.isEmpty()) {
-                riskLevel = "MEDIUM";
-                log.warn("风险级别为空，使用默认值 MEDIUM");
-            }
-            
-            AlertDTO alertDTO = AlertDTO.fromAttack(attackId, eventId, sourceIp, attackType, riskLevel);
-            alertService.generateAlert(alertDTO);
-            
-            log.info("触发告警生成：attackId={}, eventId={}, sourceIp={}, attackType={}, riskLevel={}", 
-                attackId, eventId, sourceIp, attackType, riskLevel);
-        } catch (Exception e) {
-            log.error("触发告警失败：eventId={}, sourceIp={}", entity.getEventId(), logDTO.getDefenseTarget(), e);
         }
     }
 

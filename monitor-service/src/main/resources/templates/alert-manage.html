@@ -40,24 +40,100 @@
         .stat-low .stat-value { color: #3b82f6; }
         .tab-container {
             display: flex;
-            gap: 0;
+            gap: 12px;
             margin-bottom: 20px;
-            border-bottom: 1px solid #e5e7eb;
+            padding: 4px;
         }
         .tab-item {
-            padding: 12px 24px;
+            flex: 1;
+            padding: 14px 20px;
             cursor: pointer;
-            border-bottom: 2px solid transparent;
+            border-radius: 10px;
             color: #6b7280;
             font-weight: 500;
-            transition: all 0.2s;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            background: white;
+            border: 1px solid #e5e7eb;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .tab-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: transparent;
+            transition: all 0.25s;
         }
         .tab-item:hover {
             color: #4f46e5;
+            border-color: #c7d2fe;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
         }
         .tab-item.active {
             color: #4f46e5;
-            border-bottom-color: #4f46e5;
+            background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 100%);
+            border-color: #a5b4fc;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+        }
+        .tab-item.active::before {
+            background: linear-gradient(90deg, #6366f1, #4f46e5);
+        }
+        .tab-item[data-status="0"].active {
+            color: #d97706;
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border-color: #fcd34d;
+        }
+        .tab-item[data-status="0"].active::before {
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+        }
+        .tab-item[data-status="0"]:hover {
+            color: #d97706;
+            border-color: #fcd34d;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+        }
+        .tab-item[data-status="1"].active {
+            color: #059669;
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border-color: #6ee7b7;
+        }
+        .tab-item[data-status="1"].active::before {
+            background: linear-gradient(90deg, #10b981, #059669);
+        }
+        .tab-item[data-status="1"]:hover {
+            color: #059669;
+            border-color: #6ee7b7;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+        }
+        .tab-item[data-status="2"].active {
+            color: #6b7280;
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+            border-color: #d1d5db;
+        }
+        .tab-item[data-status="2"].active::before {
+            background: linear-gradient(90deg, #9ca3af, #6b7280);
+        }
+        .tab-item[data-status="2"]:hover {
+            color: #6b7280;
+            border-color: #d1d5db;
+            box-shadow: 0 4px 12px rgba(107, 114, 128, 0.15);
+        }
+        .tab-badge {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(0, 0, 0, 0.06);
+            color: inherit;
+        }
+        .tab-item.active .tab-badge {
+            background: rgba(255, 255, 255, 0.9);
         }
         .batch-actions {
             display: flex;
@@ -125,10 +201,22 @@
                 </div>
 
                 <div class="tab-container">
-                    <div class="tab-item active" data-status="" onclick="switchTab(this, '')">全部告警</div>
-                    <div class="tab-item" data-status="0" onclick="switchTab(this, 0)">待处理</div>
-                    <div class="tab-item" data-status="1" onclick="switchTab(this, 1)">已确认</div>
-                    <div class="tab-item" data-status="2" onclick="switchTab(this, 2)">已忽略</div>
+                    <div class="tab-item active" data-status="" onclick="switchTab(this, '')">
+                        <span>全部告警</span>
+                        <span class="tab-badge" id="tabAll">0</span>
+                    </div>
+                    <div class="tab-item" data-status="0" onclick="switchTab(this, 0)">
+                        <span>待处理</span>
+                        <span class="tab-badge" id="tabPending">0</span>
+                    </div>
+                    <div class="tab-item" data-status="1" onclick="switchTab(this, 1)">
+                        <span>已确认</span>
+                        <span class="tab-badge" id="tabConfirmed">0</span>
+                    </div>
+                    <div class="tab-item" data-status="2" onclick="switchTab(this, 2)">
+                        <span>已忽略</span>
+                        <span class="tab-badge" id="tabIgnored">0</span>
+                    </div>
                 </div>
 
                 <div class="filter-bar">

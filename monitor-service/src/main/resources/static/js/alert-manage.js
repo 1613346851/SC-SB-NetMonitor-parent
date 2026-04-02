@@ -73,10 +73,33 @@ function loadStats() {
             document.getElementById('statMedium').textContent = stats.medium || 0;
             document.getElementById('statLow').textContent = stats.low || 0;
             document.getElementById('statPending').textContent = stats.pending || 0;
+            
+            updateTabBadges(stats);
         })
         .catch(function(error) {
             console.error('加载统计数据失败:', error);
         });
+}
+
+function updateTabBadges(stats) {
+    var statusStats = stats.statusStats || [];
+    var pending = 0, confirmed = 0, ignored = 0;
+    
+    statusStats.forEach(function(item) {
+        var status = parseInt(item.status);
+        var count = parseInt(item.count) || 0;
+        
+        if (status === 0) pending = count;
+        else if (status === 1) confirmed = count;
+        else if (status === 2) ignored = count;
+    });
+    
+    var total = pending + confirmed + ignored;
+    
+    document.getElementById('tabAll').textContent = total;
+    document.getElementById('tabPending').textContent = pending;
+    document.getElementById('tabConfirmed').textContent = confirmed;
+    document.getElementById('tabIgnored').textContent = ignored;
 }
 
 function searchAlerts() {

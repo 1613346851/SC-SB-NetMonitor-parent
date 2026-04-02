@@ -81,7 +81,7 @@
                     max-height: calc(100vh - 100px);
                     overflow-y: auto;
                     overflow-x: hidden;
-                    z-index: 99998;
+                    z-index: 100;
                     pointer-events: auto;
                     display: flex;
                     flex-direction: column;

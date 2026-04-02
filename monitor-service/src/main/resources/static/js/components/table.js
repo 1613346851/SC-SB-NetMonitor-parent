@@ -32,8 +32,16 @@
         
         renderStatus(status, type = 'handle') {
             if (type === 'handle') {
-                const config = status === 1 ? AppConfig.STATUS.HANDLED : AppConfig.STATUS.UNHANDLED;
-                return `<span class="tag ${config.class}">${config.text}</span>`;
+                if (status === 1) {
+                    const config = AppConfig.STATUS.HANDLED;
+                    return `<span class="tag ${config.class}">${config.text}</span>`;
+                } else if (status === 2) {
+                    const config = AppConfig.STATUS.IGNORED;
+                    return `<span class="tag ${config.class}">${config.text}</span>`;
+                } else {
+                    const config = AppConfig.STATUS.UNHANDLED;
+                    return `<span class="tag ${config.class}">${config.text}</span>`;
+                }
             } else if (type === 'ban') {
                 if (status === 1) {
                     return `<span class="tag ${AppConfig.STATUS.BANNING.class}">${AppConfig.STATUS.BANNING.text}</span>`;
