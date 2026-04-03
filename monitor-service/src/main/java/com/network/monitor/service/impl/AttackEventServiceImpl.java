@@ -37,6 +37,7 @@ public class AttackEventServiceImpl implements AttackEventService {
         entity.setRiskLevel(attackDTO.getRiskLevel());
         entity.setStartTime(LocalDateTime.now());
         entity.setTotalRequests(1);
+        entity.setPeakRps(0);
         entity.setAttackCount(1);
         entity.setConfidenceStart(attackDTO.getConfidence());
         entity.setConfidenceEnd(attackDTO.getConfidence());
@@ -86,6 +87,7 @@ public class AttackEventServiceImpl implements AttackEventService {
         entity.setRiskLevel(riskLevel);
         entity.setStartTime(LocalDateTime.now());
         entity.setTotalRequests(1);
+        entity.setPeakRps(0);
         entity.setAttackCount(1);
         entity.setConfidenceStart(confidence);
         entity.setConfidenceEnd(confidence);

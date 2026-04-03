@@ -41,52 +41,52 @@
             font-size: 14px;
             margin-top: 4px;
         }
-        .event-detail-panel {
-            position: fixed;
-            top: 0;
-            right: -500px;
-            width: 500px;
-            height: 100vh;
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
             background: #fff;
-            box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-            z-index: 1000;
-            transition: right 0.3s ease;
-            overflow-y: auto;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        .event-detail-panel.show {
-            right: 0;
+        .chart-card .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 16px;
         }
-        .event-detail-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 20px;
-            border-bottom: 1px solid #e5e7eb;
-            background: #f9fafb;
-            position: sticky;
-            top: 0;
-        }
-        .event-detail-header h3 {
-            margin: 0;
-            font-size: 18px;
+        .chart-container {
+            height: 250px;
+            position: relative;
         }
         .event-detail-grid {
-            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
         }
         .detail-section {
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
         .detail-section h4 {
             font-size: 14px;
-            color: #6b7280;
+            color: #374151;
             margin-bottom: 12px;
             padding-bottom: 8px;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 2px solid #e5e7eb;
+            font-weight: 600;
         }
         .detail-item {
             display: flex;
             justify-content: space-between;
             padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .detail-item:last-child {
+            border-bottom: none;
         }
         .detail-item label {
             color: #6b7280;
@@ -95,12 +95,13 @@
         .detail-item span {
             font-size: 14px;
             color: #1f2937;
+            font-weight: 500;
         }
         .timeline {
             padding: 16px;
             background: #f9fafb;
             border-radius: 8px;
-            margin: 16px 20px;
+            margin-top: 16px;
         }
         .timeline-item {
             display: flex;
@@ -140,27 +141,27 @@
             color: #1f2937;
         }
         .related-attacks {
-            padding: 0 20px 20px;
+            margin-top: 20px;
         }
         .related-attacks h4 {
             font-size: 14px;
-            color: #6b7280;
+            color: #374151;
             margin-bottom: 12px;
+            font-weight: 600;
         }
-        .panel-close {
-            cursor: pointer;
-            font-size: 24px;
-            color: #6b7280;
+        .modal-body {
+            max-height: 70vh;
+            overflow-y: auto;
         }
-        .panel-close:hover {
-            color: #1f2937;
+        #eventDetailModal .modal-content {
+            width: 70%;
+            max-width: 1200px;
+            min-width: 600px;
         }
-        .panel-actions {
-            padding: 16px 20px;
-            border-top: 1px solid #e5e7eb;
-            background: #f9fafb;
-            position: sticky;
-            bottom: 0;
+        .rps-highlight {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ef4444;
         }
     </style>
 </head>
@@ -196,6 +197,17 @@
                     <div class="stat-card">
                         <div class="stat-value" id="avgDuration">-</div>
                         <div class="stat-label">平均持续时间</div>
+                    </div>
+                </div>
+
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <div class="chart-title">攻击类型分布</div>
+                        <div class="chart-container" id="attackTypeChart"></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">风险等级分布</div>
+                        <div class="chart-container" id="riskLevelChart"></div>
                     </div>
                 </div>
 
@@ -277,7 +289,7 @@
                             </thead>
                             <tbody id="eventTableBody">
                                 <tr>
-                                    <td colspan="10" class="text-center">加载中...</td>
+                                    <td colspan="12" class="text-center">加载中...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -290,37 +302,41 @@
         </div>
     </div>
 
-    <div id="eventDetailPanel" class="event-detail-panel" style="display: none;">
-        <div class="event-detail-header">
-            <h3>事件详情</h3>
-            <span class="panel-close" onclick="closeEventDetail()">&times;</span>
-        </div>
-        <div id="eventDetailContent"></div>
-        
-        <div class="timeline" id="eventTimeline"></div>
-        
-        <div class="related-attacks">
-            <h4>关联攻击记录</h4>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>时间</th>
-                        <th>类型</th>
-                        <th>风险</th>
-                        <th>置信度</th>
-                        <th>状态</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="relatedAttacksBody">
-                    <tr><td colspan="6" class="text-center">加载中...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <div class="panel-actions">
-            <button class="btn btn-primary" onclick="viewAttackList()">查看完整攻击列表</button>
-            <button class="btn btn-default" onclick="closeEventDetail()">关闭</button>
+    <div id="eventDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>事件详情</h3>
+                <span class="event-full-id" id="modalEventId"></span>
+                <button class="modal-close" onclick="closeEventDetail()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="eventDetailContent"></div>
+                
+                <div class="timeline" id="eventTimeline"></div>
+                
+                <div class="related-attacks">
+                    <h4>关联攻击记录</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>类型</th>
+                                <th>风险</th>
+                                <th>置信度</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="relatedAttacksBody">
+                            <tr><td colspan="6" class="text-center">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="viewAttackList()">查看完整攻击列表</button>
+                <button class="btn btn-default" onclick="closeEventDetail()">关闭</button>
+            </div>
         </div>
     </div>
 
@@ -331,17 +347,27 @@
     <script th:src="@{/js/utils/validator.js}"></script>
     <script th:src="@{/js/core/http.js}"></script>
     <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/resource-loader.js}"></script>
     <script th:src="@{/js/core/page-init.js}"></script>
     <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
     <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/components/chart.js}"></script>
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/attack-event.js}"></script>
     <script>
-        PageInit.init({
-            requireAuth: true,
-            highlightMenu: true
+        ResourceLoader.loadEcharts().then(function() {
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
+        }).catch(function(e) {
+            console.error('ECharts 加载失败:', e);
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
         });
     </script>
 </body>

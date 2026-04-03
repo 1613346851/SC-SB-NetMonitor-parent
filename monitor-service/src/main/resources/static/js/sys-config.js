@@ -540,12 +540,14 @@ function filterAiConfigs() {
     currentFilterMode = 'AI_ONLY';
     document.getElementById('configCategory').value = 'AI';
     applyFilters();
+    scrollToConfigList();
 }
 
 function filterGatewayConfigs() {
     currentFilterMode = 'GATEWAY_ONLY';
     document.getElementById('configCategory').value = 'GATEWAY';
     applyFilters();
+    scrollToConfigList();
 }
 
 function editAiConfig(configKey) {
@@ -675,10 +677,27 @@ async function checkGatewayStatus() {
                 lastSyncEl.textContent = '--';
             }
             
-            let resultText = syncStatus.syncStatus || '正常';
-            if (syncStatus.syncSuccessCount !== undefined && syncStatus.syncFailureCount !== undefined) {
-                resultText += ` (成功:${syncStatus.syncSuccessCount}/失败:${syncStatus.syncFailureCount})`;
+            let resultText = '';
+            const status = syncStatus.syncStatus || 'NORMAL';
+            const successCount = syncStatus.syncSuccessCount || 0;
+            const failureCount = syncStatus.syncFailureCount || 0;
+            
+            if (status === 'SUCCESS' || status === 'NORMAL') {
+                if (failureCount > 0) {
+                    resultText = `部分成功 (成功:${successCount}/失败:${failureCount})`;
+                } else if (successCount > 0) {
+                    resultText = '同步成功';
+                } else {
+                    resultText = '正常';
+                }
+            } else if (status === 'FAILURE') {
+                resultText = '同步失败';
+            } else if (status === 'CONNECTING') {
+                resultText = '连接中...';
+            } else {
+                resultText = status;
             }
+            
             resultEl.textContent = resultText;
         } else {
             throw new Error('健康检查失败');
@@ -703,17 +722,13 @@ async function pushSingleConfig(id) {
     if (!confirm(`确定要将配置 "${config.configKey}" 推送到网关吗？`)) return;
     
     try {
-        const response = await http.post('/gateway/config/push', {
+        await http.post('/gateway/config/push', {
             configKey: config.configKey,
             configValue: config.configValue
         });
         
-        if (response.code === 200) {
-            message.success('配置推送成功');
-            checkGatewayStatus();
-        } else {
-            message.error('配置推送失败：' + (response.message || '未知错误'));
-        }
+        message.success('配置推送成功');
+        checkGatewayStatus();
     } catch (error) {
         console.error('推送配置失败:', error);
         message.error('推送配置失败：' + (error.message || '未知错误'));
@@ -738,14 +753,10 @@ async function pushGatewayConfigs() {
             configs[item.configKey] = item.configValue;
         });
         
-        const response = await http.post('/gateway/config/sync', { configs });
+        await http.post('/gateway/config/sync', { configs });
         
-        if (response.code === 200) {
-            message.success(`成功推送 ${gatewayConfigs.length} 项网关配置`);
-            checkGatewayStatus();
-        } else {
-            message.error('推送网关配置失败：' + (response.message || '未知错误'));
-        }
+        message.success(`成功推送 ${gatewayConfigs.length} 项网关配置`);
+        checkGatewayStatus();
     } catch (error) {
         console.error('推送网关配置失败:', error);
         message.error('推送网关配置失败：' + (error.message || '未知错误'));
@@ -756,19 +767,14 @@ async function pushAllToGateway() {
     if (!confirm('确定要将所有配置推送到网关吗？这将同步所有网关配置项。')) return;
     
     try {
-        const response = await http.post('/gateway/config/sync/all');
+        const result = await http.post('/gateway/config/sync/all');
         
-        if (response.code === 200 && response.data) {
-            const result = response.data;
-            if (result.syncStatus === 'SUCCESS') {
-                message.success(`配置已成功推送到网关，共${result.syncedConfigCount || 0}项`);
-            } else {
-                message.warning('配置推送完成：' + (result.message || '状态未知'));
-            }
-            checkGatewayStatus();
+        if (result && result.syncStatus === 'SUCCESS') {
+            message.success(`配置已成功推送到网关，共${result.syncedConfigCount || 0}项`);
         } else {
-            message.error('推送配置失败：' + (response.message || '未知错误'));
+            message.warning('配置推送完成：' + (result?.message || '状态未知'));
         }
+        checkGatewayStatus();
     } catch (error) {
         console.error('推送全部配置失败:', error);
         message.error('推送全部配置失败：' + (error.message || '未知错误'));
@@ -854,11 +860,19 @@ function setText(id, value) {
     if (el) el.textContent = value;
 }
 
+function scrollToConfigList() {
+    const section = document.getElementById('configListSection');
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
 function filterDdosConfigs() {
     currentFilterMode = 'DDOS_ONLY';
     document.getElementById('configCategory').value = 'ALL';
     document.getElementById('configKey').value = 'ddos.';
     applyFilters();
+    scrollToConfigList();
 }
 
 function filterDefenseConfigs() {
@@ -866,6 +880,7 @@ function filterDefenseConfigs() {
     document.getElementById('configCategory').value = 'ALL';
     document.getElementById('configKey').value = 'defense.';
     applyFilters();
+    scrollToConfigList();
 }
 
 function filterTrafficConfigs() {
@@ -873,6 +888,7 @@ function filterTrafficConfigs() {
     document.getElementById('configCategory').value = 'ALL';
     document.getElementById('configKey').value = 'traffic.push.';
     applyFilters();
+    scrollToConfigList();
 }
 
 function showDdosConfigModal() {

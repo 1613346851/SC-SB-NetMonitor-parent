@@ -166,8 +166,15 @@
 
     <update id="updateStatistics">
         UPDATE sys_attack_event
-        SET peak_rps = GREATEST(peak_rps, #{peakRps}),
+        SET peak_rps = GREATEST(COALESCE(peak_rps, 0), #{peakRps}),
+            total_requests = #{totalRequests},
             confidence_end = #{confidenceEnd},
+            risk_level = CASE 
+                WHEN #{confidenceEnd} >= 90 THEN 'CRITICAL'
+                WHEN #{confidenceEnd} >= 65 THEN 'HIGH'
+                WHEN #{confidenceEnd} >= 30 THEN 'MEDIUM'
+                ELSE 'LOW'
+            END,
             update_time = NOW()
         WHERE id = #{id}
     </update>

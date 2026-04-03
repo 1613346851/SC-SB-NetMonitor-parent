@@ -174,7 +174,8 @@ async function loadReportData() {
         loadTrafficTrendReport(),
         loadAttackTrendReport(),
         loadAttackTypeChart(),
-        loadRiskLevelChart()
+        loadRiskLevelChart(),
+        loadTopAttackers()
     ]);
 }
 

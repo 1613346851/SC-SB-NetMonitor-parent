@@ -382,8 +382,9 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             List<Map<String, Object>> result = new ArrayList<>();
             for (AttackMonitorMapper.SourceIpStat stat : stats) {
                 Map<String, Object> item = new HashMap<>();
-                item.put("ip", stat.getSourceIp());
-                item.put("count", stat.getCount());
+                item.put("sourceIp", stat.getSourceIp());
+                item.put("attackCount", stat.getCount());
+                item.put("riskLevel", "HIGH");
                 result.add(item);
             }
             

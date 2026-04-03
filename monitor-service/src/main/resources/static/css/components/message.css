@@ -2,52 +2,106 @@
  * 消息提示组件
  */
 
-.message {
+.message-container {
     position: fixed;
-    top: 32px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 12px 24px;
-    border-radius: var(--radius-base);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    z-index: var(--z-popover);
-    animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    top: 24px;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.message {
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 12px 20px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     font-size: 14px;
     font-weight: 500;
-    background: #fff;
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    pointer-events: auto;
+    margin-bottom: 8px;
+    animation: messageIn 0.3s ease forwards;
 }
 
-@keyframes slideDown {
+.message.hide {
+    animation: messageOut 0.3s ease forwards;
+}
+
+@keyframes messageIn {
     from {
         opacity: 0;
-        transform: translate(-50%, -20px);
+        transform: translateY(-100%);
     }
     to {
         opacity: 1;
-        transform: translate(-50%, 0);
+        transform: translateY(0);
     }
 }
 
+@keyframes messageOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-100%);
+    }
+}
+
+.message-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.message-content {
+    line-height: 1.4;
+    max-width: 400px;
+}
+
 .message.success {
-    border-left: 4px solid var(--success-color);
-    color: var(--text-primary);
+    background: #10b981;
+    color: #fff;
+}
+
+.message.success .message-icon {
+    background: rgba(255, 255, 255, 0.25);
 }
 
 .message.error {
-    border-left: 4px solid var(--danger-color);
-    color: var(--text-primary);
+    background: #ef4444;
+    color: #fff;
+}
+
+.message.error .message-icon {
+    background: rgba(255, 255, 255, 0.25);
 }
 
 .message.warning {
-    border-left: 4px solid var(--warning-color);
-    color: var(--text-primary);
+    background: #f59e0b;
+    color: #fff;
+}
+
+.message.warning .message-icon {
+    background: rgba(255, 255, 255, 0.25);
 }
 
 .message.info {
-    border-left: 4px solid var(--info-color);
-    color: var(--text-primary);
+    background: #3b82f6;
+    color: #fff;
+}
+
+.message.info .message-icon {
+    background: rgba(255, 255, 255, 0.25);
 }

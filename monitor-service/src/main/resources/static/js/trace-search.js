@@ -2,7 +2,7 @@ let traceTable;
 
 document.addEventListener('DOMContentLoaded', function() {
     initTraceTable();
-    quickSearch('today', null);
+    quickSearch('all', null);
 });
 
 function initTraceTable() {
@@ -83,11 +83,13 @@ function quickSearch(type, evt) {
         return year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
     }
     
-    endTime = formatDateTime(now);
-    
-    if (type === 'today') {
+    if (type === 'all') {
+        startTime = '';
+        endTime = '';
+    } else if (type === 'today') {
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
         startTime = formatDateTime(todayStart);
+        endTime = formatDateTime(now);
     } else if (type === 'yesterday') {
         const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
         const yesterdayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
@@ -96,13 +98,15 @@ function quickSearch(type, evt) {
     } else if (type === 'week') {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         startTime = formatDateTime(weekAgo);
+        endTime = formatDateTime(now);
     } else if (type === 'month') {
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         startTime = formatDateTime(monthAgo);
+        endTime = formatDateTime(now);
     }
     
-    document.getElementById('startTime').value = startTime;
-    document.getElementById('endTime').value = endTime;
+    document.getElementById('startTime').value = startTime || '';
+    document.getElementById('endTime').value = endTime || '';
     
     document.querySelectorAll('.quick-btn').forEach(function(btn) {
         btn.classList.remove('active');

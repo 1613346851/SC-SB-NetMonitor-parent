@@ -5,6 +5,8 @@
 
 let eventTable;
 let currentEventId = null;
+let attackTypeChart = null;
+let riskLevelChart = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
@@ -18,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     initEventTable();
     loadEventStatistics();
+    loadCharts();
     
     setInterval(() => {
         loadEventStatistics();
@@ -44,6 +47,7 @@ function initEventTable() {
             
             const duration = formatDuration(item.durationSeconds);
             const confidenceEnd = item.confidenceEnd || 0;
+            const peakRpsDisplay = item.peakRps ? `<span class="rps-highlight">${item.peakRps}</span>` : '0';
             
             return `
                 <tr onclick="loadEventDetail('${item.eventId}')" style="cursor: pointer;">
@@ -54,7 +58,7 @@ function initEventTable() {
                     <td>${cell.renderRiskLevel(item.riskLevel)}</td>
                     <td>${duration}</td>
                     <td>${item.totalRequests || 0}</td>
-                    <td>${item.peakRps || 0}</td>
+                    <td>${peakRpsDisplay}</td>
                     <td>${item.attackCount || 0}</td>
                     <td><span class="tag ${getConfidenceTagClass(confidenceEnd)}">${confidenceEnd}%</span></td>
                     <td>${statusTag}</td>
@@ -138,12 +142,162 @@ async function loadEventStatistics() {
     }
 }
 
+async function loadCharts() {
+    try {
+        const stats = await http.get('/event/statistics');
+        
+        renderAttackTypeChart(stats.attackTypeStats || {});
+        renderRiskLevelChart(stats.riskLevelStats || {});
+    } catch (error) {
+        console.error('加载图表数据失败:', error);
+    }
+}
+
+function renderAttackTypeChart(typeStats) {
+    const chartDom = document.getElementById('attackTypeChart');
+    if (!chartDom) return;
+    
+    const chart = chartHelper.init('attackTypeChart');
+    if (!chart) return;
+    
+    const typeNames = {
+        'SQL_INJECTION': 'SQL注入',
+        'XSS': 'XSS攻击',
+        'COMMAND_INJECTION': '命令注入',
+        'DDOS': 'DDoS攻击',
+        'PATH_TRAVERSAL': '路径遍历',
+        'FILE_INCLUSION': '文件包含',
+        'BRUTE_FORCE': '暴力破解',
+        'SCANNER': '扫描探测',
+        'RATE_LIMIT': '频率限制'
+    };
+    
+    const seriesData = Object.entries(typeStats).map(([type, count]) => ({
+        name: typeNames[type] || type,
+        value: count
+    }));
+    
+    if (seriesData.length === 0) {
+        seriesData.push({ name: '暂无数据', value: 1 });
+    }
+    
+    const option = {
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+            top: 'center'
+        },
+        series: [{
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+                borderRadius: 4,
+                borderColor: '#fff',
+                borderWidth: 2
+            },
+            label: {
+                show: false
+            },
+            emphasis: {
+                label: {
+                    show: true,
+                    fontSize: 14,
+                    fontWeight: 'bold'
+                }
+            },
+            labelLine: {
+                show: false
+            },
+            data: seriesData
+        }]
+    };
+    
+    chart.setOption(option, { notMerge: true });
+}
+
+function renderRiskLevelChart(riskStats) {
+    const chartDom = document.getElementById('riskLevelChart');
+    if (!chartDom) return;
+    
+    const chart = chartHelper.init('riskLevelChart');
+    if (!chart) return;
+    
+    const levelNames = {
+        'CRITICAL': '严重',
+        'HIGH': '高危',
+        'MEDIUM': '中危',
+        'LOW': '低危'
+    };
+    
+    const levelColors = {
+        'CRITICAL': '#7c3aed',
+        'HIGH': '#ef4444',
+        'MEDIUM': '#f59e0b',
+        'LOW': '#10b981'
+    };
+    
+    const seriesData = Object.entries(riskStats).map(([level, count]) => ({
+        name: levelNames[level] || level,
+        value: count,
+        itemStyle: { color: levelColors[level] }
+    }));
+    
+    if (seriesData.length === 0) {
+        seriesData.push({ name: '暂无数据', value: 1, itemStyle: { color: '#d9d9d9' } });
+    }
+    
+    const option = {
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left',
+            top: 'center'
+        },
+        series: [{
+            type: 'pie',
+            radius: ['40%', '70%'],
+            center: ['60%', '50%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+                borderRadius: 4,
+                borderColor: '#fff',
+                borderWidth: 2
+            },
+            label: {
+                show: false
+            },
+            emphasis: {
+                label: {
+                    show: true,
+                    fontSize: 14,
+                    fontWeight: 'bold'
+                }
+            },
+            labelLine: {
+                show: false
+            },
+            data: seriesData
+        }]
+    };
+    
+    chart.setOption(option, { notMerge: true });
+}
+
 async function loadEventDetail(eventId) {
     try {
         const event = await http.get(`/event/eventId/${eventId}`);
         currentEventId = eventId;
         
-        const detailContent = document.getElementById('eventDetailContent');
+        document.getElementById('modalEventId').textContent = event.eventId;
         
         const statusHtml = event.status === 0 
             ? '<span class="tag warning">进行中</span>'
@@ -155,18 +309,20 @@ async function loadEventDetail(eventId) {
                 ? '<span class="tag success">成功</span>'
                 : '<span class="tag danger">失败</span>';
         
+        const peakRpsValue = event.peakRps || 0;
+        const peakRpsHtml = peakRpsValue > 0 
+            ? `<span class="rps-highlight">${peakRpsValue}</span>`
+            : '0';
+        
+        const detailContent = document.getElementById('eventDetailContent');
+        
         detailContent.innerHTML = `
-            <div class="event-detail-header">
-                <h3>事件详情</h3>
-                <span class="event-full-id">${event.eventId}</span>
-            </div>
-            
             <div class="event-detail-grid">
                 <div class="detail-section">
                     <h4>基本信息</h4>
                     <div class="detail-item">
                         <label>源 IP:</label>
-                        <span>${event.sourceIp}</span>
+                        <span>${event.sourceIp || '-'}</span>
                     </div>
                     <div class="detail-item">
                         <label>攻击类型:</label>
@@ -206,7 +362,7 @@ async function loadEventDetail(eventId) {
                     </div>
                     <div class="detail-item">
                         <label>峰值 RPS:</label>
-                        <span>${event.peakRps || 0}</span>
+                        <span>${peakRpsHtml}</span>
                     </div>
                     <div class="detail-item">
                         <label>攻击节点数:</label>
@@ -244,8 +400,7 @@ async function loadEventDetail(eventId) {
             </div>
         `;
         
-        document.getElementById('eventDetailPanel').style.display = 'block';
-        document.getElementById('eventDetailPanel').classList.add('show');
+        document.getElementById('eventDetailModal').style.display = 'flex';
         
         loadRelatedAttacks(eventId);
         loadEventTimeline(event);
@@ -315,11 +470,7 @@ function loadEventTimeline(event) {
 }
 
 function closeEventDetail() {
-    const panel = document.getElementById('eventDetailPanel');
-    panel.classList.remove('show');
-    setTimeout(() => {
-        panel.style.display = 'none';
-    }, 300);
+    document.getElementById('eventDetailModal').style.display = 'none';
     currentEventId = null;
     
     const url = new URL(window.location);

@@ -320,7 +320,14 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
 
     private void pushDDoSEvent(String sourceIp, int rateLimitCount, ServerWebExchange exchange, String reason, int confidence, String eventId) {
         try {
-            DDoSAttackEventDTO event = new DDoSAttackEventDTO(sourceIp, rateLimitCount, confidence);
+            int effectiveConfidence = confidence;
+            if (effectiveConfidence <= 0 && rateLimitCount > 0) {
+                effectiveConfidence = Math.min(30 + rateLimitCount * 5, 65);
+            }
+            if (effectiveConfidence <= 0) {
+                effectiveConfidence = 30;
+            }
+            DDoSAttackEventDTO event = new DDoSAttackEventDTO(sourceIp, rateLimitCount, effectiveConfidence);
             event.setHttpMethod(exchange.getRequest().getMethodValue());
             event.setRequestUri(exchange.getRequest().getURI().getPath());
             event.setUserAgent(ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest())));
@@ -331,17 +338,19 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
             IpTrafficQueue queue = trafficQueueManager.getQueue(sourceIp);
             if (queue != null) {
                 event.setSlidingWindowRps((int) queue.getSlidingWindowRps());
+                event.setPeakRps((int) queue.getPeakSlidingRps());
             }
             
             IpAttackStateEntry entry = attackStateCache.get(sourceIp);
             if (entry != null) {
                 event.setAttackDuration(entry.getAttackDuration());
+                event.setRequestCount(entry.getAttackRequestCount());
                 event.setUniqueUriCount(entry.getUniqueUriCount());
             }
             
             defenseClient.pushDDoSAttackEvent(event);
-            logger.info("DDoS攻击事件推送成功: ip={}, rateLimitCount={}, confidence={}, reason={}, eventId={}, slidingRps={}", 
-                    sourceIp, rateLimitCount, confidence, reason, eventId, event.getSlidingWindowRps());
+            logger.info("DDoS攻击事件推送成功: ip={}, rateLimitCount={}, confidence={} (original={}), reason={}, eventId={}, slidingRps={}, peakRps={}, requestCount={}", 
+                    sourceIp, rateLimitCount, effectiveConfidence, confidence, reason, eventId, event.getSlidingWindowRps(), event.getPeakRps(), event.getRequestCount());
         } catch (Exception e) {
             logger.error("推送DDoS攻击事件失败: ip={}, error={}", sourceIp, e.getMessage(), e);
         }
@@ -370,6 +379,12 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                                           int currentState, String eventId) {
         try {
             int confidence = attackStateCache.getConfidence(sourceIp);
+            if (confidence <= 0 && rateLimitCount > 0) {
+                confidence = Math.min(30 + rateLimitCount * 5, 65);
+            }
+            if (confidence <= 0) {
+                confidence = 30;
+            }
             DDoSAttackEventDTO event = new DDoSAttackEventDTO(sourceIp, rateLimitCount, confidence);
             event.setHttpMethod(exchange.getRequest().getMethodValue());
             event.setRequestUri(exchange.getRequest().getURI().getPath());
@@ -381,19 +396,21 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
             IpTrafficQueue queue = trafficQueueManager.getQueue(sourceIp);
             if (queue != null) {
                 event.setSlidingWindowRps((int) queue.getSlidingWindowRps());
+                event.setPeakRps((int) queue.getPeakSlidingRps());
             }
             
             IpAttackStateEntry entry = attackStateCache.get(sourceIp);
             if (entry != null) {
                 event.setAttackDuration(entry.getAttackDuration());
+                event.setRequestCount(entry.getAttackRequestCount());
                 event.setUniqueUriCount(entry.getUniqueUriCount());
             }
             
             event.setDescription(String.format("连续触发限流%d次，置信度%d%%，状态: %s", 
                     rateLimitCount, confidence, IpAttackStateConstant.getStateNameZh(currentState)));
             defenseClient.pushDDoSAttackEvent(event);
-            logger.info("攻击监测记录推送成功: ip={}, rateLimitCount={}, confidence={}, state={}, eventId={}, slidingRps={}", 
-                    sourceIp, rateLimitCount, confidence, IpAttackStateConstant.getStateNameZh(currentState), eventId, event.getSlidingWindowRps());
+            logger.info("攻击监测记录推送成功: ip={}, rateLimitCount={}, confidence={}, state={}, eventId={}, slidingRps={}, peakRps={}, requestCount={}", 
+                    sourceIp, rateLimitCount, confidence, IpAttackStateConstant.getStateNameZh(currentState), eventId, event.getSlidingWindowRps(), event.getPeakRps(), event.getRequestCount());
         } catch (Exception e) {
             logger.error("推送攻击监测记录失败: ip={}, error={}", sourceIp, e.getMessage(), e);
         }

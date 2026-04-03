@@ -33,9 +33,9 @@
         
         RISK_LEVELS: {
             CRITICAL: { text: '严重', class: 'danger', color: '#a8071a' },
-            HIGH: { text: '高危', class: 'danger', color: '#f5222d' },
-            MEDIUM: { text: '中危', class: 'warning', color: '#faad14' },
-            LOW: { text: '低危', class: 'info', color: '#4f46e5' }
+            HIGH: { text: '高风险', class: 'danger', color: '#f5222d' },
+            MEDIUM: { text: '中风险', class: 'warning', color: '#faad14' },
+            LOW: { text: '低风险', class: 'info', color: '#4f46e5' }
         },
         
         ATTACK_TYPES: {

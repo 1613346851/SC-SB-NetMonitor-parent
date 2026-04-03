@@ -26,7 +26,9 @@ public class DDoSAttackEventDTO implements Serializable {
     private String traceId;
     private String eventId;
     private int slidingWindowRps;
+    private int peakRps;
     private long attackDuration;
+    private int requestCount;
     private int uniqueUriCount;
 
     public DDoSAttackEventDTO(String sourceIp, int rateLimitCount) {
@@ -56,9 +58,9 @@ public class DDoSAttackEventDTO implements Serializable {
     private String calculateRiskLevel(int confidence) {
         if (confidence >= 90) {
             return "CRITICAL";
-        } else if (confidence >= 70) {
+        } else if (confidence >= 65) {
             return "HIGH";
-        } else if (confidence >= 50) {
+        } else if (confidence >= 30) {
             return "MEDIUM";
         } else {
             return "LOW";
@@ -80,8 +82,14 @@ public class DDoSAttackEventDTO implements Serializable {
         if (slidingWindowRps > 0) {
             sb.append(", 滑动窗口RPS=").append(slidingWindowRps);
         }
+        if (peakRps > 0) {
+            sb.append(", 峰值RPS=").append(peakRps);
+        }
         if (attackDuration > 0) {
             sb.append(", 持续时间=").append(attackDuration / 1000).append("s");
+        }
+        if (requestCount > 0) {
+            sb.append(", 请求数=").append(requestCount);
         }
         if (uniqueUriCount > 0) {
             sb.append(", URI数量=").append(uniqueUriCount);

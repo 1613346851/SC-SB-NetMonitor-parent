@@ -43,9 +43,24 @@ public class AttackEventReceiveController {
             String description = (String) eventData.get("description");
             String reason = (String) eventData.get("reason");
             String gatewayEventId = (String) eventData.get("eventId");
+            Integer requestCount = eventData.get("requestCount") != null ? 
+                ((Number) eventData.get("requestCount")).intValue() : null;
+            Integer windowSeconds = eventData.get("windowSeconds") != null ? 
+                ((Number) eventData.get("windowSeconds")).intValue() : null;
             
-            log.info("接收到DDoS攻击事件：ip={}, attackType={}, riskLevel={}, rateLimitCount={}, reason={}, eventId={}", 
-                sourceIp, attackType, riskLevel, rateLimitCount, reason, gatewayEventId);
+            Integer slidingWindowRps = eventData.get("slidingWindowRps") != null ?
+                ((Number) eventData.get("slidingWindowRps")).intValue() : null;
+            Integer peakRps = eventData.get("peakRps") != null ?
+                ((Number) eventData.get("peakRps")).intValue() : null;
+            Integer currentRps = eventData.get("currentRps") != null ?
+                ((Number) eventData.get("currentRps")).intValue() : null;
+            Integer attackDuration = eventData.get("attackDuration") != null ?
+                ((Number) eventData.get("attackDuration")).intValue() : null;
+            Integer requestCountFromGateway = eventData.get("requestCount") != null ?
+                ((Number) eventData.get("requestCount")).intValue() : null;
+            
+            log.info("接收到DDoS攻击事件：ip={}, attackType={}, riskLevel={}, rateLimitCount={}, reason={}, eventId={}, peakRps={}, slidingWindowRps={}, requestCount={}", 
+                sourceIp, attackType, riskLevel, rateLimitCount, reason, gatewayEventId, peakRps, slidingWindowRps, requestCountFromGateway);
             
             AttackEventEntity event = attackEventService.getOrCreateEventWithEventId(
                 sourceIp, 
@@ -77,19 +92,29 @@ public class AttackEventReceiveController {
                 if (event != null) {
                     attackEventService.incrementAttackCount(event.getId());
                     
-                    Object slidingWindowRpsObj = eventData.get("slidingWindowRps");
-                    int slidingWindowRps = slidingWindowRpsObj != null ? 
-                        ((Number) slidingWindowRpsObj).intValue() : rateLimitCount;
+                    int calculatedRps = calculateRps(eventData, rateLimitCount, requestCount, windowSeconds);
+                    
+                    log.info("计算RPS：eventId={}, peakRps={}, slidingWindowRps={}, rateLimitCount={}, requestCount={}, attackDuration={}, calculatedRps={}", 
+                        eventId, peakRps, slidingWindowRps, rateLimitCount, requestCountFromGateway, attackDuration, calculatedRps);
                     
                     Integer currentPeakRps = event.getPeakRps();
-                    int newPeakRps = Math.max(currentPeakRps != null ? currentPeakRps : 0, slidingWindowRps);
+                    int newPeakRps = Math.max(currentPeakRps != null ? currentPeakRps : 0, calculatedRps);
+                    
+                    int currentTotal = event.getTotalRequests() != null ? event.getTotalRequests() : 0;
+                    int newTotal = requestCount != null ? currentTotal + requestCount : currentTotal + 1;
+                    
+                    Integer currentConfidenceEnd = event.getConfidenceEnd();
+                    int newConfidence = Math.max(currentConfidenceEnd != null ? currentConfidenceEnd : 0, confidence);
                     
                     attackEventService.updateEventStatistics(
                         event.getId(), 
-                        event.getTotalRequests() != null ? event.getTotalRequests() : 1, 
+                        newTotal, 
                         newPeakRps, 
-                        confidence
+                        newConfidence
                     );
+                    
+                    log.info("更新事件统计完成：eventId={}, peakRps={}, totalRequests={}, confidence={} (original={})", 
+                        eventId, newPeakRps, newTotal, newConfidence, confidence);
                 }
             }
             
@@ -105,5 +130,65 @@ public class AttackEventReceiveController {
             log.error("处理DDoS攻击事件失败：", e);
             return ApiResponse.error("处理DDoS攻击事件失败：" + e.getMessage());
         }
+    }
+    
+    private int calculateRps(Map<String, Object> eventData, int rateLimitCount, Integer requestCount, Integer windowSeconds) {
+        Object peakRpsObj = eventData.get("peakRps");
+        if (peakRpsObj != null) {
+            int peakRps = ((Number) peakRpsObj).intValue();
+            if (peakRps > 0) {
+                return peakRps;
+            }
+        }
+        
+        Object slidingWindowRpsObj = eventData.get("slidingWindowRps");
+        if (slidingWindowRpsObj != null) {
+            int slidingRps = ((Number) slidingWindowRpsObj).intValue();
+            if (slidingRps > 0) {
+                return slidingRps;
+            }
+        }
+        
+        Object currentRpsObj = eventData.get("currentRps");
+        if (currentRpsObj != null) {
+            int currentRps = ((Number) currentRpsObj).intValue();
+            if (currentRps > 0) {
+                return currentRps;
+            }
+        }
+        
+        if (requestCount != null && windowSeconds != null && windowSeconds > 0) {
+            int calculatedRps = requestCount / windowSeconds;
+            if (calculatedRps > 0) {
+                return calculatedRps;
+            }
+        }
+        
+        Object attackDurationMsObj = eventData.get("attackDuration");
+        Object requestCountObj = eventData.get("requestCount");
+        if (attackDurationMsObj != null && requestCountObj != null) {
+            long attackDurationMs = ((Number) attackDurationMsObj).longValue();
+            int reqCount = ((Number) requestCountObj).intValue();
+            if (attackDurationMs > 0 && reqCount > 0) {
+                int calculatedRps = (int) (reqCount * 1000 / attackDurationMs);
+                if (calculatedRps > 0) {
+                    return calculatedRps;
+                }
+            }
+        }
+        
+        if (rateLimitCount > 0) {
+            return rateLimitCount;
+        }
+        
+        Object attackCountObj = eventData.get("attackCount");
+        if (attackCountObj != null) {
+            int attackCount = ((Number) attackCountObj).intValue();
+            if (attackCount > 0) {
+                return attackCount;
+            }
+        }
+        
+        return 1;
     }
 }
