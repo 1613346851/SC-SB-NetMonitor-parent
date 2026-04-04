@@ -74,6 +74,32 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
 
             if (currentState == IpAttackStateConstant.COOLDOWN) {
                 if (attackStateCache.isInCooldown(sourceIp)) {
+                    int threshold = getCurrentThreshold(sourceIp);
+                    boolean isRateLimited = isRateLimited(sourceIp, threshold);
+                    
+                    if (isRateLimited) {
+                        int rateLimitTriggerWindowSeconds = configCache.getDdosRateLimitTriggerWindowSeconds();
+                        long windowMs = rateLimitTriggerWindowSeconds * 1000L;
+                        int currentRateLimitCount = attackStateCache.incrementRateLimitCount(sourceIp, windowMs);
+                        
+                        int reattackThreshold = configCache.getStateCooldownToAttackingThresholdRps();
+                        logger.info("COOLDOWN期间限流触发: ip={}, currentRateLimitCount={}, reattackThreshold={}", 
+                                sourceIp, currentRateLimitCount, reattackThreshold);
+                        
+                        if (currentRateLimitCount >= reattackThreshold) {
+                            IpAttackStateCache.StateTransitionResult transitionResult = 
+                                attackStateCache.checkAndTransitionState(sourceIp, currentRateLimitCount, 
+                                    IpAttackStateConstant.SUSPICIOUS_RATE_LIMIT_THRESHOLD, 
+                                    configCache.getDdosRateLimitTriggerCount());
+                            
+                            if (transitionResult.isTransitioned() && transitionResult.getNewState() == IpAttackStateConstant.ATTACKING) {
+                                logger.warn("COOLDOWN期间再次攻击，转换状态: ip={}, newState=ATTACKING", sourceIp);
+                                handleStateTransition(sourceIp, transitionResult, exchange, startTime);
+                                return handleDefendedRequest(exchange, sourceIp, startTime, IpAttackStateConstant.ATTACKING);
+                            }
+                        }
+                    }
+                    
                     logger.debug("IP处于COOLDOWN状态，放行请求: ip={}", sourceIp);
                     return chain.filter(exchange);
                 }

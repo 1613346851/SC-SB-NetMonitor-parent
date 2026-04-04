@@ -198,15 +198,32 @@ public class DefenseCommandController {
         String sourceIp = commandDTO.getSourceIp();
         Long expireTime = commandDTO.getExpireTimestamp();
         String eventId = commandDTO.getEventId();
+        String action = commandDTO.getAction();
+        
+        logger.info("执行防御指令: defenseType={}, sourceIp={}, action={}, expireTime={}", 
+            defenseType, sourceIp, action, expireTime);
 
         boolean success = switch (defenseType) {
             case BLACKLIST -> {
-                boolean added = blacklistFilter.addToBlacklist(sourceIp, expireTime);
-                if (added && eventId != null) {
-                    attackStateCache.markAsDefended(sourceIp, eventId);
-                    logger.info("IP[{}]已标记为DEFENDED状态，eventId={}", sourceIp, eventId);
+                if ("REMOVE".equals(action)) {
+                    logger.info("执行黑名单移除操作: IP={}", sourceIp);
+                    boolean removed = blacklistFilter.removeFromBlacklist(sourceIp);
+                    if (removed) {
+                        attackStateCache.markAsCooldown(sourceIp);
+                        logger.info("IP[{}]已从黑名单移除，状态更新为COOLDOWN", sourceIp);
+                    } else {
+                        logger.warn("IP[{}]从黑名单移除失败，可能不在黑名单中", sourceIp);
+                    }
+                    yield removed;
+                } else {
+                    logger.info("执行黑名单添加操作: IP={}, expireTime={}", sourceIp, expireTime);
+                    boolean added = blacklistFilter.addToBlacklist(sourceIp, expireTime);
+                    if (added && eventId != null) {
+                        attackStateCache.markAsDefended(sourceIp, eventId);
+                        logger.info("IP[{}]已标记为DEFENDED状态，eventId={}", sourceIp, eventId);
+                    }
+                    yield added;
                 }
-                yield added;
             }
             case RATE_LIMIT -> {
                 int threshold = commandDTO.getRateLimitThreshold() != null ?

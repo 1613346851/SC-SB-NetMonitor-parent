@@ -59,6 +59,11 @@ public class DefenseCommandDTO implements Serializable {
     private Integer rateLimitThreshold;
 
     /**
+     * 操作类型（ADD-添加，REMOVE-移除）
+     */
+    private String action;
+
+    /**
      * 防御类型枚举
      */
     public enum DefenseType {

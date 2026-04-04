@@ -88,7 +88,7 @@ public class GatewayConfigCache {
         configCache.put("state.cooldown.base-duration-ms", "180000");
         configCache.put("state.cooldown.max-duration-ms", "600000");
         configCache.put("state.cooldown.attack-intensity-multiplier", "0.5");
-        configCache.put("state.cooldown-to-attacking.threshold-rps", "20");
+        configCache.put("state.cooldown-to-attacking.threshold-rps", "3");
 
         configCache.put("cooldown.dynamic.enabled", "true");
         configCache.put("cooldown.base-duration-ms", "180000");
@@ -425,7 +425,7 @@ public class GatewayConfigCache {
     }
 
     public int getStateCooldownToAttackingThresholdRps() {
-        return getInt("state.cooldown-to-attacking.threshold-rps", 20);
+        return getInt("state.cooldown-to-attacking.threshold-rps", 3);
     }
 
     public boolean isCooldownDynamicEnabled() {

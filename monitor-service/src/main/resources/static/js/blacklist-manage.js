@@ -74,23 +74,22 @@ function initBlacklistTable() {
                 </tr>
                 <tr class="history-row" id="history-${ipId}" style="display: none;">
                     <td colspan="9">
-                        <div class="history-container" style="padding: 10px; background: #f5f5f5; border-radius: 4px;">
-                            <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #666;">封禁历史记录</h4>
-                            <table class="history-table" style="width: 100%; border-collapse: collapse;">
+                        <div class="history-container" style="padding: 16px; background: #fafafa; border-radius: 8px; margin-top: 8px;">
+                            <h4 style="margin: 0 0 12px 0; font-size: 14px; color: #333; font-weight: 600;">封禁历史记录</h4>
+                            <table class="history-table" style="width: 100%; border-collapse: collapse; background: #fff; border-radius: 4px; overflow: hidden;">
                                 <thead>
-                                    <tr style="background: #e0e0e0;">
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">ID</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">拉黑原因</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">封禁时长</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">过期时间</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">状态</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">创建时间</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">操作人</th>
-                                        <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">操作</th>
+                                    <tr style="background: #f5f5f5;">
+                                        <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8e8e8; font-weight: 500; color: #666;">ID</th>
+                                        <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8e8e8; font-weight: 500; color: #666;">拉黑原因</th>
+                                        <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8e8e8; font-weight: 500; color: #666;">封禁时长</th>
+                                        <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8e8e8; font-weight: 500; color: #666;">过期时间</th>
+                                        <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8e8e8; font-weight: 500; color: #666;">状态</th>
+                                        <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8e8e8; font-weight: 500; color: #666;">创建时间</th>
+                                        <th style="padding: 10px 12px; text-align: left; border-bottom: 1px solid #e8e8e8; font-weight: 500; color: #666;">操作人</th>
                                     </tr>
                                 </thead>
                                 <tbody id="history-body-${ipId}">
-                                    <tr><td colspan="8" class="text-center" style="padding: 10px;">加载中...</td></tr>
+                                    <tr><td colspan="7" class="text-center" style="padding: 20px; color: #999;">加载中...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -275,16 +274,13 @@ async function loadHistory(ip) {
         if (historyBody && result.history) {
             historyBody.innerHTML = result.history.map(item => `
                 <tr>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${item.id || '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${CellRenderer.renderText(item.reason)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${CellRenderer.renderText(item.banDurationText, 20) || '永久'}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${item.expireTime ? DateUtil.format(item.expireTime) : '永久'}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${renderBlacklistStatus(item.status)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${item.createTime ? DateUtil.format(item.createTime) : '-'}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">${CellRenderer.renderText(item.operator)}</td>
-                    <td style="padding: 8px; border: 1px solid #ddd;">
-                        <button class="btn btn-danger btn-sm" onclick="deleteSingleHistory('${ip}', ${item.id})">删除</button>
-                    </td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8;">${item.id || '-'}</td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8;">${item.reason || '-'}</td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8;">${item.banDurationText || '永久'}</td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8;">${item.expireTime ? DateUtil.format(item.expireTime) : '永久'}</td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8;">${renderBlacklistStatus(item.status)}</td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8;">${item.createTime ? DateUtil.format(item.createTime) : '-'}</td>
+                    <td style="padding: 10px 12px; border-bottom: 1px solid #e8e8e8;">${item.operator || '-'}</td>
                 </tr>
             `).join('');
         }
@@ -405,13 +401,13 @@ async function unblockIp() {
     const ip = document.getElementById('unblockIpInput').value;
 
     isUnblocking = true;
-    const unblockBtn = document.querySelector('#unblockModal .modal-footer .btn-primary');
+    const unblockBtn = document.querySelector('#unblockModal .modal-footer .btn-warning');
     const originalBtnText = unblockBtn.textContent;
     unblockBtn.textContent = '处理中...';
     unblockBtn.disabled = true;
 
     try {
-        await http.put(`/blacklist/${ip}/unblock`);
+        await http.post(`/blacklist/${ip}/unblock`);
         message.success('解禁成功');
         closeUnblockModal();
         blacklistTable.refresh();

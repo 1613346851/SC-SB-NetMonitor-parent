@@ -398,6 +398,7 @@ public class BlacklistManageServiceImpl implements BlacklistManageService {
             commandDTO.setSourceIp(ip);
             commandDTO.setDefenseType(DefenseCommandDTO.DefenseType.BLACKLIST);
             commandDTO.setRiskLevel(DefenseCommandDTO.RiskLevel.HIGH);
+            commandDTO.setAction(action);
 
             if ("ADD".equals(action)) {
                 BlacklistCache.BlacklistInfo info = blacklistCache.getBlacklistInfo(ip);

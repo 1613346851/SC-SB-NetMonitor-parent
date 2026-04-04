@@ -231,8 +231,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
                 ipBlacklistMapper.updateById(existingEntity);
             }
 
-            Long banDuration = java.time.Duration.between(now, newExpireTime).getSeconds();
-            createHistoryRecord(existingEntity.getId(), null, null, null, "MANUAL", "延长封禁时间", banDuration, newExpireTime, operator);
+            createHistoryRecord(existingEntity.getId(), null, null, null, "MANUAL", "延长封禁时间", extendSeconds, newExpireTime, operator);
             recordDefenseLog("BLOCK_IP", "UPDATE", ip, null, null, null, "延长封禁时间", newExpireTime, 1, "延长成功", operator);
 
             blacklistCache.put(ip, existingEntity);
@@ -385,6 +384,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
             commandDTO.setSourceIp(ip);
             commandDTO.setDefenseType(DefenseCommandDTO.DefenseType.BLACKLIST);
             commandDTO.setRiskLevel(DefenseCommandDTO.RiskLevel.HIGH);
+            commandDTO.setAction(action);
 
             if ("ADD".equals(action)) {
                 IpBlacklistEntity entity = ipBlacklistMapper.selectByIpAddress(ip);

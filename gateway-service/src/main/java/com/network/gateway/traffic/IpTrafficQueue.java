@@ -100,6 +100,14 @@ public class IpTrafficQueue implements Serializable {
             if (currentSlot < slidingWindowCounts.length) {
                 slidingWindowCounts[currentSlot]++;
             }
+            
+            long currentRps = 0;
+            for (long count : slidingWindowCounts) {
+                currentRps += count;
+            }
+            if (currentRps > peakSlidingRps.get()) {
+                peakSlidingRps.set(currentRps);
+            }
         }
     }
 
@@ -107,6 +115,9 @@ public class IpTrafficQueue implements Serializable {
         long total = 0;
         for (long count : slidingWindowCounts) {
             total += count;
+        }
+        if (total > peakSlidingRps.get()) {
+            peakSlidingRps.set(total);
         }
         return total;
     }
