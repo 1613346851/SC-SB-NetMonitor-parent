@@ -27,6 +27,7 @@ public class TrafficSampleDTO implements Serializable {
     private Integer targetPort;
     private String protocol;
     private String userAgent;
+    private Integer sourcePort;
 
     public TrafficSampleDTO() {
     }
@@ -49,5 +50,6 @@ public class TrafficSampleDTO implements Serializable {
         this.targetPort = sample.getTargetPort();
         this.protocol = sample.getProtocol();
         this.userAgent = sample.getUserAgent();
+        this.sourcePort = sample.getSourcePort();
     }
 }

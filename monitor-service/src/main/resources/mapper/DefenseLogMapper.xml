@@ -174,4 +174,49 @@
         FROM sys_defense_log
         WHERE event_id = #{eventId}
     </select>
+
+    <select id="selectByDefenseTarget" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_log
+        WHERE defense_target = #{defenseTarget}
+        <if test="startTime != null">
+            AND execute_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND execute_time &lt;= #{endTime}
+        </if>
+        <choose>
+            <when test="sortField != null and sortField != ''">
+                ORDER BY ${sortField}
+                <if test="sortOrder != null and sortOrder != ''">
+                    ${sortOrder}
+                </if>
+            </when>
+            <otherwise>
+                ORDER BY execute_time DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByDefenseTarget" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_defense_log
+        WHERE defense_target = #{defenseTarget}
+        <if test="startTime != null">
+            AND execute_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND execute_time &lt;= #{endTime}
+        </if>
+    </select>
+
+    <select id="countBlocksByIp" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_defense_log
+        WHERE defense_target = #{defenseTarget}
+          AND defense_type = 'BLOCK_IP'
+          AND defense_action = 'ADD'
+          AND execute_status = 1
+    </select>
 </mapper>

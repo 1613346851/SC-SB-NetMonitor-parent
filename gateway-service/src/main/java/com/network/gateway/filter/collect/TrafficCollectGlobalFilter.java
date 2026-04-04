@@ -181,6 +181,7 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         sample.setTargetPort(rawTraffic.getTargetPort());
         sample.setProtocol(rawTraffic.getProtocol());
         sample.setUserAgent(rawTraffic.getUserAgent());
+        sample.setSourcePort(rawTraffic.getSourcePort());
         
         if (eventId != null && !eventId.isEmpty()) {
             sample.setEventId(eventId);

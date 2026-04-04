@@ -110,7 +110,7 @@ function getConfidenceBadge(confidence) {
 }
 
 function viewEventDetail(eventId) {
-    window.location.href = `/attack-event?eventId=${eventId}`;
+    window.location.href = `/event?eventId=${eventId}`;
 }
 
 function searchTraffic() {

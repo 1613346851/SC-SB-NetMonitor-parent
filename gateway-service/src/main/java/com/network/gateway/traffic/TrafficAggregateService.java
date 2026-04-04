@@ -246,6 +246,9 @@ public class TrafficAggregateService {
             dto.setEventId(entry.getEventId());
         }
         
+        dto.setStartTime(formatTime(new Date(entry.getFirstTimestamp())));
+        dto.setEndTime(formatTime(new Date(entry.getLastTimestamp())));
+        
         List<UriGroupStats> uriGroups = new ArrayList<>();
         UriGroupStats uriGroup = new UriGroupStats();
         uriGroup.setUriPattern(entry.getUriPattern());
@@ -255,6 +258,8 @@ public class TrafficAggregateService {
         uriGroup.setTargetPort(entry.getTargetPort());
         uriGroup.setProtocol(entry.getProtocol());
         uriGroup.setUserAgent(entry.getUserAgent());
+        uriGroup.setSourcePort(entry.getSourcePort());
+        uriGroup.setHeaders(entry.getHeaders());
         uriGroup.setCount(entry.getCount());
         uriGroup.setErrorCount(entry.getErrorCount());
         uriGroup.setAvgProcessingTime(entry.getAvgProcessingTime());
@@ -393,9 +398,13 @@ public class TrafficAggregateService {
         private final String userAgent;
         private final TrafficSample firstSample;
         private final String eventId;
+        private final Integer sourcePort;
+        private final Map<String, String> headers;
+        private final long firstTimestamp;
         private final AtomicInteger count = new AtomicInteger(0);
         private final AtomicInteger errorCount = new AtomicInteger(0);
         private final AtomicLong totalProcessingTime = new AtomicLong(0);
+        private final AtomicLong lastTimestamp = new AtomicLong(0);
         
         public TrafficAggregateEntry(TrafficSample sample) {
             this.uriPattern = sample.getRequestUri();
@@ -407,6 +416,10 @@ public class TrafficAggregateService {
             this.userAgent = sample.getUserAgent();
             this.firstSample = sample;
             this.eventId = sample.getEventId();
+            this.sourcePort = sample.getSourcePort();
+            this.headers = sample.getHeaders();
+            this.firstTimestamp = sample.getTimestamp();
+            this.lastTimestamp.set(sample.getTimestamp());
         }
         
         public void increment(TrafficSample sample) {
@@ -415,6 +428,7 @@ public class TrafficAggregateService {
                 errorCount.incrementAndGet();
             }
             totalProcessingTime.addAndGet(sample.getProcessingTime());
+            lastTimestamp.set(sample.getTimestamp());
         }
         
         public String getUriPattern() { return uriPattern; }
@@ -426,6 +440,10 @@ public class TrafficAggregateService {
         public String getUserAgent() { return userAgent; }
         public TrafficSample getFirstSample() { return firstSample; }
         public String getEventId() { return eventId; }
+        public Integer getSourcePort() { return sourcePort; }
+        public Map<String, String> getHeaders() { return headers; }
+        public long getFirstTimestamp() { return firstTimestamp; }
+        public long getLastTimestamp() { return lastTimestamp.get(); }
         public int getCount() { return count.get(); }
         public int getErrorCount() { return errorCount.get(); }
         public long getAvgProcessingTime() {

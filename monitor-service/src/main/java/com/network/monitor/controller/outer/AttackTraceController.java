@@ -67,16 +67,9 @@ public class AttackTraceController {
     @GetMapping("/chain/{ip}")
     public ApiResponse<AttackChainDTO> getAttackChain(
             @PathVariable String ip,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
-            @RequestParam(required = false, defaultValue = "24") Integer hours) {
+            @RequestParam(required = false, defaultValue = "50") Integer limit) {
         try {
-            AttackChainDTO chain;
-            if (startTime != null && endTime != null) {
-                chain = ipProfileService.getAttackChain(ip, startTime, endTime);
-            } else {
-                chain = ipProfileService.getRecentAttackChain(ip, hours);
-            }
+            AttackChainDTO chain = ipProfileService.getRecentAttackChain(ip, limit);
             return ApiResponse.success(chain);
         } catch (Exception e) {
             log.error("获取攻击链失败: ip={}", ip, e);

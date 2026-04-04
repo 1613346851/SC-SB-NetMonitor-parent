@@ -3,6 +3,7 @@ package com.network.gateway.traffic;
 import lombok.Data;
 
 import java.io.Serializable;
+import java.util.Map;
 
 @Data
 public class UriGroupStats implements Serializable {
@@ -16,6 +17,8 @@ public class UriGroupStats implements Serializable {
     private Integer targetPort;
     private String protocol;
     private String userAgent;
+    private Integer sourcePort;
+    private Map<String, String> headers;
     private int count;
     private int errorCount;
     private int blockedCount;

@@ -160,8 +160,8 @@ public class IpProfileServiceImpl implements IpProfileService {
     public AttackChainDTO getAttackChain(String ip, LocalDateTime startTime, LocalDateTime endTime) {
         List<AttackChainDTO.TimelineEvent> timeline = new ArrayList<>();
 
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-                null, null, null, ip, null, startTime, endTime, 0, 100, "create_time DESC"
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectBySourceIp(
+                ip, startTime, endTime, 0, 100, "create_time DESC"
         );
 
         for (AttackMonitorEntity attack : attacks) {
@@ -177,8 +177,8 @@ public class IpProfileServiceImpl implements IpProfileService {
                     .build());
         }
 
-        List<DefenseLogEntity> defenses = defenseLogMapper.selectByCondition(
-                null, null, ip, null, startTime, endTime, 0, 100, "create_time", "DESC"
+        List<DefenseLogEntity> defenses = defenseLogMapper.selectByDefenseTarget(
+                ip, startTime, endTime, 0, 100, "create_time", "DESC"
         );
 
         for (DefenseLogEntity defense : defenses) {
@@ -209,18 +209,63 @@ public class IpProfileServiceImpl implements IpProfileService {
     }
 
     @Override
-    public AttackChainDTO getRecentAttackChain(String ip, int hours) {
-        LocalDateTime endTime = LocalDateTime.now();
-        LocalDateTime startTime = endTime.minusHours(hours);
-        return getAttackChain(ip, startTime, endTime);
+    public AttackChainDTO getRecentAttackChain(String ip, int limit) {
+        List<AttackChainDTO.TimelineEvent> timeline = new ArrayList<>();
+
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectBySourceIp(
+                ip, null, null, 0, limit, "create_time DESC"
+        );
+
+        for (AttackMonitorEntity attack : attacks) {
+            timeline.add(AttackChainDTO.TimelineEvent.builder()
+                    .time(attack.getCreateTime())
+                    .eventType("ATTACK")
+                    .eventTypeName("攻击事件")
+                    .title(getAttackTitle(attack))
+                    .description(buildAttackDescription(attack))
+                    .severity(attack.getRiskLevel())
+                    .attackType(attack.getAttackType())
+                    .eventId(attack.getId())
+                    .build());
+        }
+
+        List<DefenseLogEntity> defenses = defenseLogMapper.selectByDefenseTarget(
+                ip, null, null, 0, limit, "create_time", "DESC"
+        );
+
+        for (DefenseLogEntity defense : defenses) {
+            timeline.add(AttackChainDTO.TimelineEvent.builder()
+                    .time(defense.getCreateTime())
+                    .eventType("DEFENSE")
+                    .eventTypeName("防御动作")
+                    .title(getDefenseTitle(defense))
+                    .description(buildDefenseDescription(defense))
+                    .severity("INFO")
+                    .defenseAction(defense.getDefenseType())
+                    .eventId(defense.getId())
+                    .build());
+        }
+
+        timeline.sort(Comparator.comparing(AttackChainDTO.TimelineEvent::getTime).reversed());
+
+        List<AttackChainDTO.TimelineEvent> limitedTimeline = timeline.size() > limit 
+                ? timeline.subList(0, limit) 
+                : timeline;
+
+        return AttackChainDTO.builder()
+                .ip(ip)
+                .totalEvents(limitedTimeline.size())
+                .timeline(limitedTimeline)
+                .build();
     }
 
     private Long countAttacksByIp(String ip) {
-        return attackMonitorMapper.countByCondition(null, null, null, ip, null, null, null);
+        return attackMonitorMapper.countBySourceIp(ip, null, null);
     }
 
     private Long countBlocksByIp(String ip) {
-        return defenseLogMapper.countByCondition(null, "BLACKLIST", ip, null, null, null);
+        Long blockCount = defenseLogMapper.countBlocksByIp(ip);
+        return blockCount != null ? blockCount : 0;
     }
 
     private Long countRequestsByIp(String ip) {
@@ -231,8 +276,8 @@ public class IpProfileServiceImpl implements IpProfileService {
         LocalDateTime firstAttack = null;
         LocalDateTime firstTraffic = null;
 
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-                null, null, null, ip, null, null, null, 0, 1, "create_time ASC"
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectBySourceIp(
+                ip, null, null, 0, 1, "create_time ASC"
         );
         if (!attacks.isEmpty()) {
             firstAttack = attacks.get(0).getCreateTime();
@@ -258,8 +303,8 @@ public class IpProfileServiceImpl implements IpProfileService {
         LocalDateTime lastAttack = null;
         LocalDateTime lastTraffic = null;
 
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-                null, null, null, ip, null, null, null, 0, 1, "create_time DESC"
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectBySourceIp(
+                ip, null, null, 0, 1, "create_time DESC"
         );
         if (!attacks.isEmpty()) {
             lastAttack = attacks.get(0).getCreateTime();
@@ -287,8 +332,8 @@ public class IpProfileServiceImpl implements IpProfileService {
     }
 
     private List<IpProfileDTO.AttackTypeStats> getAttackTypeStats(String ip) {
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-                null, null, null, ip, null, null, null, 0, 1000, null
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectBySourceIp(
+                ip, null, null, 0, 1000, null
         );
 
         Map<String, Long> typeCount = attacks.stream()
@@ -315,8 +360,8 @@ public class IpProfileServiceImpl implements IpProfileService {
     }
 
     private List<IpProfileDTO.HourlyStats> getHourlyStats(String ip) {
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-                null, null, null, ip, null, null, null, 0, 10000, null
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectBySourceIp(
+                ip, null, null, 0, 10000, null
         );
 
         Map<Integer, Long> hourCount = attacks.stream()
@@ -339,8 +384,8 @@ public class IpProfileServiceImpl implements IpProfileService {
         LocalDateTime endTime = LocalDateTime.now();
         LocalDateTime startTime = endTime.minusDays(days);
 
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-                null, null, null, ip, null, startTime, endTime, 0, 10000, null
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectBySourceIp(
+                ip, startTime, endTime, 0, 10000, null
         );
 
         List<TrafficMonitorEntity> traffic = trafficMonitorMapper.selectByCondition(
@@ -373,8 +418,8 @@ public class IpProfileServiceImpl implements IpProfileService {
     }
 
     private AttackMonitorEntity findLastAttack(String ip) {
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-                null, null, null, ip, null, null, null, 0, 1, "create_time DESC"
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectBySourceIp(
+                ip, null, null, 0, 1, "create_time DESC"
         );
         return attacks.isEmpty() ? null : attacks.get(0);
     }
@@ -385,11 +430,20 @@ public class IpProfileServiceImpl implements IpProfileService {
             return "已封禁";
         }
 
+        AttackEventEntity ongoingEvent = attackEventMapper.selectOngoingEventByIp(ip);
+        if (ongoingEvent != null) {
+            return "攻击中";
+        }
+
         AttackMonitorEntity lastAttack = findLastAttack(ip);
         if (lastAttack != null) {
             LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
             if (lastAttack.getCreateTime().isAfter(oneHourAgo)) {
                 return "活跃";
+            }
+            LocalDateTime sixHoursAgo = LocalDateTime.now().minusHours(6);
+            if (lastAttack.getCreateTime().isAfter(sixHoursAgo)) {
+                return "冷却中";
             }
         }
 
@@ -399,7 +453,12 @@ public class IpProfileServiceImpl implements IpProfileService {
     private Integer getCurrentState(String ip) {
         IpBlacklistEntity blacklist = findActiveBlacklist(ip);
         if (blacklist != null) {
-            return 4;
+            return 3;
+        }
+
+        AttackEventEntity ongoingEvent = attackEventMapper.selectOngoingEventByIp(ip);
+        if (ongoingEvent != null) {
+            return 2;
         }
 
         AttackMonitorEntity lastAttack = findLastAttack(ip);
@@ -410,7 +469,7 @@ public class IpProfileServiceImpl implements IpProfileService {
             }
             LocalDateTime sixHoursAgo = LocalDateTime.now().minusHours(6);
             if (lastAttack.getCreateTime().isAfter(sixHoursAgo)) {
-                return 5;
+                return 4;
             }
         }
 

@@ -44,6 +44,8 @@ public class TrafficAggregateDTO implements Serializable {
         private Integer targetPort;
         private String protocol;
         private String userAgent;
+        private Integer sourcePort;
+        private Map<String, String> headers;
         private int count;
         private int errorCount;
         private long avgProcessingTime;

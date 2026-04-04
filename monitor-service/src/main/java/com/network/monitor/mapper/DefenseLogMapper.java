@@ -52,6 +52,26 @@ public interface DefenseLogMapper {
 
     int countByEventId(@Param("eventId") String eventId);
 
+    List<DefenseLogEntity> selectByDefenseTarget(
+            @Param("defenseTarget") String defenseTarget,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("offset") Integer offset,
+            @Param("limit") Integer limit,
+            @Param("sortField") String sortField,
+            @Param("sortOrder") String sortOrder
+    );
+
+    long countByDefenseTarget(
+            @Param("defenseTarget") String defenseTarget,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
+
+    long countBlocksByIp(
+            @Param("defenseTarget") String defenseTarget
+    );
+
     class TrendStat {
         private LocalDateTime time;
         private Long count;

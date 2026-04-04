@@ -182,6 +182,27 @@ public interface AttackMonitorMapper {
                                      @Param("endTime") LocalDateTime endTime);
 
     /**
+     * 根据源IP精确查询攻击记录（用于IP画像）
+     */
+    List<AttackMonitorEntity> selectBySourceIp(
+            @Param("sourceIp") String sourceIp,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("offset") Integer offset,
+            @Param("limit") Integer limit,
+            @Param("orderBy") String orderBy
+    );
+
+    /**
+     * 根据源IP精确统计攻击数量
+     */
+    long countBySourceIp(
+            @Param("sourceIp") String sourceIp,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
+
+    /**
      * 攻击趋势统计实体
      */
     class TrendStat {

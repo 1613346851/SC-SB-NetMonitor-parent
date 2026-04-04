@@ -202,12 +202,14 @@ public class TrafficReceiveController {
         dto.setSourceIp(aggregate.getIp());
         dto.setTargetIp(uriGroup.getTargetIp() != null ? uriGroup.getTargetIp() : "0.0.0.0");
         dto.setTargetPort(uriGroup.getTargetPort());
+        dto.setSourcePort(uriGroup.getSourcePort());
         dto.setProtocol(uriGroup.getProtocol());
         dto.setUserAgent(uriGroup.getUserAgent());
         dto.setRequestUri(uriGroup.getUriPattern());
         dto.setHttpMethod(uriGroup.getHttpMethod());
         dto.setStateTag(aggregate.getStateName());
         dto.setStateValue(aggregate.getState());
+        dto.setRequestHeaders(uriGroup.getHeaders());
         
         if (aggregate.getEventId() != null && !aggregate.getEventId().isEmpty()) {
             dto.setEventId(aggregate.getEventId());

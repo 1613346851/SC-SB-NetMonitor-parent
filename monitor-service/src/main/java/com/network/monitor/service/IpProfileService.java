@@ -15,5 +15,5 @@ public interface IpProfileService {
 
     AttackChainDTO getAttackChain(String ip, LocalDateTime startTime, LocalDateTime endTime);
 
-    AttackChainDTO getRecentAttackChain(String ip, int hours);
+    AttackChainDTO getRecentAttackChain(String ip, int limit);
 }

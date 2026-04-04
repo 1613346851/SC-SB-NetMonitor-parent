@@ -32,6 +32,7 @@ public class TrafficSample implements Serializable {
     private Integer targetPort;
     private String protocol;
     private String userAgent;
+    private Integer sourcePort;
 
     public TrafficSample() {
         this.timestamp = System.currentTimeMillis();

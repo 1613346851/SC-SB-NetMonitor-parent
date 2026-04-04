@@ -60,7 +60,7 @@ public class DDoSAttackEventDTO implements Serializable {
             return "CRITICAL";
         } else if (confidence >= 65) {
             return "HIGH";
-        } else if (confidence >= 30) {
+        } else if (confidence >= 50) {
             return "MEDIUM";
         } else {
             return "LOW";
