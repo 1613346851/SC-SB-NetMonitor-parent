@@ -82,7 +82,8 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
 
             attackStateCache.incrementRequestCount(sourceIp);
             
-            logger.debug("开始采集流量：{}", rawTraffic.getTrafficSummary());
+            logger.debug("开始采集流量：请求[{}] {} {} 来自IP[{}]", 
+                requestId, rawTraffic.getMethod(), rawTraffic.getUri(), sourceIp);
 
             return handleTraffic(exchange, chain, rawTraffic, sourceIp, startTime);
 
@@ -132,11 +133,6 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
             doRealtimePush(rawTraffic, sourceIp, finalState, finalEventId, statusCode, endTime - startTime);
         } else if (finalStrategy == TrafficPushStrategy.AGGREGATE) {
             doAggregatePush(rawTraffic, sourceIp, finalState, finalEventId, confidence, statusCode, endTime - startTime);
-        } else if (finalStrategy == TrafficPushStrategy.SAMPLING) {
-            int samplingRate = configCache.getTrafficPushSamplingRate();
-            if (shouldSample(samplingRate)) {
-                doRealtimePush(rawTraffic, sourceIp, finalState, finalEventId, statusCode, endTime - startTime);
-            }
         }
     }
 
@@ -194,13 +190,6 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
             IpAttackStateConstant.getStateNameZh(state), statusCode);
     }
 
-    private boolean shouldSample(int samplingRate) {
-        if (samplingRate <= 1) {
-            return true;
-        }
-        return (System.currentTimeMillis() % samplingRate) == 0;
-    }
-
     private TrafficPushStrategy getPushStrategy(int state) {
         switch (state) {
             case IpAttackStateConstant.NORMAL:
@@ -209,10 +198,8 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
             case IpAttackStateConstant.SUSPICIOUS:
             case IpAttackStateConstant.ATTACKING:
             case IpAttackStateConstant.DEFENDED:
-                return TrafficPushStrategy.AGGREGATE;
-            
             case IpAttackStateConstant.COOLDOWN:
-                return TrafficPushStrategy.SAMPLING;
+                return TrafficPushStrategy.AGGREGATE;
             
             default:
                 return TrafficPushStrategy.REALTIME;

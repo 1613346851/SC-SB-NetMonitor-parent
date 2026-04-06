@@ -548,10 +548,12 @@
             const card = document.createElement('div');
             const levelClass = this._getLevelClass(alert.alertLevel);
             const levelText = this._getLevelText(alert.alertLevel);
+            const isPotentialFalsePositive = this._checkPotentialFalsePositive(alert.alertContent);
             card.className = `alert-notification-card ${levelClass}`;
             card.dataset.alertId = alert.alertId;
             
             const time = alert.createTime ? this._formatTime(alert.createTime) : '刚刚';
+            const falsePositiveBadge = isPotentialFalsePositive ? '<span style="margin-left: 5px; color: #856404; font-size: 11px;">⚠️ 可能误报</span>' : '';
             
             card.innerHTML = `
                 <div class="alert-notification-header">
@@ -560,11 +562,12 @@
                             <path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
                         </svg>
                     </div>
-                    <span class="alert-notification-level">${levelText}</span>
+                    <span class="alert-notification-level">${levelText}${falsePositiveBadge}</span>
                     <span class="alert-notification-time">${time}</span>
                 </div>
                 <div class="alert-notification-title">${this._escapeHtml(alert.alertTitle || '安全告警')}</div>
                 <div class="alert-notification-content">${this._escapeHtml(alert.alertContent || '')}</div>
+                ${isPotentialFalsePositive ? '<div style="background-color: #fff3cd; color: #856404; padding: 5px 8px; border-radius: 4px; font-size: 12px; margin: 5px 0;">⚠️ 此告警可能是误报或低风险漏洞，建议人工确认</div>' : ''}
                 <div class="alert-notification-meta">
                     <span>来源: ${this._escapeHtml(alert.sourceIp || '-')}</span>
                     <span>类型: ${this._getAttackTypeText(alert.attackType)}</span>
@@ -619,27 +622,49 @@
             };
             return typeMap[type] || type;
         },
+        
+        _checkPotentialFalsePositive(content) {
+            if (!content) return false;
+            return content.includes('[URL路径中的命令关键字，可能是误报或低风险漏洞]');
+        },
 
         _handleAction(alert, action, card) {
-            card.classList.add('removing');
-            
-            setTimeout(() => {
-                card.remove();
+            if (action === 'handle') {
                 this._alerts = this._alerts.filter(a => a.alertId !== alert.alertId);
                 this._savePendingAlerts();
-                this._updateBadge();
                 
-                if (this._alerts.length === 0) {
-                    this._isCollapsed = false;
-                    this._container.classList.remove('collapsed');
-                    this._saveState();
-                    this._container.classList.add('hidden');
-                    this._isVisible = false;
-                }
-            }, 300);
-            
-            if (action === 'handle') {
-                window.location.href = '/alert?alertId=' + alert.id;
+                card.classList.add('removing');
+                setTimeout(() => {
+                    card.remove();
+                    this._updateBadge();
+                    
+                    if (this._alerts.length === 0) {
+                        this._isCollapsed = false;
+                        this._container.classList.remove('collapsed');
+                        this._saveState();
+                        this._container.classList.add('hidden');
+                        this._isVisible = false;
+                    }
+                    
+                    window.location.href = '/alert?alertId=' + alert.id;
+                }, 300);
+            } else {
+                card.classList.add('removing');
+                
+                setTimeout(() => {
+                    card.remove();
+                    this._alerts = this._alerts.filter(a => a.alertId !== alert.alertId);
+                    this._savePendingAlerts();
+                    this._updateBadge();
+                    
+                    if (this._alerts.length === 0) {
+                        this._isCollapsed = false;
+                        this._container.classList.remove('collapsed');
+                        this._saveState();
+                        this._container.classList.add('hidden');
+                        this._isVisible = false;
+                    }
+                }, 300);
             }
         },
 

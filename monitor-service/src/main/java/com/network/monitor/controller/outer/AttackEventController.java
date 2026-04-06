@@ -142,6 +142,19 @@ public class AttackEventController {
         }
     }
 
+    @GetMapping("/trend")
+    public ApiResponse<List<Map<String, Object>>> getEventTrend(
+            @RequestParam(defaultValue = "24h") String timeRange,
+            @RequestParam(defaultValue = "1h") String interval) {
+        try {
+            List<Map<String, Object>> trend = attackEventService.getEventTrend(timeRange, interval);
+            return ApiResponse.success(trend);
+        } catch (Exception e) {
+            log.error("查询事件趋势失败：", e);
+            return ApiResponse.error("查询失败");
+        }
+    }
+
     @PutMapping("/{id}/end")
     public ApiResponse<Void> markEventAsEnded(@PathVariable Long id) {
         try {

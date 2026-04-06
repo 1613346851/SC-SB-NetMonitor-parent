@@ -25,6 +25,10 @@ public class AlertDTO {
     private String notifyChannels;
 
     public static AlertDTO fromAttack(Long attackId, String eventId, String sourceIp, String attackType, String riskLevel) {
+        return fromAttack(attackId, eventId, sourceIp, attackType, riskLevel, null);
+    }
+    
+    public static AlertDTO fromAttack(Long attackId, String eventId, String sourceIp, String attackType, String riskLevel, String attackContent) {
         AlertDTO dto = new AlertDTO();
         dto.setAttackId(attackId);
         dto.setEventId(eventId);
@@ -32,7 +36,7 @@ public class AlertDTO {
         dto.setAttackType(attackType);
         dto.setAlertLevel(mapRiskToAlertLevel(riskLevel));
         dto.setAlertTitle(buildAlertTitle(attackType, sourceIp));
-        dto.setAlertContent(buildAlertContent(attackType, sourceIp, riskLevel));
+        dto.setAlertContent(buildAlertContent(attackType, sourceIp, riskLevel, attackContent));
         return dto;
     }
 
@@ -59,10 +63,17 @@ public class AlertDTO {
         return String.format("检测到%s攻击 - 来源IP: %s", attackTypeName, sourceIp);
     }
 
-    private static String buildAlertContent(String attackType, String sourceIp, String riskLevel) {
+    private static String buildAlertContent(String attackType, String sourceIp, String riskLevel, String attackContent) {
         String attackTypeName = getAttackTypeName(attackType);
-        return String.format("检测到%s攻击\n来源IP: %s\n风险等级: %s\n请及时处理。", 
-            attackTypeName, sourceIp, riskLevel);
+        StringBuilder content = new StringBuilder();
+        content.append("检测到").append(attackTypeName).append("攻击\n");
+        content.append("来源IP: ").append(sourceIp).append("\n");
+        content.append("风险等级: ").append(riskLevel).append("\n");
+        if (attackContent != null && !attackContent.isEmpty()) {
+            content.append("攻击内容: ").append(attackContent).append("\n");
+        }
+        content.append("请及时处理。");
+        return content.toString();
     }
 
     private static String getAttackTypeName(String attackType) {

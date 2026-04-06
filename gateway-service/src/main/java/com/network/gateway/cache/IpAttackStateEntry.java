@@ -44,6 +44,7 @@ public class IpAttackStateEntry implements Serializable {
     private long attackStartTime;
     private int attackRequestCount;
     private String transitionReason;
+    private int peakRps;
 
     private static final int MAX_SAMPLE_SIZE = 5;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -242,6 +243,7 @@ public class IpAttackStateEntry implements Serializable {
         this.attackStartTime = System.currentTimeMillis();
         this.attackRequestCount = 0;
         this.uniqueUris.clear();
+        this.peakRps = 0;
     }
 
     public void incrementAttackRequestCount() {

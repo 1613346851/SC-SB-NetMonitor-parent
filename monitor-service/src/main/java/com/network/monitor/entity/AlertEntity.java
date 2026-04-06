@@ -85,11 +85,11 @@ public class AlertEntity {
             case "CRITICAL":
                 return "严重";
             case "HIGH":
-                return "高危";
+                return "高风险";
             case "MEDIUM":
-                return "中危";
+                return "中风险";
             case "LOW":
-                return "低危";
+                return "低风险";
             default:
                 return this.alertLevel;
         }

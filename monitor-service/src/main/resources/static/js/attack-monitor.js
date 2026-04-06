@@ -176,6 +176,16 @@ async function viewAttackDetail(id) {
             ? `<a href="/event?id=${detail.eventId}" class="event-link">${detail.eventId}</a>`
             : '-';
         
+        const isPotentialFalsePositive = detail.attackContent && detail.attackContent.includes('[URL路径中的命令关键字，可能是误报或低风险漏洞]');
+        const falsePositiveBadge = isPotentialFalsePositive 
+            ? ' <span class="tag warning" style="margin-left: 5px;" title="此攻击可能是误报">⚠️ 可能误报</span>' 
+            : '';
+        const falsePositiveHint = isPotentialFalsePositive 
+            ? `<div style="background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin-top: 16px;">
+                <strong>⚠️ 提示：</strong>此攻击记录可能是误报或低风险漏洞，建议人工确认后再处理。
+               </div>` 
+            : '';
+        
         const content = document.getElementById('attackDetailContent');
         content.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -186,7 +196,7 @@ async function viewAttackDetail(id) {
                     <p><strong>源 IP:</strong> ${detail.sourceIp}</p>
                     <p><strong>目标 URI:</strong> ${detail.targetUri || '-'}</p>
                     <p><strong>攻击类型:</strong> ${tableRenderer.renderAttackType(detail.attackType)}</p>
-                    <p><strong>风险等级:</strong> ${tableRenderer.renderRiskLevel(detail.riskLevel)}</p>
+                    <p><strong>风险等级:</strong> ${tableRenderer.renderRiskLevel(detail.riskLevel)}${falsePositiveBadge}</p>
                 </div>
                 <div>
                     <p><strong>置信度:</strong> ${detail.confidence ? detail.confidence + '%' : '-'}</p>
@@ -197,6 +207,7 @@ async function viewAttackDetail(id) {
                     <p><strong>处理备注:</strong> ${detail.handleRemark || '-'}</p>
                 </div>
             </div>
+            ${falsePositiveHint}
             <div class="mt-24">
                 <p><strong>攻击内容:</strong></p>
                 <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto;">${detail.attackContent || '-'}</pre>

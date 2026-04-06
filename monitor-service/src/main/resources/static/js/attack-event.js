@@ -7,6 +7,7 @@ let eventTable;
 let currentEventId = null;
 let attackTypeChart = null;
 let riskLevelChart = null;
+let eventTrendChart = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
@@ -20,12 +21,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     initEventTable();
     loadEventStatistics();
-    loadCharts();
+    
+    initChartsWhenReady();
     
     setInterval(() => {
         loadEventStatistics();
     }, 10000);
 });
+
+async function initChartsWhenReady() {
+    if (typeof ResourceLoader !== 'undefined') {
+        await ResourceLoader.loadEcharts();
+    }
+    loadCharts();
+    loadEventTrendChart();
+}
 
 function initEventTable() {
     eventTable = TableUtils.createInstance({
@@ -290,6 +300,140 @@ function renderRiskLevelChart(riskStats) {
     };
     
     chart.setOption(option, { notMerge: true });
+}
+
+function onEventTrendTimeRangeChange() {
+    const timeRange = document.getElementById('eventTrendTimeRange').value;
+    
+    const recommendations = {
+        '1h': { interval: '5m', display: '5 分钟' },
+        '6h': { interval: '10m', display: '10 分钟' },
+        '12h': { interval: '30m', display: '30 分钟' },
+        '24h': { interval: '1h', display: '1 小时' },
+        '3d': { interval: '1h', display: '1 小时' },
+        '7d': { interval: '1h', display: '1 小时' },
+        '14d': { interval: '1d', display: '1 天' },
+        '30d': { interval: '1d', display: '1 天' }
+    };
+    
+    const recommended = recommendations[timeRange] || { interval: '1h', display: '1 小时' };
+    
+    const intervalDisplay = document.getElementById('eventTrendIntervalDisplay');
+    if (intervalDisplay) {
+        intervalDisplay.textContent = `统计精度：${recommended.display}`;
+    }
+    
+    loadEventTrendChart();
+}
+
+function getEventTrendAutoInterval(timeRange) {
+    const recommendations = {
+        '1h': '5m',
+        '6h': '10m',
+        '12h': '30m',
+        '24h': '1h',
+        '3d': '1h',
+        '7d': '1h',
+        '14d': '1d',
+        '30d': '1d'
+    };
+    
+    return recommendations[timeRange] || '1h';
+}
+
+async function loadEventTrendChart() {
+    try {
+        const timeRangeSelect = document.getElementById('eventTrendTimeRange');
+        const timeRange = timeRangeSelect?.value || '24h';
+        const interval = getEventTrendAutoInterval(timeRange);
+        
+        const chartDom = document.getElementById('eventTrendChart');
+        if (!chartDom) return;
+        
+        const chart = chartHelper.init('eventTrendChart');
+        if (!chart) return;
+        
+        const trendData = await http.get(`/event/trend?timeRange=${timeRange}&interval=${interval}`);
+        
+        const dates = trendData.map(item => item.time);
+        const counts = trendData.map(item => item.count);
+        
+        const option = {
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'cross'
+                }
+            },
+            xAxis: {
+                type: 'category',
+                data: dates,
+                boundaryGap: false,
+                axisLabel: {
+                    rotate: dates.length > 10 ? 45 : 0,
+                    interval: calculateXAxisInterval(dates.length)
+                }
+            },
+            yAxis: {
+                type: 'value',
+                minInterval: 1
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: dates.length > 10 ? '15%' : '10%',
+                containLabel: true
+            },
+            series: [{
+                name: '攻击事件数',
+                type: 'line',
+                smooth: true,
+                data: counts,
+                areaStyle: {
+                    color: {
+                        type: 'linear',
+                        x: 0,
+                        y: 0,
+                        x2: 0,
+                        y2: 1,
+                        colorStops: [
+                            { offset: 0, color: 'rgba(239, 68, 68, 0.3)' },
+                            { offset: 1, color: 'rgba(239, 68, 68, 0.05)' }
+                        ]
+                    }
+                },
+                lineStyle: {
+                    color: '#ef4444',
+                    width: 2
+                },
+                itemStyle: {
+                    color: '#ef4444'
+                }
+            }]
+        };
+        
+        chart.setOption(option, { notMerge: true });
+        
+        window.addEventListener('resize', () => {
+            chart.resize();
+        });
+    } catch (error) {
+        console.error('加载事件趋势图失败:', error);
+    }
+}
+
+function calculateXAxisInterval(dataLength) {
+    if (dataLength <= 7) {
+        return 0;
+    } else if (dataLength <= 14) {
+        return 1;
+    } else if (dataLength <= 30) {
+        return Math.floor(dataLength / 10);
+    } else if (dataLength <= 100) {
+        return Math.floor(dataLength / 15);
+    } else {
+        return Math.floor(dataLength / 20);
+    }
 }
 
 async function loadEventDetail(eventId) {

@@ -51,8 +51,6 @@ public class TrafficPushStrategyManager {
                 sb.append("  计数推送: ").append(((CounterOnlyPushHandler) entry.getValue()).getStats()).append("\n");
             } else if (entry.getValue() instanceof AggregatePushHandler) {
                 sb.append("  聚合推送: ").append(((AggregatePushHandler) entry.getValue()).getStats()).append("\n");
-            } else if (entry.getValue() instanceof SamplingPushHandler) {
-                sb.append("  采样推送: ").append(((SamplingPushHandler) entry.getValue()).getStats()).append("\n");
             }
         }
         return sb.toString();

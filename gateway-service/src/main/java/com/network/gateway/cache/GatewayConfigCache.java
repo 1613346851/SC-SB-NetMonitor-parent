@@ -70,7 +70,6 @@ public class GatewayConfigCache {
         configCache.put("traffic.push.defended.strategy", "aggregate");
         configCache.put("traffic.push.cooldown.strategy", "aggregate");
         configCache.put("traffic.push.batch-interval-ms", "3000");
-        configCache.put("traffic.push.sampling-rate", "10");
         configCache.put("traffic.push.enabled", "true");
 
         configCache.put("ddos.threshold", "50");
@@ -345,10 +344,6 @@ public class GatewayConfigCache {
     public List<String> getMaliciousUriPatterns() {
         return getList("gateway.defense.malicious.uri-patterns",
                 "/admin,/manager,/console,/wp-admin,/phpmyadmin,/mysql,/dbadmin,/webdav,/.git/config,/.env,/config/database.yml,/backup,/dump,/export,/download");
-    }
-
-    public int getTrafficPushSamplingRate() {
-        return getInt("traffic.push.sampling-rate", 10);
     }
 
     public long getTrafficPushBatchIntervalMs() {

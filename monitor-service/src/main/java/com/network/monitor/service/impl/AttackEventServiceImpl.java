@@ -329,4 +329,93 @@ public class AttackEventServiceImpl implements AttackEventService {
         
         return endedCount;
     }
+
+    @Override
+    public List<Map<String, Object>> getEventTrend(String timeRange, String interval) {
+        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime startTime = calculateStartTime(timeRange, endTime);
+        
+        List<AttackEventMapper.EventTrendStat> trendData = attackEventMapper.countEventTrend(startTime, endTime);
+        
+        Map<String, Long> dataMap = new LinkedHashMap<>();
+        for (AttackEventMapper.EventTrendStat stat : trendData) {
+            String timeKey = formatTimeKey(stat.getTime(), interval);
+            dataMap.merge(timeKey, stat.getCount(), Long::sum);
+        }
+        
+        List<Map<String, Object>> result = new ArrayList<>();
+        LocalDateTime current = startTime;
+        
+        while (!current.isAfter(endTime)) {
+            String timeKey = formatTimeKey(current, interval);
+            Map<String, Object> point = new HashMap<>();
+            point.put("time", timeKey);
+            point.put("count", dataMap.getOrDefault(timeKey, 0L));
+            result.add(point);
+            
+            current = incrementTime(current, interval);
+        }
+        
+        return result;
+    }
+    
+    private LocalDateTime calculateStartTime(String timeRange, LocalDateTime endTime) {
+        return switch (timeRange) {
+            case "1h" -> endTime.minusHours(1);
+            case "6h" -> endTime.minusHours(6);
+            case "12h" -> endTime.minusHours(12);
+            case "24h" -> endTime.minusHours(24);
+            case "3d" -> endTime.minusDays(3);
+            case "7d" -> endTime.minusDays(7);
+            case "14d" -> endTime.minusDays(14);
+            case "30d" -> endTime.minusDays(30);
+            default -> endTime.minusHours(24);
+        };
+    }
+    
+    private String formatTimeKey(LocalDateTime time, String interval) {
+        if (interval == null) {
+            interval = "1h";
+        }
+        
+        return switch (interval) {
+            case "5m", "10m", "30m" -> {
+                int minute = time.getMinute();
+                int roundedMinute = (minute / getIntervalMinutes(interval)) * getIntervalMinutes(interval);
+                yield String.format("%04d-%02d-%02d %02d:%02d", 
+                    time.getYear(), time.getMonthValue(), time.getDayOfMonth(),
+                    time.getHour(), roundedMinute);
+            }
+            case "1h" -> String.format("%04d-%02d-%02d %02d:00", 
+                time.getYear(), time.getMonthValue(), time.getDayOfMonth(), time.getHour());
+            case "1d" -> String.format("%04d-%02d-%02d", 
+                time.getYear(), time.getMonthValue(), time.getDayOfMonth());
+            default -> String.format("%04d-%02d-%02d %02d:00", 
+                time.getYear(), time.getMonthValue(), time.getDayOfMonth(), time.getHour());
+        };
+    }
+    
+    private int getIntervalMinutes(String interval) {
+        return switch (interval) {
+            case "5m" -> 5;
+            case "10m" -> 10;
+            case "30m" -> 30;
+            default -> 60;
+        };
+    }
+    
+    private LocalDateTime incrementTime(LocalDateTime time, String interval) {
+        if (interval == null) {
+            interval = "1h";
+        }
+        
+        return switch (interval) {
+            case "5m" -> time.plusMinutes(5);
+            case "10m" -> time.plusMinutes(10);
+            case "30m" -> time.plusMinutes(30);
+            case "1h" -> time.plusHours(1);
+            case "1d" -> time.plusDays(1);
+            default -> time.plusHours(1);
+        };
+    }
 }

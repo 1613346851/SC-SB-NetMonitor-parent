@@ -12,6 +12,7 @@ import com.network.monitor.event.BlacklistSyncEvent;
 import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.DefenseDecisionService;
+import com.network.monitor.service.SysConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -27,7 +28,7 @@ import java.util.UUID;
 @Service
 public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
-    private static final int DEFAULT_RATE_LIMIT_THRESHOLD = 5;
+    private static final int DEFAULT_RATE_LIMIT_THRESHOLD = 15;
 
     @Autowired
     private GatewayApiClient gatewayApiClient;
@@ -44,7 +45,22 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
     @Autowired
     private ApplicationEventPublisher eventPublisher;
 
+    @Autowired
+    private SysConfigService sysConfigService;
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    private int getRateLimitThreshold() {
+        try {
+            String value = sysConfigService.getConfigValue("defense.decision.rate-limit-threshold");
+            if (value != null && !value.isEmpty()) {
+                return Integer.parseInt(value);
+            }
+        } catch (Exception e) {
+            log.warn("获取防御决策限流阈值配置失败，使用默认值: {}", DEFAULT_RATE_LIMIT_THRESHOLD);
+        }
+        return DEFAULT_RATE_LIMIT_THRESHOLD;
+    }
 
     @Override
     public DefenseCommandDTO generateDefenseDecision(AttackMonitorDTO attackDTO) {
@@ -105,7 +121,7 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
                         eventId
                 );
                 if (commandDTO != null) {
-                    commandDTO.setRateLimitThreshold(DEFAULT_RATE_LIMIT_THRESHOLD);
+                    commandDTO.setRateLimitThreshold(getRateLimitThreshold());
                 }
             }
 
@@ -159,7 +175,7 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
             commandDTO.setEventId(eventId);
 
             if (commandDTO.getDefenseType() == DefenseCommandDTO.DefenseType.RATE_LIMIT) {
-                commandDTO.setRateLimitThreshold(DEFAULT_RATE_LIMIT_THRESHOLD);
+                commandDTO.setRateLimitThreshold(getRateLimitThreshold());
             }
 
             LocalDateTime expireTime = LocalDateTime.now().plusMinutes(120);

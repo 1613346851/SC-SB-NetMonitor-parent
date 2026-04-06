@@ -41,6 +41,7 @@ public class GatewayConfigServiceImpl implements GatewayConfigService {
         "ddos.rate-limit-trigger-window-seconds",
         "ddos.slow-attack.threshold-rps",
         "ddos.global-attack.related-ip-threshold",
+        "defense.decision.rate-limit-threshold",
         "state.normal-to-suspicious.threshold-rps",
         "state.normal-to-suspicious.window-ms",
         "state.normal-to-suspicious.slide-step-ms",
@@ -154,6 +155,7 @@ public class GatewayConfigServiceImpl implements GatewayConfigService {
         put("ddos.rate-limit-trigger-window-seconds", "连续限流检测时间窗口(秒)");
         put("ddos.slow-attack.threshold-rps", "DDoS慢速攻击检测阈值");
         put("ddos.global-attack.related-ip-threshold", "DDoS分布式攻击关联IP阈值");
+        put("defense.decision.rate-limit-threshold", "防御决策限流阈值(次/秒)");
         put("state.normal-to-suspicious.threshold-rps", "NORMAL到SUSPICIOUS的RPS阈值(次/秒)");
         put("state.normal-to-suspicious.window-ms", "NORMAL到SUSPICIOUS的检测窗口(毫秒)");
         put("state.normal-to-suspicious.slide-step-ms", "滑动窗口步进(毫秒)");
@@ -267,6 +269,7 @@ public class GatewayConfigServiceImpl implements GatewayConfigService {
         put("ddos.rate-limit-trigger-window-seconds", "30");
         put("ddos.slow-attack.threshold-rps", "5");
         put("ddos.global-attack.related-ip-threshold", "5");
+        put("defense.decision.rate-limit-threshold", "15");
         put("state.normal-to-suspicious.threshold-rps", "30");
         put("state.normal-to-suspicious.window-ms", "1000");
         put("state.normal-to-suspicious.slide-step-ms", "100");

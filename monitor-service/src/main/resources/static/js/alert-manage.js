@@ -35,6 +35,12 @@ function initAlertTable() {
             const eventIdDisplay = item.eventId ? (item.eventId.length > 16 ? item.eventId.substring(0, 16) + '...' : item.eventId) : '-';
             const attackIdDisplay = item.attackId ? ('<a href="/attack?attackId=' + item.attackId + '" style="color: #4f46e5;">查看记录</a>') : '-';
             
+            const isPotentialFalsePositive = checkPotentialFalsePositive(item.alertContent);
+            let levelDisplay = cell.renderRiskLevel(item.alertLevel);
+            if (isPotentialFalsePositive) {
+                levelDisplay += ' <span class="tag warning" style="margin-left: 2px; font-size: 11px;" title="此告警可能是误报">⚠️</span>';
+            }
+            
             const buttons = [
                 { text: '详情', type: 'info', onClick: `viewAlert(${item.id})` }
             ];
@@ -47,7 +53,7 @@ function initAlertTable() {
                 <tr>
                     <td class="checkbox-cell"><input type="checkbox" class="alert-checkbox" value="${item.id}" onchange="updateSelectedIds()"></td>
                     <td>${item.id || '-'}</td>
-                    <td>${cell.renderRiskLevel(item.alertLevel)}</td>
+                    <td>${levelDisplay}</td>
                     ${cell.renderCell(item.sourceIp, { maxLength: 20 })}
                     ${cell.renderCell(item.alertTitle, { maxLength: 40 })}
                     <td>${cell.renderAttackType(item.attackType)}</td>
@@ -163,9 +169,16 @@ function showAlertDetail(alert) {
     
     const levelClass = getLevelClass(alert.alertLevel);
     const statusClass = getStatusClass(alert.status);
+    const isPotentialFalsePositive = checkPotentialFalsePositive(alert.alertContent);
     
     let html = '<div class="alert-detail-row"><div class="alert-detail-label">告警ID</div><div class="alert-detail-value">' + escapeHtml(alert.alertId) + '</div></div>';
-    html += '<div class="alert-detail-row"><div class="alert-detail-label">告警级别</div><div class="alert-detail-value"><span class="tag ' + levelClass + '">' + (alert.alertLevelChinese || alert.alertLevel) + '</span></div></div>';
+    
+    let levelHtml = '<span class="tag ' + levelClass + '">' + (alert.alertLevelChinese || alert.alertLevel) + '</span>';
+    if (isPotentialFalsePositive) {
+        levelHtml += ' <span class="tag warning" style="margin-left: 5px;" title="此告警可能是误报，建议人工确认">⚠️ 可能误报</span>';
+    }
+    html += '<div class="alert-detail-row"><div class="alert-detail-label">告警级别</div><div class="alert-detail-value">' + levelHtml + '</div></div>';
+    
     html += '<div class="alert-detail-row"><div class="alert-detail-label">告警标题</div><div class="alert-detail-value">' + escapeHtml(alert.alertTitle) + '</div></div>';
     html += '<div class="alert-detail-row"><div class="alert-detail-label">源IP</div><div class="alert-detail-value">' + escapeHtml(alert.sourceIp) + '</div></div>';
     html += '<div class="alert-detail-row"><div class="alert-detail-label">攻击类型</div><div class="alert-detail-value"><span class="tag info">' + (alert.attackTypeChinese || alert.attackType || '-') + '</span></div></div>';
@@ -180,6 +193,10 @@ function showAlertDetail(alert) {
     
     if (alert.alertContent) {
         html += '<div class="alert-detail-row"><div class="alert-detail-label">详情</div><div class="alert-detail-value">' + escapeHtml(alert.alertContent).replace(/\n/g, '<br>') + '</div></div>';
+    }
+    
+    if (isPotentialFalsePositive) {
+        html += '<div class="alert-detail-row" style="background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;"><div class="alert-detail-label" style="color: #856404;">⚠️ 提示</div><div class="alert-detail-value" style="color: #856404;">此告警可能是误报或低风险漏洞，建议人工确认后再处理。</div></div>';
     }
     
     if (alert.status === 1) {
@@ -207,6 +224,11 @@ function showAlertDetail(alert) {
     }
 
     document.getElementById('alertDetailModal').style.display = 'flex';
+}
+
+function checkPotentialFalsePositive(content) {
+    if (!content) return false;
+    return content.includes('[URL路径中的命令关键字，可能是误报或低风险漏洞]');
 }
 
 function closeAlertDetail() {

@@ -4,8 +4,6 @@ public enum TrafficPushStrategy {
     
     REALTIME("realtime", "实时推送"),
     
-    SAMPLING("sampling", "采样推送"),
-    
     BATCH("batch", "批量推送"),
     
     SKIP("skip", "跳过推送"),

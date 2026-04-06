@@ -75,13 +75,11 @@ public class RuleEngineServiceImpl implements RuleEngineService {
         List<AttackMonitorDTO> attacks = new ArrayList<>();
 
         try {
-            // 获取对应攻击类型的规则列表
             @SuppressWarnings("unchecked")
             List<MonitorRuleEntity> rules = (List<MonitorRuleEntity>) 
                 localCacheService.get("cache:rule:" + attackType);
             
             if (rules == null || rules.isEmpty()) {
-                // 从数据库加载并缓存
                 rules = monitorRuleMapper.selectByAttackType(attackType);
                 if (!rules.isEmpty()) {
                     localCacheService.put("cache:rule:" + attackType, rules, -1);
@@ -92,39 +90,58 @@ public class RuleEngineServiceImpl implements RuleEngineService {
                 return attacks;
             }
 
-            // 多字段联合检测：URI、查询参数（转换为字符串）、请求体
+            String requestUri = trafficDTO.getRequestUri();
             String queryParamsStr = trafficDTO.getQueryParams() != null 
                 ? trafficDTO.getQueryParams().toString() 
                 : null;
             
+            String urlPath = extractUrlPath(requestUri);
+            String urlQuery = extractUrlQuery(requestUri);
+            if (urlQuery == null && queryParamsStr != null) {
+                urlQuery = queryParamsStr;
+            }
+            
             String[] checkFields = {
-                trafficDTO.getRequestUri(),
-                queryParamsStr,
+                urlPath,
+                urlQuery,
                 trafficDTO.getRequestBody()
             };
+            
+            boolean isCommandInjection = AttackTypeConstant.COMMAND_INJECTION.equals(attackType);
+            boolean hasHighRiskChars = isCommandInjection && hasHighRiskCharacters(urlPath);
 
             for (MonitorRuleEntity rule : rules) {
-                for (String fieldContent : checkFields) {
+                for (int i = 0; i < checkFields.length; i++) {
+                    String fieldContent = checkFields[i];
                     if (fieldContent == null || fieldContent.isEmpty()) {
                         continue;
                     }
+                    
+                    boolean isUrlPathField = (i == 0);
+                    boolean isLowRiskUrlPathCommand = isCommandInjection && isUrlPathField && 
+                        isLowRiskCommandInPath(fieldContent, rule);
 
-                    // 标准化处理（解码、过滤）
                     String normalizedContent = AttackContentDecodeUtil.normalize(fieldContent);
                     
-                    // 规则匹配
                     if (matchRule(normalizedContent, rule)) {
                         AttackMonitorDTO attack = buildAttackDTO(trafficDTO, attackType, rule, normalizedContent);
+                        
+                        if (isLowRiskUrlPathCommand && !hasHighRiskChars) {
+                            attack.setRiskLevel(RiskLevelConstant.LOW);
+                            String originalContent = attack.getAttackContent();
+                            attack.setAttackContent(originalContent + "\n[URL路径中的命令关键字，可能是误报或低风险漏洞]");
+                        }
+                        
                         attacks.add(attack);
                         
-                        log.debug("命中{}规则：ruleId={}, ruleName={}, sourceIp={}", 
-                            attackType, rule.getId(), rule.getRuleName(), trafficDTO.getSourceIp());
-                        break; // 同一规则在同一流量中只记录一次
+                        log.debug("命中{}规则：ruleId={}, ruleName={}, sourceIp={}, isLowRiskPath={}", 
+                            attackType, rule.getId(), rule.getRuleName(), trafficDTO.getSourceIp(), isLowRiskUrlPathCommand);
+                        break;
                     }
                 }
                 
                 if (!attacks.isEmpty()) {
-                    break; // 已检测到攻击，不再继续匹配其他规则
+                    break;
                 }
             }
         } catch (Exception e) {
@@ -132,6 +149,52 @@ public class RuleEngineServiceImpl implements RuleEngineService {
         }
 
         return attacks;
+    }
+    
+    private String extractUrlPath(String url) {
+        if (url == null) return null;
+        int queryIndex = url.indexOf('?');
+        if (queryIndex > 0) {
+            return url.substring(0, queryIndex);
+        }
+        return url;
+    }
+    
+    private String extractUrlQuery(String url) {
+        if (url == null) return null;
+        int queryIndex = url.indexOf('?');
+        if (queryIndex > 0 && queryIndex < url.length() - 1) {
+            return url.substring(queryIndex + 1);
+        }
+        return null;
+    }
+    
+    private boolean isLowRiskCommandInPath(String path, MonitorRuleEntity rule) {
+        if (path == null || path.isEmpty()) {
+            return false;
+        }
+        if (path.contains("?")) {
+            return false;
+        }
+        String ruleName = rule.getRuleName();
+        if (ruleName != null && (
+            ruleName.contains("常见命令") || 
+            ruleName.contains("Windows 命令"))) {
+            return true;
+        }
+        return false;
+    }
+    
+    private boolean hasHighRiskCharacters(String content) {
+        if (content == null || content.isEmpty()) {
+            return false;
+        }
+        return content.contains("|") || 
+               content.contains(";") || 
+               content.contains("`") ||
+               content.contains("$(") ||
+               content.contains("&&") ||
+               content.contains("||");
     }
 
     /**

@@ -81,6 +81,7 @@ public class AttackStoreServiceImpl implements AttackStoreService {
             String sourceIp = entity.getSourceIp();
             String attackType = entity.getAttackType();
             String riskLevel = entity.getRiskLevel();
+            String attackContent = entity.getAttackContent();
             
             if (attackType == null || attackType.isEmpty()) {
                 attackType = "UNKNOWN";
@@ -90,7 +91,7 @@ public class AttackStoreServiceImpl implements AttackStoreService {
                 riskLevel = "MEDIUM";
             }
             
-            AlertDTO alertDTO = AlertDTO.fromAttack(attackId, eventId, sourceIp, attackType, riskLevel);
+            AlertDTO alertDTO = AlertDTO.fromAttack(attackId, eventId, sourceIp, attackType, riskLevel, attackContent);
             alertService.generateAlert(alertDTO);
             
             log.info("攻击记录触发告警生成：attackId={}, eventId={}, sourceIp={}, attackType={}, riskLevel={}", 

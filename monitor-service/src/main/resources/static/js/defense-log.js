@@ -23,7 +23,7 @@ function initDefenseTable() {
         instanceName: 'defenseTable',
         apiUrl: '/defense/list',
         pageSize: 10,
-        defaultSortField: 'createTime',
+        defaultSortField: 'id',
         defaultSortOrder: 'desc',
         tableBodyEl: 'defenseTableBody',
         paginationEl: 'pagination',

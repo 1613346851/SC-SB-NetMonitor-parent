@@ -25,7 +25,7 @@ function initDefenseLogTable() {
         instanceName: 'defenseLogTable',
         apiUrl: '/defense/list',
         pageSize: 10,
-        defaultSortField: 'createTime',
+        defaultSortField: 'id',
         defaultSortOrder: 'desc',
         tableBodyEl: 'recentDefenseBody',
         paginationEl: 'defensePagination',
