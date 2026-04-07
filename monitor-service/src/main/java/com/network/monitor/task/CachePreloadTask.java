@@ -3,6 +3,7 @@ package com.network.monitor.task;
 import com.network.monitor.cache.RuleCache;
 import com.network.monitor.cache.VulnerabilityCache;
 import com.network.monitor.cache.BlacklistCache;
+import com.network.monitor.service.RuleSyncService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -25,6 +26,9 @@ public class CachePreloadTask implements CommandLineRunner {
     @Autowired
     private BlacklistCache blacklistCache;
 
+    @Autowired
+    private RuleSyncService ruleSyncService;
+
     @Override
     public void run(String... args) {
         log.info("开始执行缓存预加载任务...");
@@ -38,6 +42,9 @@ public class CachePreloadTask implements CommandLineRunner {
             
             // 预加载黑名单数据
             preloadBlacklistCache();
+            
+            // 同步规则到网关
+            syncRulesToGateway();
             
             log.info("缓存预加载任务执行完成");
         } catch (Exception e) {
@@ -85,6 +92,23 @@ public class CachePreloadTask implements CommandLineRunner {
             log.info("黑名单缓存预加载完成，共加载 {} 条记录", blacklistSize);
         } catch (Exception e) {
             log.error("黑名单缓存预加载失败：", e);
+        }
+    }
+
+    /**
+     * 同步规则到网关
+     */
+    private void syncRulesToGateway() {
+        try {
+            log.info("开始同步规则到网关...");
+            boolean success = ruleSyncService.syncAllRulesToGateway();
+            if (success) {
+                log.info("规则同步到网关完成");
+            } else {
+                log.warn("规则同步到网关失败或同步已禁用");
+            }
+        } catch (Exception e) {
+            log.error("同步规则到网关失败：", e);
         }
     }
 }

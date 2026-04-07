@@ -5,8 +5,11 @@ import com.network.monitor.common.constant.AttackTypeConstant;
 import com.network.monitor.common.constant.RiskLevelConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;
+import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.AttackMonitorEntity;
+import com.network.monitor.mapper.AttackMonitorMapper;
 import com.network.monitor.service.AttackDetectService;
+import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.AttackStoreService;
 import com.network.monitor.service.DefenseDecisionService;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +32,12 @@ public class AttackDetectServiceImpl implements AttackDetectService {
 
     @Autowired
     private DefenseDecisionService defenseDecisionService;
+    
+    @Autowired
+    private AttackEventService attackEventService;
+    
+    @Autowired
+    private AttackMonitorMapper attackMonitorMapper;
 
     @Override
     public List<AttackMonitorDTO> detect(TrafficMonitorDTO trafficDTO) {
@@ -100,9 +109,29 @@ public class AttackDetectServiceImpl implements AttackDetectService {
                 result.setAttackId(attackId);
                 result.setTrafficId(trafficId);
                 result.markSuccess();
+                
+                attackDTO.setAttackId(attackId);
 
                 log.info("保存攻击记录成功：attackId={}, attackType={}, riskLevel={}", 
                         attackId, attackDTO.getAttackType(), attackDTO.getRiskLevel());
+
+                AttackEventEntity event = attackEventService.getOrCreateEvent(
+                    attackDTO.getSourceIp(),
+                    attackDTO.getAttackType(),
+                    attackDTO.getRiskLevel(),
+                    attackDTO.getConfidence() != null ? attackDTO.getConfidence() : 80
+                );
+                
+                if (event != null) {
+                    String eventId = event.getEventId();
+                    try {
+                        attackMonitorMapper.updateEventId(attackId, eventId);
+                        attackDTO.setEventId(eventId);
+                        log.info("更新攻击记录的eventId：attackId={}, eventId={}", attackId, eventId);
+                    } catch (Exception e) {
+                        log.warn("更新攻击记录eventId失败：attackId={}, eventId={}", attackId, eventId, e);
+                    }
+                }
 
                 // 生成防御决策（高风险攻击）
                 if (RiskLevelConstant.HIGH.equals(attackDTO.getRiskLevel()) || 

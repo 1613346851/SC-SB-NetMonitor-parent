@@ -20,6 +20,8 @@ public interface AttackEventMapper {
 
     AttackEventEntity selectOngoingEventByIp(@Param("sourceIp") String sourceIp);
 
+    AttackEventEntity selectOngoingEventByIpAndType(@Param("sourceIp") String sourceIp, @Param("attackType") String attackType);
+
     List<AttackEventEntity> selectByCondition(
             @Param("eventId") String eventId,
             @Param("sourceIp") String sourceIp,

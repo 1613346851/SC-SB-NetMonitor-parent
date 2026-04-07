@@ -85,6 +85,14 @@
         LIMIT 1
     </select>
 
+    <select id="selectOngoingEventByIpAndType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        WHERE source_ip = #{sourceIp} AND attack_type = #{attackType} AND status = 0
+        ORDER BY start_time DESC
+        LIMIT 1
+    </select>
+
     <select id="selectByCondition" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM sys_attack_event

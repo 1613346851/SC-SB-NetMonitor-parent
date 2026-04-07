@@ -196,4 +196,10 @@
             AND create_time &lt;= #{endTime}
         </if>
     </select>
+
+    <update id="updateEventId">
+        UPDATE sys_attack_monitor
+        SET event_id = #{eventId}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
 </mapper>

@@ -225,4 +225,9 @@ public interface AttackMonitorMapper {
             this.count = count;
         }
     }
+
+    /**
+     * 更新攻击记录的事件ID
+     */
+    int updateEventId(@Param("id") Long id, @Param("eventId") String eventId);
 }

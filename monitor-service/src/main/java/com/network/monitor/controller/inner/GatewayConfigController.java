@@ -2,6 +2,8 @@ package com.network.monitor.controller.inner;
 
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.dto.GatewayConfigDTO;
+import com.network.monitor.entity.MonitorRuleEntity;
+import com.network.monitor.mapper.MonitorRuleMapper;
 import com.network.monitor.service.GatewayConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,11 +19,14 @@ import java.util.Map;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/inner/gateway/config")
+@RequestMapping("/api/inner/gateway")
 public class GatewayConfigController {
 
     @Autowired
     private GatewayConfigService gatewayConfigService;
+
+    @Autowired
+    private MonitorRuleMapper monitorRuleMapper;
 
     /**
      * 网关拉取全部配置
@@ -29,7 +34,7 @@ public class GatewayConfigController {
      * 
      * @return 所有网关配置
      */
-    @GetMapping("/sync")
+    @GetMapping("/config/sync")
     public ApiResponse<Map<String, Object>> syncConfigs() {
         try {
             Map<String, Object> configs = gatewayConfigService.getAllGatewayConfigs();
@@ -42,13 +47,31 @@ public class GatewayConfigController {
     }
 
     /**
+     * 网关拉取所有启用的规则
+     * 网关启动时调用此接口获取所有启用的规则
+     * 
+     * @return 所有启用的规则
+     */
+    @GetMapping("/rules")
+    public ApiResponse<List<MonitorRuleEntity>> getRules() {
+        try {
+            List<MonitorRuleEntity> rules = monitorRuleMapper.selectAllEnabled();
+            log.info("网关拉取规则成功，共{}条", rules != null ? rules.size() : 0);
+            return ApiResponse.success(rules);
+        } catch (Exception e) {
+            log.error("网关拉取规则失败", e);
+            return ApiResponse.error("获取规则失败: " + e.getMessage());
+        }
+    }
+
+    /**
      * 推送配置到网关
      * 支持单个配置推送和批量配置推送
      * 
      * @param dto 配置数据传输对象
      * @return 操作结果
      */
-    @PostMapping("/push")
+    @PostMapping("/config/push")
     public ApiResponse<Void> pushConfigToGateway(@RequestBody GatewayConfigDTO dto) {
         try {
             if (!dto.isValid()) {
@@ -81,7 +104,7 @@ public class GatewayConfigController {
      * 
      * @return 操作结果
      */
-    @PostMapping("/refresh")
+    @PostMapping("/config/refresh")
     public ApiResponse<Void> refreshConfig() {
         try {
             log.info("刷新网关配置缓存");
@@ -99,7 +122,7 @@ public class GatewayConfigController {
      * 
      * @return 配置项列表
      */
-    @GetMapping("/list")
+    @GetMapping("/config/list")
     public ApiResponse<List<Map<String, Object>>> getGatewayConfigList() {
         try {
             List<Map<String, Object>> configList = gatewayConfigService.getGatewayConfigList();
@@ -117,7 +140,7 @@ public class GatewayConfigController {
      * @param dto 配置数据传输对象
      * @return 操作结果
      */
-    @PutMapping("/update")
+    @PutMapping("/config/update")
     public ApiResponse<Void> updateConfig(@RequestBody GatewayConfigDTO dto) {
         try {
             if (dto.getConfigKey() == null || dto.getConfigKey().isEmpty()) {
@@ -145,7 +168,7 @@ public class GatewayConfigController {
      * @param configKey 配置键
      * @return 配置值
      */
-    @GetMapping("/value/{configKey}")
+    @GetMapping("/config/value/{configKey}")
     public ApiResponse<String> getConfigValue(@PathVariable String configKey) {
         try {
             String value = gatewayConfigService.getConfigValue(configKey, null);

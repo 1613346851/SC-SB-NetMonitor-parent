@@ -68,7 +68,10 @@ function initDefenseTable() {
 function renderDefenseType(type) {
     const typeMap = {
         'BLOCK_IP': '<span class="tag danger">IP封禁</span>',
+        'BLACKLIST': '<span class="tag danger">IP封禁</span>',
         'RATE_LIMIT': '<span class="tag warning">限流</span>',
+        'BLOCK': '<span class="tag danger">请求拦截</span>',
+        'BLOCK_REQUEST': '<span class="tag danger">请求拦截</span>',
         'REDIRECT': '<span class="tag info">重定向</span>',
         'CAPTCHA': '<span class="tag info">验证码</span>'
     };
@@ -77,6 +80,12 @@ function renderDefenseType(type) {
 
 function renderDefenseAction(action) {
     const actionMap = {
+        'ADD_BLACKLIST': '加入黑名单',
+        'REMOVE_BLACKLIST': '移出黑名单',
+        'ADD_RATE_LIMIT': '启动限流',
+        'REMOVE_RATE_LIMIT': '取消限流',
+        'ADD_BLOCK': '拦截请求',
+        'REMOVE_BLOCK': '取消拦截',
         'BLOCK': '阻断',
         'LIMIT': '限速',
         'REDIRECT': '重定向',

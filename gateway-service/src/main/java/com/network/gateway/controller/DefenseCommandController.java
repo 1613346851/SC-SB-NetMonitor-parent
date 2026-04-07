@@ -217,10 +217,13 @@ public class DefenseCommandController {
                     yield removed;
                 } else {
                     logger.info("执行黑名单添加操作: IP={}, expireTime={}", sourceIp, expireTime);
-                    boolean added = blacklistFilter.addToBlacklist(sourceIp, expireTime);
-                    if (added && eventId != null) {
+                    if (eventId != null) {
                         attackStateCache.markAsDefended(sourceIp, eventId);
-                        logger.info("IP[{}]已标记为DEFENDED状态，eventId={}", sourceIp, eventId);
+                        logger.info("IP[{}]已预先标记为DEFENDED状态，eventId={}", sourceIp, eventId);
+                    }
+                    boolean added = blacklistFilter.addToBlacklist(sourceIp, expireTime);
+                    if (added) {
+                        logger.info("IP[{}]已成功加入黑名单", sourceIp);
                     }
                     yield added;
                 }

@@ -474,16 +474,51 @@ function renderRiskLevelChart(data) {
         return;
     }
     
+    const levelNameMap = {
+        'CRITICAL': '严重',
+        'HIGH': '高风险',
+        'MEDIUM': '中风险',
+        'LOW': '低风险',
+        '严重': '严重',
+        '高风险': '高风险',
+        '中风险': '中风险',
+        '低风险': '低风险'
+    };
+    
+    const levelColorMap = {
+        'CRITICAL': '#9a60b4',
+        'HIGH': '#ee6666',
+        'MEDIUM': '#fac858',
+        'LOW': '#91cc75',
+        '严重': '#9a60b4',
+        '高风险': '#ee6666',
+        '中风险': '#fac858',
+        '低风险': '#91cc75'
+    };
+    
+    const levelOrder = ['严重', '高风险', '中风险', '低风险'];
+    
     let seriesData = [];
     
     if (Array.isArray(data)) {
-        seriesData = data.map(item => ({
-            name: item.name || item.riskLevel || '未知',
-            value: item.value || item.count || 0
-        }));
+        seriesData = data.map(item => {
+            const originalName = item.name || item.riskLevel || '未知';
+            const chineseName = levelNameMap[originalName] || originalName;
+            return {
+                name: chineseName,
+                value: item.value || item.count || 0,
+                itemStyle: {
+                    color: levelColorMap[originalName]
+                }
+            };
+        });
     } else if (data.data) {
         seriesData = data.data;
     }
+    
+    seriesData.sort((a, b) => {
+        return levelOrder.indexOf(a.name) - levelOrder.indexOf(b.name);
+    });
     
     if (seriesData.length === 0) {
         seriesData = [{
@@ -494,7 +529,8 @@ function renderRiskLevelChart(data) {
     
     const option = {
         tooltip: {
-            trigger: 'item'
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
         },
         legend: {
             orient: 'vertical',
@@ -507,9 +543,6 @@ function renderRiskLevelChart(data) {
             label: {
                 show: true,
                 formatter: seriesData.length > 0 && seriesData[0].name !== '无数据' ? '{b}: {c}' : '{b}'
-            },
-            itemStyle: {
-                color: seriesData.length > 0 && seriesData[0].name !== '无数据' ? undefined : '#d9d9d9'
             },
             emphasis: {
                 itemStyle: {

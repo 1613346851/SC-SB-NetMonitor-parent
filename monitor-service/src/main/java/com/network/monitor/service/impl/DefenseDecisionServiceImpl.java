@@ -9,6 +9,7 @@ import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.event.BlacklistSyncEvent;
+import com.network.monitor.mapper.AttackMonitorMapper;
 import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.DefenseDecisionService;
@@ -47,6 +48,9 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
     @Autowired
     private SysConfigService sysConfigService;
+    
+    @Autowired
+    private AttackMonitorMapper attackMonitorMapper;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -70,27 +74,19 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
 
         try {
             String sourceIp = attackDTO.getSourceIp();
-
-            if (attackStateCache.isInDefendedState(sourceIp)) {
-                log.debug("IP已处于DEFENDED状态，跳过防御决策: ip={}", sourceIp);
-                return null;
-            }
-
             String riskLevelStr = attackDTO.getRiskLevel();
             DefenseCommandDTO commandDTO = null;
 
             DefenseCommandDTO.RiskLevel riskLevel = parseRiskLevel(riskLevelStr);
 
             String existingEventId = attackDTO.getEventId();
-            AttackEventEntity event;
+            AttackEventEntity event = null;
+            String eventId;
+            
             if (existingEventId != null && !existingEventId.isEmpty()) {
-                event = attackEventService.getOrCreateEventWithEventId(
-                    sourceIp, 
-                    attackDTO.getAttackType(), 
-                    riskLevelStr, 
-                    attackDTO.getConfidence() != null ? attackDTO.getConfidence() : 80,
-                    existingEventId
-                );
+                event = attackEventService.getEventByEventId(existingEventId);
+                eventId = existingEventId;
+                log.debug("使用已有事件：eventId={}, ip={}", eventId, sourceIp);
             } else {
                 event = attackEventService.getOrCreateEvent(
                     sourceIp, 
@@ -98,31 +94,71 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
                     riskLevelStr, 
                     attackDTO.getConfidence() != null ? attackDTO.getConfidence() : 80
                 );
+                eventId = event != null ? event.getEventId() : generateEventId();
+                
+                if (attackDTO.getAttackId() != null && eventId != null && !eventId.isEmpty()) {
+                    try {
+                        attackMonitorMapper.updateEventId(attackDTO.getAttackId(), eventId);
+                        log.info("更新攻击记录的eventId：attackId={}, eventId={}", attackDTO.getAttackId(), eventId);
+                    } catch (Exception e) {
+                        log.warn("更新攻击记录eventId失败：attackId={}, eventId={}", attackDTO.getAttackId(), eventId, e);
+                    }
+                }
             }
 
-            String eventId = event != null ? event.getEventId() : generateEventId();
+            if (attackStateCache.isInDefendedState(sourceIp)) {
+                log.debug("IP已处于DEFENDED状态，跳过防御决策: ip={}", sourceIp);
+                return null;
+            }
 
-            if (riskLevel == DefenseCommandDTO.RiskLevel.HIGH || riskLevel == DefenseCommandDTO.RiskLevel.CRITICAL) {
-                commandDTO = buildDefenseCommand(
-                        attackDTO,
-                        DefenseCommandDTO.DefenseType.BLACKLIST,
-                        sourceIp,
-                        "检测到高风险攻击：" + attackDTO.getAttackType(),
-                        calculateExpireTime(30),
-                        eventId
-                );
-            } else if (riskLevel == DefenseCommandDTO.RiskLevel.MEDIUM) {
+            String attackContent = attackDTO.getAttackContent();
+            if (attackContent != null && attackContent.contains("[URL路径中的命令关键字，可能是误报或低风险漏洞]")) {
+                log.info("检测到可能误报的攻击，跳过防御: ip={}, attackType={}", sourceIp, attackDTO.getAttackType());
+                return null;
+            }
+
+            String attackType = attackDTO.getAttackType();
+            boolean isDdosAttack = "DDOS".equals(attackType) || "BRUTE_FORCE".equals(attackType);
+
+            if (isDdosAttack) {
                 commandDTO = buildDefenseCommand(
                         attackDTO,
                         DefenseCommandDTO.DefenseType.RATE_LIMIT,
                         sourceIp,
-                        "检测到中风险攻击：" + attackDTO.getAttackType(),
+                        "检测到DDoS攻击，启动限流保护",
                         calculateExpireTime(60),
                         eventId
                 );
                 if (commandDTO != null) {
                     commandDTO.setRateLimitThreshold(getRateLimitThreshold());
                 }
+            } else if (riskLevel == DefenseCommandDTO.RiskLevel.HIGH || riskLevel == DefenseCommandDTO.RiskLevel.CRITICAL) {
+                commandDTO = buildDefenseCommand(
+                        attackDTO,
+                        DefenseCommandDTO.DefenseType.BLOCK,
+                        sourceIp,
+                        "检测到高风险攻击：" + attackDTO.getAttackType() + "，拦截恶意请求",
+                        calculateExpireTime(30),
+                        eventId
+                );
+            } else if (riskLevel == DefenseCommandDTO.RiskLevel.MEDIUM) {
+                commandDTO = buildDefenseCommand(
+                        attackDTO,
+                        DefenseCommandDTO.DefenseType.BLOCK,
+                        sourceIp,
+                        "检测到中风险攻击：" + attackDTO.getAttackType() + "，拦截恶意请求",
+                        calculateExpireTime(30),
+                        eventId
+                );
+            } else if (riskLevel == DefenseCommandDTO.RiskLevel.LOW) {
+                commandDTO = buildDefenseCommand(
+                        attackDTO,
+                        DefenseCommandDTO.DefenseType.BLOCK,
+                        sourceIp,
+                        "检测到低风险攻击：" + attackDTO.getAttackType() + "，拦截恶意请求",
+                        calculateExpireTime(15),
+                        eventId
+                );
             }
 
             if (commandDTO != null) {
@@ -275,7 +311,7 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
             logEntity.setDefenseType(convertDefenseType(commandDTO.getDefenseType()));
             logEntity.setDefenseTarget(commandDTO.getSourceIp());
             logEntity.setDefenseReason(commandDTO.getDescription());
-            logEntity.setDefenseAction("ADD_BLACKLIST");
+            logEntity.setDefenseAction(convertDefenseAction(commandDTO.getDefenseType()));
             logEntity.setExecuteStatus(1);
             logEntity.setIsFirst(1);
             logEntity.setOperator("SYSTEM");
@@ -345,6 +381,17 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
             case BLACKLIST -> DefenseTypeConstant.BLOCK_IP;
             case RATE_LIMIT -> DefenseTypeConstant.RATE_LIMIT;
             case BLOCK -> DefenseTypeConstant.BLOCK_REQUEST;
+        };
+    }
+
+    private String convertDefenseAction(DefenseCommandDTO.DefenseType defenseType) {
+        if (defenseType == null) {
+            return "ADD_BLACKLIST";
+        }
+        return switch (defenseType) {
+            case BLACKLIST -> "ADD_BLACKLIST";
+            case RATE_LIMIT -> "ADD_RATE_LIMIT";
+            case BLOCK -> "ADD_BLOCK";
         };
     }
 }

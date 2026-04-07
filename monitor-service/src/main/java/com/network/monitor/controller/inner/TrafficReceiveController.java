@@ -5,6 +5,7 @@ import com.network.monitor.common.ApiResponse;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.TrafficAggregateDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;
+import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.TrafficMonitorEntity;
 import com.network.monitor.entity.VulnerabilityMonitorEntity;
@@ -116,17 +117,32 @@ public class TrafficReceiveController {
                     
                     VulnerabilityMonitorEntity matchedVuln = vulnerabilityVerifyService.verifyAttack(attack);
                     
+                    AttackEventEntity event = attackEventService.getOrCreateEvent(
+                        attack.getSourceIp(),
+                        attack.getAttackType(),
+                        attack.getRiskLevel(),
+                        attack.getConfidence() != null ? attack.getConfidence() : 80
+                    );
+                    
+                    if (event != null) {
+                        attack.setEventId(event.getEventId());
+                    }
+                    
                     AttackMonitorEntity attackEntity = attackStoreService.convertToEntity(attack);
                     Long attackId = attackStoreService.saveAttack(attackEntity);
                     
-                    if (attackId != null && matchedVuln != null) {
-                        vulnerabilityStatService.incrementAttackCount(
-                            matchedVuln.getId(),
-                            attackId
-                        );
+                    if (attackId != null) {
+                        attack.setAttackId(attackId);
+                        
+                        if (matchedVuln != null) {
+                            vulnerabilityStatService.incrementAttackCount(
+                                matchedVuln.getId(),
+                                attackId
+                            );
+                        }
+                        
+                        defenseDecisionService.generateDefenseDecision(attack);
                     }
-                    
-                    defenseDecisionService.generateDefenseDecision(attack);
                 }
 
                 log.info("流量检测完成：trafficId={}, 检测到攻击数={}", trafficId, detectedAttacks.size());

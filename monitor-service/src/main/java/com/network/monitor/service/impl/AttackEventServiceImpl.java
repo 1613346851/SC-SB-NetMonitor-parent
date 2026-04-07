@@ -72,9 +72,9 @@ public class AttackEventServiceImpl implements AttackEventService {
             }
         }
 
-        AttackEventEntity existingEvent = attackEventMapper.selectOngoingEventByIp(normalizedIp);
+        AttackEventEntity existingEvent = attackEventMapper.selectOngoingEventByIpAndType(normalizedIp, attackType);
         if (existingEvent != null) {
-            log.debug("IP已有进行中的事件：eventId={}, ip={}", existingEvent.getEventId(), normalizedIp);
+            log.debug("IP已有同类型进行中的事件：eventId={}, ip={}, attackType={}", existingEvent.getEventId(), normalizedIp, attackType);
             return existingEvent;
         }
 

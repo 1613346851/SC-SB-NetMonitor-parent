@@ -112,27 +112,27 @@ function handleEventStatsUpdate(eventStats) {
 function initRecentAttacksTable() {
     recentAttacksTable = TableUtils.createInstance({
         instanceName: 'recentAttacksTable',
-        apiUrl: '/alert/list?pageSize=10&sortField=createTime&sortOrder=desc',
+        apiUrl: '/alert/list',
         pageSize: 10,
         defaultSortField: 'createTime',
         defaultSortOrder: 'desc',
         tableBodyEl: 'recentAttacks',
         paginationEl: null,
-        colspan: 5,
+        colspan: 6,
         enablePagination: false,
         renderRow: function(alert) {
             const levelClass = {
                 'CRITICAL': 'tag danger',
-                'HIGH': 'tag warning',
-                'MEDIUM': 'tag info',
-                'LOW': 'tag success'
+                'HIGH': 'tag danger',
+                'MEDIUM': 'tag warning',
+                'LOW': 'tag info'
             }[alert.alertLevel] || 'tag';
             
             const levelText = {
                 'CRITICAL': '严重',
-                'HIGH': '高危',
-                'MEDIUM': '中危',
-                'LOW': '低危'
+                'HIGH': '高风险',
+                'MEDIUM': '中风险',
+                'LOW': '低风险'
             }[alert.alertLevel] || alert.alertLevel;
             
             const statusText = alert.status === 0 ? '待处理' : (alert.status === 1 ? '已确认' : '已忽略');
@@ -147,10 +147,11 @@ function initRecentAttacksTable() {
                 'DDOS': 'DDoS攻击',
                 'BRUTE_FORCE': '暴力破解',
                 'SCANNER': '扫描器探测'
-            }[alert.attackType] || alert.attackType;
+            }[alert.attackType] || alert.attackType || '-';
             
             return `
                 <tr onclick="window.location.href='/alert?alertId=${alert.alertId}'" style="cursor: pointer;">
+                    <td>${alert.alertId || '-'}</td>
                     <td>${DateUtil.format(alert.createTime)}</td>
                     <td>${CellRenderer.renderText(alert.sourceIp)}</td>
                     <td>${attackTypeText}</td>
@@ -536,14 +537,59 @@ async function loadVulnerabilityLevelDistribution() {
             return;
         }
         
-        const seriesData = (chartData && chartData.length > 0) ? chartData : [{
-            name: '无数据',
-            value: 1
-        }];
+        const levelNameMap = {
+            'CRITICAL': '严重',
+            'HIGH': '高风险',
+            'MEDIUM': '中风险',
+            'LOW': '低风险',
+            '严重': '严重',
+            '高风险': '高风险',
+            '中风险': '中风险',
+            '低风险': '低风险'
+        };
+        
+        const levelColorMap = {
+            'CRITICAL': '#9a60b4',
+            'HIGH': '#ee6666',
+            'MEDIUM': '#fac858',
+            'LOW': '#91cc75',
+            '严重': '#9a60b4',
+            '高风险': '#ee6666',
+            '中风险': '#fac858',
+            '低风险': '#91cc75'
+        };
+        
+        const levelOrder = ['严重', '高风险', '中风险', '低风险'];
+        
+        let seriesData = [];
+        if (chartData && chartData.length > 0) {
+            seriesData = chartData.map(item => {
+                const originalName = item.name || '未知';
+                const chineseName = levelNameMap[originalName] || originalName;
+                return {
+                    name: chineseName,
+                    value: item.value,
+                    itemStyle: {
+                        color: levelColorMap[originalName] || '#d9d9d9'
+                    }
+                };
+            }).sort((a, b) => {
+                const indexA = levelOrder.indexOf(a.name);
+                const indexB = levelOrder.indexOf(b.name);
+                return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+            });
+        } else {
+            seriesData = [{
+                name: '无数据',
+                value: 1,
+                itemStyle: { color: '#d9d9d9' }
+            }];
+        }
         
         const option = {
             tooltip: {
-                trigger: 'item'
+                trigger: 'item',
+                formatter: chartData && chartData.length > 0 ? '{b}: {c} ({d}%)' : '{b}'
             },
             legend: {
                 orient: 'vertical',
@@ -556,9 +602,6 @@ async function loadVulnerabilityLevelDistribution() {
                 label: {
                     show: true,
                     formatter: chartData && chartData.length > 0 ? '{b}: {c}' : '{b}'
-                },
-                itemStyle: {
-                    color: chartData && chartData.length > 0 ? undefined : '#d9d9d9'
                 },
                 emphasis: {
                     itemStyle: {
