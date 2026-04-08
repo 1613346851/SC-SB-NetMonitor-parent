@@ -1,6 +1,5 @@
 package com.network.gateway.client;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.gateway.constant.GatewayHttpConstant;
@@ -19,7 +18,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -207,59 +205,5 @@ public class MonitorServiceConfigClient {
      */
     public String getStatistics() {
         return "监控服务配置客户端 - 配置端点：" + GatewayHttpConstant.MonitorService.BASE_URL + CONFIG_SYNC_ENDPOINT;
-    }
-
-    /**
-     * 从监控服务拉取所有启用的规则
-     *
-     * @return 规则列表，失败时返回null
-     */
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> getRules() {
-        String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-
-            Map<String, String> securityHeaders = CrossServiceSecurityUtil.generateSecurityHeaders(
-                    requestId,
-                    secretKey
-            );
-            headers.set("X-Timestamp", securityHeaders.get("X-Timestamp"));
-            headers.set("X-Request-ID", securityHeaders.get("X-Request-ID"));
-            headers.set("X-Signature", securityHeaders.get("X-Signature"));
-
-            HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
-
-            String url = GatewayHttpConstant.MonitorService.BASE_URL + "/api/inner/gateway/rules";
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    org.springframework.http.HttpMethod.GET,
-                    requestEntity,
-                    String.class
-            );
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                JsonNode root = objectMapper.readTree(response.getBody());
-                int code = root.has("code") ? root.get("code").asInt() : 200;
-                if (code == 200) {
-                    Map<String, Object> result = new HashMap<>();
-                    result.put("success", true);
-                    if (root.has("data")) {
-                        result.put("data", objectMapper.convertValue(root.get("data"), new TypeReference<List<Map<String, Object>>>() {}));
-                    }
-                    logger.info("从监控服务拉取规则成功");
-                    return result;
-                }
-            }
-            
-            logger.warn("从监控服务拉取规则失败");
-            return null;
-
-        } catch (Exception e) {
-            logger.error("从监控服务拉取规则失败: {}", e.getMessage());
-            return null;
-        }
     }
 }

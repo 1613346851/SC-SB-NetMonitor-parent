@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.WhitelistMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.WhitelistEntity">
+        <id column="id" property="id"/>
+        <result column="whitelist_type" property="whitelistType"/>
+        <result column="whitelist_value" property="whitelistValue"/>
+        <result column="description" property="description"/>
+        <result column="enabled" property="enabled"/>
+        <result column="priority" property="priority"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, whitelist_type, whitelist_value, description, enabled, priority, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.WhitelistEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_detection_whitelist (
+            whitelist_type, whitelist_value, description, enabled, priority, create_time, update_time
+        ) VALUES (
+            #{whitelistType}, #{whitelistValue}, #{description}, #{enabled}, #{priority}, NOW(), NOW()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_detection_whitelist
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectAllEnabled" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_detection_whitelist
+        WHERE enabled = 1
+        ORDER BY priority ASC
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_detection_whitelist
+        ORDER BY whitelist_type ASC, priority ASC, create_time DESC
+    </select>
+
+    <select id="selectByType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_detection_whitelist
+        WHERE whitelist_type = #{whitelistType} AND enabled = 1
+        ORDER BY priority ASC
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_detection_whitelist
+        <where>
+            <if test="whitelistType != null and whitelistType != ''">
+                AND whitelist_type = #{whitelistType}
+            </if>
+            <if test="whitelistValue != null and whitelistValue != ''">
+                AND whitelist_value LIKE CONCAT('%', #{whitelistValue}, '%')
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+        ORDER BY whitelist_type ASC, priority ASC, create_time DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_detection_whitelist
+        <where>
+            <if test="whitelistType != null and whitelistType != ''">
+                AND whitelist_type = #{whitelistType}
+            </if>
+            <if test="whitelistValue != null and whitelistValue != ''">
+                AND whitelist_value LIKE CONCAT('%', #{whitelistValue}, '%')
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+    </select>
+
+    <update id="update" parameterType="com.network.monitor.entity.WhitelistEntity">
+        UPDATE sys_detection_whitelist
+        SET whitelist_type = #{whitelistType},
+            whitelist_value = #{whitelistValue},
+            description = #{description},
+            enabled = #{enabled},
+            priority = #{priority},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_detection_whitelist WHERE id = #{id}
+    </delete>
+
+    <update id="updateEnabled">
+        UPDATE sys_detection_whitelist
+        SET enabled = #{enabled}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+</mapper>

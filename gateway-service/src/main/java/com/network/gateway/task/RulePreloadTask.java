@@ -1,24 +1,20 @@
 package com.network.gateway.task;
 
 import com.network.gateway.cache.RuleCache;
-import com.network.gateway.client.MonitorServiceConfigClient;
+import com.network.gateway.cache.WhitelistCache;
+import com.network.gateway.client.MonitorServiceRuleClient;
 import com.network.gateway.dto.AttackRuleDTO;
+import com.network.gateway.dto.WhitelistDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * 规则预加载任务
- * 在网关启动时从监测服务拉取规则
- */
 @Component
-@Order(2)
 public class RulePreloadTask implements CommandLineRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(RulePreloadTask.class);
@@ -27,90 +23,112 @@ public class RulePreloadTask implements CommandLineRunner {
     private RuleCache ruleCache;
 
     @Autowired
-    private MonitorServiceConfigClient configClient;
+    private WhitelistCache whitelistCache;
+
+    @Autowired
+    private MonitorServiceRuleClient ruleClient;
+
+    private final AtomicBoolean preloadCompleted = new AtomicBoolean(false);
+
+    private final AtomicBoolean whitelistPreloadCompleted = new AtomicBoolean(false);
 
     @Override
     public void run(String... args) {
         logger.info("开始执行规则预加载任务...");
         
-        try {
-            preloadRules();
-            logger.info("规则预加载任务执行完成，共加载 {} 条规则", ruleCache.size());
-        } catch (Exception e) {
-            logger.error("规则预加载任务执行失败：", e);
-        }
+        preloadRules();
+        preloadWhitelists();
+        
+        logger.info("规则预加载任务执行完成");
     }
 
-    /**
-     * 预加载规则
-     */
-    @SuppressWarnings("unchecked")
     private void preloadRules() {
-        try {
-            logger.info("从监测服务拉取规则...");
-            
-            Map<String, Object> response = configClient.getRules();
-            if (response != null && Boolean.TRUE.equals(response.get("success"))) {
-                Object data = response.get("data");
-                if (data instanceof List) {
-                    List<Map<String, Object>> ruleMaps = (List<Map<String, Object>>) data;
-                    
-                    for (Map<String, Object> ruleMap : ruleMaps) {
-                        try {
-                            AttackRuleDTO ruleDTO = convertToRuleDTO(ruleMap);
-                            if (ruleDTO != null && ruleDTO.getEnabled() != null && ruleDTO.getEnabled() == 1) {
-                                ruleCache.addRule(ruleDTO);
-                            }
-                        } catch (Exception e) {
-                            logger.warn("转换规则失败: {}", ruleMap, e);
-                        }
-                    }
-                    
-                    logger.info("从监测服务拉取规则成功，共 {} 条", ruleMaps.size());
+        int maxRetries = 5;
+        int retryInterval = 5000;
+        
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                logger.info("尝试从监控服务拉取规则，第{}次...", i + 1);
+                
+                List<AttackRuleDTO> rules = ruleClient.pullRulesFromMonitor();
+                
+                if (rules != null && !rules.isEmpty()) {
+                    ruleCache.syncRules(rules);
+                    preloadCompleted.set(true);
+                    logger.info("规则预加载成功，共加载{}条规则", rules.size());
+                    return;
+                } else {
+                    logger.warn("从监控服务拉取规则为空，等待重试...");
                 }
-            } else {
-                logger.warn("从监测服务拉取规则失败，使用空规则缓存");
+            } catch (Exception e) {
+                logger.warn("从监控服务拉取规则失败: {}，等待重试...", e.getMessage());
             }
-        } catch (Exception e) {
-            logger.warn("从监测服务拉取规则失败，使用空规则缓存: {}", e.getMessage());
+            
+            if (i < maxRetries - 1) {
+                try {
+                    Thread.sleep(retryInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        
+        if (!preloadCompleted.get()) {
+            logger.warn("规则预加载失败，网关将在收到监控服务推送规则后生效");
         }
     }
 
-    /**
-     * 将Map转换为AttackRuleDTO
-     */
-    private AttackRuleDTO convertToRuleDTO(Map<String, Object> map) {
-        if (map == null) {
-            return null;
+    private void preloadWhitelists() {
+        int maxRetries = 5;
+        int retryInterval = 5000;
+        
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                logger.info("尝试从监控服务拉取白名单，第{}次...", i + 1);
+                
+                List<WhitelistDTO> whitelists = ruleClient.pullWhitelistsFromMonitor();
+                
+                if (whitelists != null && !whitelists.isEmpty()) {
+                    whitelistCache.syncWhitelists(whitelists);
+                    whitelistPreloadCompleted.set(true);
+                    logger.info("白名单预加载成功，共加载{}条", whitelists.size());
+                    return;
+                } else {
+                    logger.warn("从监控服务拉取白名单为空，等待重试...");
+                }
+            } catch (Exception e) {
+                logger.warn("从监控服务拉取白名单失败: {}，等待重试...", e.getMessage());
+            }
+            
+            if (i < maxRetries - 1) {
+                try {
+                    Thread.sleep(retryInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
         }
         
-        AttackRuleDTO dto = new AttackRuleDTO();
-        
-        if (map.get("id") != null) {
-            dto.setId(Long.valueOf(map.get("id").toString()));
+        if (!whitelistPreloadCompleted.get()) {
+            logger.warn("白名单预加载失败，网关将在收到监控服务推送白名单后生效");
         }
-        if (map.get("ruleName") != null) {
-            dto.setRuleName(map.get("ruleName").toString());
-        }
-        if (map.get("ruleContent") != null) {
-            dto.setRuleContent(map.get("ruleContent").toString());
-        }
-        if (map.get("attackType") != null) {
-            dto.setAttackType(map.get("attackType").toString());
-        }
-        if (map.get("riskLevel") != null) {
-            dto.setRiskLevel(map.get("riskLevel").toString());
-        }
-        if (map.get("enabled") != null) {
-            dto.setEnabled(Integer.valueOf(map.get("enabled").toString()));
-        }
-        if (map.get("priority") != null) {
-            dto.setPriority(Integer.valueOf(map.get("priority").toString()));
-        }
-        if (map.get("description") != null) {
-            dto.setDescription(map.get("description").toString());
-        }
-        
-        return dto;
+    }
+
+    public boolean isPreloadCompleted() {
+        return preloadCompleted.get();
+    }
+
+    public boolean isWhitelistPreloadCompleted() {
+        return whitelistPreloadCompleted.get();
+    }
+
+    public int getRuleCount() {
+        return ruleCache.size();
+    }
+
+    public int getWhitelistCount() {
+        return whitelistCache.size();
     }
 }

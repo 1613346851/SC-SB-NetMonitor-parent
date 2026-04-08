@@ -1,6 +1,7 @@
 package com.network.monitor.controller.inner;
 
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.dto.AttackEventDTO;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.AttackMonitorEntity;
@@ -190,5 +191,75 @@ public class AttackEventReceiveController {
         }
         
         return 1;
+    }
+    
+    @PostMapping("/attack-event")
+    public ApiResponse<Void> receiveAttackEvent(@RequestBody AttackEventDTO eventDTO) {
+        try {
+            log.info("接收到攻击事件：ip={}, type={}, risk={}, confidence={}, rule={}, eventId={}", 
+                eventDTO.getSourceIp(), eventDTO.getAttackType(), eventDTO.getRiskLevel(), 
+                eventDTO.getConfidence(), eventDTO.getRuleName(), eventDTO.getEventId());
+            
+            AttackEventEntity event = attackEventService.getOrCreateEventWithEventId(
+                eventDTO.getSourceIp(), 
+                eventDTO.getAttackType(), 
+                eventDTO.getRiskLevel(), 
+                eventDTO.getConfidence(),
+                eventDTO.getEventId()
+            );
+            
+            String eventId = event != null ? event.getEventId() : null;
+            
+            AttackMonitorDTO attackDTO = new AttackMonitorDTO();
+            attackDTO.setSourceIp(eventDTO.getSourceIp());
+            attackDTO.setAttackType(eventDTO.getAttackType());
+            attackDTO.setRiskLevel(eventDTO.getRiskLevel());
+            attackDTO.setConfidence(eventDTO.getConfidence());
+            attackDTO.setTargetUri(eventDTO.getTargetUri());
+            attackDTO.setEventId(eventId);
+            attackDTO.setAttackContent(eventDTO.getAttackContent());
+            
+            if (eventDTO.getQueryParams() != null && !eventDTO.getQueryParams().isEmpty()) {
+                attackDTO.setAttackContent(buildAttackContentFromParams(eventDTO.getQueryParams()));
+            }
+            
+            AttackMonitorEntity attackEntity = attackStoreService.convertToEntity(attackDTO);
+            Long attackId = attackStoreService.saveAttack(attackEntity);
+            
+            if (attackId != null) {
+                attackDTO.setAttackId(attackId);
+                log.info("攻击记录已保存：attackId={}, ip={}, type={}, eventId={}", 
+                    attackId, eventDTO.getSourceIp(), eventDTO.getAttackType(), eventId);
+                
+                if (event != null) {
+                    attackEventService.incrementAttackCount(event.getId());
+                    log.info("更新事件统计完成：eventId={}, attackCount+1", eventId);
+                }
+            }
+            
+            defenseDecisionService.generateDefenseDecision(attackDTO);
+            log.info("攻击事件处理完成：ip={}, type={}, 已生成防御决策", 
+                eventDTO.getSourceIp(), eventDTO.getAttackType());
+            
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("处理攻击事件失败：", e);
+            return ApiResponse.error("处理攻击事件失败：" + e.getMessage());
+        }
+    }
+    
+    private String buildAttackContentFromParams(Map<String, String> queryParams) {
+        if (queryParams == null || queryParams.isEmpty()) {
+            return null;
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+            if (sb.length() > 0) {
+                sb.append("&");
+            }
+            sb.append(entry.getKey()).append("=").append(entry.getValue());
+        }
+        return sb.toString();
     }
 }

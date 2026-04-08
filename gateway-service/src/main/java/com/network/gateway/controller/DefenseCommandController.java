@@ -238,11 +238,7 @@ public class DefenseCommandController {
             }
 
             case BLOCK -> {
-                maliciousRequestFilter.addMaliciousIp(sourceIp);
-                if (eventId != null) {
-                    attackStateCache.markAsDefended(sourceIp, eventId);
-                    logger.info("IP[{}]已标记为DEFENDED状态，eventId={}", sourceIp, eventId);
-                }
+                logger.info("请求拦截防御：IP[{}]，eventId={}，拦截已由攻击规则检测过滤器实时执行", sourceIp, eventId);
                 yield true;
             }
         };

@@ -81,6 +81,8 @@ public class GatewayHttpConstant {
         public static final String DEFENSE_COMMAND_ENDPOINT = "/api/monitor/defense/command";
         /** DDoS攻击事件接口路径 */
         public static final String DDOS_ATTACK_EVENT_ENDPOINT = "/api/inner/attack/ddos-event";
+        /** 攻击事件接口路径 */
+        public static final String ATTACK_EVENT_ENDPOINT = "/api/inner/attack/attack-event";
         /** 黑名单事件接口路径 */
         public static final String BLACKLIST_EVENT_ENDPOINT = "/api/inner/blacklist/event";
         

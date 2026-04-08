@@ -149,6 +149,10 @@ gateway:
   alert:
     enabled: true
   
+  # 监控服务配置
+  monitor-service:
+    url: http://localhost:9002
+  
   # 流量采集配置
   traffic:
     collection:

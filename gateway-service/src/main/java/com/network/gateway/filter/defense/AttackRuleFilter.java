@@ -3,10 +3,14 @@ package com.network.gateway.filter.defense;
 import com.network.gateway.bo.DefenseResultBO;
 import com.network.gateway.cache.GatewayConfigCache;
 import com.network.gateway.cache.RuleCache;
+import com.network.gateway.cache.WhitelistCache;
 import com.network.gateway.client.MonitorServiceDefenseClient;
+import com.network.gateway.client.MonitorServiceTrafficClient;
 import com.network.gateway.constant.GatewayFilterOrderConstant;
+import com.network.gateway.dto.AttackEventDTO;
 import com.network.gateway.dto.AttackRuleDTO;
 import com.network.gateway.dto.DefenseLogDTO;
+import com.network.gateway.dto.TrafficMonitorDTO;
 import com.network.gateway.util.DefenseLogUtil;
 import com.network.gateway.util.DefenseResponseUtil;
 import com.network.gateway.util.ServerWebExchangeUtil;
@@ -24,6 +28,9 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +39,10 @@ import java.util.Map;
  * 实现两阶段检测：
  * 1. 第一阶段：检测URL、Query参数、请求头、Cookie（无需读取请求体）
  * 2. 第二阶段：如果第一阶段未匹配，读取请求体进行检测
+ * 
+ * 白名单机制：
+ * - 路径白名单：跳过URL路径检测
+ * - 请求头白名单：跳过指定请求头的检测
  *
  * @author network-monitor
  * @since 1.0.0
@@ -51,10 +62,16 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
     private RuleCache ruleCache;
 
     @Autowired
+    private WhitelistCache whitelistCache;
+
+    @Autowired
     private GatewayConfigCache configCache;
 
     @Autowired
     private MonitorServiceDefenseClient defenseClient;
+
+    @Autowired
+    private MonitorServiceTrafficClient trafficClient;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -70,6 +87,7 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
             }
 
             if (ruleCache.size() == 0) {
+                logger.warn("规则缓存为空，跳过攻击检测。请检查规则同步状态！");
                 return chain.filter(exchange);
             }
 
@@ -115,12 +133,16 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
     private RuleCache.MatchResult detectPhase1(ServerWebExchange exchange) {
         ServerHttpRequest request = exchange.getRequest();
-
         String uri = request.getURI().getPath();
-        RuleCache.MatchResult uriResult = ruleCache.matchAll(uri);
-        if (uriResult != null) {
-            logger.debug("URL路径匹配规则: uri={}, rule={}", uri, uriResult.getRuleName());
-            return uriResult;
+
+        if (!whitelistCache.isPathWhitelisted(uri)) {
+            RuleCache.MatchResult uriResult = ruleCache.matchAll(uri);
+            if (uriResult != null) {
+                logger.debug("URL路径匹配规则: uri={}, rule={}", uri, uriResult.getRuleName());
+                return uriResult;
+            }
+        } else {
+            logger.debug("URL路径在白名单中，跳过检测: uri={}", uri);
         }
 
         String queryString = request.getURI().getQuery();
@@ -130,15 +152,34 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                 logger.debug("Query参数匹配规则: query={}, rule={}", queryString, queryResult.getRuleName());
                 return queryResult;
             }
+            
+            try {
+                String decodedQuery = java.net.URLDecoder.decode(queryString, java.nio.charset.StandardCharsets.UTF_8);
+                if (!decodedQuery.equals(queryString)) {
+                    queryResult = ruleCache.matchAll(decodedQuery);
+                    if (queryResult != null) {
+                        logger.debug("解码后Query参数匹配规则: query={}, rule={}", decodedQuery, queryResult.getRuleName());
+                        return queryResult;
+                    }
+                }
+            } catch (Exception e) {
+                logger.debug("Query参数解码失败: {}", e.getMessage());
+            }
         }
 
         Map<String, String> headers = ServerWebExchangeUtil.extractHeaders(request);
         for (Map.Entry<String, String> entry : headers.entrySet()) {
+            String headerName = entry.getKey();
             String headerValue = entry.getValue();
+
+            if (whitelistCache.isHeaderWhitelisted(headerName)) {
+                continue;
+            }
+
             if (headerValue != null && !headerValue.isEmpty()) {
                 RuleCache.MatchResult headerResult = ruleCache.matchAll(headerValue);
                 if (headerResult != null) {
-                    logger.debug("请求头匹配规则: header={}, rule={}", entry.getKey(), headerResult.getRuleName());
+                    logger.debug("请求头匹配规则: header={}, rule={}", headerName, headerResult.getRuleName());
                     return headerResult;
                 }
             }
@@ -222,6 +263,23 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
         String eventId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
 
+        try {
+            AttackEventDTO attackEvent = buildAttackEventDTO(exchange, sourceIp, eventId, matchResult);
+            defenseClient.pushAttackEvent(attackEvent);
+            logger.info("推送攻击事件成功: eventId={}, ip={}, type={}, rule={}", 
+                eventId, sourceIp, attackType, rule.getRuleName());
+        } catch (Exception e) {
+            logger.error("推送攻击事件失败: {}", e.getMessage());
+        }
+
+        try {
+            TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, eventId, attackType, riskLevel);
+            trafficClient.pushTraffic(trafficDTO);
+            logger.info("推送攻击流量数据成功: eventId={}, ip={}, type={}", eventId, sourceIp, attackType);
+        } catch (Exception e) {
+            logger.error("推送攻击流量数据失败: {}", e.getMessage());
+        }
+
         DefenseLogDTO logDTO = DefenseLogUtil.buildBlockLog(
                 sourceIp,
                 eventId,
@@ -245,7 +303,117 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
             logger.error("推送攻击检测日志失败: {}", e.getMessage());
         }
 
+        exchange.getAttributes().put("attack_intercepted", true);
+
         return DefenseResponseUtil.buildMaliciousRequestResponse(response, sourceIp, eventId, riskLevel);
+    }
+    
+    private TrafficMonitorDTO buildTrafficDTO(ServerWebExchange exchange, String sourceIp, 
+                                              String eventId, String attackType, String riskLevel) {
+        ServerHttpRequest request = exchange.getRequest();
+        
+        TrafficMonitorDTO trafficDTO = new TrafficMonitorDTO();
+        trafficDTO.setRequestId(java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+        trafficDTO.setEventId(eventId);
+        trafficDTO.setSourceIp(sourceIp);
+        trafficDTO.setTargetIp(ServerWebExchangeUtil.extractTargetIp(request));
+        trafficDTO.setHttpMethod(request.getMethodValue());
+        trafficDTO.setRequestUri(request.getURI().getPath());
+        trafficDTO.setRequestTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        trafficDTO.setResponseStatus(400);
+        trafficDTO.setResponseTime(0L);
+        trafficDTO.setStateTag("攻击");
+        trafficDTO.setAbnormalTraffic(true);
+        trafficDTO.setAbnormalReason("攻击规则匹配: " + attackType);
+        
+        String queryString = request.getURI().getQuery();
+        if (queryString != null && !queryString.isEmpty()) {
+            Map<String, String> queryParams = new HashMap<>();
+            String[] pairs = queryString.split("&");
+            for (String pair : pairs) {
+                String[] keyValue = pair.split("=", 2);
+                if (keyValue.length == 2) {
+                    try {
+                        String key = java.net.URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
+                        String value = java.net.URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
+                        queryParams.put(key, value);
+                    } catch (Exception e) {
+                        logger.debug("URL参数解码失败: {}", e.getMessage());
+                    }
+                }
+            }
+            trafficDTO.setQueryParams(queryParams);
+        }
+        
+        Map<String, String> headers = ServerWebExchangeUtil.extractHeaders(request);
+        trafficDTO.setRequestHeaders(headers);
+        trafficDTO.setUserAgent(headers.get("User-Agent"));
+        
+        return trafficDTO;
+    }
+    
+    private AttackEventDTO buildAttackEventDTO(ServerWebExchange exchange, String sourceIp, 
+                                               String eventId, RuleCache.MatchResult matchResult) {
+        ServerHttpRequest request = exchange.getRequest();
+        AttackRuleDTO rule = matchResult.getMatchedRule();
+        
+        AttackEventDTO eventDTO = new AttackEventDTO(
+            sourceIp, 
+            matchResult.getAttackType(), 
+            matchResult.getRiskLevel(), 
+            85
+        );
+        
+        eventDTO.setEventId(eventId);
+        eventDTO.setRuleName(rule.getRuleName());
+        eventDTO.setRuleId(String.valueOf(rule.getId()));
+        eventDTO.setTargetUri(request.getURI().getPath());
+        eventDTO.setHttpMethod(request.getMethodValue());
+        
+        String queryString = request.getURI().getQuery();
+        if (queryString != null && !queryString.isEmpty()) {
+            Map<String, String> queryParams = new HashMap<>();
+            String[] pairs = queryString.split("&");
+            for (String pair : pairs) {
+                String[] keyValue = pair.split("=", 2);
+                if (keyValue.length == 2) {
+                    try {
+                        String key = java.net.URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
+                        String value = java.net.URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
+                        queryParams.put(key, value);
+                    } catch (Exception e) {
+                        logger.debug("URL参数解码失败: {}", e.getMessage());
+                    }
+                }
+            }
+            eventDTO.setQueryParams(queryParams);
+            
+            String attackContent = buildAttackContent(queryParams);
+            eventDTO.setAttackContent(attackContent);
+        }
+        
+        Map<String, String> headers = ServerWebExchangeUtil.extractHeaders(request);
+        eventDTO.setRequestHeaders(headers);
+        eventDTO.setUserAgent(headers.get("User-Agent"));
+        
+        eventDTO.updateDescription();
+        
+        return eventDTO;
+    }
+    
+    private String buildAttackContent(Map<String, String> queryParams) {
+        if (queryParams == null || queryParams.isEmpty()) {
+            return null;
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+            if (sb.length() > 0) {
+                sb.append("&");
+            }
+            sb.append(entry.getKey()).append("=").append(entry.getValue());
+        }
+        return sb.toString();
     }
 
     @Override

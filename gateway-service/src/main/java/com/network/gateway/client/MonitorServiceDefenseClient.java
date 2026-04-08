@@ -3,6 +3,7 @@ package com.network.gateway.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.gateway.constant.GatewayHttpConstant;
+import com.network.gateway.dto.AttackEventDTO;
 import com.network.gateway.dto.BlacklistEventDTO;
 import com.network.gateway.dto.DDoSAttackEventDTO;
 import com.network.gateway.dto.DefenseLogDTO;
@@ -259,6 +260,56 @@ public class MonitorServiceDefenseClient {
         event.setRequestUri(requestUri);
         event.setUserAgent(userAgent);
         pushDDoSAttackEvent(event);
+    }
+
+    public void pushAttackEvent(AttackEventDTO event) throws RestClientException {
+        if (event == null) {
+            logger.warn("尝试推送空的攻击事件");
+            return;
+        }
+
+        String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, String> securityHeaders = CrossServiceSecurityUtil.generateSecurityHeaders(
+                    requestId, 
+                    secretKey
+            );
+            headers.set("X-Timestamp", securityHeaders.get("X-Timestamp"));
+            headers.set("X-Request-ID", securityHeaders.get("X-Request-ID"));
+            headers.set("X-Signature", securityHeaders.get("X-Signature"));
+
+            HttpEntity<AttackEventDTO> requestEntity = new HttpEntity<>(event, headers);
+
+            String url = GatewayHttpConstant.MonitorService.BASE_URL + GatewayHttpConstant.MonitorService.ATTACK_EVENT_ENDPOINT;
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    url,
+                    requestEntity,
+                    String.class
+            );
+
+            if (isResponseSuccessful(response)) {
+                logger.info("攻击事件推送成功: ip={}, type={}, rule={}", 
+                    event.getSourceIp(), event.getAttackType(), event.getRuleName());
+            } else {
+                String errorMsg = extractErrorMessage(response.getBody());
+                logger.error("攻击事件推送失败: ip={}, type={}, 响应内容[{}]", 
+                    event.getSourceIp(), event.getAttackType(), errorMsg);
+                throw new RestClientException("监控服务返回错误: " + errorMsg);
+            }
+
+        } catch (RestClientException e) {
+            logger.error("推送攻击事件到监控服务失败: ip={}, type={}, 错误: {}", 
+                event.getSourceIp(), event.getAttackType(), e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            logger.error("推送攻击事件时发生未知异常: ip={}, type={}", 
+                event.getSourceIp(), event.getAttackType(), e);
+            throw new RestClientException("推送攻击事件时发生未知异常", e);
+        }
     }
 
     public void pushBlacklistEvent(BlacklistEventDTO event) throws RestClientException {

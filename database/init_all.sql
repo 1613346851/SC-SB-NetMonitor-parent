@@ -169,6 +169,26 @@ CREATE TABLE `sys_monitor_rule` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='攻击规则表';
 
 -- ------------------------------------------------------------
+-- 2.5.1 检测白名单表 (sys_detection_whitelist)
+-- 存储攻击检测白名单，用于减少误报
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_detection_whitelist`;
+CREATE TABLE `sys_detection_whitelist` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
+  `whitelist_type` VARCHAR(20) NOT NULL COMMENT '白名单类型(PATH-路径白名单，HEADER-请求头白名单，IP-IP白名单)',
+  `whitelist_value` VARCHAR(255) NOT NULL COMMENT '白名单值(路径模式/请求头名称/IP地址)',
+  `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
+  `enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '启用状态 (0-禁用，1-启用)',
+  `priority` INT DEFAULT 100 COMMENT '优先级 (数字越小优先级越高)',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_whitelist_type` (`whitelist_type`),
+  KEY `idx_enabled` (`enabled`),
+  KEY `idx_priority` (`priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='检测白名单表';
+
+-- ------------------------------------------------------------
 -- 2.6 系统配置表 (sys_config)
 -- 存储系统配置信息
 -- ------------------------------------------------------------
@@ -546,17 +566,19 @@ GROUP BY e.id, e.event_id, e.source_ip, e.attack_type, e.risk_level,
 -- 4.1 初始化攻击检测规则
 -- ------------------------------------------------------------
 
--- SQL 注入检测规则
+-- SQL 注入检测规则（针对靶场测试用例优化）
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
 ('SQL 注入检测 - UNION 关键字', 'SQL_INJECTION', '(?i)\\bUNION\\b.*\\bSELECT\\b', '检测 UNION SELECT 注入攻击', 'HIGH', 1, 10),
-('SQL 注入检测 - OR 1=1', 'SQL_INJECTION', '(?i)\\bOR\\b\\s+1\\s*=\\s*1', '检测 OR 1=1 注入攻击', 'HIGH', 1, 10),
+('SQL 注入检测 - OR 1=1', 'SQL_INJECTION', '(?i)\\bOR\\b\\s+[\'"]?1[\'"]?\\s*=\\s*[\'"]?1[\'"]?', '检测 OR 1=1 注入攻击', 'HIGH', 1, 10),
 ('SQL 注入检测 - DROP TABLE', 'SQL_INJECTION', '(?i)\\bDROP\\b.*\\bTABLE\\b', '检测 DROP TABLE 恶意注入', 'HIGH', 1, 5),
 ('SQL 注入检测 - SLEEP 函数', 'SQL_INJECTION', '(?i)\\bSLEEP\\b\\s*\\(', '检测基于时间盲注的 SLEEP 函数', 'MEDIUM', 1, 20),
 ('SQL 注入检测 - BENCHMARK 函数', 'SQL_INJECTION', '(?i)\\bBENCHMARK\\b\\s*\\(', '检测基于时间盲注的 BENCHMARK 函数', 'MEDIUM', 1, 20),
 ('SQL 注入检测 - 注释符号', 'SQL_INJECTION', '(--|#|/\\*)', '检测 SQL 注释符号', 'LOW', 1, 50),
-('SQL 注入检测 - 十六进制编码', 'SQL_INJECTION', '0x[0-9a-fA-F]+', '检测十六进制编码的注入', 'MEDIUM', 1, 30);
+('SQL 注入检测 - 十六进制编码', 'SQL_INJECTION', '0x[0-9a-fA-F]+', '检测十六进制编码的注入', 'MEDIUM', 1, 30),
+('SQL 注入检测 - 堆叠查询', 'SQL_INJECTION', ';\\s*(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\\b', '检测堆叠查询攻击', 'HIGH', 1, 15),
+('SQL 注入检测 - 布尔盲注', 'SQL_INJECTION', '(?i)\\bAND\\b\\s+[\'"]?\\d+[\'"]?\\s*=\\s*[\'"]?\\d+[\'"]?', '检测布尔盲注攻击', 'MEDIUM', 1, 25);
 
--- XSS 攻击检测规则
+-- XSS 攻击检测规则（针对靶场测试用例优化）
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
 ('XSS 检测 - script 标签', 'XSS', '(?i)<\\s*script[^>]*>', '检测 script 标签注入', 'HIGH', 1, 10),
 ('XSS 检测 - javascript 协议', 'XSS', '(?i)javascript\\s*:', '检测 javascript 协议注入', 'HIGH', 1, 10),
@@ -565,34 +587,89 @@ INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `des
 ('XSS 检测 - onclick 事件', 'XSS', '(?i)\\bonclick\\b\\s*=', '检测 onclick 事件处理器', 'MEDIUM', 1, 20),
 ('XSS 检测 - alert 函数', 'XSS', '(?i)\\balert\\b\\s*\\(', '检测 alert 弹窗函数', 'MEDIUM', 1, 30),
 ('XSS 检测 - document.cookie', 'XSS', '(?i)document\\.cookie', '检测 Cookie 窃取尝试', 'HIGH', 1, 15),
-('XSS 检测 - img 标签注入', 'XSS', '(?i)<\\s*img[^>]+onerror', '检测 img 标签 onerror 注入', 'MEDIUM', 1, 25);
+('XSS 检测 - img 标签注入', 'XSS', '(?i)<\\s*img[^>]+onerror', '检测 img 标签 onerror 注入', 'MEDIUM', 1, 25),
+('XSS 检测 - SVG 标签注入', 'XSS', '(?i)<\\s*svg[^>]*onload', '检测 SVG 标签 onload 注入', 'MEDIUM', 1, 25),
+('XSS 检测 - eval 函数', 'XSS', '(?i)\\beval\\b\\s*\\(', '检测 eval 函数调用', 'HIGH', 1, 20);
 
--- 命令注入检测规则
+-- 命令注入检测规则（针对靶场测试用例优化，减少误报）
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('命令注入 - 管道符', 'COMMAND_INJECTION', '\\|\\s*\\w+', '检测管道符命令注入', 'HIGH', 1, 10),
-('命令注入 - 分号分隔', 'COMMAND_INJECTION', ';\\s*\\w+', '检测分号分隔的命令注入', 'HIGH', 1, 10),
+('命令注入 - 管道符', 'COMMAND_INJECTION', '\\|\\s*(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|ping|tasklist)\\b', '检测管道符命令注入', 'HIGH', 1, 10),
+('命令注入 - 分号分隔', 'COMMAND_INJECTION', ';\\s*(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|ping|tasklist)\\b', '检测分号分隔的命令注入', 'HIGH', 1, 10),
 ('命令注入 - 反引号执行', 'COMMAND_INJECTION', '`[^`]+`', '检测反引号命令执行', 'HIGH', 1, 5),
 ('命令注入 - $() 执行', 'COMMAND_INJECTION', '\\$\\([^)]+\\)', '检测 $() 命令执行', 'HIGH', 1, 5),
-('命令注入 - 常见命令', 'COMMAND_INJECTION', '(?i)\\b(cat|ls|pwd|whoami|wget|curl|nc|bash|sh)\\b', '检测常见系统命令', 'MEDIUM', 1, 30),
-('命令注入 - Windows 命令', 'COMMAND_INJECTION', '(?i)\\b(cmd|powershell|systeminfo|ipconfig)\\b', '检测 Windows 系统命令', 'MEDIUM', 1, 30);
+('命令注入 - 常见命令带参数', 'COMMAND_INJECTION', '(?i)\\b(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|ping|tasklist)\\s+[\\w\\-./]+', '检测常见系统命令带参数', 'MEDIUM', 1, 30),
+('命令注入 - Windows 命令执行', 'COMMAND_INJECTION', '(?i)(cmd\\s*/c|cmd\\.exe|powershell\\s*-|\\|\\s*cmd\\b)', '检测 Windows 命令执行模式', 'HIGH', 1, 25),
+('命令注入 - 参数注入', 'COMMAND_INJECTION', '(?i)(cmd|command|exec|execute|ping|tasklist|dir)\\s*=[^&]*\\b(cat|ls|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|ping|tasklist)\\b', '检测参数中的命令注入', 'HIGH', 1, 20);
 
--- 路径遍历检测规则
+-- 路径遍历检测规则（针对靶场测试用例优化）
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
 ('路径遍历 - 父目录引用', 'PATH_TRAVERSAL', '\\.\\./|\\.\\.\\\\', '检测父目录引用 (../ 或 ..\\)', 'HIGH', 1, 10),
 ('路径遍历 - 绝对路径', 'PATH_TRAVERSAL', '(?i)/etc/passwd|/etc/shadow', '检测 Linux 敏感文件路径', 'HIGH', 1, 5),
 ('路径遍历 - Windows 敏感文件', 'PATH_TRAVERSAL', '(?i)c:\\\\windows', '检测 Windows 系统路径', 'MEDIUM', 1, 20),
-('路径遍历 - URL 编码绕过', 'PATH_TRAVERSAL', '%2e%2e%2f|%2e%2e/', '检测 URL 编码的路径遍历', 'HIGH', 1, 15);
+('路径遍历 - URL 编码绕过', 'PATH_TRAVERSAL', '%2e%2e%2f|%2e%2e/', '检测 URL 编码的路径遍历', 'HIGH', 1, 15),
+('路径遍历 - 参数注入', 'PATH_TRAVERSAL', '(?i)(filename|file|path)\\s*=[^&]*\\.\\./', '检测参数中的路径遍历', 'HIGH', 1, 12);
 
--- 文件包含检测规则
+-- 文件包含检测规则（针对靶场测试用例优化）
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
 ('文件包含 - PHP include', 'FILE_INCLUSION', '(?i)\\b(include|require|include_once|require_once)\\b\\s*\\(', '检测 PHP 文件包含函数', 'HIGH', 1, 10),
 ('文件包含 - data 协议', 'FILE_INCLUSION', '(?i)data://', '检测 data 协议文件包含', 'HIGH', 1, 10),
 ('文件包含 - php://协议', 'FILE_INCLUSION', '(?i)php://', '检测 php:// 协议', 'HIGH', 1, 10),
-('文件包含 - file://协议', 'FILE_INCLUSION', '(?i)file://', '检测 file:// 协议', 'HIGH', 1, 10);
+('文件包含 - file://协议', 'FILE_INCLUSION', '(?i)file://', '检测 file:// 协议', 'HIGH', 1, 10),
+('文件包含 - classpath 协议', 'FILE_INCLUSION', '(?i)classpath:', '检测 classpath 协议文件包含', 'HIGH', 1, 10),
+('文件包含 - 参数注入', 'FILE_INCLUSION', '(?i)(path|file|include)\\s*=[^&]*(file://|classpath:|\\.\\./)', '检测参数中的文件包含', 'HIGH', 1, 15);
 
 -- DDoS 攻击检测规则（基于频率）
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
 ('DDoS 检测 - 高频请求', 'DDOS', 'FREQUENCY_THRESHOLD', '基于请求频率的 DDoS 检测（需配合计数器）', 'HIGH', 1, 1);
+
+-- ------------------------------------------------------------
+-- 4.1.2 初始化检测白名单
+-- 减少误报，跳过对特定路径和请求头的检测
+-- ------------------------------------------------------------
+
+-- 路径白名单：靶场静态页面路径（精确匹配，不使用通配符）
+INSERT INTO `sys_detection_whitelist` (`whitelist_type`, `whitelist_value`, `description`, `enabled`, `priority`) VALUES
+('PATH', '/target/page/index', '靶场首页', 1, 10),
+('PATH', '/target/page/', '靶场首页（根路径）', 1, 10),
+('PATH', '/target/page/cmd-vuln', 'CMD命令注入测试页面', 1, 10),
+('PATH', '/target/page/sql-vuln', 'SQL注入测试页面', 1, 10),
+('PATH', '/target/page/xss-vuln', 'XSS测试页面', 1, 10),
+('PATH', '/target/page/ddos-vuln', 'DDoS测试页面', 1, 10),
+('PATH', '/target/page/path-traversal-vuln', '路径遍历测试页面', 1, 10),
+('PATH', '/target/page/file-include-vuln', '文件包含测试页面', 1, 10),
+('PATH', '/target/page/ssrf-vuln', 'SSRF测试页面', 1, 10),
+('PATH', '/target/page/xxe-vuln', 'XXE测试页面', 1, 10),
+('PATH', '/target/page/deserial-vuln', '反序列化测试页面', 1, 10),
+('PATH', '/target/page/csrf-vuln', 'CSRF测试页面', 1, 10),
+('PATH', '/target/sql/safe-query', 'SQL注入安全对比接口', 1, 15),
+('PATH', '/target/xss/safe-submit-comment', 'XSS安全对比接口', 1, 15),
+('PATH', '/target/xss/list-comments', 'XSS评论列表接口', 1, 15),
+('PATH', '/target/path/safe-read', '路径遍历安全对比接口', 1, 15),
+('PATH', '/target/path/list-files', '路径遍历文件列表接口', 1, 15),
+('PATH', '/target/file/safe-include', '文件包含安全对比接口', 1, 15),
+('PATH', '/target/file/list-allowed', '文件包含允许列表接口', 1, 15),
+('PATH', '/static/*', '静态资源路径', 1, 20),
+('PATH', '/favicon.ico', '网站图标', 1, 30),
+('PATH', '/actuator/*', 'Spring Boot Actuator端点', 1, 40);
+
+-- 请求头白名单：标准HTTP请求头，不应被检测
+INSERT INTO `sys_detection_whitelist` (`whitelist_type`, `whitelist_value`, `description`, `enabled`, `priority`) VALUES
+('HEADER', 'Accept', 'HTTP内容协商请求头', 1, 10),
+('HEADER', 'Accept-Language', '语言偏好请求头', 1, 20),
+('HEADER', 'Accept-Encoding', '编码偏好请求头', 1, 30),
+('HEADER', 'Accept-Charset', '字符集偏好请求头', 1, 40),
+('HEADER', 'Cache-Control', '缓存控制请求头', 1, 50),
+('HEADER', 'Connection', '连接控制请求头', 1, 60),
+('HEADER', 'Content-Type', '内容类型请求头', 1, 70),
+('HEADER', 'Content-Length', '内容长度请求头', 1, 80),
+('HEADER', 'Host', '主机请求头', 1, 90),
+('HEADER', 'Origin', '跨域来源请求头', 1, 100),
+('HEADER', 'Referer', '来源页面请求头', 1, 110),
+('HEADER', 'User-Agent', '用户代理请求头', 1, 120),
+('HEADER', 'X-Forwarded-For', '代理转发请求头', 1, 130),
+('HEADER', 'X-Real-IP', '真实IP请求头', 1, 140),
+('HEADER', 'X-Request-ID', '请求ID请求头', 1, 150),
+('HEADER', 'X-Forwarded-Proto', '转发协议请求头', 1, 160);
 
 -- ------------------------------------------------------------
 -- 4.2 初始化预设漏洞信息

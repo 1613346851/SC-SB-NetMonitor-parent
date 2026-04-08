@@ -23,65 +23,140 @@
             </header>
 
             <main class="content">
-                <div class="filter-bar">
-                    <div class="form-inline">
-                        <div class="form-group">
-                            <label class="form-label">规则名称</label>
-                            <input type="text" class="form-control" id="ruleName" placeholder="请输入规则名称">
+                <div class="tab-container">
+                    <div class="tab-header">
+                        <div class="tab-item active" onclick="switchTab('rules')" id="tab-rules">
+                            <span>攻击规则</span>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">攻击类型</label>
-                            <select class="form-control" id="attackType">
-                                <option value="">全部</option>
-                                <option value="SQL_INJECTION">SQL 注入</option>
-                                <option value="XSS">XSS 攻击</option>
-                                <option value="COMMAND_INJECTION">命令注入</option>
-                                <option value="DDOS">DDoS 攻击</option>
-                                <option value="PATH_TRAVERSAL">路径遍历</option>
-                                <option value="FILE_INCLUSION">文件包含</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">启用状态</label>
-                            <select class="form-control" id="enabled">
-                                <option value="">全部</option>
-                                <option value="1">启用</option>
-                                <option value="0">禁用</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-primary" onclick="searchRules()">查询</button>
-                            <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                        <div class="tab-item" onclick="switchTab('whitelist')" id="tab-whitelist">
+                            <span>检测白名单</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="table-container">
-                    <div class="table-header">
-                        <h3 class="table-title">攻击规则</h3>
+                <div id="rules-content">
+                    <div class="filter-bar">
+                        <div class="form-inline">
+                            <div class="form-group">
+                                <label class="form-label">规则名称</label>
+                                <input type="text" class="form-control" id="ruleName" placeholder="请输入规则名称">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">攻击类型</label>
+                                <select class="form-control" id="attackType">
+                                    <option value="">全部</option>
+                                    <option value="SQL_INJECTION">SQL 注入</option>
+                                    <option value="XSS">XSS 攻击</option>
+                                    <option value="COMMAND_INJECTION">命令注入</option>
+                                    <option value="DDOS">DDoS 攻击</option>
+                                    <option value="PATH_TRAVERSAL">路径遍历</option>
+                                    <option value="FILE_INCLUSION">文件包含</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">启用状态</label>
+                                <select class="form-control" id="enabled">
+                                    <option value="">全部</option>
+                                    <option value="1">启用</option>
+                                    <option value="0">禁用</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <button class="btn btn-primary" onclick="searchRules()">查询</button>
+                                <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="table-wrapper" style="position: relative;">
-                        <table class="data-table has-fixed-action">
-                            <thead>
-                                <tr>
-                                    <th data-sort="id" style="min-width: 60px;">ID</th>
-                                    <th data-sort="ruleName" style="min-width: 120px;">规则名称</th>
-                                    <th data-sort="attackType" style="min-width: 100px;">攻击类型</th>
-                                    <th style="min-width: 200px;">规则表达式</th>
-                                    <th data-sort="riskLevel" style="min-width: 100px;">风险等级</th>
-                                    <th data-sort="enabled" style="min-width: 100px;">启用状态</th>
-                                    <th>操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ruleTableBody">
-                                <tr>
-                                    <td colspan="7" class="text-center">加载中...</td>
-                                </tr>
-                            </tbody>
-                        </table>
+
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3 class="table-title">攻击规则</h3>
+                        </div>
+                        <div class="table-wrapper" style="position: relative;">
+                            <table class="data-table has-fixed-action">
+                                <thead>
+                                    <tr>
+                                        <th data-sort="id" style="min-width: 60px;">ID</th>
+                                        <th data-sort="ruleName" style="min-width: 120px;">规则名称</th>
+                                        <th data-sort="attackType" style="min-width: 100px;">攻击类型</th>
+                                        <th style="min-width: 200px;">规则表达式</th>
+                                        <th data-sort="riskLevel" style="min-width: 100px;">风险等级</th>
+                                        <th data-sort="enabled" style="min-width: 100px;">启用状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ruleTableBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center">加载中...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination-container" style="padding: 16px 24px;">
+                            <div class="pagination" id="pagination"></div>
+                        </div>
                     </div>
-                    <div class="pagination-container" style="padding: 16px 24px;">
-                        <div class="pagination" id="pagination"></div>
+                </div>
+
+                <div id="whitelist-content" style="display: none;">
+                    <div class="filter-bar">
+                        <div class="form-inline">
+                            <div class="form-group">
+                                <label class="form-label">白名单类型</label>
+                                <select class="form-control" id="whitelistType">
+                                    <option value="">全部</option>
+                                    <option value="PATH">路径白名单</option>
+                                    <option value="HEADER">请求头白名单</option>
+                                    <option value="IP">IP白名单</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">白名单值</label>
+                                <input type="text" class="form-control" id="whitelistValue" placeholder="请输入白名单值">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">启用状态</label>
+                                <select class="form-control" id="whitelistEnabled">
+                                    <option value="">全部</option>
+                                    <option value="1">启用</option>
+                                    <option value="0">禁用</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <button class="btn btn-primary" onclick="searchWhitelists()">查询</button>
+                                <button class="btn btn-default" onclick="resetWhitelistSearch()">重置</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3 class="table-title">检测白名单</h3>
+                            <button class="btn btn-primary" onclick="showAddWhitelistModal()">+ 新增白名单</button>
+                        </div>
+                        <div class="table-wrapper" style="position: relative;">
+                            <table class="data-table has-fixed-action">
+                                <thead>
+                                    <tr>
+                                        <th data-sort="id" style="min-width: 60px;">ID</th>
+                                        <th data-sort="whitelistType" style="min-width: 100px;">白名单类型</th>
+                                        <th style="min-width: 200px;">白名单值</th>
+                                        <th style="min-width: 150px;">描述</th>
+                                        <th data-sort="priority" style="min-width: 80px;">优先级</th>
+                                        <th data-sort="enabled" style="min-width: 100px;">启用状态</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="whitelistTableBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center">加载中...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination-container" style="padding: 16px 24px;">
+                            <div class="pagination" id="whitelistPagination"></div>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -148,6 +223,54 @@
             <div class="modal-footer">
                 <button class="btn btn-default" onclick="closeRuleModal()">取消</button>
                 <button class="btn btn-primary" onclick="saveRule()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="whitelistModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title" id="whitelistModalTitle">新增白名单</h3>
+                <span class="modal-close" onclick="closeWhitelistModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="whitelistForm">
+                    <input type="hidden" id="whitelistId">
+                    <div class="form-group">
+                        <label class="form-label">白名单类型 <span style="color: red;">*</span></label>
+                        <select class="form-control" id="whitelistTypeInput" required>
+                            <option value="">请选择</option>
+                            <option value="PATH">路径白名单</option>
+                            <option value="HEADER">请求头白名单</option>
+                            <option value="IP">IP白名单</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">白名单值 <span style="color: red;">*</span></label>
+                        <input type="text" class="form-control" id="whitelistValueInput" required placeholder="路径模式/请求头名称/IP地址">
+                        <small class="form-hint">路径支持通配符 * ，如 /target/page/*</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" id="whitelistDescInput" rows="2" placeholder="描述（可选）"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">优先级</label>
+                        <input type="number" class="form-control" id="whitelistPriorityInput" value="100" min="1" max="1000">
+                        <small class="form-hint">数字越小优先级越高</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <select class="form-control" id="whitelistEnabledInput">
+                            <option value="1">启用</option>
+                            <option value="0">禁用</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeWhitelistModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveWhitelist()">保存</button>
             </div>
         </div>
     </div>

@@ -66,7 +66,7 @@ public class DefenseStateCheckFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return GatewayFilterOrderConstant.DEFENSE_STATE_CHECK_FILTER_ORDER;
+        return 6;
     }
 
     public String getFilterName() {

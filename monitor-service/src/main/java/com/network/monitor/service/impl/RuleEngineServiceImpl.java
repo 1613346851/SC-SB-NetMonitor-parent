@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 规则引擎服务实现类 - 增强型攻击检测核心
@@ -91,9 +92,7 @@ public class RuleEngineServiceImpl implements RuleEngineService {
             }
 
             String requestUri = trafficDTO.getRequestUri();
-            String queryParamsStr = trafficDTO.getQueryParams() != null 
-                ? trafficDTO.getQueryParams().toString() 
-                : null;
+            String queryParamsStr = buildQueryString(trafficDTO.getQueryParams());
             
             String urlPath = extractUrlPath(requestUri);
             String urlQuery = extractUrlQuery(requestUri);
@@ -123,8 +122,8 @@ public class RuleEngineServiceImpl implements RuleEngineService {
 
                     String normalizedContent = AttackContentDecodeUtil.normalize(fieldContent);
                     
-                    if (matchRule(normalizedContent, rule)) {
-                        AttackMonitorDTO attack = buildAttackDTO(trafficDTO, attackType, rule, normalizedContent);
+                    if (matchRule(fieldContent, rule) || matchRule(normalizedContent, rule)) {
+                        AttackMonitorDTO attack = buildAttackDTO(trafficDTO, attackType, rule, fieldContent);
                         
                         if (isLowRiskUrlPathCommand && !hasHighRiskChars) {
                             attack.setRiskLevel(RiskLevelConstant.LOW);
@@ -195,6 +194,21 @@ public class RuleEngineServiceImpl implements RuleEngineService {
                content.contains("$(") ||
                content.contains("&&") ||
                content.contains("||");
+    }
+    
+    private String buildQueryString(Map<String, String> queryParams) {
+        if (queryParams == null || queryParams.isEmpty()) {
+            return null;
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+            if (sb.length() > 0) {
+                sb.append("&");
+            }
+            sb.append(entry.getKey()).append("=").append(entry.getValue());
+        }
+        return sb.toString();
     }
 
     /**

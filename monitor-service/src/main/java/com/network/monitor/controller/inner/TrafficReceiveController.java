@@ -105,6 +105,12 @@ public class TrafficReceiveController {
             
             log.info("流量数据已保存：trafficId={}, sourceIp={}, uri={}", 
                 trafficId, trafficDTO.getSourceIp(), trafficEntity.getSourceIp());
+            
+            if (trafficDTO.getEventId() != null && !trafficDTO.getEventId().isEmpty()) {
+                log.info("流量数据包含eventId，网关已识别攻击，跳过规则匹配：eventId={}, ip={}, uri={}", 
+                    trafficDTO.getEventId(), trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+                return;
+            }
 
             List<AttackMonitorDTO> detectedAttacks = ruleEngineService.executeMatching(trafficDTO);
             if (detectedAttacks == null) {
@@ -117,11 +123,13 @@ public class TrafficReceiveController {
                     
                     VulnerabilityMonitorEntity matchedVuln = vulnerabilityVerifyService.verifyAttack(attack);
                     
-                    AttackEventEntity event = attackEventService.getOrCreateEvent(
+                    String gatewayEventId = trafficDTO.getEventId();
+                    AttackEventEntity event = attackEventService.getOrCreateEventWithEventId(
                         attack.getSourceIp(),
                         attack.getAttackType(),
                         attack.getRiskLevel(),
-                        attack.getConfidence() != null ? attack.getConfidence() : 80
+                        attack.getConfidence() != null ? attack.getConfidence() : 80,
+                        gatewayEventId
                     );
                     
                     if (event != null) {

@@ -115,6 +115,12 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
 
     private void processTrafficAfterResponse(ServerWebExchange exchange, RawTrafficBO rawTraffic, 
                                              String sourceIp, long startTime) {
+        Boolean attackIntercepted = exchange.getAttribute("attack_intercepted");
+        if (attackIntercepted != null && attackIntercepted) {
+            logger.debug("请求已被拦截，跳过流量推送：ip={}, uri={}", sourceIp, rawTraffic.getUri());
+            return;
+        }
+        
         long endTime = System.currentTimeMillis();
         int statusCode = exchange.getResponse().getStatusCode() != null ? 
                        exchange.getResponse().getStatusCode().value() : 200;

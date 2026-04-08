@@ -1,8 +1,30 @@
 let ruleTable;
+let whitelistTable;
+let currentTab = 'rules';
 
 document.addEventListener('DOMContentLoaded', function() {
     initRuleTable();
+    initWhitelistTable();
 });
+
+function switchTab(tab) {
+    currentTab = tab;
+    
+    document.getElementById('tab-rules').classList.remove('active');
+    document.getElementById('tab-whitelist').classList.remove('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+    
+    if (tab === 'rules') {
+        document.getElementById('rules-content').style.display = 'block';
+        document.getElementById('whitelist-content').style.display = 'none';
+    } else {
+        document.getElementById('rules-content').style.display = 'none';
+        document.getElementById('whitelist-content').style.display = 'block';
+        if (whitelistTable) {
+            whitelistTable.refresh();
+        }
+    }
+}
 
 function initRuleTable() {
     ruleTable = TableUtils.createInstance({
@@ -41,6 +63,51 @@ function initRuleTable() {
     ruleTable.loadData();
 }
 
+function initWhitelistTable() {
+    whitelistTable = TableUtils.createInstance({
+        instanceName: 'whitelistTable',
+        apiUrl: '/whitelist/list',
+        pageSize: 10,
+        defaultSortField: 'id',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'whitelistTableBody',
+        paginationEl: 'whitelistPagination',
+        colspan: 7,
+        fixedAction: true,
+        enableTooltip: true,
+        renderRow: function(item) {
+            const cell = TableUtils.cell;
+            
+            return `
+                <tr>
+                    <td>${item.id || '-'}</td>
+                    <td>${renderWhitelistType(item.whitelistType)}</td>
+                    ${cell.renderCell(item.whitelistValue, { maxLength: 50 })}
+                    ${cell.renderCell(item.description, { maxLength: 40 })}
+                    <td>${item.priority || 100}</td>
+                    <td>${cell.renderStatus(item.enabled)}</td>
+                    ${cell.renderActionCell([
+                        cell.renderToggleButtonItem(item.enabled, item.id, '禁用', '启用', 'toggleWhitelistStatus'),
+                        { text: '编辑', type: 'primary', onClick: `editWhitelist(${item.id})` },
+                        { text: '删除', type: 'danger', onClick: `deleteWhitelist(${item.id})` }
+                    ])}
+                </tr>
+            `;
+        }
+    });
+    
+    window.whitelistTable = whitelistTable;
+}
+
+function renderWhitelistType(type) {
+    const typeMap = {
+        'PATH': '<span class="tag tag-info">路径白名单</span>',
+        'HEADER': '<span class="tag tag-warning">请求头白名单</span>',
+        'IP': '<span class="tag tag-success">IP白名单</span>'
+    };
+    return typeMap[type] || '<span class="tag">' + type + '</span>';
+}
+
 function searchRules() {
     const ruleName = ruleTable.getSearchValue('ruleName');
     const attackType = ruleTable.getSearchSelectValue('attackType');
@@ -61,6 +128,26 @@ function resetSearch() {
     ruleTable.resetSearch();
 }
 
+function searchWhitelists() {
+    const whitelistType = whitelistTable.getSearchSelectValue('whitelistType');
+    const whitelistValue = whitelistTable.getSearchValue('whitelistValue');
+    const enabled = whitelistTable.getSearchSelectValue('whitelistEnabled');
+    
+    const params = {};
+    if (whitelistType) params.whitelistType = whitelistType;
+    if (whitelistValue) params.whitelistValue = whitelistValue;
+    if (enabled !== '') params.enabled = enabled;
+    
+    whitelistTable.search(params);
+}
+
+function resetWhitelistSearch() {
+    document.getElementById('whitelistType').value = '';
+    document.getElementById('whitelistValue').value = '';
+    document.getElementById('whitelistEnabled').value = '';
+    whitelistTable.resetSearch();
+}
+
 function toggleRuleStatus(id, currentStatus) {
     const newStatus = currentStatus === 1 ? 0 : 1;
     const actionText = newStatus === 1 ? '启用' : '禁用';
@@ -73,6 +160,24 @@ function toggleRuleStatus(id, currentStatus) {
         .then(result => {
             message.success(`${actionText}成功`);
             ruleTable.refresh();
+        })
+        .catch(error => {
+            message.error(`${actionText}失败: ` + (error.message || '未知错误'));
+        });
+}
+
+function toggleWhitelistStatus(id, currentStatus) {
+    const newStatus = currentStatus === 1 ? 0 : 1;
+    const actionText = newStatus === 1 ? '启用' : '禁用';
+    
+    if (!confirm(`确定要${actionText}该白名单吗？`)) {
+        return;
+    }
+    
+    http.put('/whitelist/' + id + '/toggle')
+        .then(result => {
+            message.success(`${actionText}成功`);
+            whitelistTable.refresh();
         })
         .catch(error => {
             message.error(`${actionText}失败: ` + (error.message || '未知错误'));
@@ -101,6 +206,26 @@ function editRule(id) {
         });
 }
 
+function editWhitelist(id) {
+    http.get('/whitelist/' + id)
+        .then(result => {
+            if (result) {
+                document.getElementById('whitelistId').value = result.id;
+                document.getElementById('whitelistTypeInput').value = result.whitelistType || '';
+                document.getElementById('whitelistValueInput').value = result.whitelistValue || '';
+                document.getElementById('whitelistDescInput').value = result.description || '';
+                document.getElementById('whitelistPriorityInput').value = result.priority || 100;
+                document.getElementById('whitelistEnabledInput').value = result.enabled !== undefined ? result.enabled : 1;
+                
+                document.getElementById('whitelistModalTitle').textContent = '编辑白名单';
+                document.getElementById('whitelistModal').style.display = 'flex';
+            }
+        })
+        .catch(error => {
+            message.error('获取白名单详情失败: ' + (error.message || '未知错误'));
+        });
+}
+
 function deleteRule(id) {
     if (!confirm('确定要删除该规则吗？此操作不可恢复。')) {
         return;
@@ -110,6 +235,21 @@ function deleteRule(id) {
         .then(result => {
             message.success('删除成功');
             ruleTable.refresh();
+        })
+        .catch(error => {
+            message.error('删除失败: ' + (error.message || '未知错误'));
+        });
+}
+
+function deleteWhitelist(id) {
+    if (!confirm('确定要删除该白名单吗？此操作不可恢复。')) {
+        return;
+    }
+    
+    http.delete('/whitelist/' + id)
+        .then(result => {
+            message.success('删除成功');
+            whitelistTable.refresh();
         })
         .catch(error => {
             message.error('删除失败: ' + (error.message || '未知错误'));
@@ -136,6 +276,22 @@ function showAddRuleModal() {
 
 function closeRuleModal() {
     document.getElementById('ruleModal').style.display = 'none';
+}
+
+function showAddWhitelistModal() {
+    document.getElementById('whitelistId').value = '';
+    document.getElementById('whitelistTypeInput').value = '';
+    document.getElementById('whitelistValueInput').value = '';
+    document.getElementById('whitelistDescInput').value = '';
+    document.getElementById('whitelistPriorityInput').value = '100';
+    document.getElementById('whitelistEnabledInput').value = '1';
+    
+    document.getElementById('whitelistModalTitle').textContent = '新增白名单';
+    document.getElementById('whitelistModal').style.display = 'flex';
+}
+
+function closeWhitelistModal() {
+    document.getElementById('whitelistModal').style.display = 'none';
 }
 
 function saveRule() {
@@ -190,8 +346,53 @@ function saveRule() {
         });
 }
 
+function saveWhitelist() {
+    const id = document.getElementById('whitelistId').value;
+    const whitelistType = document.getElementById('whitelistTypeInput').value.trim();
+    const whitelistValue = document.getElementById('whitelistValueInput').value.trim();
+    const description = document.getElementById('whitelistDescInput').value.trim();
+    const priority = parseInt(document.getElementById('whitelistPriorityInput').value) || 100;
+    const enabled = parseInt(document.getElementById('whitelistEnabledInput').value);
+    
+    if (!whitelistType) {
+        message.error('请选择白名单类型');
+        return;
+    }
+    if (!whitelistValue) {
+        message.error('请输入白名单值');
+        return;
+    }
+    
+    const data = {
+        whitelistType: whitelistType,
+        whitelistValue: whitelistValue,
+        description: description,
+        priority: priority,
+        enabled: enabled
+    };
+    
+    const isEdit = id && id !== '';
+    const url = isEdit ? '/whitelist/update' : '/whitelist/add';
+    const method = isEdit ? 'put' : 'post';
+    
+    if (isEdit) {
+        data.id = parseInt(id);
+    }
+    
+    http[method](url, data)
+        .then(result => {
+            message.success(isEdit ? '更新成功' : '新增成功');
+            closeWhitelistModal();
+            whitelistTable.refresh();
+        })
+        .catch(error => {
+            message.error((isEdit ? '更新失败' : '新增失败') + ': ' + (error.message || '未知错误'));
+        });
+}
+
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         closeRuleModal();
+        closeWhitelistModal();
     }
 });

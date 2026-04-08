@@ -87,6 +87,7 @@ function renderDefenseAction(action) {
         'ADD_BLOCK': '拦截请求',
         'REMOVE_BLOCK': '取消拦截',
         'BLOCK': '阻断',
+        'BLOCK_REQUEST': '拦截请求',
         'LIMIT': '限速',
         'REDIRECT': '重定向',
         'CHALLENGE': '挑战'

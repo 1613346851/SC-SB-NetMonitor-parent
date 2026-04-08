@@ -190,12 +190,10 @@ public class DefenseCommandDTO implements Serializable {
         return sb.toString();
     }
 
-    /**
-     * 获取剩余有效时间（毫秒）
-     *
-     * @return 剩余时间
-     */
     public long getRemainingTime() {
+        if (this.expireTimestamp == null) {
+            return -1;
+        }
         long remaining = this.expireTimestamp - System.currentTimeMillis();
         return Math.max(0, remaining);
     }
