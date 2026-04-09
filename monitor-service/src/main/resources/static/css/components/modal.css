@@ -27,7 +27,7 @@
     position: relative;
     background: var(--bg-white);
     border-radius: var(--radius-lg);
-    width: 600px;
+    width: 70%;
     max-width: 90%;
     max-height: 90vh;
     overflow-y: auto;
@@ -78,7 +78,7 @@
     background: var(--bg-white);
     display: block;
     border-radius: var(--radius-lg);
-    width: 600px;
+    width: 70%;
     max-width: 90%;
     max-height: 90vh;
     overflow-y: auto;
@@ -89,12 +89,17 @@
 
 /* ==================== 模态框头部 ==================== */
 .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     padding: var(--spacing-lg) var(--spacing-xl);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(248, 250, 252, 0.5);
+    background: rgba(248, 250, 252, 0.95);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 

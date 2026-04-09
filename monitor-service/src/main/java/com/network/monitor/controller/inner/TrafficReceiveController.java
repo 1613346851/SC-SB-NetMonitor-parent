@@ -107,8 +107,10 @@ public class TrafficReceiveController {
                 trafficId, trafficDTO.getSourceIp(), trafficEntity.getSourceIp());
             
             if (trafficDTO.getEventId() != null && !trafficDTO.getEventId().isEmpty()) {
-                log.info("流量数据包含eventId，网关已识别攻击，跳过规则匹配：eventId={}, ip={}, uri={}", 
-                    trafficDTO.getEventId(), trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+                log.info("流量数据包含eventId，网关已识别攻击，更新攻击记录的trafficId：eventId={}, trafficId={}, ip={}, uri={}", 
+                    trafficDTO.getEventId(), trafficId, trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+                
+                attackStoreService.updateTrafficIdByEventId(trafficDTO.getEventId(), trafficId);
                 return;
             }
 

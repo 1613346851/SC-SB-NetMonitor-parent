@@ -21,6 +21,21 @@
     
     window.utils = modules;
     
+    window.escapeHtml = function(text) {
+        if (text === null || text === undefined) {
+            return '';
+        }
+        text = String(text);
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    };
+    
     if (modules.http) {
         window.http = modules.http;
         window.httpGet = function(url, params) { return modules.http.get(url, params); };

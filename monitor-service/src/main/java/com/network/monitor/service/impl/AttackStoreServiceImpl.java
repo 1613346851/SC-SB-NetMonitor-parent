@@ -100,4 +100,18 @@ public class AttackStoreServiceImpl implements AttackStoreService {
             log.error("触发告警失败：attackId={}", entity.getId(), e);
         }
     }
+    
+    @Override
+    public void updateTrafficIdByEventId(String eventId, Long trafficId) {
+        if (eventId == null || eventId.isEmpty() || trafficId == null) {
+            return;
+        }
+        
+        try {
+            int updated = attackMonitorMapper.updateTrafficIdByEventId(eventId, trafficId);
+            log.info("更新攻击记录的流量ID：eventId={}, trafficId={}, updated={}", eventId, trafficId, updated);
+        } catch (Exception e) {
+            log.error("更新攻击记录的流量ID失败：eventId={}, trafficId={}", eventId, trafficId, e);
+        }
+    }
 }

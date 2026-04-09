@@ -173,9 +173,9 @@ async function viewTrafficDetail(id) {
                     <p><strong>请求次数:</strong> ${detail.requestCount || 1}</p>
                     <p><strong>错误次数:</strong> ${detail.errorCount || 0}</p>
                     <p><strong>平均处理时间:</strong> ${detail.avgProcessingTime || '-'} ms</p>
-                    <p><strong>请求 URI:</strong> ${detail.requestUri}</p>
-                    <p><strong>查询参数:</strong> ${detail.queryParams || '-'}</p>
-                    <p><strong>Content-Type:</strong> ${detail.contentType || '-'}</p>
+                    <p><strong>请求 URI:</strong> ${escapeHtml(detail.requestUri)}</p>
+                    <p><strong>查询参数:</strong> ${escapeHtml(detail.queryParams) || '-'}</p>
+                    <p><strong>Content-Type:</strong> ${escapeHtml(detail.contentType) || '-'}</p>
                     <p><strong>响应状态:</strong> ${detail.responseStatus}</p>
                     <p><strong>响应时间:</strong> ${detail.responseTime} ms</p>
                     <p><strong>User-Agent:</strong> ${detail.userAgent || '-'}</p>
@@ -188,18 +188,18 @@ async function viewTrafficDetail(id) {
             ` : ''}
             <div class="mt-24">
                 <p><strong>请求头:</strong></p>
-                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 200px; overflow-y: auto;">${formatHeaders(detail.requestHeaders)}</pre>
+                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 200px; overflow-y: auto;">${escapeHtml(formatHeaders(detail.requestHeaders))}</pre>
             </div>
             ${detail.requestBody ? `
             <div class="mt-16">
                 <p><strong>请求体:</strong></p>
-                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto;">${detail.requestBody}</pre>
+                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto;">${escapeHtml(detail.requestBody)}</pre>
             </div>
             ` : ''}
             ${detail.responseBody ? `
             <div class="mt-16">
                 <p><strong>响应体:</strong></p>
-                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto;">${detail.responseBody}</pre>
+                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto;">${escapeHtml(detail.responseBody)}</pre>
             </div>
             ` : ''}
         `;

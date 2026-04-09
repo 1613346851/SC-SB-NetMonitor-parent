@@ -163,10 +163,14 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
                     
                     attackStateCache.markAsDefended(sourceIp, eventId);
                     
-                    if (event != null && commandDTO.getDefenseType() != DefenseCommandDTO.DefenseType.BLOCK) {
-                        LocalDateTime expireTime = LocalDateTime.now().plusMinutes(
-                            commandDTO.getDefenseType() == DefenseCommandDTO.DefenseType.BLACKLIST ? 30 : 60
-                        );
+                    if (event != null) {
+                        LocalDateTime expireTime = null;
+                        if (commandDTO.getDefenseType() == DefenseCommandDTO.DefenseType.BLACKLIST) {
+                            expireTime = LocalDateTime.now().plusMinutes(30);
+                        } else if (commandDTO.getDefenseType() == DefenseCommandDTO.DefenseType.RATE_LIMIT) {
+                            expireTime = LocalDateTime.now().plusMinutes(60);
+                        }
+                        
                         attackEventService.setDefenseInfo(
                             event.getId(), 
                             commandDTO.getDefenseType().name(), 
@@ -291,46 +295,8 @@ public class DefenseDecisionServiceImpl implements DefenseDecisionService {
                 return;
             }
             
-            int existingCount = defenseLogMapper.countByEventId(eventId);
-            if (existingCount > 0) {
-                log.info("防御日志已存在，跳过重复记录：eventId={}, target={}", eventId, commandDTO.getSourceIp());
-                return;
-            }
+            log.info("防御日志由网关负责记录，监控服务跳过：eventId={}, target={}", eventId, commandDTO.getSourceIp());
             
-            DefenseLogEntity logEntity = new DefenseLogEntity();
-            logEntity.setEventId(eventId);
-            logEntity.setDefenseType(convertDefenseType(commandDTO.getDefenseType()));
-            logEntity.setDefenseTarget(commandDTO.getSourceIp());
-            logEntity.setDefenseReason(commandDTO.getDescription());
-            logEntity.setDefenseAction(convertDefenseAction(commandDTO.getDefenseType()));
-            logEntity.setExecuteStatus(1);
-            logEntity.setIsFirst(1);
-            logEntity.setOperator("SYSTEM");
-            
-            if (event != null) {
-                logEntity.setAttackId(event.getId());
-            }
-            
-            if (attackDTO != null) {
-                logEntity.setTrafficId(attackDTO.getTrafficId());
-            }
-            
-            if (commandDTO.getExpireTimestamp() != null) {
-                logEntity.setExpireTime(LocalDateTime.ofInstant(
-                    Instant.ofEpochMilli(commandDTO.getExpireTimestamp()),
-                    ZoneId.systemDefault()
-                ));
-            }
-            
-            LocalDateTime now = LocalDateTime.now();
-            logEntity.setExecuteTime(now);
-            logEntity.setCreateTime(now);
-            logEntity.setUpdateTime(now);
-            
-            defenseLogMapper.insert(logEntity);
-            
-            log.info("记录防御日志成功：eventId={}, defenseType={}, target={}, isFirst=1", 
-                eventId, logEntity.getDefenseType(), logEntity.getDefenseTarget());
         } catch (Exception e) {
             log.error("记录防御日志失败：eventId={}, target={}", 
                 commandDTO.getEventId(), commandDTO.getSourceIp(), e);

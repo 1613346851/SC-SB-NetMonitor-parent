@@ -200,6 +200,9 @@ public class AttackEventReceiveController {
                 eventDTO.getSourceIp(), eventDTO.getAttackType(), eventDTO.getRiskLevel(), 
                 eventDTO.getConfidence(), eventDTO.getRuleName(), eventDTO.getEventId());
             
+            log.info("攻击事件详情：attackContent={}, queryParams={}", 
+                eventDTO.getAttackContent(), eventDTO.getQueryParams());
+            
             AttackEventEntity event = attackEventService.getOrCreateEventWithEventId(
                 eventDTO.getSourceIp(), 
                 eventDTO.getAttackType(), 
@@ -217,11 +220,28 @@ public class AttackEventReceiveController {
             attackDTO.setConfidence(eventDTO.getConfidence());
             attackDTO.setTargetUri(eventDTO.getTargetUri());
             attackDTO.setEventId(eventId);
-            attackDTO.setAttackContent(eventDTO.getAttackContent());
             
-            if (eventDTO.getQueryParams() != null && !eventDTO.getQueryParams().isEmpty()) {
-                attackDTO.setAttackContent(buildAttackContentFromParams(eventDTO.getQueryParams()));
+            if (eventDTO.getRuleId() != null && !eventDTO.getRuleId().isEmpty()) {
+                try {
+                    attackDTO.setRuleId(Long.parseLong(eventDTO.getRuleId()));
+                } catch (NumberFormatException e) {
+                    log.warn("规则ID转换失败: ruleId={}", eventDTO.getRuleId());
+                }
             }
+            
+            if (eventDTO.getAttackContent() != null && !eventDTO.getAttackContent().isEmpty()) {
+                attackDTO.setAttackContent(eventDTO.getAttackContent());
+                log.info("使用攻击内容: attackContent={}, length={}", 
+                    eventDTO.getAttackContent().substring(0, Math.min(100, eventDTO.getAttackContent().length())),
+                    eventDTO.getAttackContent().length());
+            } else if (eventDTO.getQueryParams() != null && !eventDTO.getQueryParams().isEmpty()) {
+                String attackContent = buildAttackContentFromParams(eventDTO.getQueryParams());
+                attackDTO.setAttackContent(attackContent);
+                log.info("从查询参数构建攻击内容: queryParams={}, attackContent={}", 
+                    eventDTO.getQueryParams(), attackContent);
+            }
+            
+            attackDTO.setDescription(eventDTO.getDescription());
             
             AttackMonitorEntity attackEntity = attackStoreService.convertToEntity(attackDTO);
             Long attackId = attackStoreService.saveAttack(attackEntity);
@@ -230,11 +250,6 @@ public class AttackEventReceiveController {
                 attackDTO.setAttackId(attackId);
                 log.info("攻击记录已保存：attackId={}, ip={}, type={}, eventId={}", 
                     attackId, eventDTO.getSourceIp(), eventDTO.getAttackType(), eventId);
-                
-                if (event != null) {
-                    attackEventService.incrementAttackCount(event.getId());
-                    log.info("更新事件统计完成：eventId={}, attackCount+1", eventId);
-                }
             }
             
             defenseDecisionService.generateDefenseDecision(attackDTO);

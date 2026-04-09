@@ -147,6 +147,7 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
         TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
         monitorDTO.setIsAggregated(false);
         monitorDTO.setResponseInfo(statusCode, "", processingTime);
+        monitorDTO.setAvgProcessingTime(processingTime);
         monitorDTO.setStateTag(IpAttackStateConstant.getStateName(state));
         
         if (eventId != null && !eventId.isEmpty()) {

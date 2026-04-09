@@ -261,10 +261,10 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         String attackType = matchResult.getAttackType();
         String riskLevel = matchResult.getRiskLevel();
 
-        String eventId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        AttackEventDTO attackEvent = buildAttackEventDTO(exchange, sourceIp, null, matchResult);
+        String eventId = attackEvent.getEventId();
 
         try {
-            AttackEventDTO attackEvent = buildAttackEventDTO(exchange, sourceIp, eventId, matchResult);
             defenseClient.pushAttackEvent(attackEvent);
             logger.info("推送攻击事件成功: eventId={}, ip={}, type={}, rule={}", 
                 eventId, sourceIp, attackType, rule.getRuleName());
@@ -273,9 +273,11 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         }
 
         try {
-            TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, eventId, attackType, riskLevel);
+            long processingTime = System.currentTimeMillis() - startTime;
+            TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, eventId, attackType, riskLevel, processingTime);
             trafficClient.pushTraffic(trafficDTO);
-            logger.info("推送攻击流量数据成功: eventId={}, ip={}, type={}", eventId, sourceIp, attackType);
+            logger.info("推送攻击流量数据成功: eventId={}, ip={}, type={}", 
+                eventId, sourceIp, attackType);
         } catch (Exception e) {
             logger.error("推送攻击流量数据失败: {}", e.getMessage());
         }
@@ -309,7 +311,8 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
     }
     
     private TrafficMonitorDTO buildTrafficDTO(ServerWebExchange exchange, String sourceIp, 
-                                              String eventId, String attackType, String riskLevel) {
+                                              String eventId, String attackType, String riskLevel, 
+                                              long processingTime) {
         ServerHttpRequest request = exchange.getRequest();
         
         TrafficMonitorDTO trafficDTO = new TrafficMonitorDTO();
@@ -317,11 +320,15 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         trafficDTO.setEventId(eventId);
         trafficDTO.setSourceIp(sourceIp);
         trafficDTO.setTargetIp(ServerWebExchangeUtil.extractTargetIp(request));
+        trafficDTO.setSourcePort(ServerWebExchangeUtil.extractSourcePort(request));
+        trafficDTO.setTargetPort(ServerWebExchangeUtil.extractTargetPort(request));
         trafficDTO.setHttpMethod(request.getMethodValue());
+        trafficDTO.setProtocol(ServerWebExchangeUtil.extractProtocol(request));
         trafficDTO.setRequestUri(request.getURI().getPath());
         trafficDTO.setRequestTime(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         trafficDTO.setResponseStatus(400);
-        trafficDTO.setResponseTime(0L);
+        trafficDTO.setResponseTime(processingTime);
+        trafficDTO.setAvgProcessingTime(processingTime);
         trafficDTO.setStateTag("攻击");
         trafficDTO.setAbnormalTraffic(true);
         trafficDTO.setAbnormalReason("攻击规则匹配: " + attackType);
@@ -338,8 +345,11 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                         String value = java.net.URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
                         queryParams.put(key, value);
                     } catch (Exception e) {
-                        logger.debug("URL参数解码失败: {}", e.getMessage());
+                        logger.warn("URL参数解码失败: pair={}, error={}", pair, e.getMessage());
+                        queryParams.put(keyValue[0], keyValue[1]);
                     }
+                } else if (keyValue.length == 1) {
+                    queryParams.put(keyValue[0], "");
                 }
             }
             trafficDTO.setQueryParams(queryParams);
@@ -349,6 +359,11 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         trafficDTO.setRequestHeaders(headers);
         trafficDTO.setUserAgent(headers.get("User-Agent"));
         
+        String contentType = headers.get("Content-Type");
+        trafficDTO.setContentType(contentType != null ? contentType : "unknown");
+        
+        trafficDTO.setCookie(headers.get("Cookie"));
+        
         return trafficDTO;
     }
     
@@ -357,14 +372,19 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         ServerHttpRequest request = exchange.getRequest();
         AttackRuleDTO rule = matchResult.getMatchedRule();
         
+        int confidence = calculateConfidence(matchResult.getRiskLevel());
+        
         AttackEventDTO eventDTO = new AttackEventDTO(
             sourceIp, 
             matchResult.getAttackType(), 
             matchResult.getRiskLevel(), 
-            85
+            confidence
         );
         
-        eventDTO.setEventId(eventId);
+        if (eventId != null && !eventId.isEmpty()) {
+            eventDTO.setEventId(eventId);
+        }
+        
         eventDTO.setRuleName(rule.getRuleName());
         eventDTO.setRuleId(String.valueOf(rule.getId()));
         eventDTO.setTargetUri(request.getURI().getPath());
@@ -381,15 +401,20 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                         String key = java.net.URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
                         String value = java.net.URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
                         queryParams.put(key, value);
+                        logger.debug("URL参数解码成功: key={}, value={}", key, value);
                     } catch (Exception e) {
-                        logger.debug("URL参数解码失败: {}", e.getMessage());
+                        logger.warn("URL参数解码失败: pair={}, error={}", pair, e.getMessage());
+                        queryParams.put(keyValue[0], keyValue[1]);
                     }
+                } else if (keyValue.length == 1) {
+                    queryParams.put(keyValue[0], "");
                 }
             }
             eventDTO.setQueryParams(queryParams);
             
             String attackContent = buildAttackContent(queryParams);
             eventDTO.setAttackContent(attackContent);
+            logger.debug("构建攻击内容: attackContent={}", attackContent);
         }
         
         Map<String, String> headers = ServerWebExchangeUtil.extractHeaders(request);
@@ -414,6 +439,25 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
             sb.append(entry.getKey()).append("=").append(entry.getValue());
         }
         return sb.toString();
+    }
+    
+    private int calculateConfidence(String riskLevel) {
+        if (riskLevel == null) {
+            return 70;
+        }
+        
+        switch (riskLevel.toUpperCase()) {
+            case "CRITICAL":
+                return 95;
+            case "HIGH":
+                return 85;
+            case "MEDIUM":
+                return 70;
+            case "LOW":
+                return 50;
+            default:
+                return 70;
+        }
     }
 
     @Override

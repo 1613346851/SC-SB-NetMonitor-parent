@@ -86,9 +86,9 @@ public class AttackEventServiceImpl implements AttackEventService {
         entity.setAttackType(attackType);
         entity.setRiskLevel(riskLevel);
         entity.setStartTime(LocalDateTime.now());
-        entity.setTotalRequests(1);
+        entity.setTotalRequests(0);
         entity.setPeakRps(0);
-        entity.setAttackCount(1);
+        entity.setAttackCount(0);
         entity.setConfidenceStart(confidence);
         entity.setConfidenceEnd(confidence);
         entity.setStatus(AttackEventEntity.STATUS_ONGOING);
@@ -96,6 +96,9 @@ public class AttackEventServiceImpl implements AttackEventService {
         entity.setUpdateTime(LocalDateTime.now());
 
         attackEventMapper.insert(entity);
+        
+        incrementAttackCount(entity.getId());
+        entity.setAttackCount(1);
 
         log.info("创建新攻击事件：eventId={}, sourceIp={}, attackType={}", finalEventId, normalizedIp, attackType);
 

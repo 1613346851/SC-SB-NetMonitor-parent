@@ -230,4 +230,9 @@ public interface AttackMonitorMapper {
      * 更新攻击记录的事件ID
      */
     int updateEventId(@Param("id") Long id, @Param("eventId") String eventId);
+    
+    /**
+     * 根据事件ID更新攻击记录的流量ID
+     */
+    int updateTrafficIdByEventId(@Param("eventId") String eventId, @Param("trafficId") Long trafficId);
 }

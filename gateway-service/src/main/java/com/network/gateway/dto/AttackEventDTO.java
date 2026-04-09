@@ -51,8 +51,7 @@ public class AttackEventDTO implements Serializable {
     }
 
     private String generateEventId(String attackType) {
-        String prefix = attackType != null ? attackType : "ATTACK";
-        return prefix + "_" + System.currentTimeMillis() + "_" + traceId;
+        return "EVT_" + System.currentTimeMillis() + "_" + traceId.toUpperCase();
     }
 
     public void updateDescription() {

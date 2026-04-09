@@ -193,8 +193,8 @@ async function viewAttackDetail(id) {
                     <p><strong>攻击记录 ID:</strong> ${detail.id || '-'}</p>
                     <p><strong>事件 ID:</strong> ${eventIdHtml}</p>
                     <p><strong>攻击时间:</strong> ${dateFormat.format(detail.createTime)}</p>
-                    <p><strong>源 IP:</strong> ${detail.sourceIp}</p>
-                    <p><strong>目标 URI:</strong> ${detail.targetUri || '-'}</p>
+                    <p><strong>源 IP:</strong> ${escapeHtml(detail.sourceIp)}</p>
+                    <p><strong>目标 URI:</strong> ${escapeHtml(detail.targetUri) || '-'}</p>
                     <p><strong>攻击类型:</strong> ${tableRenderer.renderAttackType(detail.attackType)}</p>
                     <p><strong>风险等级:</strong> ${tableRenderer.renderRiskLevel(detail.riskLevel)}${falsePositiveBadge}</p>
                 </div>
@@ -204,13 +204,13 @@ async function viewAttackDetail(id) {
                     <p><strong>命中规则 ID:</strong> ${detail.ruleId || '-'}</p>
                     <p><strong>关联流量 ID:</strong> ${detail.trafficId || '-'}</p>
                     <p><strong>处理时间:</strong> ${detail.handleTime ? dateFormat.format(detail.handleTime) : '-'}</p>
-                    <p><strong>处理备注:</strong> ${detail.handleRemark || '-'}</p>
+                    <p><strong>处理备注:</strong> ${escapeHtml(detail.handleRemark) || '-'}</p>
                 </div>
             </div>
             ${falsePositiveHint}
             <div class="mt-24">
                 <p><strong>攻击内容:</strong></p>
-                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto;">${detail.attackContent || '-'}</pre>
+                <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto;">${escapeHtml(detail.attackContent) || '-'}</pre>
             </div>
         `;
         

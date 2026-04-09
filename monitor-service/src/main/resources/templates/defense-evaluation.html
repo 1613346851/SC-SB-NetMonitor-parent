@@ -204,18 +204,16 @@
         </div>
     </div>
 
-    <div class="modal" id="defenseDetailModal" style="display: none;">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">防御详情</h3>
-                    <button class="modal-close" onclick="closeDefenseDetailModal()">&times;</button>
-                </div>
-                <div class="modal-body" id="defenseDetailContent">
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-default" onclick="closeDefenseDetailModal()">关闭</button>
-                </div>
+    <div id="defenseDetailModal" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">防御详情</h3>
+                <span class="modal-close" onclick="closeDefenseDetailModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="defenseDetailContent">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeDefenseDetailModal()">关闭</button>
             </div>
         </div>
     </div>

@@ -91,7 +91,11 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
         // 转换 Map 类型为 JSON 字符串
         if (dto.getQueryParams() != null) {
             try {
-                entity.setQueryParams(mapToJson(dto.getQueryParams()));
+                String queryParamsJson = mapToJson(dto.getQueryParams());
+                entity.setQueryParams(queryParamsJson);
+                log.info("转换查询参数为 JSON: queryParams={}, length={}", 
+                    queryParamsJson.substring(0, Math.min(100, queryParamsJson.length())),
+                    queryParamsJson.length());
             } catch (JsonProcessingException e) {
                 log.warn("转换查询参数为 JSON 失败：{}", e.getMessage());
                 entity.setQueryParams(dto.getQueryParams().toString());
@@ -146,6 +150,12 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
         
         if (dto.getAvgProcessingTime() != null) {
             entity.setAvgProcessingTime(dto.getAvgProcessingTime());
+        }
+        
+        if (dto.getContentType() != null && !dto.getContentType().isEmpty()) {
+            entity.setContentType(dto.getContentType());
+        } else {
+            entity.setContentType("unknown");
         }
         
         // 转换聚合时间字段
