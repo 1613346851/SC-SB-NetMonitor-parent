@@ -33,6 +33,8 @@
     overflow-y: auto;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
 }
 
 @keyframes modalSlideUp {
@@ -89,17 +91,13 @@
 
 /* ==================== 模态框头部 ==================== */
 .modal-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    flex-shrink: 0;
     padding: var(--spacing-lg) var(--spacing-xl);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(248, 250, 252, 0.95);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: var(--bg-white);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
@@ -134,15 +132,18 @@
 /* ==================== 模态框内容 ==================== */
 .modal-body {
     padding: var(--spacing-xl);
+    flex: 1;
+    overflow-y: auto;
 }
 
 /* ==================== 模态框底部 ==================== */
 .modal-footer {
+    flex-shrink: 0;
     padding: var(--spacing-lg) var(--spacing-xl);
     border-top: 1px solid var(--border-color);
     display: flex;
     justify-content: flex-end;
     gap: var(--spacing-sm);
-    background: rgba(248, 250, 252, 0.5);
+    background: var(--bg-white);
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }

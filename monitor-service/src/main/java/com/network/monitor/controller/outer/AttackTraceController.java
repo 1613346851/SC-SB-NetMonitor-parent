@@ -4,6 +4,7 @@ import com.network.monitor.common.ApiResponse;
 import com.network.monitor.dto.AttackChainDTO;
 import com.network.monitor.dto.GeoIpDTO;
 import com.network.monitor.dto.IpProfileDTO;
+import com.network.monitor.dto.TraceStatsDTO;
 import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.entity.TrafficMonitorEntity;
@@ -12,6 +13,7 @@ import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.mapper.TrafficMonitorMapper;
 import com.network.monitor.service.GeoIpService;
 import com.network.monitor.service.IpProfileService;
+import com.network.monitor.service.TraceStatsService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -32,6 +34,9 @@ public class AttackTraceController {
 
     @Autowired
     private GeoIpService geoIpService;
+
+    @Autowired
+    private TraceStatsService traceStatsService;
 
     @Autowired
     private AttackMonitorMapper attackMonitorMapper;
@@ -230,6 +235,19 @@ public class AttackTraceController {
         } catch (Exception e) {
             log.warn("解析时间失败: {}", dateTimeStr, e);
             return null;
+        }
+    }
+
+    @GetMapping("/stats")
+    public ApiResponse<TraceStatsDTO> getTraceStats(
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
+        try {
+            TraceStatsDTO stats = traceStatsService.getTraceStats(startTime, endTime);
+            return ApiResponse.success(stats);
+        } catch (Exception e) {
+            log.error("获取溯源统计数据失败", e);
+            return ApiResponse.error("获取溯源统计数据失败");
         }
     }
 }

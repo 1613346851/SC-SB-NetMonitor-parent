@@ -92,34 +92,7 @@
                     </div>
                 </section>
 
-                <section class="ai-config-panel">
-                    <div class="card ai-config-card">
-                        <div class="ai-config-card__head">
-                            <div>
-                                <div class="ai-config-card__title">AI 模型配置</div>
-                                <div class="ai-config-card__key">ai.model.*</div>
-                            </div>
-                            <span class="ai-badge">AI</span>
-                        </div>
-                        <div class="ai-config-items">
-                            <div class="ai-config-item">
-                                <div class="ai-config-item__label">接口地址 <code>ai.model.url</code></div>
-                                <div class="ai-config-item__value" id="aiModelUrlValue">未配置</div>
-                                <button class="btn btn-primary btn-sm" onclick="editAiConfig('ai.model.url')">编辑</button>
-                            </div>
-                            <div class="ai-config-item">
-                                <div class="ai-config-item__label">API 密钥 <code>ai.model.apiKey</code></div>
-                                <div class="ai-config-item__value" id="aiModelApiKeyValue">未配置</div>
-                                <button class="btn btn-primary btn-sm" onclick="editAiConfig('ai.model.apiKey')">编辑</button>
-                            </div>
-                        </div>
-                        <div class="ai-config-card__footer">
-                            <div class="ai-config-card__desc">漏洞扫描、攻击分析与智能研判等场景共用的AI模型配置。</div>
-                            <div class="ai-card-actions">
-                                <button class="btn btn-default btn-sm" onclick="filterAiConfigs()">定位配置</button>
-                            </div>
-                        </div>
-                    </div>
+                <section class="gateway-config-panel">
                     <div class="card gateway-config-card">
                         <div class="ai-config-card__head">
                             <div>
@@ -282,7 +255,6 @@
                             <select class="form-control" id="configCategory" onchange="filterByCategory()">
                                 <option value="ALL">全部配置</option>
                                 <option value="GATEWAY">网关配置</option>
-                                <option value="AI">AI 配置</option>
                                 <option value="MONITOR">监测服务配置</option>
                             </select>
                         </div>

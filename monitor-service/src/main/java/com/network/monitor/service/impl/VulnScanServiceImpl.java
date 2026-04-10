@@ -3,8 +3,11 @@ package com.network.monitor.service.impl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.monitor.common.constant.VerifyStatusConstant;
+import com.network.monitor.entity.PayloadLibraryEntity;
+import com.network.monitor.entity.ScanInterfaceEntity;
 import com.network.monitor.entity.VulnerabilityMonitorEntity;
-import com.network.monitor.service.AiModelService;
+import com.network.monitor.service.PayloadLibraryService;
+import com.network.monitor.service.ScanInterfaceService;
 import com.network.monitor.service.VulnScanService;
 import com.network.monitor.service.VulnerabilityVerifyService;
 import com.network.monitor.util.payload.CommandInjectionPayload;
@@ -74,7 +77,10 @@ public class VulnScanServiceImpl implements VulnScanService {
     private VulnerabilityVerifyService vulnerabilityVerifyService;
 
     @Autowired
-    private AiModelService aiModelService;
+    private ScanInterfaceService scanInterfaceService;
+
+    @Autowired
+    private PayloadLibraryService payloadLibraryService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ExecutorService executorService = Executors.newSingleThreadExecutor(r -> {
@@ -246,9 +252,7 @@ public class VulnScanServiceImpl implements VulnScanService {
             }
 
             state.currentStep = "汇总扫描结果";
-            // 【AI全局调用】智能生成扫描总结
-            String aiSummary = aiModelService.summaryReport(buildSummaryContext(state));
-            state.summary = aiSummary != null && !aiSummary.isBlank() ? aiSummary : buildSummary(state);
+            state.summary = buildSummary(state);
             state.status = STATUS_COMPLETED;
             state.endTime = LocalDateTime.now();
             state.lastMessage = "扫描完成，共发现 " + state.discoveredCount + " 项漏洞";
@@ -266,6 +270,34 @@ public class VulnScanServiceImpl implements VulnScanService {
 
     private List<ScanPlan> detectInterfaces(String scanType) {
         List<ScanPlan> plans = new ArrayList<>();
+        
+        try {
+            List<ScanInterfaceEntity> dbInterfaces = scanInterfaceService.getAllEnabled();
+            
+            if (!dbInterfaces.isEmpty()) {
+                log.info("从数据库加载扫描接口配置：共{}个接口", dbInterfaces.size());
+                
+                for (ScanInterfaceEntity scanInterface : dbInterfaces) {
+                    if (!isFullScan(scanType) && !isQuickScanType(scanType, scanInterface.getVulnType())) {
+                        continue;
+                    }
+                    
+                    ScanPlan plan = createScanPlanFromConfig(scanInterface, scanType);
+                    if (plan != null) {
+                        plans.add(plan);
+                    }
+                }
+                
+                if (!plans.isEmpty()) {
+                    plans.sort(Comparator.comparingInt(p -> getPriorityByVulnType(p.vulnType())));
+                    return plans;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("从数据库加载扫描接口配置失败，使用默认配置：{}", e.getMessage());
+        }
+        
+        log.info("使用默认硬编码扫描接口配置");
         plans.add(new ScanPlan("SQL 注入 - 用户查询", "SQL_INJECTION", "HIGH", "GET", "/target/sql/query",
                 () -> probeSqlInjection(scanType)));
         plans.add(new ScanPlan("XSS - 反射型搜索", "XSS", "MEDIUM", "GET", "/target/xss/search",
@@ -289,6 +321,77 @@ public class VulnScanServiceImpl implements VulnScanService {
         }
 
         return plans;
+    }
+
+    private ScanPlan createScanPlanFromConfig(ScanInterfaceEntity scanInterface, String scanType) {
+        try {
+            String vulnType = scanInterface.getVulnType();
+            String path = scanInterface.getInterfacePath();
+            String method = scanInterface.getHttpMethod();
+            String riskLevel = scanInterface.getRiskLevel();
+            String title = scanInterface.getInterfaceName();
+            
+            return switch (vulnType) {
+                case "SQL_INJECTION" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                        () -> probeSqlInjection(scanType));
+                case "XSS" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                        () -> probeXssByPath(path, scanType));
+                case "COMMAND_INJECTION" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                        () -> probeCommandInjection(scanType));
+                case "PATH_TRAVERSAL" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                        () -> probePathTraversal(scanType));
+                case "FILE_INCLUSION" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                        this::probeFileInclude);
+                case "SSRF" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                        this::probeSsrf);
+                case "XXE" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                        this::probeXxe);
+                case "CSRF" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                        this::probeCsrf);
+                default -> {
+                    log.warn("不支持的漏洞类型：{}", vulnType);
+                    yield null;
+                }
+            };
+        } catch (Exception e) {
+            log.warn("创建扫描计划失败：interfaceId={}, error={}", scanInterface.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private ScanFinding probeXssByPath(String path, String scanType) {
+        if (path.contains("search")) {
+            return probeReflectiveXss(scanType);
+        } else if (path.contains("profile")) {
+            return probeDomXss(scanType);
+        }
+        return probeReflectiveXss(scanType);
+    }
+
+    private boolean isQuickScanType(String scanType, String vulnType) {
+        return switch (scanType.toUpperCase(Locale.ROOT)) {
+            case "QUICK" -> List.of("SQL_INJECTION", "XSS", "COMMAND_INJECTION", "PATH_TRAVERSAL")
+                    .contains(vulnType);
+            case "SQL_INJECTION" -> "SQL_INJECTION".equals(vulnType);
+            case "XSS" -> "XSS".equals(vulnType);
+            case "COMMAND_INJECTION" -> "COMMAND_INJECTION".equals(vulnType);
+            case "PATH_TRAVERSAL" -> "PATH_TRAVERSAL".equals(vulnType);
+            default -> true;
+        };
+    }
+
+    private int getPriorityByVulnType(String vulnType) {
+        return switch (vulnType) {
+            case "COMMAND_INJECTION" -> 1;
+            case "SQL_INJECTION" -> 2;
+            case "PATH_TRAVERSAL" -> 3;
+            case "XSS" -> 4;
+            case "FILE_INCLUSION" -> 5;
+            case "SSRF" -> 6;
+            case "XXE" -> 7;
+            case "CSRF" -> 8;
+            default -> 9;
+        };
     }
 
     private boolean checkTargetOnline() {
@@ -324,10 +427,7 @@ public class VulnScanServiceImpl implements VulnScanService {
 
     private ScanFinding probeSqlInjection(String scanType) {
         List<PayloadCase> payloads = SqlInjectionPayload.getPayloads(scanType);
-        // 【AI全局调用】生成智能Payload
-        List<String> aiPayloads = aiModelService.generatePayload("SQL_INJECTION", "/target/sql/query",
-                payloads.stream().map(PayloadCase::payload).collect(Collectors.joining(",")));
-        List<PayloadCase> mergedPayloads = mergePayloads(payloads, aiPayloads);
+        List<PayloadCase> mergedPayloads = payloads;
 
         for (PayloadCase payload : mergedPayloads) {
             ProbeResponse response = doGet("/target/sql/query", Map.of("id", payload.payload()));
@@ -470,10 +570,8 @@ public class VulnScanServiceImpl implements VulnScanService {
     private void autoInsertVuln(ScanState state, Map<String, Object> item) {
         try {
             VulnerabilityMonitorEntity entity = buildVulnerabilityEntity(item);
-            // 【AI全局调用】自动生成修复建议
-            String aiFixSuggestion = aiModelService.generateFixSuggestion(entity.getVulnType(), entity.getVulnPath());
-            if (aiFixSuggestion != null && !aiFixSuggestion.isBlank()) {
-                entity.setFixSuggestion(aiFixSuggestion);
+            if (entity.getFixSuggestion() == null || entity.getFixSuggestion().isBlank()) {
+                entity.setFixSuggestion(defaultFixSuggestion(entity.getVulnType(), entity.getVulnPath()));
             }
             VulnerabilityMonitorEntity saved = vulnerabilityVerifyService.saveOrUpdateVulnerability(entity);
             item.put("synced", true);
@@ -510,11 +608,7 @@ public class VulnScanServiceImpl implements VulnScanService {
                                      String description,
                                      String responseBody,
                                      String fixSuggestion) {
-        // 【AI全局调用】AI智能验证漏洞
-        String aiVerdict = aiModelService.analyzeVuln(vulnType, responseBody, vulnPath);
-        // 【AI全局调用】风险等级智能评估
-        String aiRiskLevel = aiModelService.analyzeAttack(payload, responseBody);
-        String finalLevel = normalizeRiskLevel(aiRiskLevel, vulnLevel);
+        String finalLevel = normalizeRiskLevel(null, vulnLevel);
         return new ScanFinding(
                 vulnName,
                 vulnType,
@@ -526,7 +620,7 @@ public class VulnScanServiceImpl implements VulnScanService {
                 description,
                 summarizeResponse(responseBody),
                 fixSuggestion,
-                aiVerdict
+                null
         );
     }
 

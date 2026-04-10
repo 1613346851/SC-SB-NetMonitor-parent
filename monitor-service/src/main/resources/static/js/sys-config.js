@@ -4,7 +4,6 @@ let currentFilterMode = 'ALL';
 let sortField = 'id';
 let sortOrder = 'desc';
 
-const AI_CONFIG_KEYS = ['ai.model.url', 'ai.model.apiKey'];
 const GATEWAY_CONFIG_PREFIX = 'gateway.';
 const DDOS_CONFIG_PREFIX = 'ddos.';
 const DEFENSE_CONFIG_PREFIX = 'defense.';
@@ -290,9 +289,7 @@ function applyFilters() {
     const category = document.getElementById('configCategory')?.value || 'ALL';
     let list = [...configList];
 
-    if (currentFilterMode === 'AI_ONLY') {
-        list = list.filter(item => AI_CONFIG_KEYS.includes(item.configKey));
-    } else if (currentFilterMode === 'GATEWAY_ONLY') {
+    if (currentFilterMode === 'GATEWAY_ONLY') {
         list = list.filter(item => item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX));
     } else if (currentFilterMode === 'DDOS_ONLY') {
         list = list.filter(item => item.configKey && item.configKey.startsWith(DDOS_CONFIG_PREFIX));
@@ -304,11 +301,8 @@ function applyFilters() {
 
     if (category === 'GATEWAY') {
         list = list.filter(item => item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX));
-    } else if (category === 'AI') {
-        list = list.filter(item => AI_CONFIG_KEYS.includes(item.configKey));
     } else if (category === 'MONITOR') {
         list = list.filter(item => 
-            !AI_CONFIG_KEYS.includes(item.configKey) && 
             !(item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX))
         );
     }
@@ -355,17 +349,12 @@ function sortConfigList(list) {
 
 function renderOverview(list) {
     const latestConfig = [...configList].sort((a, b) => new Date(b.updateTime || 0) - new Date(a.updateTime || 0))[0];
-    const aiConfigs = configList.filter(item => AI_CONFIG_KEYS.includes(item.configKey));
     const gatewayConfigs = configList.filter(item => GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
 
     setText('configTotalCount', configList.length);
-    setText('configAiCount', aiConfigs.length);
     setText('configGatewayCount', gatewayConfigs.length);
     setText('configFilteredCount', list.length);
     setText('configLastUpdated', latestConfig ? formatTime(latestConfig.updateTime) : '--');
-
-    renderAiCard('ai.model.url', false);
-    renderAiCard('ai.model.apiKey', true);
     
     renderDdosConfigPanel();
     renderDefenseStrategyPanel();
@@ -419,23 +408,6 @@ function formatStrategyName(value) {
     return strategyMap[value] || value;
 }
 
-function renderAiCard(configKey, masked) {
-    const config = configList.find(item => item.configKey === configKey);
-    const targetId = configKey === 'ai.model.url' ? 'aiModelUrlValue' : 'aiModelApiKeyValue';
-    const el = document.getElementById(targetId);
-    if (!el) return;
-
-    const value = config?.configValue || '';
-    if (!value) {
-        el.textContent = '未配置';
-        el.style.color = 'var(--text-disabled)';
-        return;
-    }
-
-    el.textContent = masked ? maskConfigValue(value) : value;
-    el.style.color = 'var(--text-primary)';
-}
-
 function updateGatewayDefenseDisplay() {
     const blacklistConfig = configList.find(item => item.configKey === 'gateway.defense.blacklist.enabled');
     const rateLimitConfig = configList.find(item => item.configKey === 'gateway.defense.rate-limit.enabled');
@@ -476,10 +448,8 @@ function renderConfigTable(list) {
     cell._currentTableBodyId = 'configTableBody';
     
     tbody.innerHTML = list.map(config => {
-        const isAiConfig = AI_CONFIG_KEYS.includes(config.configKey);
         const isGatewayConfig = GATEWAY_SYNC_CONFIG_KEYS.includes(config.configKey);
-        const badgeHtml = isAiConfig ? '<span class="ai-badge">AI</span>' : 
-                          isGatewayConfig ? '<span class="gateway-badge">网关</span>' : '';
+        const badgeHtml = isGatewayConfig ? '<span class="gateway-badge">网关</span>' : '';
         const actionButtons = getActionButtons(config);
         const buttonCount = actionButtons.filter(btn => btn.visible !== false).length;
         const actionWidth = buttonCount >= 3 ? '220px' : '160px';
@@ -548,21 +518,6 @@ function filterGatewayConfigs() {
     document.getElementById('configCategory').value = 'GATEWAY';
     applyFilters();
     scrollToConfigList();
-}
-
-function editAiConfig(configKey) {
-    currentFilterMode = 'AI_ONLY';
-    document.getElementById('configKey').value = configKey;
-    const config = configList.find(item => item.configKey === configKey);
-    if (config) {
-        applyFilters();
-        showEditConfigModal(config.id);
-        return;
-    }
-    showAddConfigModal({
-        configKey,
-        description: configKey === 'ai.model.url' ? '全局AI大模型接口地址' : '全局AI大模型API密钥'
-    });
 }
 
 function showAddConfigModal(preset = {}) {
@@ -841,8 +796,7 @@ async function saveGatewayDefenseConfig() {
 }
 
 function formatConfigValue(config) {
-    const value = config?.configValue || '';
-    return config?.configKey === 'ai.model.apiKey' ? maskConfigValue(value) : value || '-';
+    return config?.configValue || '-';
 }
 
 function maskConfigValue(value) {

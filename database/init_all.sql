@@ -558,6 +558,72 @@ GROUP BY e.id, e.event_id, e.source_ip, e.attack_type, e.risk_level,
          e.peak_rps, e.attack_count, e.confidence_start, e.confidence_end,
          e.defense_action, e.defense_success, e.status;
 
+-- ------------------------------------------------------------
+-- 2.10 扫描目标配置表 (sys_scan_target)
+-- 存储扫描目标服务配置
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_scan_target`;
+CREATE TABLE `sys_scan_target` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '目标ID',
+    `target_name` VARCHAR(100) NOT NULL COMMENT '目标名称',
+    `target_url` VARCHAR(255) NOT NULL COMMENT '目标URL',
+    `target_type` VARCHAR(20) NOT NULL COMMENT '目标类型(PRODUCTION/TEST/DEMO)',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
+    `enabled` TINYINT DEFAULT 1 COMMENT '是否启用(0-禁用，1-启用)',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='扫描目标配置表';
+
+-- ------------------------------------------------------------
+-- 2.11 扫描接口配置表 (sys_scan_interface)
+-- 存储扫描接口配置
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_scan_interface`;
+CREATE TABLE `sys_scan_interface` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '接口ID',
+    `target_id` BIGINT NOT NULL COMMENT '关联目标ID',
+    `interface_name` VARCHAR(100) NOT NULL COMMENT '接口名称',
+    `interface_path` VARCHAR(255) NOT NULL COMMENT '接口路径',
+    `http_method` VARCHAR(10) NOT NULL COMMENT 'HTTP方法',
+    `vuln_type` VARCHAR(50) NOT NULL COMMENT '漏洞类型',
+    `risk_level` VARCHAR(20) NOT NULL COMMENT '风险等级',
+    `params_config` TEXT DEFAULT NULL COMMENT '参数配置(JSON)',
+    `payload_config` TEXT DEFAULT NULL COMMENT 'Payload配置(JSON)',
+    `match_rules` TEXT DEFAULT NULL COMMENT '匹配规则(JSON)',
+    `enabled` TINYINT DEFAULT 1 COMMENT '是否启用(0-禁用，1-启用)',
+    `priority` INT DEFAULT 100 COMMENT '扫描优先级',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_target_id` (`target_id`),
+    KEY `idx_vuln_type` (`vuln_type`),
+    KEY `idx_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='扫描接口配置表';
+
+-- ------------------------------------------------------------
+-- 2.12 Payload库表 (sys_payload_library)
+-- 存储Payload库配置
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_payload_library`;
+CREATE TABLE `sys_payload_library` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Payload ID',
+    `vuln_type` VARCHAR(50) NOT NULL COMMENT '漏洞类型',
+    `payload_level` VARCHAR(20) NOT NULL COMMENT 'Payload级别(BASIC/ADVANCED/CUSTOM)',
+    `payload_content` TEXT NOT NULL COMMENT 'Payload内容',
+    `match_keywords` VARCHAR(500) DEFAULT NULL COMMENT '匹配关键词(逗号分隔)',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
+    `risk_level` VARCHAR(20) DEFAULT NULL COMMENT '风险等级',
+    `references` VARCHAR(255) DEFAULT NULL COMMENT '参考链接',
+    `enabled` TINYINT DEFAULT 1 COMMENT '是否启用(0-禁用，1-启用)',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_vuln_type` (`vuln_type`),
+    KEY `idx_payload_level` (`payload_level`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Payload库表';
+
 -- ============================================================
 -- 4. 初始化基础数据
 -- ============================================================
@@ -708,8 +774,102 @@ INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`,
  '限制协议类型（仅允许 HTTP/HTTPS）；禁用重定向；使用白名单验证目标地址');
 
 -- ------------------------------------------------------------
--- 4.3 初始化系统配置
--- 按监测服务配置、AI配置、网关配置的顺序排列
+-- 4.3 初始化扫描配置数据
+-- ------------------------------------------------------------
+
+-- 初始化扫描目标（靶场服务）
+INSERT INTO `sys_scan_target` (`target_name`, `target_url`, `target_type`, `description`, `enabled`) VALUES
+('靶场服务', 'http://127.0.0.1:9001', 'TEST', '漏洞测试靶场服务，包含SQL注入、XSS、命令注入等多种漏洞测试接口', 1);
+
+-- 初始化扫描接口配置（靶场服务的各个漏洞测试接口）
+INSERT INTO `sys_scan_interface` (`target_id`, `interface_name`, `interface_path`, `http_method`, `vuln_type`, `risk_level`, `params_config`, `payload_config`, `match_rules`, `enabled`, `priority`) VALUES
+(1, 'SQL注入测试接口', '/target/sql/query', 'GET', 'SQL_INJECTION', 'HIGH', 
+ '{"id": {"type": "string", "required": true, "testValues": ["1", "1 OR 1=1", "1; SELECT 1"]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["OR 1=1", "statement_results", "executed_sql"], "responsePatterns": ["SQL注入漏洞", "多语句执行成功"]}',
+ 1, 10),
+
+(1, 'XSS反射型测试接口', '/target/xss/search', 'GET', 'XSS', 'MEDIUM',
+ '{"keyword": {"type": "string", "required": true, "testValues": ["test", "<script>alert(1)</script>"]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["scan_xss_quick", "scan_xss_full"], "responsePatterns": ["反射型XSS漏洞", "搜索成功"]}',
+ 1, 20),
+
+(1, 'XSS DOM型测试接口', '/target/xss/profile', 'GET', 'XSS', 'MEDIUM',
+ '{"username": {"type": "string", "required": true, "testValues": ["test", "<svg/onload=alert(1)>"]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["scan_xss_quick", "scan_xss_full"], "responsePatterns": ["DOM型XSS漏洞", "获取资料成功"]}',
+ 1, 30),
+
+(1, '命令注入测试接口', '/target/cmd/execute', 'GET', 'COMMAND_INJECTION', 'CRITICAL',
+ '{"cmd": {"type": "string", "required": true, "testValues": ["ping 127.0.0.1 -n 2", "whoami"]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["Pinging", "ping statistics", "\\\\", "root"], "responsePatterns": ["命令执行结果", "纯命令注入漏洞触发成功"]}',
+ 1, 5),
+
+(1, '路径遍历测试接口', '/target/path/read', 'GET', 'PATH_TRAVERSAL', 'HIGH',
+ '{"filename": {"type": "string", "required": true, "testValues": ["test.txt", "../../application.yml"]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["server:", "<project", "root:"], "responsePatterns": ["路径遍历漏洞", "文件读取成功"]}',
+ 1, 15),
+
+(1, '文件包含测试接口', '/target/file/include', 'GET', 'FILE_INCLUSION', 'HIGH',
+ '{"path": {"type": "string", "required": true, "testValues": ["test.properties", "config/test.properties"]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["db.password", "文件包含漏洞", "文件加载成功"], "responsePatterns": ["文件包含漏洞", "文件加载成功"]}',
+ 1, 25),
+
+(1, 'SSRF测试接口', '/target/ssrf/request', 'GET', 'SSRF', 'HIGH',
+ '{"url": {"type": "string", "required": true, "testValues": ["http://127.0.0.1:9001/target/ddos/status"]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["DDoS被攻击目标状态", "SSRF漏洞", "请求成功"], "responsePatterns": ["SSRF漏洞", "请求成功（漏洞接口）"]}',
+ 1, 35),
+
+(1, 'XXE测试接口', '/target/xxe/parse', 'POST', 'XXE', 'HIGH',
+ '{"xmlBody": {"type": "xml", "required": true}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["has_external_entity", "test_password_123", "XXE漏洞"], "responsePatterns": ["XXE漏洞", "has_external_entity"]}',
+ 1, 40),
+
+(1, 'CSRF测试接口', '/target/csrf/update-name', 'POST', 'CSRF', 'MEDIUM',
+ '{"userId": {"type": "string", "required": true}, "nickname": {"type": "string", "required": true}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["CSRF漏洞", "昵称修改成功"], "responsePatterns": ["CSRF漏洞", "昵称修改成功（漏洞接口）"]}',
+ 1, 45);
+
+-- 初始化Payload库（基础Payload）
+INSERT INTO `sys_payload_library` (`vuln_type`, `payload_level`, `payload_content`, `match_keywords`, `description`, `risk_level`, `enabled`) VALUES
+-- SQL注入Payload
+('SQL_INJECTION', 'BASIC', '1 OR 1=1', 'OR 1=1', '布尔型恒真注入探测', 'HIGH', 1),
+('SQL_INJECTION', 'ADVANCED', '1; SELECT 1', 'statement_results', '堆叠语句执行探测', 'HIGH', 1),
+('SQL_INJECTION', 'ADVANCED', '1 UNION SELECT 1,2,3,4,5', 'UNION', '联合查询注入探测', 'HIGH', 1),
+('SQL_INJECTION', 'ADVANCED', '1'' AND ''1''=''1', 'AND', '字符串型注入探测', 'MEDIUM', 1),
+('SQL_INJECTION', 'ADVANCED', '1; DROP TABLE users--', 'DROP', '危险操作注入探测', 'CRITICAL', 1),
+('SQL_INJECTION', 'ADVANCED', '1 AND SLEEP(3)', 'SLEEP', '时间盲注探测', 'MEDIUM', 1),
+
+-- XSS Payload
+('XSS', 'BASIC', '<svg/onload=alert(''scan_xss_quick'')>', 'scan_xss_quick', 'SVG 事件回显探测', 'MEDIUM', 1),
+('XSS', 'ADVANCED', '<img src=x onerror=alert(''scan_xss_full'')>', 'scan_xss_full', 'IMG onerror 回显探测', 'MEDIUM', 1),
+('XSS', 'ADVANCED', '<script>alert(''scan_xss_script'')</script>', 'scan_xss_script', 'Script 标签探测', 'HIGH', 1),
+('XSS', 'ADVANCED', ''\"><script>alert(''scan_xss_attr'')</script>', 'scan_xss_attr', '属性注入探测', 'HIGH', 1),
+('XSS', 'ADVANCED', '<body onload=alert(''scan_xss_body'')>', 'scan_xss_body', 'Body 事件探测', 'MEDIUM', 1),
+('XSS', 'ADVANCED', '<iframe src=''javascript:alert(\"scan_xss_iframe\")''>', 'scan_xss_iframe', 'Iframe 注入探测', 'HIGH', 1),
+
+-- 命令注入Payload（Windows）
+('COMMAND_INJECTION', 'BASIC', 'ping 127.0.0.1 -n 2', 'Pinging,ping statistics', 'Ping 命令探测', 'HIGH', 1),
+('COMMAND_INJECTION', 'ADVANCED', 'whoami', '\\\\,root', '用户身份探测', 'HIGH', 1),
+('COMMAND_INJECTION', 'ADVANCED', 'dir', 'bytes,total', '目录列表探测', 'MEDIUM', 1),
+('COMMAND_INJECTION', 'ADVANCED', 'tasklist,ps aux', 'PID', '进程列表探测', 'MEDIUM', 1),
+
+-- 路径遍历Payload
+('PATH_TRAVERSAL', 'BASIC', '../../application.yml', 'server:', '读取服务配置文件', 'HIGH', 1),
+('PATH_TRAVERSAL', 'ADVANCED', '../../../../../pom.xml', '<project', '读取项目构建文件', 'HIGH', 1),
+('PATH_TRAVERSAL', 'ADVANCED', '....//....//....//etc/passwd', 'root:', 'Linux 密码文件读取', 'CRITICAL', 1),
+('PATH_TRAVERSAL', 'ADVANCED', '..\\..\\..\\..\\windows\\win.ini', '[fonts]', 'Windows 系统文件读取', 'CRITICAL', 1);
+
+-- ------------------------------------------------------------
+-- 4.4 初始化系统配置
+-- 按监测服务配置、网关配置的顺序排列
 -- ------------------------------------------------------------
 
 -- ============================================================
@@ -765,19 +925,7 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('traffic.push.aggregate-interval-ms', '5000', '聚合推送统计周期(毫秒)');
 
 -- ============================================================
--- 二、AI配置
--- ============================================================
-
--- ------------------------------------------------------------
--- 2.1 AI模型配置项
--- AI模型配置，用于漏洞扫描、攻击分析与智能研判
--- ------------------------------------------------------------
-INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
-('ai.model.url', '', 'AI大模型接口地址'),
-('ai.model.apiKey', '', 'AI大模型API密钥');
-
--- ============================================================
--- 三、网关配置（需要同步到网关，共110项）
+-- 二、网关配置（需要同步到网关，共110项）
 -- ============================================================
 
 -- ------------------------------------------------------------

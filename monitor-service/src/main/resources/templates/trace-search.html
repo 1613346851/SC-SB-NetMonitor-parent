@@ -73,6 +73,68 @@
                     </div>
                 </div>
 
+                <div class="stats-overview" id="statsOverview">
+                    <div class="stat-card-overview">
+                        <div class="stat-icon success">🛡️</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="successRate">0%</div>
+                            <div class="stat-label">攻击拦截率</div>
+                        </div>
+                    </div>
+                    <div class="stat-card-overview">
+                        <div class="stat-icon info">⚡</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="avgTraceTime">0ms</div>
+                            <div class="stat-label">平均响应时间</div>
+                        </div>
+                    </div>
+                    <div class="stat-card-overview">
+                        <div class="stat-icon danger">🔴</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="highRiskIpCount">0</div>
+                            <div class="stat-label">高风险IP数量</div>
+                        </div>
+                    </div>
+                    <div class="stat-card-overview">
+                        <div class="stat-icon warning">🚫</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="blacklistedIpCount">0</div>
+                            <div class="stat-label">已封禁IP数量</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-container">
+                    <div class="chart-row">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3 class="chart-title">攻击类型分布</h3>
+                            </div>
+                            <div class="chart-body">
+                                <div id="attackTypeChart" style="width: 100%; height: 300px;"></div>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <h3 class="chart-title">IP风险等级分布</h3>
+                            </div>
+                            <div class="chart-body">
+                                <div id="riskLevelChart" style="width: 100%; height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-row">
+                        <div class="chart-card full-width">
+                            <div class="chart-header">
+                                <h3 class="chart-title">攻击来源地域分布</h3>
+                            </div>
+                            <div class="chart-body">
+                                <div id="geoChart" style="width: 100%; height: 300px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-container">
                     <div class="table-header">
                         <h3 class="table-title">攻击记录</h3>
@@ -509,6 +571,111 @@
             margin-bottom: 16px;
         }
         
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card-overview {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .stat-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        
+        .stat-icon.success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));
+        }
+        
+        .stat-icon.info {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
+        }
+        
+        .stat-icon.danger {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+        }
+        
+        .stat-icon.warning {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
+        }
+        
+        .stat-info {
+            flex: 1;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1f2937;
+            line-height: 1.2;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        .charts-container {
+            margin-bottom: 24px;
+        }
+        
+        .chart-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .chart-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            margin: 0;
+        }
+        
+        .chart-body {
+            padding: 20px;
+        }
+        
+        @media (max-width: 1200px) {
+            .chart-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        
         .table-container .data-table {
             margin: 0;
         }
@@ -521,6 +688,7 @@
     </style>
 
     <script th:src="@{/js/core/config.js}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script th:src="@{/js/utils/storage.js}"></script>
     <script th:src="@{/js/utils/date.js}"></script>
     <script th:src="@{/js/utils/message.js}"></script>

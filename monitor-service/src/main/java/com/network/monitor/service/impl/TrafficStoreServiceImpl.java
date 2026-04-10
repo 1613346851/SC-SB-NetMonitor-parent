@@ -92,10 +92,10 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
         if (dto.getQueryParams() != null) {
             try {
                 String queryParamsJson = mapToJson(dto.getQueryParams());
-                entity.setQueryParams(queryParamsJson);
-                log.info("转换查询参数为 JSON: queryParams={}, length={}", 
-                    queryParamsJson.substring(0, Math.min(100, queryParamsJson.length())),
-                    queryParamsJson.length());
+                if (queryParamsJson != null && !queryParamsJson.isEmpty()) {
+                    entity.setQueryParams(queryParamsJson);
+                    log.debug("转换查询参数为 JSON: length={}", queryParamsJson.length());
+                }
             } catch (JsonProcessingException e) {
                 log.warn("转换查询参数为 JSON 失败：{}", e.getMessage());
                 entity.setQueryParams(dto.getQueryParams().toString());

@@ -2,10 +2,14 @@ let traceTable;
 let currentProfileIp = null;
 let attackPageNum = 1;
 const attackPageSize = 10;
+let attackTypeChartInstance = null;
+let riskLevelChartInstance = null;
+let geoChartInstance = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     initTraceTable();
     quickSearch('all', null);
+    loadTraceStats();
 });
 
 function initTraceTable() {
@@ -57,6 +61,7 @@ function searchTraces() {
     if (endTime) params.endTime = endTime.replace('T', ' ') + ':00';
     
     traceTable.search(params);
+    loadTraceStats();
 }
 
 function resetSearch() {
@@ -71,6 +76,7 @@ function resetSearch() {
     });
     
     traceTable.resetSearch();
+    loadTraceStats();
 }
 
 function quickSearch(type, evt) {
@@ -464,3 +470,218 @@ function getHandledBadge(handled) {
     }
     return '<span class="tag warning">未处理</span>';
 }
+
+function loadTraceStats() {
+    const startTime = document.getElementById('startTime').value;
+    const endTime = document.getElementById('endTime').value;
+    
+    const params = {};
+    if (startTime) params.startTime = startTime.replace('T', ' ') + ':00';
+    if (endTime) params.endTime = endTime.replace('T', ' ') + ':00';
+    
+    console.log('加载溯源统计数据，参数:', params);
+    
+    http.get('/trace/stats', params)
+        .then(function(data) {
+            console.log('溯源统计数据:', data);
+            renderOverviewStats(data.overview);
+            renderAttackTypeChart(data.attackTypeStats);
+            renderRiskLevelChart(data.riskLevelStats);
+            renderGeoChart(data.geoStats);
+        })
+        .catch(function(error) {
+            console.error('加载溯源统计数据失败:', error);
+        });
+}
+
+function renderOverviewStats(overview) {
+    if (!overview) return;
+    
+    document.getElementById('successRate').textContent = (overview.successRate || 0) + '%';
+    document.getElementById('avgTraceTime').textContent = (overview.avgTraceTime || 0) + 'ms';
+    document.getElementById('highRiskIpCount').textContent = overview.highRiskIpCount || 0;
+    document.getElementById('blacklistedIpCount').textContent = overview.blacklistedIpCount || 0;
+}
+
+function renderAttackTypeChart(stats) {
+    if (!stats || stats.length === 0) return;
+    
+    const chartDom = document.getElementById('attackTypeChart');
+    if (!chartDom) return;
+    
+    if (attackTypeChartInstance) {
+        attackTypeChartInstance.dispose();
+    }
+    
+    attackTypeChartInstance = echarts.init(chartDom);
+    
+    const seriesData = stats.map(function(item) {
+        return {
+            name: item.attackTypeName,
+            value: item.count
+        };
+    });
+    
+    const option = {
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left'
+        },
+        series: [{
+            type: 'pie',
+            radius: '50%',
+            data: seriesData,
+            label: {
+                show: true,
+                formatter: '{b}: {c}'
+            },
+            emphasis: {
+                itemStyle: {
+                    shadowBlur: 10,
+                    shadowOffsetX: 0,
+                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+            }
+        }]
+    };
+    
+    attackTypeChartInstance.setOption(option);
+}
+
+function renderRiskLevelChart(stats) {
+    if (!stats || stats.length === 0) return;
+    
+    const chartDom = document.getElementById('riskLevelChart');
+    if (!chartDom) return;
+    
+    if (riskLevelChartInstance) {
+        riskLevelChartInstance.dispose();
+    }
+    
+    riskLevelChartInstance = echarts.init(chartDom);
+    
+    const levelColorMap = {
+        '严重': '#9a60b4',
+        '高风险': '#ee6666',
+        '中风险': '#fac858',
+        '低风险': '#91cc75'
+    };
+    
+    const levelOrder = ['严重', '高风险', '中风险', '低风险'];
+    
+    const seriesData = stats.map(function(item) {
+        return {
+            name: item.riskLevelName,
+            value: item.count,
+            itemStyle: {
+                color: levelColorMap[item.riskLevelName] || '#d9d9d9'
+            }
+        };
+    }).sort(function(a, b) {
+        const indexA = levelOrder.indexOf(a.name);
+        const indexB = levelOrder.indexOf(b.name);
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+    });
+    
+    const option = {
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'vertical',
+            left: 'left'
+        },
+        series: [{
+            type: 'pie',
+            radius: '50%',
+            data: seriesData,
+            label: {
+                show: true,
+                formatter: '{b}: {c}'
+            },
+            emphasis: {
+                itemStyle: {
+                    shadowBlur: 10,
+                    shadowOffsetX: 0,
+                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+            }
+        }]
+    };
+    
+    riskLevelChartInstance.setOption(option);
+}
+
+function renderGeoChart(stats) {
+    if (!stats || stats.length === 0) return;
+    
+    const chartDom = document.getElementById('geoChart');
+    if (!chartDom) return;
+    
+    if (geoChartInstance) {
+        geoChartInstance.dispose();
+    }
+    
+    geoChartInstance = echarts.init(chartDom);
+    
+    const data = stats.map(function(item) {
+        return {
+            name: item.location,
+            value: item.count
+        };
+    });
+    
+    const option = {
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
+            }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            top: '10%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'category',
+            data: data.map(function(item) { return item.name; }),
+            axisLabel: {
+                interval: 0,
+                rotate: 30,
+                fontSize: 11
+            }
+        },
+        yAxis: {
+            type: 'value'
+        },
+        series: [{
+            data: data.map(function(item) {
+                return {
+                    value: item.value,
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#818cf8' },
+                            { offset: 1, color: '#4f46e5' }
+                        ])
+                    }
+                };
+            }),
+            type: 'bar',
+            barWidth: '60%',
+            itemStyle: {
+                borderRadius: [4, 4, 0, 0]
+            }
+        }]
+    };
+    
+    geoChartInstance.setOption(option);
+}
+

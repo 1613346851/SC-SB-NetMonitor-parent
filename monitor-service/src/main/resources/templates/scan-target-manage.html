@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫描目标管理 - 网络监测系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <div th:replace="~{fragments/common :: mobileMenuToggle}"></div>
+                    <h2>扫描目标管理</h2>
+                </div>
+                <div class="header-right">
+                    <button class="btn btn-primary" onclick="showAddModal()">+ 新增扫描目标</button>
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+
+            <main class="content">
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">目标名称</label>
+                            <input type="text" class="form-control" id="targetName" placeholder="请输入目标名称">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">目标类型</label>
+                            <select class="form-control" id="targetType">
+                                <option value="">全部</option>
+                                <option value="PRODUCTION">生产环境</option>
+                                <option value="TEST">测试环境</option>
+                                <option value="DEVELOPMENT">开发环境</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">启用状态</label>
+                            <select class="form-control" id="enabled">
+                                <option value="">全部</option>
+                                <option value="1">启用</option>
+                                <option value="0">禁用</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="searchTargets()">查询</button>
+                            <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3 class="table-title">扫描目标列表</h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table has-fixed-action">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 60px;">ID</th>
+                                    <th style="min-width: 150px;">目标名称</th>
+                                    <th style="min-width: 200px;">目标URL</th>
+                                    <th style="min-width: 100px;">目标类型</th>
+                                    <th style="min-width: 200px;">描述</th>
+                                    <th style="min-width: 100px;">启用状态</th>
+                                    <th style="min-width: 160px;">创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="pagination" class="pagination"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">新增扫描目标</h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="targetForm">
+                    <input type="hidden" id="targetId">
+                    <div class="form-group">
+                        <label class="form-label">目标名称 <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="formTargetName" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">目标URL <span class="required">*</span></label>
+                        <input type="text" class="form-control" id="formTargetUrl" placeholder="http://127.0.0.1:9001" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">目标类型 <span class="required">*</span></label>
+                        <select class="form-control" id="formTargetType" required>
+                            <option value="PRODUCTION">生产环境</option>
+                            <option value="TEST">测试环境</option>
+                            <option value="DEVELOPMENT">开发环境</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">描述</label>
+                        <textarea class="form-control" id="formDescription" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">启用状态</label>
+                        <select class="form-control" id="formEnabled">
+                            <option value="1">启用</option>
+                            <option value="0">禁用</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveTarget()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/scan-target-manage.js}"></script>
+</body>
+</html>

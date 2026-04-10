@@ -76,7 +76,9 @@
                 ORDER BY id DESC
             </otherwise>
         </choose>
-        LIMIT #{offset}, #{limit}
+        <if test="offset != null and limit != null">
+            LIMIT #{offset}, #{limit}
+        </if>
     </select>
 
     <select id="countByCondition" resultType="long">

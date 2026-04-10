@@ -362,10 +362,10 @@ function batchDelete() {
 
 function getLevelClass(level) {
     switch (level) {
-        case 'CRITICAL': return 'danger';
-        case 'HIGH': return 'warning';
-        case 'MEDIUM': return 'info';
-        case 'LOW': return 'success';
+        case 'CRITICAL': return 'danger risk-critical';
+        case 'HIGH': return 'danger risk-high';
+        case 'MEDIUM': return 'warning risk-medium';
+        case 'LOW': return 'info risk-low';
         default: return 'info';
     }
 }
