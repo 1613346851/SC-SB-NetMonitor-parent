@@ -72,6 +72,21 @@ public class ScanInterfaceEntity {
     private Integer priority = 100;
 
     /**
+     * 防御规则状态（0-未配置，1-部分已配置，2-已配置）
+     */
+    private Integer defenseRuleStatus = 0;
+
+    /**
+     * 关联防御规则数量
+     */
+    private Integer defenseRuleCount = 0;
+
+    /**
+     * 防御规则说明
+     */
+    private String defenseRuleNote;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

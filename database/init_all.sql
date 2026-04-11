@@ -132,6 +132,9 @@ CREATE TABLE `sys_vulnerability_monitor` (
   `last_attack_time` DATETIME DEFAULT NULL COMMENT '最近被攻击时间',
   `attack_count` INT NOT NULL DEFAULT 0 COMMENT '被攻击次数',
   `attack_ids` VARCHAR(2048) DEFAULT NULL COMMENT '关联攻击 ID 列表 (逗号分隔)',
+  `rule_ids` VARCHAR(2048) DEFAULT NULL COMMENT '关联防御规则 ID 列表 (逗号分隔)',
+  `rule_count` INT DEFAULT 0 COMMENT '关联防御规则数量',
+  `defense_status` TINYINT DEFAULT 0 COMMENT '防御状态(0-未配置，1-部分已配置，2-已配置)',
   `description` TEXT DEFAULT NULL COMMENT '漏洞描述',
   `fix_suggestion` TEXT DEFAULT NULL COMMENT '修复建议',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -140,8 +143,29 @@ CREATE TABLE `sys_vulnerability_monitor` (
   KEY `idx_vuln_type` (`vuln_type`),
   KEY `idx_vuln_level` (`vuln_level`),
   KEY `idx_verify_status` (`verify_status`),
-  KEY `idx_vuln_path` (`vuln_path`(255))
+  KEY `idx_vuln_path` (`vuln_path`(255)),
+  KEY `idx_defense_status` (`defense_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='漏洞监测表';
+
+-- ------------------------------------------------------------
+-- 2.4.1 漏洞-规则关联表 (sys_vulnerability_rule)
+-- 记录漏洞与防御规则的多对多关系
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_vulnerability_rule`;
+CREATE TABLE `sys_vulnerability_rule` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `vulnerability_id` BIGINT NOT NULL COMMENT '漏洞ID',
+  `rule_id` BIGINT NOT NULL COMMENT '规则ID',
+  `rule_name` VARCHAR(255) DEFAULT NULL COMMENT '规则名称(冗余字段)',
+  `attack_type` VARCHAR(50) DEFAULT NULL COMMENT '攻击类型(冗余字段)',
+  `risk_level` VARCHAR(20) DEFAULT NULL COMMENT '风险等级(冗余字段)',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_vulnerability_rule` (`vulnerability_id`, `rule_id`),
+  KEY `idx_vulnerability_id` (`vulnerability_id`),
+  KEY `idx_rule_id` (`rule_id`),
+  KEY `idx_attack_type` (`attack_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='漏洞-规则关联表';
 
 -- ------------------------------------------------------------
 -- 2.5 攻击规则表 (sys_monitor_rule)
@@ -594,13 +618,37 @@ CREATE TABLE `sys_scan_interface` (
     `match_rules` TEXT DEFAULT NULL COMMENT '匹配规则(JSON)',
     `enabled` TINYINT DEFAULT 1 COMMENT '是否启用(0-禁用，1-启用)',
     `priority` INT DEFAULT 100 COMMENT '扫描优先级',
+    `defense_rule_status` TINYINT DEFAULT 0 COMMENT '防御规则状态(0-未配置，1-部分已配置，2-已配置)',
+    `defense_rule_count` INT DEFAULT 0 COMMENT '关联防御规则数量',
+    `defense_rule_note` VARCHAR(500) DEFAULT NULL COMMENT '防御规则说明',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     KEY `idx_target_id` (`target_id`),
     KEY `idx_vuln_type` (`vuln_type`),
-    KEY `idx_enabled` (`enabled`)
+    KEY `idx_enabled` (`enabled`),
+    KEY `idx_defense_rule_status` (`defense_rule_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='扫描接口配置表';
+
+-- ------------------------------------------------------------
+-- 2.11.1 接口-规则关联表 (sys_interface_rule)
+-- 记录接口与防御规则的多对多关系
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_interface_rule`;
+CREATE TABLE `sys_interface_rule` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `interface_id` BIGINT NOT NULL COMMENT '接口ID',
+    `rule_id` BIGINT NOT NULL COMMENT '规则ID',
+    `rule_name` VARCHAR(255) DEFAULT NULL COMMENT '规则名称(冗余字段)',
+    `attack_type` VARCHAR(50) DEFAULT NULL COMMENT '攻击类型(冗余字段)',
+    `risk_level` VARCHAR(20) DEFAULT NULL COMMENT '风险等级(冗余字段)',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_interface_rule` (`interface_id`, `rule_id`),
+    KEY `idx_interface_id` (`interface_id`),
+    KEY `idx_rule_id` (`rule_id`),
+    KEY `idx_attack_type` (`attack_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='接口-规则关联表';
 
 -- ------------------------------------------------------------
 -- 2.12 Payload库表 (sys_payload_library)
@@ -623,6 +671,34 @@ CREATE TABLE `sys_payload_library` (
     KEY `idx_vuln_type` (`vuln_type`),
     KEY `idx_payload_level` (`payload_level`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Payload库表';
+
+-- ------------------------------------------------------------
+-- 3.5 扫描历史表 (sys_scan_history)
+-- 存储漏洞扫描历史记录
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_scan_history`;
+CREATE TABLE `sys_scan_history` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '扫描记录ID',
+    `task_id` VARCHAR(64) NOT NULL COMMENT '扫描任务ID',
+    `scan_type` VARCHAR(50) NOT NULL COMMENT '扫描类型(QUICK/FULL/CUSTOM)',
+    `target` VARCHAR(255) DEFAULT NULL COMMENT '扫描目标',
+    `status` VARCHAR(20) NOT NULL COMMENT '扫描状态(RUNNING/PAUSED/COMPLETED/FAILED/TERMINATED)',
+    `discovered_count` INT DEFAULT 0 COMMENT '发现漏洞数量',
+    `completed_interfaces` INT DEFAULT 0 COMMENT '已完成接口数',
+    `total_interfaces` INT DEFAULT 0 COMMENT '总接口数',
+    `start_time` DATETIME NOT NULL COMMENT '开始时间',
+    `end_time` DATETIME DEFAULT NULL COMMENT '结束时间',
+    `duration_seconds` INT DEFAULT 0 COMMENT '扫描耗时(秒)',
+    `summary` TEXT DEFAULT NULL COMMENT '扫描总结',
+    `error_message` TEXT DEFAULT NULL COMMENT '错误信息',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_task_id` (`task_id`),
+    KEY `idx_scan_type` (`scan_type`),
+    KEY `idx_status` (`status`),
+    KEY `idx_start_time` (`start_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='扫描历史表';
 
 -- ============================================================
 -- 4. 初始化基础数据
@@ -665,7 +741,8 @@ INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `des
 ('命令注入 - $() 执行', 'COMMAND_INJECTION', '\\$\\([^)]+\\)', '检测 $() 命令执行', 'HIGH', 1, 5),
 ('命令注入 - 常见命令带参数', 'COMMAND_INJECTION', '(?i)\\b(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|ping|tasklist)\\s+[\\w\\-./]+', '检测常见系统命令带参数', 'MEDIUM', 1, 30),
 ('命令注入 - Windows 命令执行', 'COMMAND_INJECTION', '(?i)(cmd\\s*/c|cmd\\.exe|powershell\\s*-|\\|\\s*cmd\\b)', '检测 Windows 命令执行模式', 'HIGH', 1, 25),
-('命令注入 - 参数注入', 'COMMAND_INJECTION', '(?i)(cmd|command|exec|execute|ping|tasklist|dir)\\s*=[^&]*\\b(cat|ls|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|ping|tasklist)\\b', '检测参数中的命令注入', 'HIGH', 1, 20);
+('命令注入 - 参数注入', 'COMMAND_INJECTION', '(?i)(cmd|command|exec|execute)\\s*=\\s*(ping|cat|ls|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|tasklist)\\b', '检测参数中的命令注入（参数名=命令）', 'HIGH', 1, 20),
+('命令注入 - ping命令注入', 'COMMAND_INJECTION', '(?i)(cmd|command|exec|execute)\\s*=\\s*ping\\s+\\d+\\.\\d+\\.\\d+\\.\\d+', '检测ping命令注入攻击', 'HIGH', 1, 15);
 
 -- 路径遍历检测规则（针对靶场测试用例优化）
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
@@ -687,6 +764,31 @@ INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `des
 -- DDoS 攻击检测规则（基于频率）
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
 ('DDoS 检测 - 高频请求', 'DDOS', 'FREQUENCY_THRESHOLD', '基于请求频率的 DDoS 检测（需配合计数器）', 'HIGH', 1, 1);
+
+-- XXE 攻击检测规则
+INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
+('XXE 检测 - DOCTYPE ENTITY', 'XXE', '(?i)<!DOCTYPE[^>]*\\bENTITY\\b', '检测 DOCTYPE ENTITY 声明', 'HIGH', 1, 5),
+('XXE 检测 - SYSTEM 关键字', 'XXE', '(?i)\\bSYSTEM\\s*["\']', '检测 SYSTEM 关键字引用外部实体', 'HIGH', 1, 5),
+('XXE 检测 - PUBLIC 关键字', 'XXE', '(?i)\\bPUBLIC\\s*["\']', '检测 PUBLIC 关键字引用外部实体', 'HIGH', 1, 5),
+('XXE 检测 - file:// 协议', 'XXE', '(?i)file://', '检测 file:// 协议外部实体引用', 'HIGH', 1, 8),
+('XXE 检测 - http:// 协议', 'XXE', '(?i)\\bSYSTEM\\s*["\']?https?://', '检测 http/https 协议外部实体引用', 'HIGH', 1, 8),
+('XXE 检测 - 参数实体', 'XXE', '(?i)<!ENTITY\\s+%', '检测参数实体声明', 'HIGH', 1, 10),
+('XXE 检测 - 外部通用实体', 'XXE', '(?i)<!ENTITY\\s+\\w+\\s+SYSTEM', '检测外部通用实体声明', 'HIGH', 1, 5);
+
+-- SSRF 攻击检测规则
+INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
+('SSRF 检测 - 内网IP', 'SSRF', '(?i)(url|uri|target|host|domain|site|link|src|source)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost|192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)', '检测内网IP地址请求', 'HIGH', 1, 10),
+('SSRF 检测 - file:// 协议', 'SSRF', '(?i)(url|uri|target|host|domain)\\s*[=:]\\s*["\']?file://', '检测 file:// 协议SSRF', 'HIGH', 1, 8),
+('SSRF 检测 - dict:// 协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?dict://', '检测 dict:// 协议SSRF', 'HIGH', 1, 8),
+('SSRF 检测 - gopher:// 协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?gopher://', '检测 gopher:// 协议SSRF', 'HIGH', 1, 8),
+('SSRF 检测 - 云元数据', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(169\\.254\\.169\\.254|metadata\\.azure|metadata\\.google)', '检测云元数据SSRF', 'HIGH', 1, 5);
+
+-- 反序列化攻击检测规则
+INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
+('反序列化 - Java序列化头', 'DESERIALIZATION', '\\xac\\xed\\x00\\x05', '检测Java序列化对象头', 'HIGH', 1, 5),
+('反序列化 - PHP序列化', 'DESERIALIZATION', '(?i)(O:\\d+:|a:\\d+:|s:\\d+:)', '检测PHP序列化字符串', 'HIGH', 1, 10),
+('反序列化 - Python pickle', 'DESERIALIZATION', '(?i)(c__builtin__|c__main__|cos\\n|csubprocess)', '检测Python pickle序列化', 'HIGH', 1, 10),
+('反序列化 - base64编码Java', 'DESERIALIZATION', '(?i)rO0AB', '检测base64编码的Java序列化对象', 'HIGH', 1, 8);
 
 -- ------------------------------------------------------------
 -- 4.1.2 初始化检测白名单
@@ -782,60 +884,60 @@ INSERT INTO `sys_scan_target` (`target_name`, `target_url`, `target_type`, `desc
 ('靶场服务', 'http://127.0.0.1:9001', 'TEST', '漏洞测试靶场服务，包含SQL注入、XSS、命令注入等多种漏洞测试接口', 1);
 
 -- 初始化扫描接口配置（靶场服务的各个漏洞测试接口）
-INSERT INTO `sys_scan_interface` (`target_id`, `interface_name`, `interface_path`, `http_method`, `vuln_type`, `risk_level`, `params_config`, `payload_config`, `match_rules`, `enabled`, `priority`) VALUES
+INSERT INTO `sys_scan_interface` (`target_id`, `interface_name`, `interface_path`, `http_method`, `vuln_type`, `risk_level`, `params_config`, `payload_config`, `match_rules`, `enabled`, `priority`, `defense_rule_status`, `defense_rule_count`, `defense_rule_note`) VALUES
 (1, 'SQL注入测试接口', '/target/sql/query', 'GET', 'SQL_INJECTION', 'HIGH', 
  '{"id": {"type": "string", "required": true, "testValues": ["1", "1 OR 1=1", "1; SELECT 1"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["OR 1=1", "statement_results", "executed_sql"], "responsePatterns": ["SQL注入漏洞", "多语句执行成功"]}',
- 1, 10),
+ 1, 10, 0, 0, NULL),
 
 (1, 'XSS反射型测试接口', '/target/xss/search', 'GET', 'XSS', 'MEDIUM',
  '{"keyword": {"type": "string", "required": true, "testValues": ["test", "<script>alert(1)</script>"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["scan_xss_quick", "scan_xss_full"], "responsePatterns": ["反射型XSS漏洞", "搜索成功"]}',
- 1, 20),
+ 1, 20, 0, 0, NULL),
 
 (1, 'XSS DOM型测试接口', '/target/xss/profile', 'GET', 'XSS', 'MEDIUM',
  '{"username": {"type": "string", "required": true, "testValues": ["test", "<svg/onload=alert(1)>"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["scan_xss_quick", "scan_xss_full"], "responsePatterns": ["DOM型XSS漏洞", "获取资料成功"]}',
- 1, 30),
+ 1, 30, 0, 0, NULL),
 
 (1, '命令注入测试接口', '/target/cmd/execute', 'GET', 'COMMAND_INJECTION', 'CRITICAL',
  '{"cmd": {"type": "string", "required": true, "testValues": ["ping 127.0.0.1 -n 2", "whoami"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["Pinging", "ping statistics", "\\\\", "root"], "responsePatterns": ["命令执行结果", "纯命令注入漏洞触发成功"]}',
- 1, 5),
+ 1, 5, 0, 0, NULL),
 
 (1, '路径遍历测试接口', '/target/path/read', 'GET', 'PATH_TRAVERSAL', 'HIGH',
  '{"filename": {"type": "string", "required": true, "testValues": ["test.txt", "../../application.yml"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["server:", "<project", "root:"], "responsePatterns": ["路径遍历漏洞", "文件读取成功"]}',
- 1, 15),
+ 1, 15, 0, 0, NULL),
 
 (1, '文件包含测试接口', '/target/file/include', 'GET', 'FILE_INCLUSION', 'HIGH',
  '{"path": {"type": "string", "required": true, "testValues": ["test.properties", "config/test.properties"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["db.password", "文件包含漏洞", "文件加载成功"], "responsePatterns": ["文件包含漏洞", "文件加载成功"]}',
- 1, 25),
+ 1, 25, 0, 0, NULL),
 
 (1, 'SSRF测试接口', '/target/ssrf/request', 'GET', 'SSRF', 'HIGH',
  '{"url": {"type": "string", "required": true, "testValues": ["http://127.0.0.1:9001/target/ddos/status"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["DDoS被攻击目标状态", "SSRF漏洞", "请求成功"], "responsePatterns": ["SSRF漏洞", "请求成功（漏洞接口）"]}',
- 1, 35),
+ 1, 35, 0, 0, NULL),
 
 (1, 'XXE测试接口', '/target/xxe/parse', 'POST', 'XXE', 'HIGH',
  '{"xmlBody": {"type": "xml", "required": true}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["has_external_entity", "test_password_123", "XXE漏洞"], "responsePatterns": ["XXE漏洞", "has_external_entity"]}',
- 1, 40),
+ 1, 40, 0, 0, NULL),
 
 (1, 'CSRF测试接口', '/target/csrf/update-name', 'POST', 'CSRF', 'MEDIUM',
  '{"userId": {"type": "string", "required": true}, "nickname": {"type": "string", "required": true}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["CSRF漏洞", "昵称修改成功"], "responsePatterns": ["CSRF漏洞", "昵称修改成功（漏洞接口）"]}',
- 1, 45);
+ 1, 45, 0, 0, NULL);
 
 -- 初始化Payload库（基础Payload）
 INSERT INTO `sys_payload_library` (`vuln_type`, `payload_level`, `payload_content`, `match_keywords`, `description`, `risk_level`, `enabled`) VALUES
@@ -851,9 +953,9 @@ INSERT INTO `sys_payload_library` (`vuln_type`, `payload_level`, `payload_conten
 ('XSS', 'BASIC', '<svg/onload=alert(''scan_xss_quick'')>', 'scan_xss_quick', 'SVG 事件回显探测', 'MEDIUM', 1),
 ('XSS', 'ADVANCED', '<img src=x onerror=alert(''scan_xss_full'')>', 'scan_xss_full', 'IMG onerror 回显探测', 'MEDIUM', 1),
 ('XSS', 'ADVANCED', '<script>alert(''scan_xss_script'')</script>', 'scan_xss_script', 'Script 标签探测', 'HIGH', 1),
-('XSS', 'ADVANCED', ''\"><script>alert(''scan_xss_attr'')</script>', 'scan_xss_attr', '属性注入探测', 'HIGH', 1),
+('XSS', 'ADVANCED', '\'"><script>alert(''scan_xss_attr'')</script>', 'scan_xss_attr', '属性注入探测', 'HIGH', 1),
 ('XSS', 'ADVANCED', '<body onload=alert(''scan_xss_body'')>', 'scan_xss_body', 'Body 事件探测', 'MEDIUM', 1),
-('XSS', 'ADVANCED', '<iframe src=''javascript:alert(\"scan_xss_iframe\")''>', 'scan_xss_iframe', 'Iframe 注入探测', 'HIGH', 1),
+('XSS', 'ADVANCED', '<iframe src=''javascript:alert("scan_xss_iframe")''>', 'scan_xss_iframe', 'Iframe 注入探测', 'HIGH', 1),
 
 -- 命令注入Payload（Windows）
 ('COMMAND_INJECTION', 'BASIC', 'ping 127.0.0.1 -n 2', 'Pinging,ping statistics', 'Ping 命令探测', 'HIGH', 1),

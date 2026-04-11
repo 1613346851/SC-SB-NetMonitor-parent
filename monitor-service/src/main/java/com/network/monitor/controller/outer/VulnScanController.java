@@ -49,4 +49,9 @@ public class VulnScanController {
                 ? String.valueOf(request.get("action")) : "";
         return ApiResponse.success(vulnScanService.controlScan(action));
     }
+
+    @GetMapping("/interfaces")
+    public ApiResponse<Map<String, Object>> getScanInterfaces(String scanType) {
+        return ApiResponse.success(vulnScanService.getScanInterfaces(scanType));
+    }
 }

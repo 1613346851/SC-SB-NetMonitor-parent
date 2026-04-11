@@ -1,12 +1,18 @@
 package com.network.monitor.controller.outer;
 
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.dto.ScanInterfaceRelationDTO;
+import com.network.monitor.entity.MonitorRuleEntity;
 import com.network.monitor.entity.ScanInterfaceEntity;
+import com.network.monitor.entity.VulnerabilityMonitorEntity;
+import com.network.monitor.mapper.MonitorRuleMapper;
+import com.network.monitor.mapper.VulnerabilityMonitorMapper;
 import com.network.monitor.service.ScanInterfaceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +23,12 @@ public class ScanInterfaceController {
 
     @Autowired
     private ScanInterfaceService scanInterfaceService;
+
+    @Autowired
+    private VulnerabilityMonitorMapper vulnerabilityMonitorMapper;
+
+    @Autowired
+    private MonitorRuleMapper monitorRuleMapper;
 
     @GetMapping("/{id}")
     public ApiResponse<ScanInterfaceEntity> getById(@PathVariable Long id) {
@@ -85,6 +97,17 @@ public class ScanInterfaceController {
         }
     }
 
+    @GetMapping("/all-with-relations")
+    public ApiResponse<List<ScanInterfaceRelationDTO>> getAllWithRelations() {
+        try {
+            List<ScanInterfaceRelationDTO> list = scanInterfaceService.getAllWithRelations();
+            return ApiResponse.success(list);
+        } catch (Exception e) {
+            log.error("查询扫描接口关联信息失败：", e);
+            return ApiResponse.error("查询失败");
+        }
+    }
+
     @GetMapping("/vuln-type/{vulnType}")
     public ApiResponse<List<ScanInterfaceEntity>> getByVulnType(@PathVariable String vulnType) {
         try {
@@ -148,5 +171,65 @@ public class ScanInterfaceController {
             log.error("更新扫描接口启用状态失败：", e);
             return ApiResponse.error("更新失败");
         }
+    }
+
+    @PutMapping("/{id}/defense-rule")
+    public ApiResponse<Boolean> updateDefenseRule(
+            @PathVariable Long id,
+            @RequestParam Integer hasDefenseRule,
+            @RequestParam(required = false) String defenseRuleNote) {
+        try {
+            boolean success = scanInterfaceService.updateDefenseRule(id, hasDefenseRule, defenseRuleNote);
+            if (success) {
+                return ApiResponse.success(true);
+            } else {
+                return ApiResponse.error("更新失败");
+            }
+        } catch (Exception e) {
+            log.error("更新扫描接口防御规则标记失败：", e);
+            return ApiResponse.error("更新失败");
+        }
+    }
+
+    @GetMapping("/{id}/detail")
+    public ApiResponse<Map<String, Object>> getDetail(@PathVariable Long id) {
+        try {
+            ScanInterfaceEntity interfaceEntity = scanInterfaceService.getById(id);
+            if (interfaceEntity == null) {
+                return ApiResponse.notFound("扫描接口不存在");
+            }
+
+            List<VulnerabilityMonitorEntity> vulnList = vulnerabilityMonitorMapper.selectByVulnPath(interfaceEntity.getInterfacePath());
+
+            String attackType = convertVulnTypeToAttackType(interfaceEntity.getVulnType());
+            List<MonitorRuleEntity> ruleList = monitorRuleMapper.selectByAttackType(attackType);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("interface", interfaceEntity);
+            result.put("vulnerabilities", vulnList);
+            result.put("rules", ruleList);
+
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("查询扫描接口详情失败：", e);
+            return ApiResponse.error("查询失败");
+        }
+    }
+
+    private String convertVulnTypeToAttackType(String vulnType) {
+        if (vulnType == null) {
+            return "UNKNOWN";
+        }
+        return switch (vulnType) {
+            case "SQL_INJECTION" -> "SQL_INJECTION";
+            case "XSS" -> "XSS";
+            case "COMMAND_INJECTION" -> "COMMAND_INJECTION";
+            case "PATH_TRAVERSAL" -> "PATH_TRAVERSAL";
+            case "FILE_INCLUSION" -> "FILE_INCLUSION";
+            case "SSRF" -> "SSRF";
+            case "XXE" -> "XXE";
+            case "CSRF" -> "CSRF";
+            default -> vulnType;
+        };
     }
 }

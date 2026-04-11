@@ -15,22 +15,25 @@
         <result column="match_rules" property="matchRules"/>
         <result column="enabled" property="enabled"/>
         <result column="priority" property="priority"/>
+        <result column="defense_rule_status" property="defenseRuleStatus"/>
+        <result column="defense_rule_count" property="defenseRuleCount"/>
+        <result column="defense_rule_note" property="defenseRuleNote"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <sql id="Base_Column_List">
         id, target_id, interface_name, interface_path, http_method, vuln_type, risk_level,
-        params_config, payload_config, match_rules, enabled, priority, create_time, update_time
+        params_config, payload_config, match_rules, enabled, priority, defense_rule_status, defense_rule_count, defense_rule_note, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.ScanInterfaceEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_scan_interface (
             target_id, interface_name, interface_path, http_method, vuln_type, risk_level,
-            params_config, payload_config, match_rules, enabled, priority, create_time, update_time
+            params_config, payload_config, match_rules, enabled, priority, defense_rule_status, defense_rule_count, defense_rule_note, create_time, update_time
         ) VALUES (
             #{targetId}, #{interfaceName}, #{interfacePath}, #{httpMethod}, #{vulnType}, #{riskLevel},
-            #{paramsConfig}, #{payloadConfig}, #{matchRules}, #{enabled}, #{priority}, NOW(), NOW()
+            #{paramsConfig}, #{payloadConfig}, #{matchRules}, #{enabled}, #{priority}, #{defenseRuleStatus}, #{defenseRuleCount}, #{defenseRuleNote}, NOW(), NOW()
         )
     </insert>
 
@@ -120,6 +123,9 @@
             match_rules = #{matchRules},
             enabled = #{enabled},
             priority = #{priority},
+            defense_rule_status = #{defenseRuleStatus},
+            defense_rule_count = #{defenseRuleCount},
+            defense_rule_note = #{defenseRuleNote},
             update_time = NOW()
         WHERE id = #{id}
     </update>
@@ -137,5 +143,20 @@
         SET enabled = #{enabled}, update_time = NOW()
         WHERE id = #{id}
     </update>
+
+    <update id="updateDefenseRuleStatus">
+        UPDATE sys_scan_interface
+        SET defense_rule_status = #{defenseRuleStatus},
+            defense_rule_count = #{defenseRuleCount},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectByPathLike" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        WHERE interface_path LIKE CONCAT('%', #{interfacePath}, '%')
+        ORDER BY priority ASC, create_time DESC
+    </select>
 
 </mapper>

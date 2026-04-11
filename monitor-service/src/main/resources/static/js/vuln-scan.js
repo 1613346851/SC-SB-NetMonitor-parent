@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', function() {
     bindDetailModal();
     initTableSorting();
     loadScanState();
+    loadScanInterfaces();
+    loadScanConfigList();
 });
 
 function bindScanModeUI() {
@@ -20,6 +22,7 @@ function bindScanModeUI() {
         radio.addEventListener('change', () => {
             document.querySelectorAll('.scan-mode-option').forEach(item => item.classList.remove('active'));
             radio.closest('.scan-mode-option')?.classList.add('active');
+            loadScanInterfaces();
         });
     });
 }
@@ -114,6 +117,284 @@ async function loadScanState() {
         console.error('加载扫描状态失败:', error);
         message.error('加载扫描状态失败：' + (error.message || '未知错误'));
     }
+}
+
+async function loadScanInterfaces() {
+    try {
+        const scanType = document.querySelector('input[name="scanType"]:checked')?.value || 'QUICK';
+        const result = await http.get(`/vuln/scan/interfaces?scanType=${scanType}`);
+        if (result && result.interfaces) {
+            renderInterfaceTags(result.interfaces);
+        }
+    } catch (error) {
+        console.error('加载扫描接口列表失败:', error);
+    }
+}
+
+async function loadScanConfigList() {
+    try {
+        const result = await http.get('/scan-interface/all-with-relations');
+        console.log('扫描配置列表返回:', result);
+        if (result && Array.isArray(result)) {
+            renderScanConfigTable(result);
+        } else {
+            console.error('扫描配置列表格式错误:', result);
+            const tbody = document.getElementById('scanConfigTableBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center">数据格式错误</td></tr>';
+            }
+        }
+    } catch (error) {
+        console.error('加载扫描配置列表失败:', error);
+        const tbody = document.getElementById('scanConfigTableBody');
+        if (tbody) {
+            let errorMsg = '加载失败';
+            if (error.message && error.message.includes('401')) {
+                errorMsg = '未授权，请重新登录';
+            } else if (error.message && error.message.includes('404')) {
+                errorMsg = '接口不存在，请检查服务是否启动';
+            } else if (error.message && error.message.includes('500')) {
+                errorMsg = '服务器错误，请检查数据库是否初始化';
+            } else {
+                errorMsg = `加载失败: ${error.message || '未知错误'}`;
+            }
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center">${errorMsg}<br><small>提示：请确保已执行数据库初始化脚本 init_all.sql</small></td></tr>`;
+        }
+    }
+}
+
+function renderScanConfigTable(list) {
+    const tbody = document.getElementById('scanConfigTableBody');
+    if (!tbody) return;
+
+    if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center">暂无配置</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = list.map(item => {
+        let defenseStatusHtml = '';
+        const status = item.defenseRuleStatus || 0;
+        if (status === 2) {
+            defenseStatusHtml = '<span class="tag success">已配置</span>';
+        } else if (status === 1) {
+            defenseStatusHtml = '<span class="tag warning">部分已配置</span>';
+        } else {
+            defenseStatusHtml = '<span class="tag info">未配置</span>';
+        }
+        
+        return `
+        <tr>
+            <td>${CellRenderer.renderText(item.interfaceName)}</td>
+            <td><code>${CellRenderer.renderText(item.interfacePath)}</code></td>
+            <td>${CellRenderer.renderText(item.vulnType)}</td>
+            <td><span class="badge badge-info">${item.ruleCount || 0}</span></td>
+            <td><span class="badge badge-warning">${item.vulnCount || 0}</span></td>
+            <td><span class="badge badge-success">${item.verifiedCount || 0}</span></td>
+            <td>${defenseStatusHtml}</td>
+            <td>${item.enabled === 1 ? '<span class="tag success">已启用</span>' : '<span class="tag warning">已禁用</span>'}</td>
+            <td>
+                <button class="btn btn-sm btn-info" onclick="showInterfaceDetail(${item.interfaceId})">详情</button>
+                <button class="btn btn-sm ${item.enabled === 1 ? 'btn-warning' : 'btn-success'}" 
+                        onclick="toggleScanInterface(${item.interfaceId}, ${item.enabled || 0})">
+                    ${item.enabled === 1 ? '禁用' : '启用'}
+                </button>
+                <button class="btn btn-sm ${status === 2 ? 'btn-warning' : 'btn-success'}" 
+                        onclick="toggleDefenseRule(${item.interfaceId}, ${status})">
+                    ${status === 2 ? '取消防御' : '标记防御'}
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteScanInterface(${item.interfaceId})">删除</button>
+            </td>
+        </tr>
+    `}).join('');
+}
+
+async function toggleScanInterface(id, currentEnabled) {
+    try {
+        const newEnabled = currentEnabled === 1 ? 0 : 1;
+        await http.put(`/scan-interface/${id}/enabled?enabled=${newEnabled}`);
+        message.success(newEnabled === 1 ? '接口已启用' : '接口已禁用');
+        loadScanConfigList();
+        loadScanInterfaces();
+    } catch (error) {
+        console.error('切换接口状态失败:', error);
+        message.error('操作失败：' + (error.message || '未知错误'));
+    }
+}
+
+async function toggleDefenseRule(id, currentStatus) {
+    try {
+        const newStatus = currentStatus === 2 ? 0 : 2;
+        const note = newStatus === 2 ? '手动标记：已配置防御规则' : '';
+        
+        await http.put(`/scan-interface/${id}/defense-rule?hasDefenseRule=${newStatus}&defenseRuleNote=${encodeURIComponent(note)}`);
+        message.success(newStatus === 2 ? '已标记为已配置防御规则' : '已取消防御标记');
+        loadScanConfigList();
+    } catch (error) {
+        console.error('切换防御规则标记失败:', error);
+        message.error('操作失败：' + (error.message || '未知错误'));
+    }
+}
+
+function showAddInterfaceModal() {
+    document.getElementById('addInterfaceModal').style.display = 'flex';
+    document.getElementById('addInterfaceForm').reset();
+}
+
+function closeAddInterfaceModal() {
+    document.getElementById('addInterfaceModal').style.display = 'none';
+}
+
+async function submitAddInterface() {
+    try {
+        const interfaceName = document.getElementById('interfaceName').value.trim();
+        const interfacePath = document.getElementById('interfacePath').value.trim();
+        const httpMethod = document.getElementById('httpMethod').value;
+        const vulnType = document.getElementById('vulnType').value;
+        const riskLevel = document.getElementById('riskLevel').value;
+        const priority = parseInt(document.getElementById('priority').value) || 100;
+
+        if (!interfaceName || !interfacePath) {
+            message.error('请填写必填项');
+            return;
+        }
+
+        const entity = {
+            targetId: 1,
+            interfaceName,
+            interfacePath,
+            httpMethod,
+            vulnType,
+            riskLevel,
+            priority,
+            enabled: 1,
+            defenseRuleStatus: 0,
+            defenseRuleCount: 0,
+            paramsConfig: '{}',
+            payloadConfig: '{}',
+            matchRules: '{}'
+        };
+
+        await http.post('/scan-interface/add', entity);
+        message.success('接口添加成功');
+        closeAddInterfaceModal();
+        loadScanConfigList();
+        loadScanInterfaces();
+    } catch (error) {
+        console.error('添加接口失败:', error);
+        message.error('添加失败：' + (error.message || '未知错误'));
+    }
+}
+
+async function deleteScanInterface(id) {
+    if (!confirm('确定要删除这个接口吗？')) {
+        return;
+    }
+    
+    try {
+        await http.delete(`/scan-interface/${id}`);
+        message.success('接口删除成功');
+        loadScanConfigList();
+        loadScanInterfaces();
+    } catch (error) {
+        console.error('删除接口失败:', error);
+        message.error('删除失败：' + (error.message || '未知错误'));
+    }
+}
+
+async function showInterfaceDetail(id) {
+    try {
+        const modal = document.getElementById('interfaceDetailModal');
+        modal.style.display = 'flex';
+        
+        const result = await http.get(`/scan-interface/${id}/detail`);
+        
+        renderInterfaceBasicInfo(result.interface);
+        renderRelatedVulnTable(result.vulnerabilities || []);
+        renderRelatedRuleTable(result.rules || []);
+    } catch (error) {
+        console.error('加载接口详情失败:', error);
+        message.error('加载详情失败：' + (error.message || '未知错误'));
+    }
+}
+
+function closeInterfaceDetailModal() {
+    document.getElementById('interfaceDetailModal').style.display = 'none';
+}
+
+function renderInterfaceBasicInfo(interfaceEntity) {
+    const container = document.getElementById('interfaceBasicInfo');
+    if (!container || !interfaceEntity) {
+        container.innerHTML = '<p class="text-muted">暂无信息</p>';
+        return;
+    }
+
+    const status = interfaceEntity.defenseRuleStatus || 0;
+    let defenseStatusText = '未配置';
+    if (status === 2) {
+        defenseStatusText = '已配置';
+    } else if (status === 1) {
+        defenseStatusText = '部分已配置';
+    }
+
+    const info = [
+        { label: '接口名称', value: interfaceEntity.interfaceName },
+        { label: '接口路径', value: interfaceEntity.interfacePath },
+        { label: 'HTTP方法', value: interfaceEntity.httpMethod },
+        { label: '漏洞类型', value: interfaceEntity.vulnType },
+        { label: '风险等级', value: interfaceEntity.riskLevel },
+        { label: '扫描优先级', value: interfaceEntity.priority },
+        { label: '防御规则', value: defenseStatusText },
+        { label: '关联规则数', value: interfaceEntity.defenseRuleCount || 0 },
+        { label: '创建时间', value: interfaceEntity.createTime || '-' }
+    ];
+
+    container.innerHTML = info.map(item => `
+        <div class="detail-info-item">
+            <span class="detail-info-label">${item.label}：</span>
+            <span class="detail-info-value">${CellRenderer.renderText(item.value)}</span>
+        </div>
+    `).join('');
+}
+
+function renderRelatedVulnTable(vulnList) {
+    const tbody = document.getElementById('relatedVulnTableBody');
+    if (!tbody) return;
+
+    if (!vulnList || vulnList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无关联漏洞记录</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = vulnList.map(item => `
+        <tr>
+            <td>${CellRenderer.renderText(item.vulnName)}</td>
+            <td>${CellRenderer.renderText(item.vulnType)}</td>
+            <td>${CellRenderer.renderRiskLevel(item.vulnLevel || 'LOW')}</td>
+            <td>${CellRenderer.renderVerifyStatus(item.verifyStatus || 0)}</td>
+            <td>${CellRenderer.renderText(item.createTime || '-')}</td>
+        </tr>
+    `).join('');
+}
+
+function renderRelatedRuleTable(ruleList) {
+    const tbody = document.getElementById('relatedRuleTableBody');
+    if (!tbody) return;
+
+    if (!ruleList || ruleList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无关联防御规则</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = ruleList.map(item => `
+        <tr>
+            <td>${CellRenderer.renderText(item.ruleName)}</td>
+            <td>${CellRenderer.renderText(item.attackType)}</td>
+            <td>${CellRenderer.renderRiskLevel(item.riskLevel || 'LOW')}</td>
+            <td>${item.enabled === 1 ? '<span class="tag success">已启用</span>' : '<span class="tag warning">已禁用</span>'}</td>
+            <td>${item.priority || '-'}</td>
+        </tr>
+    `).join('');
 }
 
 async function startScan() {
@@ -436,7 +717,6 @@ function viewScanResultDetail(index) {
                 <p><strong>来源：</strong>${CellRenderer.renderText(result.source)}</p>
                 <p><strong>同步状态：</strong>${result.synced ? '<span class="tag success">已同步</span>' : '<span class="tag warning">待同步</span>'}</p>
                 <p><strong>漏洞ID：</strong>${CellRenderer.renderText(result.vulnerabilityId ? String(result.vulnerabilityId) : null)}</p>
-                <p><strong>AI研判预留：</strong>${CellRenderer.renderText(result.aiVerdict || '当前未启用 AI 自动研判')}</p>
             </div>
         </div>
         <div class="scan-detail-section">

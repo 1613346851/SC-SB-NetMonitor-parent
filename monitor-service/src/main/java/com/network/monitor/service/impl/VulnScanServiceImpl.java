@@ -4,9 +4,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.monitor.common.constant.VerifyStatusConstant;
 import com.network.monitor.entity.PayloadLibraryEntity;
+import com.network.monitor.entity.ScanHistoryEntity;
 import com.network.monitor.entity.ScanInterfaceEntity;
 import com.network.monitor.entity.VulnerabilityMonitorEntity;
 import com.network.monitor.service.PayloadLibraryService;
+import com.network.monitor.service.ScanHistoryService;
 import com.network.monitor.service.ScanInterfaceService;
 import com.network.monitor.service.VulnScanService;
 import com.network.monitor.service.VulnerabilityVerifyService;
@@ -26,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -82,6 +85,9 @@ public class VulnScanServiceImpl implements VulnScanService {
     @Autowired
     private PayloadLibraryService payloadLibraryService;
 
+    @Autowired
+    private ScanHistoryService scanHistoryService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ExecutorService executorService = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "vuln-scan-executor");
@@ -92,6 +98,35 @@ public class VulnScanServiceImpl implements VulnScanService {
     private final Deque<Map<String, Object>> history = new ConcurrentLinkedDeque<>();
 
     private volatile ScanState currentState = ScanState.idle();
+
+    @PostConstruct
+    public void init() {
+        loadHistoryFromDatabase();
+    }
+
+    private void loadHistoryFromDatabase() {
+        try {
+            List<ScanHistoryEntity> dbHistory = scanHistoryService.getRecent(historySize);
+            for (ScanHistoryEntity entity : dbHistory) {
+                Map<String, Object> summary = new LinkedHashMap<>();
+                summary.put("taskId", entity.getTaskId());
+                summary.put("status", entity.getStatus());
+                summary.put("scanType", entity.getScanType());
+                summary.put("target", entity.getTarget());
+                summary.put("discoveredCount", entity.getDiscoveredCount());
+                summary.put("completedInterfaces", entity.getCompletedInterfaces());
+                summary.put("totalInterfaces", entity.getTotalInterfaces());
+                summary.put("startTime", formatTime(entity.getStartTime()));
+                summary.put("endTime", formatTime(entity.getEndTime()));
+                summary.put("durationSeconds", entity.getDurationSeconds());
+                summary.put("summary", entity.getSummary());
+                history.addLast(summary);
+            }
+            log.info("从数据库加载扫描历史：{} 条记录", history.size());
+        } catch (Exception e) {
+            log.warn("从数据库加载扫描历史失败：{}", e.getMessage());
+        }
+    }
 
     @Override
     public Map<String, Object> startScan(String scanType) {
@@ -206,6 +241,21 @@ public class VulnScanServiceImpl implements VulnScanService {
         return buildStateResponse(state, state.lastMessage);
     }
 
+    @Override
+    public Map<String, Object> getScanInterfaces(String scanType) {
+        String normalizedType = normalizeScanType(scanType);
+        List<ScanPlan> plans = detectInterfaces(normalizedType);
+        List<Map<String, Object>> interfaces = plans.stream()
+                .map(ScanPlan::toSummary)
+                .collect(Collectors.toList());
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("scanType", normalizedType);
+        result.put("totalInterfaces", interfaces.size());
+        result.put("interfaces", interfaces);
+        return result;
+    }
+
     @PreDestroy
     public void destroy() {
         executorService.shutdownNow();
@@ -240,7 +290,19 @@ public class VulnScanServiceImpl implements VulnScanService {
                     }
                 } catch (Exception ex) {
                     log.warn("扫描接口失败：path={}, msg={}", plan.path, ex.getMessage());
-                    state.warnings.add(plan.path + " 扫描失败：" + ex.getMessage());
+                    
+                    if (isDefenseRuleBlock(ex.getMessage())) {
+                        markInterfaceAsDefended(plan.path);
+                        ScanFinding defenseFinding = createDefenseRuleFinding(
+                            plan.title, plan.vulnType, plan.riskLevel, plan.path,
+                            "扫描请求被网关拦截，可能已配置防御规则"
+                        );
+                        Map<String, Object> resultItem = defenseFinding.toMap();
+                        state.results.add(resultItem);
+                        state.discoveredCount = state.results.size();
+                    } else {
+                        state.warnings.add(plan.path + " 扫描失败：" + ex.getMessage());
+                    }
                 } finally {
                     state.completedInterfaces++;
                 }
@@ -356,6 +418,52 @@ public class VulnScanServiceImpl implements VulnScanService {
         } catch (Exception e) {
             log.warn("创建扫描计划失败：interfaceId={}, error={}", scanInterface.getId(), e.getMessage());
             return null;
+        }
+    }
+
+    private ScanFinding createDefenseRuleFinding(String title, String vulnType, String riskLevel, String path, String defenseRuleNote) {
+        return new ScanFinding(
+            title + " - 已配置防御规则",
+            vulnType,
+            riskLevel,
+            path,
+            "N/A",
+            "N/A",
+            "已配置防御规则",
+            defenseRuleNote != null ? defenseRuleNote : "该接口已配置攻击检测规则，扫描请求会被网关拦截，无需再次扫描",
+            "该接口已纳入安全防护体系，网关会自动拦截攻击请求",
+            "防御规则已生效，建议定期检查规则有效性",
+            "已配置防御规则，跳过扫描"
+        );
+    }
+
+    private boolean isDefenseRuleBlock(String errorMessage) {
+        if (errorMessage == null) {
+            return false;
+        }
+        String msg = errorMessage.toLowerCase(Locale.ROOT);
+        return msg.contains("400 bad request") || 
+               msg.contains("403 forbidden") ||
+               msg.contains("blocked") ||
+               msg.contains("拦截");
+    }
+
+    private void markInterfaceAsDefended(String path) {
+        try {
+            List<ScanInterfaceEntity> interfaces = scanInterfaceService.getAllEnabled();
+            for (ScanInterfaceEntity entity : interfaces) {
+                if (path.equals(entity.getInterfacePath())) {
+                    if (entity.getDefenseRuleStatus() == null || entity.getDefenseRuleStatus() == 0) {
+                        entity.setDefenseRuleStatus(2);
+                        entity.setDefenseRuleNote("系统自动检测：扫描请求被网关拦截");
+                        scanInterfaceService.update(entity);
+                        log.info("自动标记接口为已配置防御规则：path={}", path);
+                    }
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("标记接口防御规则失败：path={}, error={}", path, e.getMessage());
         }
     }
 
@@ -521,35 +629,55 @@ public class VulnScanServiceImpl implements VulnScanService {
     }
 
     private ScanFinding probeXxe() {
-        ProbeResponse cases = doGet("/target/xxe/test-cases", Collections.emptyMap());
-        Map<String, Object> caseBody = parseBody(cases.body);
-        Map<String, Object> caseData = getNestedMap(caseBody, "data");
-        Map<String, Object> testCases = getNestedMap(caseData, "test_cases");
-        String xmlPayload = Objects.toString(testCases.get("xxe_project_config"), "");
-        if (xmlPayload.isBlank()) {
-            return null;
-        }
-        ProbeResponse response = doPostText("/target/xxe/parse", xmlPayload, MediaType.APPLICATION_XML);
-        if (containsAny(response.body, "XXE漏洞", "has_external_entity", "test_password_123")) {
-            return buildFinding("XXE 漏洞 - XML 外部实体解析接口", "XXE", "HIGH",
-                    "/target/xxe/parse", "POST", "<!DOCTYPE ...>", "has_external_entity",
-                    "XML 解析器未禁用外部实体，攻击者可借此读取项目内文件内容。", response.body,
-                    defaultFixSuggestion("XXE", "/target/xxe/parse"));
+        try {
+            ProbeResponse cases = doGet("/target/xxe/test-cases", Collections.emptyMap());
+            Map<String, Object> caseBody = parseBody(cases.body);
+            Map<String, Object> caseData = getNestedMap(caseBody, "data");
+            Map<String, Object> testCases = getNestedMap(caseData, "test_cases");
+            String xmlPayload = Objects.toString(testCases.get("xxe_project_config"), "");
+            if (xmlPayload.isBlank()) {
+                return null;
+            }
+            ProbeResponse response = doPostText("/target/xxe/parse", xmlPayload, MediaType.APPLICATION_XML);
+            if (containsAny(response.body, "XXE漏洞", "has_external_entity", "test_password_123")) {
+                return buildFinding("XXE 漏洞 - XML 外部实体解析接口", "XXE", "HIGH",
+                        "/target/xxe/parse", "POST", "<!DOCTYPE ...>", "has_external_entity",
+                        "XML 解析器未禁用外部实体，攻击者可借此读取项目内文件内容。", response.body,
+                        defaultFixSuggestion("XXE", "/target/xxe/parse"));
+            }
+        } catch (Exception e) {
+            log.warn("XXE扫描失败: {}", e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("timeout")) {
+                return buildFinding("XXE 扫描超时", "XXE", "HIGH",
+                        "/target/xxe/parse", "POST", "N/A", "扫描超时",
+                        "XXE接口响应超时，可能存在性能问题或已配置防御规则", "超时",
+                        "建议检查接口性能或防御规则配置");
+            }
         }
         return null;
     }
 
     private ScanFinding probeCsrf() {
-        String nickname = "scan_csrf_user";
-        ProbeResponse response = doPostForm("/target/csrf/update-name", Map.of(
-                "userId", "1",
-                "nickname", nickname
-        ));
-        if (containsAny(response.body, "CSRF漏洞", nickname, "昵称修改成功（漏洞接口）")) {
-            return buildFinding("CSRF 漏洞 - 用户昵称修改接口", "CSRF", "MEDIUM",
-                    "/target/csrf/update-name", "POST", nickname, nickname,
-                    "状态修改接口缺少 CSRF Token 校验，可被第三方站点诱导发起跨站请求。", response.body,
-                    defaultFixSuggestion("CSRF", "/target/csrf/update-name"));
+        try {
+            String nickname = "scan_csrf_user";
+            ProbeResponse response = doPostForm("/target/csrf/update-name", Map.of(
+                    "userId", "1",
+                    "nickname", nickname
+            ));
+            if (containsAny(response.body, "CSRF漏洞", nickname, "昵称修改成功（漏洞接口）")) {
+                return buildFinding("CSRF 漏洞 - 用户昵称修改接口", "CSRF", "MEDIUM",
+                        "/target/csrf/update-name", "POST", nickname, nickname,
+                        "状态修改接口缺少 CSRF Token 校验，可被第三方站点诱导发起跨站请求。", response.body,
+                        defaultFixSuggestion("CSRF", "/target/csrf/update-name"));
+            }
+        } catch (Exception e) {
+            log.warn("CSRF扫描失败: {}", e.getMessage());
+            if (e.getMessage() != null && e.getMessage().contains("timeout")) {
+                return buildFinding("CSRF 扫描超时", "CSRF", "MEDIUM",
+                        "/target/csrf/update-name", "POST", "N/A", "扫描超时",
+                        "CSRF接口响应超时，可能存在性能问题或已配置防御规则", "超时",
+                        "建议检查接口性能或防御规则配置");
+            }
         }
         return null;
     }
@@ -691,6 +819,30 @@ public class VulnScanServiceImpl implements VulnScanService {
     }
 
     private void appendHistory(ScanState state) {
+        try {
+            ScanHistoryEntity entity = new ScanHistoryEntity();
+            entity.setTaskId(state.taskId);
+            entity.setScanType(state.scanType);
+            entity.setTarget(state.target);
+            entity.setStatus(state.status);
+            entity.setDiscoveredCount(state.discoveredCount);
+            entity.setCompletedInterfaces(state.completedInterfaces);
+            entity.setTotalInterfaces(state.totalInterfaces);
+            entity.setStartTime(state.startTime);
+            entity.setEndTime(state.endTime);
+            entity.setDurationSeconds((int) state.getDurationSeconds());
+            entity.setSummary(state.summary);
+            
+            if (state.status.equals(STATUS_FAILED) && state.lastMessage != null) {
+                entity.setErrorMessage(state.lastMessage);
+            }
+            
+            scanHistoryService.save(entity);
+            log.info("扫描历史已保存到数据库：taskId={}", state.taskId);
+        } catch (Exception e) {
+            log.error("保存扫描历史失败：taskId={}, error={}", state.taskId, e.getMessage());
+        }
+        
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("taskId", state.taskId);
         summary.put("status", state.status);

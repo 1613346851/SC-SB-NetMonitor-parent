@@ -16,4 +16,6 @@ public interface VulnScanService {
     Map<String, Object> syncCurrentResults();
 
     Map<String, Object> controlScan(String action);
+
+    Map<String, Object> getScanInterfaces(String scanType);
 }

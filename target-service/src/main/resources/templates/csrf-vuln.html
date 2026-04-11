@@ -143,7 +143,11 @@
 <script th:src="@{/js/common.js}"></script>
 <script th:src="@{/js/csrf-vuln.js}"></script>
 <script>
-    ResourceLoader.loadAll();
+    ResourceLoader.loadAll().then(function() {
+        console.log('所有资源加载完成，初始化应用');
+    }).catch(function(e) {
+        console.warn('部分资源加载失败，但继续初始化:', e);
+    });
 </script>
 </body>
 </html>

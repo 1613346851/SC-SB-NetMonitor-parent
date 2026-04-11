@@ -32,22 +32,18 @@ public class DefenseResponseUtil {
      */
     public static Mono<Void> buildIpBlacklistResponse(ServerHttpResponse response, 
                                                      String blockedIp, String eventId) {
-        // 设置响应状态码
         response.setStatusCode(HttpStatus.FORBIDDEN);
         
-        // 设置响应头
         HttpHeaders headers = response.getHeaders();
         headers.add(HttpHeaders.CONTENT_TYPE, GatewayHttpConstant.ContentType.TEXT_HTML + ";charset=" + GatewayHttpConstant.Charset.UTF_8);
         headers.add(HttpHeaders.CACHE_CONTROL, "no-cache,no-store,must-revalidate");
         headers.add(HttpHeaders.PRAGMA, "no-cache");
         headers.add(HttpHeaders.EXPIRES, "0");
         
-        // 构建响应体
         String responseBody = buildBlacklistHtml(blockedIp, eventId);
         DataBuffer buffer = BUFFER_FACTORY.wrap(responseBody.getBytes(StandardCharsets.UTF_8));
         
-        return response.writeWith(Mono.just(buffer))
-                .then(response.setComplete());
+        return response.writeWith(Mono.just(buffer));
     }
 
     /**
@@ -60,22 +56,18 @@ public class DefenseResponseUtil {
      */
     public static Mono<Void> buildRateLimitResponse(ServerHttpResponse response, 
                                                    String sourceIp, int rateLimit) {
-        // 设置响应状态码
         response.setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
         
-        // 设置响应头
         HttpHeaders headers = response.getHeaders();
         headers.add(HttpHeaders.CONTENT_TYPE, GatewayHttpConstant.ContentType.APPLICATION_JSON + ";charset=" + GatewayHttpConstant.Charset.UTF_8);
-        headers.add(HttpHeaders.RETRY_AFTER, "1"); // 建议1秒后重试
+        headers.add(HttpHeaders.RETRY_AFTER, "1");
         headers.add("X-RateLimit-Limit", String.valueOf(rateLimit));
         headers.add("X-RateLimit-Remaining", "0");
         
-        // 构建响应体
         String responseBody = buildRateLimitJson(sourceIp, rateLimit);
         DataBuffer buffer = BUFFER_FACTORY.wrap(responseBody.getBytes(StandardCharsets.UTF_8));
         
-        return response.writeWith(Mono.just(buffer))
-                .then(response.setComplete());
+        return response.writeWith(Mono.just(buffer));
     }
 
     /**
@@ -89,20 +81,16 @@ public class DefenseResponseUtil {
      */
     public static Mono<Void> buildMaliciousRequestResponse(ServerHttpResponse response,
                                                          String sourceIp, String eventId, String riskLevel) {
-        // 设置响应状态码
         response.setStatusCode(HttpStatus.BAD_REQUEST);
         
-        // 设置响应头
         HttpHeaders headers = response.getHeaders();
         headers.add(HttpHeaders.CONTENT_TYPE, GatewayHttpConstant.ContentType.TEXT_HTML + ";charset=" + GatewayHttpConstant.Charset.UTF_8);
         headers.add(HttpHeaders.CACHE_CONTROL, "no-cache,no-store,must-revalidate");
         
-        // 构建响应体
         String responseBody = buildMaliciousRequestHtml(sourceIp, eventId, riskLevel);
         DataBuffer buffer = BUFFER_FACTORY.wrap(responseBody.getBytes(StandardCharsets.UTF_8));
         
-        return response.writeWith(Mono.just(buffer))
-                .then(response.setComplete());
+        return response.writeWith(Mono.just(buffer));
     }
 
     /**
@@ -124,8 +112,7 @@ public class DefenseResponseUtil {
                                           statusCode.getReasonPhrase(), message);
         DataBuffer buffer = BUFFER_FACTORY.wrap(responseBody.getBytes(StandardCharsets.UTF_8));
         
-        return response.writeWith(Mono.just(buffer))
-                .then(response.setComplete());
+        return response.writeWith(Mono.just(buffer));
     }
 
     /**
@@ -174,8 +161,7 @@ public class DefenseResponseUtil {
             """, GatewayHttpConstant.Charset.UTF_8, message, sourceIp);
         DataBuffer buffer = BUFFER_FACTORY.wrap(responseBody.getBytes(StandardCharsets.UTF_8));
         
-        return response.writeWith(Mono.just(buffer))
-                .then(response.setComplete());
+        return response.writeWith(Mono.just(buffer));
     }
 
     /**

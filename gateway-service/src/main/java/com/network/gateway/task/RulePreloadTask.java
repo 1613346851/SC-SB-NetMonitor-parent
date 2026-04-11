@@ -1,8 +1,10 @@
 package com.network.gateway.task;
 
 import com.network.gateway.cache.RuleCache;
+import com.network.gateway.cache.VulnerabilityCache;
 import com.network.gateway.cache.WhitelistCache;
 import com.network.gateway.client.MonitorServiceRuleClient;
+import com.network.gateway.client.MonitorServiceVulnerabilityClient;
 import com.network.gateway.dto.AttackRuleDTO;
 import com.network.gateway.dto.WhitelistDTO;
 import org.slf4j.Logger;
@@ -23,20 +25,29 @@ public class RulePreloadTask implements CommandLineRunner {
     private RuleCache ruleCache;
 
     @Autowired
+    private VulnerabilityCache vulnCache;
+
+    @Autowired
     private WhitelistCache whitelistCache;
 
     @Autowired
     private MonitorServiceRuleClient ruleClient;
 
+    @Autowired
+    private MonitorServiceVulnerabilityClient vulnClient;
+
     private final AtomicBoolean preloadCompleted = new AtomicBoolean(false);
 
     private final AtomicBoolean whitelistPreloadCompleted = new AtomicBoolean(false);
+
+    private final AtomicBoolean vulnPreloadCompleted = new AtomicBoolean(false);
 
     @Override
     public void run(String... args) {
         logger.info("开始执行规则预加载任务...");
         
         preloadRules();
+        preloadVulnerabilities();
         preloadWhitelists();
         
         logger.info("规则预加载任务执行完成");
@@ -76,6 +87,43 @@ public class RulePreloadTask implements CommandLineRunner {
         
         if (!preloadCompleted.get()) {
             logger.warn("规则预加载失败，网关将在收到监控服务推送规则后生效");
+        }
+    }
+
+    private void preloadVulnerabilities() {
+        int maxRetries = 5;
+        int retryInterval = 5000;
+        
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                logger.info("尝试从监控服务拉取漏洞，第{}次...", i + 1);
+                
+                List<VulnerabilityCache.VulnerabilityInfo> vulns = vulnClient.pullVulnerabilitiesFromMonitor();
+                
+                if (vulns != null && !vulns.isEmpty()) {
+                    vulnCache.syncVulnerabilities(vulns);
+                    vulnPreloadCompleted.set(true);
+                    logger.info("漏洞预加载成功，共加载{}条漏洞", vulns.size());
+                    return;
+                } else {
+                    logger.warn("从监控服务拉取漏洞为空，等待重试...");
+                }
+            } catch (Exception e) {
+                logger.warn("从监控服务拉取漏洞失败: {}，等待重试...", e.getMessage());
+            }
+            
+            if (i < maxRetries - 1) {
+                try {
+                    Thread.sleep(retryInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        
+        if (!vulnPreloadCompleted.get()) {
+            logger.warn("漏洞预加载失败，网关将在收到监控服务推送漏洞后生效");
         }
     }
 
@@ -124,11 +172,19 @@ public class RulePreloadTask implements CommandLineRunner {
         return whitelistPreloadCompleted.get();
     }
 
+    public boolean isVulnPreloadCompleted() {
+        return vulnPreloadCompleted.get();
+    }
+
     public int getRuleCount() {
         return ruleCache.size();
     }
 
     public int getWhitelistCount() {
         return whitelistCache.size();
+    }
+
+    public int getVulnCount() {
+        return vulnCache.size();
     }
 }

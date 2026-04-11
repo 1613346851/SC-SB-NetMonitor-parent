@@ -1,13 +1,23 @@
 package com.network.monitor.controller.outer;
 
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.common.constant.DefenseRuleStatusConstant;
+import com.network.monitor.entity.InterfaceRuleEntity;
 import com.network.monitor.entity.MonitorRuleEntity;
+import com.network.monitor.entity.ScanInterfaceEntity;
+import com.network.monitor.entity.VulnerabilityMonitorEntity;
+import com.network.monitor.entity.VulnerabilityRuleEntity;
+import com.network.monitor.mapper.InterfaceRuleMapper;
 import com.network.monitor.mapper.MonitorRuleMapper;
+import com.network.monitor.mapper.ScanInterfaceMapper;
+import com.network.monitor.mapper.VulnerabilityMonitorMapper;
+import com.network.monitor.mapper.VulnerabilityRuleMapper;
 import com.network.monitor.service.AuthService;
 import com.network.monitor.service.OperLogService;
 import com.network.monitor.service.RuleSyncService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
@@ -15,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 规则管理控制器（对外前端业务接口）
@@ -35,6 +46,18 @@ public class RuleManageController {
 
     @Autowired
     private RuleSyncService ruleSyncService;
+
+    @Autowired
+    private InterfaceRuleMapper interfaceRuleMapper;
+
+    @Autowired
+    private VulnerabilityRuleMapper vulnerabilityRuleMapper;
+
+    @Autowired
+    private ScanInterfaceMapper scanInterfaceMapper;
+
+    @Autowired
+    private VulnerabilityMonitorMapper vulnerabilityMonitorMapper;
 
     /**
      * 根据 ID 查询规则
@@ -156,13 +179,33 @@ public class RuleManageController {
      * 删除规则
      */
     @DeleteMapping("/{id}")
+    @Transactional
     public ApiResponse<Void> deleteRule(@PathVariable Long id, HttpServletRequest request) {
         try {
+            MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
+            if (rule == null) {
+                return ApiResponse.notFound("规则不存在");
+            }
+
+            List<Long> interfaceIds = interfaceRuleMapper.selectInterfaceIdsByRuleId(id);
+            List<Long> vulnerabilityIds = vulnerabilityRuleMapper.selectVulnerabilityIdsByRuleId(id);
+
+            interfaceRuleMapper.deleteByRuleId(id);
+            vulnerabilityRuleMapper.deleteByRuleId(id);
+
             monitorRuleMapper.deleteById(id);
             operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "规则管理", 
                 "删除规则ID：" + id, "delete", "/api/rule/" + id, getClientIp(request), 0);
             
             ruleSyncService.syncRuleDeleteToGatewayAsync(id);
+
+            for (Long interfaceId : interfaceIds) {
+                updateInterfaceDefenseStatus(interfaceId);
+            }
+
+            for (Long vulnerabilityId : vulnerabilityIds) {
+                updateVulnerabilityDefenseStatus(vulnerabilityId);
+            }
             
             return ApiResponse.success();
         } catch (Exception e) {
@@ -239,6 +282,38 @@ public class RuleManageController {
         } catch (Exception e) {
             log.error("同步规则失败：", e);
             return ApiResponse.error("同步失败");
+        }
+    }
+
+    /**
+     * 更新接口的防御规则状态
+     */
+    private void updateInterfaceDefenseStatus(Long interfaceId) {
+        try {
+            int ruleCount = interfaceRuleMapper.countByInterfaceId(interfaceId);
+            int status = DefenseRuleStatusConstant.calculateStatus(ruleCount);
+            scanInterfaceMapper.updateDefenseRuleStatus(interfaceId, status, ruleCount);
+            log.info("更新接口[{}]防御状态: status={}, ruleCount={}", interfaceId, status, ruleCount);
+        } catch (Exception e) {
+            log.error("更新接口防御状态失败: interfaceId={}", interfaceId, e);
+        }
+    }
+
+    /**
+     * 更新漏洞的防御规则状态
+     */
+    private void updateVulnerabilityDefenseStatus(Long vulnerabilityId) {
+        try {
+            List<VulnerabilityRuleEntity> rules = vulnerabilityRuleMapper.selectByVulnerabilityId(vulnerabilityId);
+            int ruleCount = rules.size();
+            int status = DefenseRuleStatusConstant.calculateStatus(ruleCount);
+            String ruleIds = rules.stream()
+                    .map(r -> String.valueOf(r.getRuleId()))
+                    .collect(Collectors.joining(","));
+            vulnerabilityMonitorMapper.updateDefenseStatus(vulnerabilityId, status, ruleCount, ruleIds);
+            log.info("更新漏洞[{}]防御状态: status={}, ruleCount={}", vulnerabilityId, status, ruleCount);
+        } catch (Exception e) {
+            log.error("更新漏洞防御状态失败: vulnerabilityId={}", vulnerabilityId, e);
         }
     }
     

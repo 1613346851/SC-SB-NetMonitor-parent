@@ -3,6 +3,7 @@ package com.network.gateway.filter.defense;
 import com.network.gateway.bo.DefenseResultBO;
 import com.network.gateway.cache.GatewayConfigCache;
 import com.network.gateway.cache.RuleCache;
+import com.network.gateway.cache.VulnerabilityCache;
 import com.network.gateway.cache.WhitelistCache;
 import com.network.gateway.client.MonitorServiceDefenseClient;
 import com.network.gateway.client.MonitorServiceTrafficClient;
@@ -26,6 +27,7 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -39,6 +41,10 @@ import java.util.Map;
  * 实现两阶段检测：
  * 1. 第一阶段：检测URL、Query参数、请求头、Cookie（无需读取请求体）
  * 2. 第二阶段：如果第一阶段未匹配，读取请求体进行检测
+ * 
+ * 检测机制：
+ * - 基于规则的检测：使用预定义的正则规则匹配攻击模式
+ * - 基于漏洞的检测：匹配已知漏洞路径，即使未配置防御规则也能检测
  * 
  * 白名单机制：
  * - 路径白名单：跳过URL路径检测
@@ -60,6 +66,9 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
     @Autowired
     private RuleCache ruleCache;
+
+    @Autowired
+    private VulnerabilityCache vulnCache;
 
     @Autowired
     private WhitelistCache whitelistCache;
@@ -86,17 +95,18 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                 return chain.filter(exchange);
             }
 
-            if (ruleCache.size() == 0) {
-                logger.warn("规则缓存为空，跳过攻击检测。请检查规则同步状态！");
-                return chain.filter(exchange);
-            }
-
             ServerHttpRequest request = exchange.getRequest();
             String sourceIp = ServerWebExchangeUtil.extractSourceIp(request);
+            String uri = request.getURI().getPath();
 
-            RuleCache.MatchResult phase1Result = detectPhase1(exchange);
-            if (phase1Result != null) {
-                return handleAttackDetected(exchange, sourceIp, phase1Result, startTime, "Phase1");
+            RuleCache.MatchResult ruleResult = detectPhase1(exchange);
+            if (ruleResult != null) {
+                return handleAttackDetected(exchange, sourceIp, ruleResult, startTime, "Phase1-Rule");
+            }
+
+            VulnerabilityCache.VulnMatchResult vulnResult = detectVulnerabilityByPath(uri);
+            if (vulnResult != null) {
+                return handleVulnAttackDetected(exchange, sourceIp, vulnResult, startTime, "Phase1-Vuln");
             }
 
             if (shouldDetectBody(request)) {
@@ -228,6 +238,7 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         }
 
         return DataBufferUtils.join(exchange.getRequest().getBody())
+                .timeout(java.time.Duration.ofSeconds(5))
                 .flatMap(dataBuffer -> {
                     try {
                         byte[] bytes = new byte[dataBuffer.readableByteCount()];
@@ -238,8 +249,14 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
                         RuleCache.MatchResult bodyResult = ruleCache.matchAll(bodyContent);
                         if (bodyResult != null) {
-                            logger.debug("请求体匹配规则: rule={}", bodyResult.getRuleName());
-                            return handleAttackDetected(exchange, sourceIp, bodyResult, startTime, "Phase2");
+                            logger.info("请求体匹配规则: rule={}, 立即返回拦截响应", bodyResult.getRuleName());
+                            return handleAttackDetected(exchange, sourceIp, bodyResult, startTime, "Phase2-Rule");
+                        }
+
+                        VulnerabilityCache.VulnMatchResult vulnResult = detectVulnerabilityByPath(request.getURI().getPath());
+                        if (vulnResult != null) {
+                            logger.debug("请求体检测阶段匹配漏洞: vuln={}", vulnResult.getVulnName());
+                            return handleVulnAttackDetected(exchange, sourceIp, vulnResult, startTime, "Phase2-Vuln");
                         }
 
                         ServerHttpRequest newRequest = request.mutate().build();
@@ -250,7 +267,30 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                         return chain.filter(exchange);
                     }
                 })
+                .onErrorResume(java.util.concurrent.TimeoutException.class, e -> {
+                    logger.warn("请求体读取超时，跳过检测: uri={}", request.getURI().getPath());
+                    return chain.filter(exchange);
+                })
                 .switchIfEmpty(chain.filter(exchange));
+    }
+
+    private VulnerabilityCache.VulnMatchResult detectVulnerabilityByPath(String uri) {
+        if (uri == null || uri.isEmpty()) {
+            return null;
+        }
+
+        if (whitelistCache.isPathWhitelisted(uri)) {
+            logger.debug("URL路径在白名单中，跳过漏洞检测: uri={}", uri);
+            return null;
+        }
+
+        VulnerabilityCache.VulnMatchResult result = vulnCache.matchByPath(uri);
+        if (result != null) {
+            logger.info("漏洞路径匹配: uri={}, vuln={}, type={}, hasDefenseRule={}", 
+                uri, result.getVulnName(), result.getVulnType(), result.hasDefenseRule());
+        }
+        
+        return result;
     }
 
     private Mono<Void> handleAttackDetected(ServerWebExchange exchange, String sourceIp,
@@ -264,50 +304,235 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         AttackEventDTO attackEvent = buildAttackEventDTO(exchange, sourceIp, null, matchResult);
         String eventId = attackEvent.getEventId();
 
-        try {
-            defenseClient.pushAttackEvent(attackEvent);
-            logger.info("推送攻击事件成功: eventId={}, ip={}, type={}, rule={}", 
-                eventId, sourceIp, attackType, rule.getRuleName());
-        } catch (Exception e) {
-            logger.error("推送攻击事件失败: {}", e.getMessage());
-        }
-
-        try {
-            long processingTime = System.currentTimeMillis() - startTime;
-            TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, eventId, attackType, riskLevel, processingTime);
-            trafficClient.pushTraffic(trafficDTO);
-            logger.info("推送攻击流量数据成功: eventId={}, ip={}, type={}", 
-                eventId, sourceIp, attackType);
-        } catch (Exception e) {
-            logger.error("推送攻击流量数据失败: {}", e.getMessage());
-        }
-
-        DefenseLogDTO logDTO = DefenseLogUtil.buildBlockLog(
-                sourceIp,
-                eventId,
-                DefenseResultBO.RiskLevel.valueOf(riskLevel),
-                String.format("攻击规则匹配: %s [%s]", rule.getRuleName(), attackType)
-        );
-        logDTO.setRequestUri(exchange.getRequest().getURI().getPath());
-        logDTO.setHttpMethod(exchange.getRequest().getMethodValue());
-        logDTO.setDefenseReason(String.format("规则匹配[%s]: %s", rule.getAttackType(), rule.getRuleName()));
-        logDTO.setAttackType(attackType);
-        logDTO.setRiskLevel(riskLevel);
-
-        try {
-            defenseClient.pushDefenseLog(logDTO);
-
-            logger.info("攻击检测拦截: ip={}, type={}, rule={}, phase={}, uri={}, eventId={}",
-                    sourceIp, attackType, rule.getRuleName(), phase, 
-                    exchange.getRequest().getURI().getPath(), eventId);
-
-        } catch (Exception e) {
-            logger.error("推送攻击检测日志失败: {}", e.getMessage());
-        }
-
+        final String finalEventId = eventId;
+        final String finalAttackType = attackType;
+        final String finalRiskLevel = riskLevel;
+        
         exchange.getAttributes().put("attack_intercepted", true);
 
+        logger.info("攻击检测拦截: ip={}, type={}, rule={}, phase={}, uri={}, eventId={}, 立即返回拦截响应",
+                sourceIp, finalAttackType, rule.getRuleName(), phase, 
+                exchange.getRequest().getURI().getPath(), finalEventId);
+
+        Mono.fromRunnable(() -> {
+            try {
+                defenseClient.pushAttackEvent(attackEvent);
+                logger.debug("推送攻击事件成功: eventId={}, ip={}, type={}, rule={}", 
+                    finalEventId, sourceIp, finalAttackType, rule.getRuleName());
+            } catch (Exception e) {
+                logger.error("推送攻击事件失败: {}", e.getMessage());
+            }
+
+            try {
+                long processingTime = System.currentTimeMillis() - startTime;
+                TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, finalEventId, finalAttackType, finalRiskLevel, processingTime);
+                trafficClient.pushTraffic(trafficDTO);
+                logger.debug("推送攻击流量数据成功: eventId={}, ip={}, type={}", 
+                    finalEventId, sourceIp, finalAttackType);
+            } catch (Exception e) {
+                logger.error("推送攻击流量数据失败: {}", e.getMessage());
+            }
+
+            DefenseLogDTO logDTO = DefenseLogUtil.buildBlockLog(
+                    sourceIp,
+                    finalEventId,
+                    DefenseResultBO.RiskLevel.valueOf(finalRiskLevel),
+                    String.format("攻击规则匹配: %s [%s]", rule.getRuleName(), finalAttackType)
+            );
+            logDTO.setRequestUri(exchange.getRequest().getURI().getPath());
+            logDTO.setHttpMethod(exchange.getRequest().getMethodValue());
+            logDTO.setDefenseReason(String.format("规则匹配[%s]: %s", rule.getAttackType(), rule.getRuleName()));
+            logDTO.setAttackType(finalAttackType);
+            logDTO.setRiskLevel(finalRiskLevel);
+
+            try {
+                defenseClient.pushDefenseLog(logDTO);
+            } catch (Exception e) {
+                logger.error("推送攻击检测日志失败: {}", e.getMessage());
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+
         return DefenseResponseUtil.buildMaliciousRequestResponse(response, sourceIp, eventId, riskLevel);
+    }
+
+    private Mono<Void> handleVulnAttackDetected(ServerWebExchange exchange, String sourceIp,
+                                                VulnerabilityCache.VulnMatchResult vulnResult, 
+                                                long startTime, String phase) {
+        ServerHttpResponse response = exchange.getResponse();
+        ServerHttpRequest request = exchange.getRequest();
+
+        VulnerabilityCache.VulnerabilityInfo vuln = vulnResult.getFirstVuln();
+        String attackType = vulnResult.getVulnType();
+        String riskLevel = convertVulnLevelToRiskLevel(vulnResult.getVulnLevel());
+        String vulnName = vulnResult.getVulnName();
+        Long vulnId = vuln.getId();
+
+        AttackEventDTO attackEvent = buildVulnAttackEventDTO(exchange, sourceIp, vulnResult);
+        String eventId = attackEvent.getEventId();
+
+        final String finalEventId = eventId;
+        final String finalAttackType = attackType;
+        final String finalRiskLevel = riskLevel;
+        final String finalVulnName = vulnName;
+        final Long finalVulnId = vulnId;
+        
+        exchange.getAttributes().put("attack_intercepted", true);
+        exchange.getAttributes().put("vuln_matched", true);
+        exchange.getAttributes().put("vuln_id", vulnId);
+
+        logger.info("漏洞攻击检测拦截: ip={}, vulnId={}, vulnName={}, type={}, phase={}, uri={}, eventId={}, hasDefenseRule={}, 立即返回拦截响应",
+                sourceIp, finalVulnId, finalVulnName, finalAttackType, phase, 
+                exchange.getRequest().getURI().getPath(), finalEventId, vulnResult.hasDefenseRule());
+        
+        Mono.fromRunnable(() -> {
+            try {
+                defenseClient.pushAttackEvent(attackEvent);
+                logger.debug("推送漏洞攻击事件成功: eventId={}, ip={}, vulnId={}, vulnName={}", 
+                    finalEventId, sourceIp, finalVulnId, finalVulnName);
+            } catch (Exception e) {
+                logger.error("推送漏洞攻击事件失败: {}", e.getMessage());
+            }
+
+            try {
+                long processingTime = System.currentTimeMillis() - startTime;
+                TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, finalEventId, 
+                    finalAttackType, finalRiskLevel, processingTime);
+                trafficDTO.setAbnormalReason("漏洞路径匹配: " + finalVulnName);
+                trafficClient.pushTraffic(trafficDTO);
+                logger.debug("推送漏洞攻击流量数据成功: eventId={}, ip={}, vulnName={}", 
+                    finalEventId, sourceIp, finalVulnName);
+            } catch (Exception e) {
+                logger.error("推送漏洞攻击流量数据失败: {}", e.getMessage());
+            }
+
+            DefenseLogDTO logDTO = DefenseLogUtil.buildBlockLog(
+                    sourceIp,
+                    finalEventId,
+                    DefenseResultBO.RiskLevel.valueOf(finalRiskLevel),
+                    String.format("漏洞路径匹配: %s [%s]", finalVulnName, finalAttackType)
+            );
+            logDTO.setRequestUri(exchange.getRequest().getURI().getPath());
+            logDTO.setHttpMethod(exchange.getRequest().getMethodValue());
+            logDTO.setDefenseReason(String.format("漏洞匹配[id=%d]: %s", finalVulnId, finalVulnName));
+            logDTO.setAttackType(finalAttackType);
+            logDTO.setRiskLevel(finalRiskLevel);
+
+            try {
+                defenseClient.pushDefenseLog(logDTO);
+            } catch (Exception e) {
+                logger.error("推送漏洞攻击检测日志失败: {}", e.getMessage());
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+
+        return DefenseResponseUtil.buildMaliciousRequestResponse(response, sourceIp, eventId, riskLevel);
+    }
+
+    private String convertVulnLevelToRiskLevel(String vulnLevel) {
+        if (vulnLevel == null) {
+            return "MEDIUM";
+        }
+        
+        switch (vulnLevel.toUpperCase()) {
+            case "CRITICAL":
+            case "严重":
+                return "CRITICAL";
+            case "HIGH":
+            case "高危":
+                return "HIGH";
+            case "MEDIUM":
+            case "中危":
+                return "MEDIUM";
+            case "LOW":
+            case "低危":
+                return "LOW";
+            default:
+                return "MEDIUM";
+        }
+    }
+
+    private AttackEventDTO buildVulnAttackEventDTO(ServerWebExchange exchange, String sourceIp,
+                                                   VulnerabilityCache.VulnMatchResult vulnResult) {
+        ServerHttpRequest request = exchange.getRequest();
+        VulnerabilityCache.VulnerabilityInfo vuln = vulnResult.getFirstVuln();
+        
+        String riskLevel = convertVulnLevelToRiskLevel(vulnResult.getVulnLevel());
+        int confidence = calculateVulnConfidence(vulnResult);
+        
+        AttackEventDTO eventDTO = new AttackEventDTO(
+            sourceIp, 
+            vulnResult.getVulnType(), 
+            riskLevel, 
+            confidence
+        );
+        
+        eventDTO.setTargetUri(request.getURI().getPath());
+        eventDTO.setHttpMethod(request.getMethodValue());
+        
+        eventDTO.setDescription(String.format("漏洞路径匹配: %s (ID: %d, 类型: %s)", 
+            vulnResult.getVulnName(), vuln.getId(), vulnResult.getVulnType()));
+        
+        String queryString = request.getURI().getQuery();
+        if (queryString != null && !queryString.isEmpty()) {
+            Map<String, String> queryParams = new HashMap<>();
+            String[] pairs = queryString.split("&");
+            for (String pair : pairs) {
+                String[] keyValue = pair.split("=", 2);
+                if (keyValue.length == 2) {
+                    try {
+                        String key = java.net.URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
+                        String value = java.net.URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
+                        queryParams.put(key, value);
+                    } catch (Exception e) {
+                        logger.warn("URL参数解码失败: pair={}, error={}", pair, e.getMessage());
+                        queryParams.put(keyValue[0], keyValue[1]);
+                    }
+                } else if (keyValue.length == 1) {
+                    queryParams.put(keyValue[0], "");
+                }
+            }
+            eventDTO.setQueryParams(queryParams);
+            
+            String attackContent = buildAttackContent(queryParams);
+            eventDTO.setAttackContent(attackContent);
+        }
+        
+        Map<String, String> headers = ServerWebExchangeUtil.extractHeaders(request);
+        eventDTO.setRequestHeaders(headers);
+        eventDTO.setUserAgent(headers.get("User-Agent"));
+        
+        return eventDTO;
+    }
+
+    private int calculateVulnConfidence(VulnerabilityCache.VulnMatchResult vulnResult) {
+        int baseConfidence = 80;
+        
+        String vulnLevel = vulnResult.getVulnLevel();
+        if (vulnLevel != null) {
+            switch (vulnLevel.toUpperCase()) {
+                case "CRITICAL":
+                case "严重":
+                    baseConfidence = 95;
+                    break;
+                case "HIGH":
+                case "高危":
+                    baseConfidence = 90;
+                    break;
+                case "MEDIUM":
+                case "中危":
+                    baseConfidence = 80;
+                    break;
+                case "LOW":
+                case "低危":
+                    baseConfidence = 70;
+                    break;
+            }
+        }
+        
+        if (vulnResult.hasDefenseRule()) {
+            baseConfidence = Math.min(baseConfidence + 5, 99);
+        }
+        
+        return baseConfidence;
     }
     
     private TrafficMonitorDTO buildTrafficDTO(ServerWebExchange exchange, String sourceIp, 
@@ -470,7 +695,8 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
     }
 
     public String getStatistics() {
-        return String.format("攻击规则检测过滤器统计:\n  - %s", ruleCache.getStats());
+        return String.format("攻击规则检测过滤器统计:\n  - %s\n  - %s", 
+            ruleCache.getStats(), vulnCache.getStats());
     }
 
     public int getRuleCount() {
@@ -479,5 +705,13 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
     public int getTypeCount() {
         return ruleCache.getTypeCount();
+    }
+
+    public int getVulnCount() {
+        return vulnCache.size();
+    }
+
+    public int getVulnPathCount() {
+        return vulnCache.getPathCount();
     }
 }

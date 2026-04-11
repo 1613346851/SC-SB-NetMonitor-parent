@@ -100,7 +100,7 @@ spring:
       # 全局超时配置
       httpclient:
         connect-timeout: 5000
-        response-timeout: 30s
+        response-timeout: 60s
         pool:
           max-idle-time: 15s
           max-connections: 1000

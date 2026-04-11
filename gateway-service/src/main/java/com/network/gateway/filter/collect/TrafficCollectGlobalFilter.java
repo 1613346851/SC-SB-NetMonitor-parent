@@ -96,7 +96,7 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
     private Mono<Void> handleTraffic(ServerWebExchange exchange, GatewayFilterChain chain,
                                      RawTrafficBO rawTraffic, String sourceIp, long startTime) {
         return chain.filter(exchange)
-                .doOnSuccess(unused -> {
+                .doOnTerminate(() -> {
                     try {
                         processTrafficAfterResponse(exchange, rawTraffic, sourceIp, startTime);
                     } catch (Exception e) {
@@ -105,11 +105,6 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
                 })
                 .doOnError(throwable -> {
                     logger.warn("请求处理错误：ip={}, error={}", sourceIp, throwable.getMessage());
-                    try {
-                        processTrafficAfterResponse(exchange, rawTraffic, sourceIp, startTime);
-                    } catch (Exception e) {
-                        logger.error("错误流量处理失败：ip={}", sourceIp, e);
-                    }
                 });
     }
 

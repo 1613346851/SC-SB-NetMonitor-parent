@@ -86,4 +86,9 @@ public interface MonitorRuleMapper {
      * 更新规则命中次数
      */
     int updateHitCount(@Param("id") Long id, @Param("hitCount") Integer hitCount);
+
+    /**
+     * 根据攻击类型统计规则数量
+     */
+    long countByAttackType(@Param("attackType") String attackType);
 }

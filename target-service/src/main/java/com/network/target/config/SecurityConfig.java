@@ -7,14 +7,11 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import javax.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 
-/**
- * 靶场服务安全配置
- * 仅对 CSRF 安全示例接口启用 Spring Security CSRF Token 校验，避免影响其他漏洞演示接口。
- */
 @Configuration
 public class SecurityConfig {
 
@@ -26,7 +23,20 @@ public class SecurityConfig {
         csrfTokenRepository.setParameterName("_csrf");
 
         http
-                .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(
+                                new AntPathRequestMatcher("/lib/**"),
+                                new AntPathRequestMatcher("/css/**"),
+                                new AntPathRequestMatcher("/js/**"),
+                                new AntPathRequestMatcher("/webfonts/**"),
+                                new AntPathRequestMatcher("/favicon.ico"),
+                                new AntPathRequestMatcher("/target/lib/**"),
+                                new AntPathRequestMatcher("/target/css/**"),
+                                new AntPathRequestMatcher("/target/js/**"),
+                                new AntPathRequestMatcher("/target/webfonts/**"),
+                                new AntPathRequestMatcher("/target/test-files/**")
+                        ).permitAll()
+                        .anyRequest().permitAll())
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .requireCsrfProtectionMatcher(request -> {

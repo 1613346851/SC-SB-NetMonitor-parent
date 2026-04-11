@@ -30,8 +30,19 @@ const VulnCommon = {
                 <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>`;
         document.body.appendChild(toast);
-        const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
-        bsToast.show();
+        
+        if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+            const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+            bsToast.show();
+        } else {
+            toast.style.cssText += '; padding: 12px 20px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+            const closeBtn = toast.querySelector('.btn-close');
+            if (closeBtn) {
+                closeBtn.style.cssText = 'background: transparent; border: none; color: white; cursor: pointer; font-size: 16px;';
+                closeBtn.innerHTML = '×';
+                closeBtn.onclick = () => toast.remove();
+            }
+        }
         setTimeout(() => toast.remove(), 4000);
     },
 

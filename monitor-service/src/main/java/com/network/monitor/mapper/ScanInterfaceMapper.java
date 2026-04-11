@@ -81,4 +81,16 @@ public interface ScanInterfaceMapper {
      * 更新扫描接口启用状态
      */
     int updateEnabled(@Param("id") Long id, @Param("enabled") Integer enabled);
+
+    /**
+     * 更新防御规则状态
+     */
+    int updateDefenseRuleStatus(@Param("id") Long id, 
+            @Param("defenseRuleStatus") Integer defenseRuleStatus,
+            @Param("defenseRuleCount") Integer defenseRuleCount);
+
+    /**
+     * 根据接口路径模糊查询
+     */
+    List<ScanInterfaceEntity> selectByPathLike(@Param("interfacePath") String interfacePath);
 }

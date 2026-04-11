@@ -55,6 +55,14 @@ public class IpBlacklistDefenseFilter implements GlobalFilter, Ordered {
                 return chain.filter(exchange);
             }
 
+            if (ServerWebExchangeUtil.isStaticResource(exchange)) {
+                return chain.filter(exchange);
+            }
+
+            if (ServerWebExchangeUtil.isHealthCheck(exchange) || ServerWebExchangeUtil.isManagementEndpoint(exchange)) {
+                return chain.filter(exchange);
+            }
+
             if (blacklistCache.isInBlacklist(sourceIp)) {
                 return handleBlacklistedIp(exchange, sourceIp, startTime);
             }

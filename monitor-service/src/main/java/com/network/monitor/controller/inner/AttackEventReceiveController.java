@@ -5,9 +5,11 @@ import com.network.monitor.dto.AttackEventDTO;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.AttackMonitorEntity;
+import com.network.monitor.entity.VulnerabilityMonitorEntity;
 import com.network.monitor.service.AttackEventService;
 import com.network.monitor.service.AttackStoreService;
 import com.network.monitor.service.DefenseDecisionService;
+import com.network.monitor.service.VulnerabilityVerifyService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +29,9 @@ public class AttackEventReceiveController {
 
     @Autowired
     private AttackEventService attackEventService;
+
+    @Autowired
+    private VulnerabilityVerifyService vulnerabilityVerifyService;
 
     @PostMapping("/ddos-event")
     public ApiResponse<Void> receiveDDoSEvent(@RequestBody Map<String, Object> eventData) {
@@ -242,6 +247,12 @@ public class AttackEventReceiveController {
             }
             
             attackDTO.setDescription(eventDTO.getDescription());
+            
+            VulnerabilityMonitorEntity matchedVuln = vulnerabilityVerifyService.verifyAttack(attackDTO);
+            if (matchedVuln != null) {
+                log.info("攻击命中预设漏洞，已更新验证状态：vulnId={}, vulnName={}, vulnPath={}", 
+                    matchedVuln.getId(), matchedVuln.getVulnName(), matchedVuln.getVulnPath());
+            }
             
             AttackMonitorEntity attackEntity = attackStoreService.convertToEntity(attackDTO);
             Long attackId = attackStoreService.saveAttack(attackEntity);

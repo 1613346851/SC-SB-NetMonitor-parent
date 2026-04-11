@@ -78,6 +78,41 @@
                     </div>
                 </section>
 
+                <section class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">扫描配置管理</div>
+                            <div class="scan-section-desc">管理扫描目标和接口配置，支持启用/禁用接口、配置防御规则标记。</div>
+                        </div>
+                        <div>
+                            <button class="btn btn-primary" onclick="showAddInterfaceModal()">新增接口</button>
+                            <button class="btn btn-default" onclick="loadScanConfigList()">刷新配置</button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+                        <table class="data-table has-fixed-action">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 150px;">接口名称</th>
+                                    <th style="min-width: 200px;">路径</th>
+                                    <th style="min-width: 100px;">漏洞类型</th>
+                                    <th style="min-width: 100px;">关联规则</th>
+                                    <th style="min-width: 100px;">漏洞记录</th>
+                                    <th style="min-width: 100px;">已验证</th>
+                                    <th style="min-width: 100px;">防御规则</th>
+                                    <th style="min-width: 100px;">启用状态</th>
+                                    <th style="min-width: 200px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scanConfigTableBody">
+                                <tr>
+                                    <td colspan="9" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
                 <section class="stat-grid">
                     <div class="stat-card">
                         <div class="stat-card-header">
@@ -215,6 +250,125 @@
             <div class="modal-body" id="scanResultDetailContent"></div>
             <div class="modal-footer">
                 <button class="btn btn-default" onclick="closeScanResultDetail()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addInterfaceModal" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">新增扫描接口</h3>
+                <span class="modal-close" onclick="closeAddInterfaceModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="addInterfaceForm">
+                    <div class="form-group">
+                        <label class="form-label">接口名称 <span class="required">*</span></label>
+                        <input type="text" id="interfaceName" class="form-control" required placeholder="例如：SQL注入测试接口">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">接口路径 <span class="required">*</span></label>
+                        <input type="text" id="interfacePath" class="form-control" required placeholder="例如：/target/sql/query">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">HTTP方法 <span class="required">*</span></label>
+                        <select id="httpMethod" class="form-control" required>
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">漏洞类型 <span class="required">*</span></label>
+                        <select id="vulnType" class="form-control" required>
+                            <option value="SQL_INJECTION">SQL注入</option>
+                            <option value="XSS">XSS跨站脚本</option>
+                            <option value="COMMAND_INJECTION">命令注入</option>
+                            <option value="PATH_TRAVERSAL">路径遍历</option>
+                            <option value="FILE_INCLUSION">文件包含</option>
+                            <option value="SSRF">SSRF服务端请求伪造</option>
+                            <option value="XXE">XXE外部实体注入</option>
+                            <option value="CSRF">CSRF跨站请求伪造</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">风险等级 <span class="required">*</span></label>
+                        <select id="riskLevel" class="form-control" required>
+                            <option value="LOW">低危</option>
+                            <option value="MEDIUM">中危</option>
+                            <option value="HIGH">高危</option>
+                            <option value="CRITICAL">严重</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">扫描优先级</label>
+                        <input type="number" id="priority" class="form-control" value="100" min="1" max="1000">
+                        <small class="form-hint">数字越小优先级越高</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeAddInterfaceModal()">取消</button>
+                <button class="btn btn-primary" onclick="submitAddInterface()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="interfaceDetailModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 class="modal-title">扫描接口详情</h3>
+                <span class="modal-close" onclick="closeInterfaceDetailModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="interfaceDetailContent">
+                <div class="detail-section">
+                    <h4 class="detail-section-title">基本信息</h4>
+                    <div id="interfaceBasicInfo" class="detail-info-grid"></div>
+                </div>
+                
+                <div class="detail-section">
+                    <h4 class="detail-section-title">关联漏洞监测记录</h4>
+                    <div class="table-wrapper" style="max-height: 300px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>漏洞名称</th>
+                                    <th>漏洞类型</th>
+                                    <th>风险等级</th>
+                                    <th>验证状态</th>
+                                    <th>发现时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="relatedVulnTableBody">
+                                <tr><td colspan="5" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <h4 class="detail-section-title">关联防御规则</h4>
+                    <div class="table-wrapper" style="max-height: 300px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>规则名称</th>
+                                    <th>攻击类型</th>
+                                    <th>风险等级</th>
+                                    <th>启用状态</th>
+                                    <th>优先级</th>
+                                </tr>
+                            </thead>
+                            <tbody id="relatedRuleTableBody">
+                                <tr><td colspan="5" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeInterfaceDetailModal()">关闭</button>
             </div>
         </div>
     </div>

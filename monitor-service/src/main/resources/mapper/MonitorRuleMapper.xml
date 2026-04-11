@@ -164,4 +164,9 @@
         SET hit_count = #{hitCount}, last_hit_time = NOW(), update_time = NOW()
         WHERE id = #{id}
     </update>
+
+    <select id="countByAttackType" resultType="long">
+        SELECT COUNT(*) FROM sys_monitor_rule
+        WHERE attack_type = #{attackType}
+    </select>
 </mapper>
