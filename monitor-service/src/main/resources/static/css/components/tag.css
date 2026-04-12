@@ -87,3 +87,33 @@
     border-color: rgba(107, 114, 128, 0.2);
     color: #6b7280;
 }
+
+.status-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    border-radius: var(--radius-xl);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    cursor: default;
+}
+
+.status-tag.status-default {
+    background: rgba(107, 114, 128, 0.1);
+    border: 1px solid rgba(107, 114, 128, 0.2);
+    color: #6b7280;
+}
+
+.status-tag.status-warning {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #b45309;
+}
+
+.status-tag.status-success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #059669;
+}

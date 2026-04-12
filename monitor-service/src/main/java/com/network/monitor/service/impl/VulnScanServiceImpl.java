@@ -442,10 +442,14 @@ public class VulnScanServiceImpl implements VulnScanService {
             return false;
         }
         String msg = errorMessage.toLowerCase(Locale.ROOT);
-        return msg.contains("400 bad request") || 
-               msg.contains("403 forbidden") ||
+        return msg.contains("400") || 
+               msg.contains("403") ||
+               msg.contains("bad request") ||
+               msg.contains("forbidden") ||
                msg.contains("blocked") ||
-               msg.contains("拦截");
+               msg.contains("拦截") ||
+               msg.contains("invalid request") ||
+               msg.contains("access denied");
     }
 
     private void markInterfaceAsDefended(String path) {
@@ -539,6 +543,9 @@ public class VulnScanServiceImpl implements VulnScanService {
 
         for (PayloadCase payload : mergedPayloads) {
             ProbeResponse response = doGet("/target/sql/query", Map.of("id", payload.payload()));
+            if (response.isBlocked()) {
+                return null;
+            }
             if (containsIgnoreCase(response.body, payload.matchKeyword())
                     && containsAny(response.body, "SQL注入漏洞", "多语句执行成功", "executed_sql")) {
                 return buildFinding("SQL 注入漏洞 - 用户查询接口", "SQL_INJECTION", "HIGH",
@@ -553,6 +560,9 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ScanFinding probeReflectiveXss(String scanType) {
         PayloadCase payload = XssPayload.getPayloads(scanType).get(0);
         ProbeResponse response = doGet("/target/xss/search", Map.of("keyword", payload.payload()));
+        if (response.isBlocked()) {
+            return null;
+        }
         if (containsIgnoreCase(response.body, payload.matchKeyword())
                 && containsAny(response.body, "反射型XSS漏洞", "搜索成功")) {
             return buildFinding("XSS 漏洞 - 反射型搜索接口", "XSS", "MEDIUM",
@@ -566,6 +576,9 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ScanFinding probeDomXss(String scanType) {
         PayloadCase payload = XssPayload.getPayloads(scanType).get(0);
         ProbeResponse response = doGet("/target/xss/profile", Map.of("username", payload.payload()));
+        if (response.isBlocked()) {
+            return null;
+        }
         if (containsIgnoreCase(response.body, payload.matchKeyword())
                 && containsAny(response.body, "DOM型XSS漏洞", "获取资料成功")) {
             return buildFinding("XSS 漏洞 - DOM 资料渲染接口", "XSS", "MEDIUM",
@@ -579,6 +592,9 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ScanFinding probeCommandInjection(String scanType) {
         for (PayloadCase payload : CommandInjectionPayload.getPayloads(scanType)) {
             ProbeResponse response = doGet("/target/cmd/execute", Map.of("cmd", payload.payload()));
+            if (response.isBlocked()) {
+                return null;
+            }
             if (containsIgnoreCase(response.body, payload.matchKeyword())
                     && containsAny(response.body, "命令执行结果", "纯命令注入漏洞触发成功")) {
                 return buildFinding("命令注入漏洞 - 系统命令执行接口", "COMMAND_INJECTION", "CRITICAL",
@@ -593,6 +609,9 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ScanFinding probePathTraversal(String scanType) {
         for (PayloadCase payload : PathTraversalPayload.getPayloads(scanType)) {
             ProbeResponse response = doGet("/target/path/read", Map.of("filename", payload.payload()));
+            if (response.isBlocked()) {
+                return null;
+            }
             if (containsIgnoreCase(response.body, payload.matchKeyword())
                     && containsAny(response.body, "路径遍历漏洞", "文件读取成功")) {
                 return buildFinding("路径遍历漏洞 - 文件读取接口", "PATH_TRAVERSAL", "HIGH",
@@ -607,6 +626,9 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ScanFinding probeFileInclude() {
         String payload = "config/test.properties";
         ProbeResponse response = doGet("/target/file/include", Map.of("path", payload));
+        if (response.isBlocked()) {
+            return null;
+        }
         if (containsAny(response.body, "文件包含漏洞", "db.password", "文件加载成功")) {
             return buildFinding("文件包含漏洞 - 动态资源加载接口", "FILE_INCLUSION", "HIGH",
                     "/target/file/include", "GET", payload, "db.password",
@@ -619,6 +641,9 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ScanFinding probeSsrf() {
         String payload = gatewayBaseUrl + "/target/ddos/status";
         ProbeResponse response = doGet("/target/ssrf/request", Map.of("url", payload));
+        if (response.isBlocked()) {
+            return null;
+        }
         if (containsAny(response.body, "SSRF漏洞", "DDoS被攻击目标状态", "请求成功（漏洞接口）")) {
             return buildFinding("SSRF 漏洞 - 服务端请求转发接口", "SSRF", "HIGH",
                     "/target/ssrf/request", "GET", payload, "DDoS被攻击目标状态",
@@ -631,6 +656,9 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ScanFinding probeXxe() {
         try {
             ProbeResponse cases = doGet("/target/xxe/test-cases", Collections.emptyMap());
+            if (cases.isBlocked()) {
+                return null;
+            }
             Map<String, Object> caseBody = parseBody(cases.body);
             Map<String, Object> caseData = getNestedMap(caseBody, "data");
             Map<String, Object> testCases = getNestedMap(caseData, "test_cases");
@@ -639,6 +667,9 @@ public class VulnScanServiceImpl implements VulnScanService {
                 return null;
             }
             ProbeResponse response = doPostText("/target/xxe/parse", xmlPayload, MediaType.APPLICATION_XML);
+            if (response.isBlocked()) {
+                return null;
+            }
             if (containsAny(response.body, "XXE漏洞", "has_external_entity", "test_password_123")) {
                 return buildFinding("XXE 漏洞 - XML 外部实体解析接口", "XXE", "HIGH",
                         "/target/xxe/parse", "POST", "<!DOCTYPE ...>", "has_external_entity",
@@ -647,12 +678,6 @@ public class VulnScanServiceImpl implements VulnScanService {
             }
         } catch (Exception e) {
             log.warn("XXE扫描失败: {}", e.getMessage());
-            if (e.getMessage() != null && e.getMessage().contains("timeout")) {
-                return buildFinding("XXE 扫描超时", "XXE", "HIGH",
-                        "/target/xxe/parse", "POST", "N/A", "扫描超时",
-                        "XXE接口响应超时，可能存在性能问题或已配置防御规则", "超时",
-                        "建议检查接口性能或防御规则配置");
-            }
         }
         return null;
     }
@@ -664,6 +689,9 @@ public class VulnScanServiceImpl implements VulnScanService {
                     "userId", "1",
                     "nickname", nickname
             ));
+            if (response.isBlocked()) {
+                return null;
+            }
             if (containsAny(response.body, "CSRF漏洞", nickname, "昵称修改成功（漏洞接口）")) {
                 return buildFinding("CSRF 漏洞 - 用户昵称修改接口", "CSRF", "MEDIUM",
                         "/target/csrf/update-name", "POST", nickname, nickname,
@@ -672,12 +700,6 @@ public class VulnScanServiceImpl implements VulnScanService {
             }
         } catch (Exception e) {
             log.warn("CSRF扫描失败: {}", e.getMessage());
-            if (e.getMessage() != null && e.getMessage().contains("timeout")) {
-                return buildFinding("CSRF 扫描超时", "CSRF", "MEDIUM",
-                        "/target/csrf/update-name", "POST", "N/A", "扫描超时",
-                        "CSRF接口响应超时，可能存在性能问题或已配置防御规则", "超时",
-                        "建议检查接口性能或防御规则配置");
-            }
         }
         return null;
     }
@@ -755,9 +777,14 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ProbeResponse doGet(String path, Map<String, String> params) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(gatewayBaseUrl).path(path);
         params.forEach(builder::queryParam);
-        ResponseEntity<String> response = restTemplate.getForEntity(builder.build().encode().toUri(), String.class);
-
-        return new ProbeResponse(response.getStatusCodeValue(), response.getBody());
+        try {
+            ResponseEntity<String> response = restTemplate.getForEntity(builder.build().encode().toUri(), String.class);
+            return new ProbeResponse(response.getStatusCodeValue(), response.getBody());
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            return new ProbeResponse(e.getStatusCode().value(), e.getResponseBodyAsString());
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            throw new RuntimeException("请求超时或连接失败: " + e.getMessage());
+        }
     }
 
     private ProbeResponse doPostForm(String path, Map<String, String> formData) {
@@ -767,16 +794,28 @@ public class VulnScanServiceImpl implements VulnScanService {
                 .map(entry -> entry.getKey() + "=" + encodeValue(entry.getValue()))
                 .collect(Collectors.joining("&"));
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(gatewayBaseUrl + path, entity, String.class);
-        return new ProbeResponse(response.getStatusCodeValue(), response.getBody());
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(gatewayBaseUrl + path, entity, String.class);
+            return new ProbeResponse(response.getStatusCodeValue(), response.getBody());
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            return new ProbeResponse(e.getStatusCode().value(), e.getResponseBodyAsString());
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            throw new RuntimeException("请求超时或连接失败: " + e.getMessage());
+        }
     }
 
     private ProbeResponse doPostText(String path, String text, MediaType contentType) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(contentType);
         HttpEntity<String> entity = new HttpEntity<>(text, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(gatewayBaseUrl + path, entity, String.class);
-        return new ProbeResponse(response.getStatusCodeValue(), response.getBody());
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(gatewayBaseUrl + path, entity, String.class);
+            return new ProbeResponse(response.getStatusCodeValue(), response.getBody());
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            return new ProbeResponse(e.getStatusCode().value(), e.getResponseBodyAsString());
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            throw new RuntimeException("请求超时或连接失败: " + e.getMessage());
+        }
     }
 
     private String encodeValue(String value) {
@@ -949,6 +988,10 @@ public class VulnScanServiceImpl implements VulnScanService {
 
         private boolean isOk() {
             return statusCode >= 200 && statusCode < 300;
+        }
+
+        private boolean isBlocked() {
+            return statusCode == 400 || statusCode == 403;
         }
     }
 

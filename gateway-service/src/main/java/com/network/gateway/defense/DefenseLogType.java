@@ -11,6 +11,7 @@ public enum DefenseLogType {
     BLOCK_REQUEST("BLOCK_REQUEST", "拦截请求", "恶意请求被拦截", true),
     BLOCK_USER_AGENT("BLOCK_USER_AGENT", "拦截UA", "恶意User-Agent被拦截", true),
     BLOCK_URI("BLOCK_URI", "拦截URI", "恶意URI被拦截", true),
+    ALERT_ONLY("ALERT_ONLY", "仅告警", "漏洞访问仅告警不拦截", false),
     COMPOSITE("COMPOSITE", "组合防御", "多种防御措施组合", true),
     MANUAL_BAN("MANUAL_BAN", "人工封禁", "管理员手动封禁IP", true),
     MANUAL_UNBAN("MANUAL_UNBAN", "人工解封", "管理员手动解封IP", true),

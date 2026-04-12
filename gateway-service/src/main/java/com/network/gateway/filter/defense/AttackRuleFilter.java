@@ -21,11 +21,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpRequestDecorator;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -57,6 +62,8 @@ import java.util.Map;
 public class AttackRuleFilter implements GlobalFilter, Ordered {
 
     private static final Logger logger = LoggerFactory.getLogger(AttackRuleFilter.class);
+    
+    private static final DefaultDataBufferFactory BUFFER_FACTORY = new DefaultDataBufferFactory();
 
     private static final List<String> BODY_METHODS = List.of("POST", "PUT", "PATCH");
 
@@ -106,7 +113,7 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
             VulnerabilityCache.VulnMatchResult vulnResult = detectVulnerabilityByPath(uri);
             if (vulnResult != null) {
-                return handleVulnAttackDetected(exchange, sourceIp, vulnResult, startTime, "Phase1-Vuln");
+                handleVulnAlertOnly(exchange, sourceIp, vulnResult, startTime, "Phase1-Vuln");
             }
 
             if (shouldDetectBody(request)) {
@@ -241,7 +248,8 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                 .timeout(java.time.Duration.ofSeconds(5))
                 .flatMap(dataBuffer -> {
                     try {
-                        byte[] bytes = new byte[dataBuffer.readableByteCount()];
+                        int readableBytes = dataBuffer.readableByteCount();
+                        byte[] bytes = new byte[readableBytes];
                         dataBuffer.read(bytes);
                         DataBufferUtils.release(dataBuffer);
 
@@ -255,11 +263,25 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
                         VulnerabilityCache.VulnMatchResult vulnResult = detectVulnerabilityByPath(request.getURI().getPath());
                         if (vulnResult != null) {
-                            logger.debug("请求体检测阶段匹配漏洞: vuln={}", vulnResult.getVulnName());
-                            return handleVulnAttackDetected(exchange, sourceIp, vulnResult, startTime, "Phase2-Vuln");
+                            logger.info("请求体检测阶段匹配漏洞: vuln={}, 只产生告警不拦截", vulnResult.getVulnName());
+                            handleVulnAlertOnly(exchange, sourceIp, vulnResult, startTime, "Phase2-Vuln");
                         }
 
-                        ServerHttpRequest newRequest = request.mutate().build();
+                        ServerHttpRequest newRequest = new ServerHttpRequestDecorator(request) {
+                            @Override
+                            public HttpHeaders getHeaders() {
+                                HttpHeaders headers = new HttpHeaders();
+                                headers.putAll(super.getHeaders());
+                                headers.setContentLength(bytes.length);
+                                return headers;
+                            }
+                            
+                            @Override
+                            public Flux<DataBuffer> getBody() {
+                                return Flux.just(BUFFER_FACTORY.wrap(bytes));
+                            }
+                        };
+                        
                         return chain.filter(exchange.mutate().request(newRequest).build());
 
                     } catch (Exception e) {
@@ -271,7 +293,10 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                     logger.warn("请求体读取超时，跳过检测: uri={}", request.getURI().getPath());
                     return chain.filter(exchange);
                 })
-                .switchIfEmpty(chain.filter(exchange));
+                .switchIfEmpty(Mono.defer(() -> {
+                    logger.debug("请求体为空，直接转发: uri={}", request.getURI().getPath());
+                    return chain.filter(exchange);
+                }));
     }
 
     private VulnerabilityCache.VulnMatchResult detectVulnerabilityByPath(String uri) {
@@ -355,12 +380,9 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         return DefenseResponseUtil.buildMaliciousRequestResponse(response, sourceIp, eventId, riskLevel);
     }
 
-    private Mono<Void> handleVulnAttackDetected(ServerWebExchange exchange, String sourceIp,
-                                                VulnerabilityCache.VulnMatchResult vulnResult, 
-                                                long startTime, String phase) {
-        ServerHttpResponse response = exchange.getResponse();
-        ServerHttpRequest request = exchange.getRequest();
-
+    private void handleVulnAlertOnly(ServerWebExchange exchange, String sourceIp,
+                                     VulnerabilityCache.VulnMatchResult vulnResult, 
+                                     long startTime, String phase) {
         VulnerabilityCache.VulnerabilityInfo vuln = vulnResult.getFirstVuln();
         String attackType = vulnResult.getVulnType();
         String riskLevel = convertVulnLevelToRiskLevel(vulnResult.getVulnLevel());
@@ -376,11 +398,10 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
         final String finalVulnName = vulnName;
         final Long finalVulnId = vulnId;
         
-        exchange.getAttributes().put("attack_intercepted", true);
         exchange.getAttributes().put("vuln_matched", true);
         exchange.getAttributes().put("vuln_id", vulnId);
 
-        logger.info("漏洞攻击检测拦截: ip={}, vulnId={}, vulnName={}, type={}, phase={}, uri={}, eventId={}, hasDefenseRule={}, 立即返回拦截响应",
+        logger.info("漏洞匹配告警(不拦截): ip={}, vulnId={}, vulnName={}, type={}, phase={}, uri={}, eventId={}, hasDefenseRule={}",
                 sourceIp, finalVulnId, finalVulnName, finalAttackType, phase, 
                 exchange.getRequest().getURI().getPath(), finalEventId, vulnResult.hasDefenseRule());
         
@@ -397,7 +418,7 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                 long processingTime = System.currentTimeMillis() - startTime;
                 TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, finalEventId, 
                     finalAttackType, finalRiskLevel, processingTime);
-                trafficDTO.setAbnormalReason("漏洞路径匹配: " + finalVulnName);
+                trafficDTO.setAbnormalReason("漏洞路径匹配(仅告警): " + finalVulnName);
                 trafficClient.pushTraffic(trafficDTO);
                 logger.debug("推送漏洞攻击流量数据成功: eventId={}, ip={}, vulnName={}", 
                     finalEventId, sourceIp, finalVulnName);
@@ -405,26 +426,24 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                 logger.error("推送漏洞攻击流量数据失败: {}", e.getMessage());
             }
 
-            DefenseLogDTO logDTO = DefenseLogUtil.buildBlockLog(
+            DefenseLogDTO logDTO = DefenseLogUtil.buildAlertLog(
                     sourceIp,
                     finalEventId,
                     DefenseResultBO.RiskLevel.valueOf(finalRiskLevel),
-                    String.format("漏洞路径匹配: %s [%s]", finalVulnName, finalAttackType)
+                    String.format("漏洞路径匹配(仅告警): %s [%s]", finalVulnName, finalAttackType)
             );
             logDTO.setRequestUri(exchange.getRequest().getURI().getPath());
             logDTO.setHttpMethod(exchange.getRequest().getMethodValue());
-            logDTO.setDefenseReason(String.format("漏洞匹配[id=%d]: %s", finalVulnId, finalVulnName));
+            logDTO.setDefenseReason(String.format("漏洞匹配[id=%d]: %s (未配置防御规则，仅告警)", finalVulnId, finalVulnName));
             logDTO.setAttackType(finalAttackType);
             logDTO.setRiskLevel(finalRiskLevel);
 
             try {
                 defenseClient.pushDefenseLog(logDTO);
             } catch (Exception e) {
-                logger.error("推送漏洞攻击检测日志失败: {}", e.getMessage());
+                logger.error("推送漏洞告警日志失败: {}", e.getMessage());
             }
         }).subscribeOn(Schedulers.boundedElastic()).subscribe();
-
-        return DefenseResponseUtil.buildMaliciousRequestResponse(response, sourceIp, eventId, riskLevel);
     }
 
     private String convertVulnLevelToRiskLevel(String vulnLevel) {

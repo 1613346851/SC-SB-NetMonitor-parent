@@ -134,6 +134,25 @@ public class DefenseLogUtil {
         return logDTO;
     }
 
+    public static DefenseLogDTO buildAlertLog(String targetIp, String eventId,
+                                            DefenseResultBO.RiskLevel riskLevel, String triggerReason) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.ALERT_ONLY.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setDefenseAction(DefenseLogType.ALERT_ONLY.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("检测到漏洞访问，仅告警不拦截");
+        logDTO.setOperator("SYSTEM");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        if (riskLevel != null) {
+            logDTO.setRiskLevel(riskLevel.name());
+        }
+        
+        return logDTO;
+    }
+
     public static DefenseLogDTO buildBlockLog(String targetIp, String eventId,
                                             String triggerReason, Integer confidence,
                                             String requestUri, String httpMethod) {
