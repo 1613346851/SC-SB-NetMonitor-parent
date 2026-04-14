@@ -3,10 +3,15 @@ package com.network.monitor.service.impl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.monitor.common.constant.VerifyStatusConstant;
+import com.network.monitor.entity.MonitorRuleEntity;
 import com.network.monitor.entity.PayloadLibraryEntity;
 import com.network.monitor.entity.ScanHistoryEntity;
 import com.network.monitor.entity.ScanInterfaceEntity;
 import com.network.monitor.entity.VulnerabilityMonitorEntity;
+import com.network.monitor.entity.VulnerabilityRuleEntity;
+import com.network.monitor.mapper.MonitorRuleMapper;
+import com.network.monitor.mapper.VulnerabilityMonitorMapper;
+import com.network.monitor.mapper.VulnerabilityRuleMapper;
 import com.network.monitor.service.PayloadLibraryService;
 import com.network.monitor.service.ScanHistoryService;
 import com.network.monitor.service.ScanInterfaceService;
@@ -63,6 +68,11 @@ public class VulnScanServiceImpl implements VulnScanService {
     private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String STATUS_TERMINATED = "TERMINATED";
     private static final String STATUS_FAILED = "FAILED";
+    
+    private static final String SCAN_TRAFFIC_HEADER = "X-Scan-Traffic";
+    private static final String SCAN_TRAFFIC_VALUE = "vulnerability-scan";
+    private static final String SCAN_SOURCE_HEADER = "X-Scan-Source";
+    private static final String SCAN_SOURCE_VALUE = "monitor-service";
 
     @Value("${vuln.scan.gateway-base-url:http://localhost:9000}")
     private String gatewayBaseUrl;
@@ -87,6 +97,15 @@ public class VulnScanServiceImpl implements VulnScanService {
 
     @Autowired
     private ScanHistoryService scanHistoryService;
+
+    @Autowired
+    private MonitorRuleMapper monitorRuleMapper;
+
+    @Autowired
+    private VulnerabilityRuleMapper vulnerabilityRuleMapper;
+
+    @Autowired
+    private VulnerabilityMonitorMapper vulnerabilityMonitorMapper;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ExecutorService executorService = Executors.newSingleThreadExecutor(r -> {
@@ -256,6 +275,229 @@ public class VulnScanServiceImpl implements VulnScanService {
         return result;
     }
 
+    @Override
+    public Map<String, Object> startCustomScan(List<Long> interfaceIds) {
+        synchronized (stateLock) {
+            if (currentState.isActive()) {
+                return buildStateResponse(currentState, "当前已有扫描任务正在执行，请先暂停或终止后再试");
+            }
+
+            if (interfaceIds == null || interfaceIds.isEmpty()) {
+                Map<String, Object> errorResult = new LinkedHashMap<>();
+                errorResult.put("success", false);
+                errorResult.put("message", "请至少选择一个接口进行扫描");
+                return errorResult;
+            }
+
+            List<ScanInterfaceEntity> interfaces = scanInterfaceService.getByIds(interfaceIds);
+            if (interfaces.isEmpty()) {
+                Map<String, Object> errorResult = new LinkedHashMap<>();
+                errorResult.put("success", false);
+                errorResult.put("message", "未找到有效的扫描接口");
+                return errorResult;
+            }
+
+            List<ScanPlan> plans = interfaces.stream()
+                    .map(this::createScanPlanFromEntity)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            if (plans.isEmpty()) {
+                Map<String, Object> errorResult = new LinkedHashMap<>();
+                errorResult.put("success", false);
+                errorResult.put("message", "无法创建有效的扫描计划");
+                return errorResult;
+            }
+
+            ScanState state = ScanState.start("CUSTOM", targetDisplayUrl, plans);
+            currentState = state;
+
+            executorService.submit(() -> executeScan(state));
+            log.info("自定义扫描任务已启动：taskId={}, interfaceIds={}, totalInterfaces={}",
+                    state.taskId, interfaceIds, state.totalInterfaces);
+            return buildStateResponse(state, "自定义扫描任务已启动");
+        }
+    }
+
+    @Override
+    public Map<String, Object> getSelectableInterfaces(String vulnType, String riskLevel, Long targetId) {
+        List<ScanInterfaceEntity> all = scanInterfaceService.getAllEnabled();
+        
+        List<ScanInterfaceEntity> filtered = all.stream()
+                .filter(e -> vulnType == null || vulnType.isEmpty() || containsVulnType(e.getVulnType(), vulnType))
+                .filter(e -> riskLevel == null || riskLevel.isEmpty() || riskLevel.equals(e.getRiskLevel()))
+                .filter(e -> targetId == null || targetId.equals(e.getTargetId()))
+                .collect(Collectors.toList());
+        
+        List<Map<String, Object>> interfaceList = filtered.stream()
+                .map(this::toSelectableInterface)
+                .collect(Collectors.toList());
+        
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", filtered.size());
+        result.put("interfaces", interfaceList);
+        return result;
+    }
+
+    private ScanPlan createScanPlanFromEntity(ScanInterfaceEntity entity) {
+        String vulnType = entity.getVulnType();
+        String path = entity.getInterfacePath();
+        String method = entity.getHttpMethod();
+        String riskLevel = entity.getRiskLevel();
+        String title = entity.getInterfaceName();
+        
+        return switch (vulnType) {
+            case "SQL_INJECTION" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    () -> probeSqlInjection("FULL"));
+            case "XSS" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    () -> probeXssByPath(path, "FULL"));
+            case "COMMAND_INJECTION" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    () -> probeCommandInjection("FULL"));
+            case "PATH_TRAVERSAL" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    () -> probePathTraversal("FULL"));
+            case "FILE_INCLUSION" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    this::probeFileInclude);
+            case "SSRF" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    this::probeSsrf);
+            case "XXE" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    this::probeXxe);
+            case "CSRF" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    this::probeCsrf);
+            case "DESERIALIZATION" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    this::probeDeserialization);
+            case "DDOS" -> new ScanPlan(title, vulnType, riskLevel, method, path,
+                    this::probeDdos);
+            default -> {
+                log.warn("不支持的漏洞类型：{}", vulnType);
+                yield null;
+            }
+        };
+    }
+
+    private List<ScanFinding> toList(ScanFinding finding) {
+        if (finding == null) {
+            return Collections.emptyList();
+        }
+        return Collections.singletonList(finding);
+    }
+
+    private List<ScanFinding> probeXssByPath(String path, String scanType) {
+        if (path.contains("submit-comment") || path.contains("comment")) {
+            return probeStoredXss(path, scanType);
+        } else if (path.contains("search")) {
+            return probeReflectiveXss(scanType);
+        } else if (path.contains("profile")) {
+            return probeDomXss(scanType);
+        }
+        return Collections.emptyList();
+    }
+
+    private List<ScanFinding> probeStoredXss(String path, String scanType) {
+        List<ScanFinding> findings = new ArrayList<>();
+        List<PayloadCase> payloads = XssPayload.getPayloads(scanType);
+        
+        for (PayloadCase payload : payloads) {
+            ProbeResponse response = doPostForm(path, Map.of("content", payload.payload()));
+            if (response.isBlocked()) {
+                continue;
+            }
+            if (containsIgnoreCase(response.body, payload.matchKeyword())
+                    && containsAny(response.body, "评论提交成功", "存储型XSS漏洞")) {
+                Long ruleId = determineRuleId("XSS", payload.payload(), path);
+                findings.add(buildFinding("XSS 漏洞 - 存储型评论接口", "XSS", "HIGH",
+                        path, "POST", payload.payload(), payload.matchKeyword(),
+                        "评论内容未过滤直接存入数据库，后续查询时会在前端执行恶意脚本", response.body,
+                        defaultFixSuggestion("XSS", path), ruleId));
+            }
+        }
+        return findings;
+    }
+
+    private List<ScanFinding> probeDeserialization() {
+        List<ScanFinding> findings = new ArrayList<>();
+        try {
+            ProbeResponse genResponse = doGet("/target/deserial/generate-test-data", Collections.emptyMap());
+            if (genResponse.isBlocked()) {
+                return findings;
+            }
+            
+            Map<String, Object> genBody = parseBody(genResponse.body);
+            Map<String, Object> genData = getNestedMap(genBody, "data");
+            Map<String, Object> testData = getNestedMap(genData, "test_data");
+            String serializedBase64 = Objects.toString(testData.get("serialized_base64"), "");
+            
+            if (serializedBase64.isBlank()) {
+                return findings;
+            }
+            
+            ProbeResponse response = doPostText("/target/deserial/parse", serializedBase64, MediaType.TEXT_PLAIN);
+            if (response.isBlocked()) {
+                return findings;
+            }
+            
+            if (containsAny(response.body, "反序列化漏洞", "反序列化成功", "deserialized_object")) {
+                findings.add(buildFinding("Java反序列化漏洞 - 对象解析接口", "DESERIALIZATION", "CRITICAL",
+                        "/target/deserial/parse", "POST", "Base64序列化对象", "deserialized_object",
+                        "未对反序列化类进行白名单校验，可能导致远程代码执行", response.body,
+                        defaultFixSuggestion("DESERIALIZATION", "/target/deserial/parse"), 53L));
+            }
+        } catch (Exception e) {
+            log.warn("反序列化扫描失败: {}", e.getMessage());
+        }
+        return findings;
+    }
+
+    private List<ScanFinding> probeDdos() {
+        List<ScanFinding> findings = new ArrayList<>();
+        
+        ProbeResponse cpuResponse = doGet("/target/ddos/compute-heavy", Collections.emptyMap());
+        if (!cpuResponse.isBlocked() && containsAny(cpuResponse.body, "DDoS攻击目标", "CPU密集型计算完成")) {
+            findings.add(buildFinding("DDoS攻击目标 - CPU密集型接口", "DDOS", "HIGH",
+                    "/target/ddos/compute-heavy", "GET", "N/A", "CPU密集型计算完成",
+                    "CPU密集型计算接口易受DDoS攻击，高频请求可耗尽服务器资源", cpuResponse.body,
+                    defaultFixSuggestion("DDOS", "/target/ddos/compute-heavy"), 60L));
+        }
+        
+        ProbeResponse ioResponse = doGet("/target/ddos/io-delay", Map.of("delay", "100"));
+        if (!ioResponse.isBlocked() && containsAny(ioResponse.body, "DDoS攻击目标", "I/O操作模拟完成")) {
+            findings.add(buildFinding("DDoS攻击目标 - I/O延迟型接口", "DDOS", "MEDIUM",
+                    "/target/ddos/io-delay", "GET", "delay=100", "I/O操作模拟完成",
+                    "I/O延迟接口易受慢速攻击，可长期占用连接资源", ioResponse.body,
+                    defaultFixSuggestion("DDOS", "/target/ddos/io-delay"), 60L));
+        }
+        
+        ProbeResponse pingResponse = doGet("/target/ddos/ping", Collections.emptyMap());
+        if (!pingResponse.isBlocked() && containsAny(pingResponse.body, "pong", "total_requests")) {
+            findings.add(buildFinding("DDoS攻击目标 - Ping洪水接口", "DDOS", "MEDIUM",
+                    "/target/ddos/ping", "GET", "N/A", "pong",
+                    "简单Ping接口易受高频洪水攻击，可冲击网络栈", pingResponse.body,
+                    defaultFixSuggestion("DDOS", "/target/ddos/ping"), 60L));
+        }
+        
+        return findings;
+    }
+
+    private Map<String, Object> toSelectableInterface(ScanInterfaceEntity entity) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", entity.getId());
+        map.put("interfaceName", entity.getInterfaceName());
+        map.put("interfacePath", entity.getInterfacePath());
+        map.put("httpMethod", entity.getHttpMethod());
+        map.put("vulnType", entity.getVulnType());
+        map.put("riskLevel", entity.getRiskLevel());
+        map.put("targetId", entity.getTargetId());
+        map.put("defenseRuleStatus", entity.getDefenseRuleStatus());
+        map.put("enabled", entity.getEnabled());
+        return map;
+    }
+
+    private boolean containsVulnType(String entityVulnType, String filterVulnType) {
+        if (entityVulnType == null || filterVulnType == null) {
+            return false;
+        }
+        return entityVulnType.equalsIgnoreCase(filterVulnType);
+    }
+
     @PreDestroy
     public void destroy() {
         executorService.shutdownNow();
@@ -281,11 +523,13 @@ public class VulnScanServiceImpl implements VulnScanService {
 
                 state.currentStep = "扫描接口 " + plan.path + "（" + plan.title + "）";
                 try {
-                    ScanFinding finding = plan.operation.execute();
-                    if (finding != null) {
-                        Map<String, Object> resultItem = finding.toMap();
-                        autoInsertVuln(state, resultItem);
-                        state.results.add(resultItem);
+                    List<ScanFinding> findings = plan.operation.execute();
+                    if (findings != null && !findings.isEmpty()) {
+                        for (ScanFinding finding : findings) {
+                            Map<String, Object> resultItem = finding.toMap();
+                            autoInsertVuln(state, resultItem);
+                            state.results.add(resultItem);
+                        }
                         state.discoveredCount = state.results.size();
                     }
                 } catch (Exception ex) {
@@ -433,7 +677,8 @@ public class VulnScanServiceImpl implements VulnScanService {
             defenseRuleNote != null ? defenseRuleNote : "该接口已配置攻击检测规则，扫描请求会被网关拦截，无需再次扫描",
             "该接口已纳入安全防护体系，网关会自动拦截攻击请求",
             "防御规则已生效，建议定期检查规则有效性",
-            "已配置防御规则，跳过扫描"
+            "已配置防御规则，跳过扫描",
+            null
         );
     }
 
@@ -469,15 +714,6 @@ public class VulnScanServiceImpl implements VulnScanService {
         } catch (Exception e) {
             log.warn("标记接口防御规则失败：path={}, error={}", path, e.getMessage());
         }
-    }
-
-    private ScanFinding probeXssByPath(String path, String scanType) {
-        if (path.contains("search")) {
-            return probeReflectiveXss(scanType);
-        } else if (path.contains("profile")) {
-            return probeDomXss(scanType);
-        }
-        return probeReflectiveXss(scanType);
     }
 
     private boolean isQuickScanType(String scanType, String vulnType) {
@@ -537,171 +773,224 @@ public class VulnScanServiceImpl implements VulnScanService {
         appendHistory(state);
     }
 
-    private ScanFinding probeSqlInjection(String scanType) {
+    private List<ScanFinding> probeSqlInjection(String scanType) {
+        List<ScanFinding> findings = new ArrayList<>();
         List<PayloadCase> payloads = SqlInjectionPayload.getPayloads(scanType);
         List<PayloadCase> mergedPayloads = payloads;
 
         for (PayloadCase payload : mergedPayloads) {
             ProbeResponse response = doGet("/target/sql/query", Map.of("id", payload.payload()));
             if (response.isBlocked()) {
-                return null;
+                continue;
             }
             if (containsIgnoreCase(response.body, payload.matchKeyword())
                     && containsAny(response.body, "SQL注入漏洞", "多语句执行成功", "executed_sql")) {
-                return buildFinding("SQL 注入漏洞 - 用户查询接口", "SQL_INJECTION", "HIGH",
+                Long ruleId = determineRuleId("SQL_INJECTION", payload.payload(), "/target/sql/query");
+                findings.add(buildFinding("SQL 注入漏洞 - 用户查询接口", "SQL_INJECTION", "HIGH",
                         "/target/sql/query", "GET", payload.payload(), payload.matchKeyword(),
                         "发现未经参数化处理的 SQL 查询，可被构造恒真条件或堆叠语句绕过。", response.body,
-                        defaultFixSuggestion("SQL_INJECTION", "/target/sql/query"));
+                        defaultFixSuggestion("SQL_INJECTION", "/target/sql/query"), ruleId));
             }
         }
-        return null;
+        return findings;
     }
 
-    private ScanFinding probeReflectiveXss(String scanType) {
-        PayloadCase payload = XssPayload.getPayloads(scanType).get(0);
-        ProbeResponse response = doGet("/target/xss/search", Map.of("keyword", payload.payload()));
-        if (response.isBlocked()) {
-            return null;
+    private List<ScanFinding> probeReflectiveXss(String scanType) {
+        List<ScanFinding> findings = new ArrayList<>();
+        List<PayloadCase> payloads = XssPayload.getPayloads(scanType);
+        
+        for (PayloadCase payload : payloads) {
+            ProbeResponse response = doGet("/target/xss/search", Map.of("keyword", payload.payload()));
+            if (response.isBlocked()) {
+                continue;
+            }
+            if (containsIgnoreCase(response.body, payload.matchKeyword())
+                    && containsAny(response.body, "反射型XSS漏洞", "搜索成功")) {
+                Long ruleId = determineRuleId("XSS", payload.payload(), "/target/xss/search");
+                findings.add(buildFinding("XSS 漏洞 - 反射型搜索接口", "XSS", "MEDIUM",
+                        "/target/xss/search", "GET", payload.payload(), payload.matchKeyword(),
+                        "搜索关键词被直接拼接到响应中，前端渲染时可能执行恶意脚本。", response.body,
+                        defaultFixSuggestion("XSS", "/target/xss/search"), ruleId));
+            }
         }
-        if (containsIgnoreCase(response.body, payload.matchKeyword())
-                && containsAny(response.body, "反射型XSS漏洞", "搜索成功")) {
-            return buildFinding("XSS 漏洞 - 反射型搜索接口", "XSS", "MEDIUM",
-                    "/target/xss/search", "GET", payload.payload(), payload.matchKeyword(),
-                    "搜索关键词被直接拼接到响应中，前端渲染时可能执行恶意脚本。", response.body,
-                    defaultFixSuggestion("XSS", "/target/xss/search"));
-        }
-        return null;
+        return findings;
     }
 
-    private ScanFinding probeDomXss(String scanType) {
-        PayloadCase payload = XssPayload.getPayloads(scanType).get(0);
-        ProbeResponse response = doGet("/target/xss/profile", Map.of("username", payload.payload()));
-        if (response.isBlocked()) {
-            return null;
+    private List<ScanFinding> probeDomXss(String scanType) {
+        List<ScanFinding> findings = new ArrayList<>();
+        List<PayloadCase> payloads = XssPayload.getPayloads(scanType);
+        
+        for (PayloadCase payload : payloads) {
+            ProbeResponse response = doGet("/target/xss/profile", Map.of("username", payload.payload()));
+            if (response.isBlocked()) {
+                continue;
+            }
+            if (containsIgnoreCase(response.body, payload.matchKeyword())
+                    && containsAny(response.body, "DOM型XSS漏洞", "获取资料成功")) {
+                Long ruleId = determineRuleId("XSS", payload.payload(), "/target/xss/profile");
+                findings.add(buildFinding("XSS 漏洞 - DOM 资料渲染接口", "XSS", "MEDIUM",
+                        "/target/xss/profile", "GET", payload.payload(), payload.matchKeyword(),
+                        "后端返回未转义的 HTML 片段，前端若直接使用 innerHTML 渲染将触发脚本执行。", response.body,
+                        defaultFixSuggestion("XSS", "/target/xss/profile"), ruleId));
+            }
         }
-        if (containsIgnoreCase(response.body, payload.matchKeyword())
-                && containsAny(response.body, "DOM型XSS漏洞", "获取资料成功")) {
-            return buildFinding("XSS 漏洞 - DOM 资料渲染接口", "XSS", "MEDIUM",
-                    "/target/xss/profile", "GET", payload.payload(), payload.matchKeyword(),
-                    "后端返回未转义的 HTML 片段，前端若直接使用 innerHTML 渲染将触发脚本执行。", response.body,
-                    defaultFixSuggestion("XSS", "/target/xss/profile"));
-        }
-        return null;
+        return findings;
     }
 
-    private ScanFinding probeCommandInjection(String scanType) {
-        for (PayloadCase payload : CommandInjectionPayload.getPayloads(scanType)) {
+    private List<ScanFinding> probeCommandInjection(String scanType) {
+        List<ScanFinding> findings = new ArrayList<>();
+        List<PayloadCase> payloads = CommandInjectionPayload.getPayloads(scanType);
+        
+        for (PayloadCase payload : payloads) {
             ProbeResponse response = doGet("/target/cmd/execute", Map.of("cmd", payload.payload()));
             if (response.isBlocked()) {
-                return null;
+                continue;
             }
             if (containsIgnoreCase(response.body, payload.matchKeyword())
                     && containsAny(response.body, "命令执行结果", "纯命令注入漏洞触发成功")) {
-                return buildFinding("命令注入漏洞 - 系统命令执行接口", "COMMAND_INJECTION", "CRITICAL",
+                Long ruleId = determineRuleId("COMMAND_INJECTION", payload.payload(), "/target/cmd/execute");
+                findings.add(buildFinding("命令注入漏洞 - 系统命令执行接口", "COMMAND_INJECTION", "CRITICAL",
                         "/target/cmd/execute", "GET", payload.payload(), payload.matchKeyword(),
                         "用户输入被直接拼接为系统命令执行，具备远程命令执行风险。", response.body,
-                        defaultFixSuggestion("COMMAND_INJECTION", "/target/cmd/execute"));
+                        defaultFixSuggestion("COMMAND_INJECTION", "/target/cmd/execute"), ruleId));
             }
         }
-        return null;
+        return findings;
     }
 
-    private ScanFinding probePathTraversal(String scanType) {
-        for (PayloadCase payload : PathTraversalPayload.getPayloads(scanType)) {
+    private List<ScanFinding> probePathTraversal(String scanType) {
+        List<ScanFinding> findings = new ArrayList<>();
+        List<PayloadCase> payloads = PathTraversalPayload.getPayloads(scanType);
+        
+        for (PayloadCase payload : payloads) {
             ProbeResponse response = doGet("/target/path/read", Map.of("filename", payload.payload()));
             if (response.isBlocked()) {
-                return null;
+                continue;
             }
             if (containsIgnoreCase(response.body, payload.matchKeyword())
                     && containsAny(response.body, "路径遍历漏洞", "文件读取成功")) {
-                return buildFinding("路径遍历漏洞 - 文件读取接口", "PATH_TRAVERSAL", "HIGH",
+                Long ruleId = determineRuleId("PATH_TRAVERSAL", payload.payload(), "/target/path/read");
+                findings.add(buildFinding("路径遍历漏洞 - 文件读取接口", "PATH_TRAVERSAL", "HIGH",
                         "/target/path/read", "GET", payload.payload(), payload.matchKeyword(),
                         "文件名未经严格约束即参与路径拼接，可读取项目资源目录之外的敏感文件。", response.body,
-                        defaultFixSuggestion("PATH_TRAVERSAL", "/target/path/read"));
+                        defaultFixSuggestion("PATH_TRAVERSAL", "/target/path/read"), ruleId));
             }
         }
-        return null;
+        return findings;
     }
 
-    private ScanFinding probeFileInclude() {
-        String payload = "config/test.properties";
-        ProbeResponse response = doGet("/target/file/include", Map.of("path", payload));
-        if (response.isBlocked()) {
-            return null;
+    private List<ScanFinding> probeFileInclude() {
+        List<ScanFinding> findings = new ArrayList<>();
+        List<String> payloads = List.of(
+            "config/test.properties",
+            "config/application.yml",
+            "WEB-INF/web.xml",
+            "../config/database.properties"
+        );
+        
+        for (String payload : payloads) {
+            ProbeResponse response = doGet("/target/file/include", Map.of("path", payload));
+            if (response.isBlocked()) {
+                continue;
+            }
+            if (containsAny(response.body, "文件包含漏洞", "db.password", "文件加载成功", "application")) {
+                Long ruleId = determineRuleId("FILE_INCLUSION", payload, "/target/file/include");
+                findings.add(buildFinding("文件包含漏洞 - 动态资源加载接口", "FILE_INCLUSION", "HIGH",
+                        "/target/file/include", "GET", payload, "敏感配置内容",
+                        "用户可控制待加载资源路径，导致本地配置文件和敏感内容被直接回显。", response.body,
+                        defaultFixSuggestion("FILE_INCLUSION", "/target/file/include"), ruleId));
+            }
         }
-        if (containsAny(response.body, "文件包含漏洞", "db.password", "文件加载成功")) {
-            return buildFinding("文件包含漏洞 - 动态资源加载接口", "FILE_INCLUSION", "HIGH",
-                    "/target/file/include", "GET", payload, "db.password",
-                    "用户可控制待加载资源路径，导致本地配置文件和敏感内容被直接回显。", response.body,
-                    defaultFixSuggestion("FILE_INCLUSION", "/target/file/include"));
-        }
-        return null;
+        return findings;
     }
 
-    private ScanFinding probeSsrf() {
-        String payload = gatewayBaseUrl + "/target/ddos/status";
-        ProbeResponse response = doGet("/target/ssrf/request", Map.of("url", payload));
-        if (response.isBlocked()) {
-            return null;
+    private List<ScanFinding> probeSsrf() {
+        List<ScanFinding> findings = new ArrayList<>();
+        List<String> payloads = List.of(
+            gatewayBaseUrl + "/target/ddos/status",
+            "http://127.0.0.1:9001/target/ddos/status",
+            "http://localhost:9001/target/ddos/status",
+            "file:///etc/passwd"
+        );
+        
+        for (String payload : payloads) {
+            ProbeResponse response = doGet("/target/ssrf/request", Map.of("url", payload));
+            if (response.isBlocked()) {
+                continue;
+            }
+            if (containsAny(response.body, "SSRF漏洞", "DDoS被攻击目标状态", "请求成功（漏洞接口）", "root:")) {
+                Long ruleId = determineRuleId("SSRF", payload, "/target/ssrf/request");
+                findings.add(buildFinding("SSRF 漏洞 - 服务端请求转发接口", "SSRF", "HIGH",
+                        "/target/ssrf/request", "GET", payload, "内部服务响应",
+                        "服务端对外部 URL 无约束访问，可被用来探测内网或读取受信任服务响应。", response.body,
+                        defaultFixSuggestion("SSRF", "/target/ssrf/request"), ruleId));
+            }
         }
-        if (containsAny(response.body, "SSRF漏洞", "DDoS被攻击目标状态", "请求成功（漏洞接口）")) {
-            return buildFinding("SSRF 漏洞 - 服务端请求转发接口", "SSRF", "HIGH",
-                    "/target/ssrf/request", "GET", payload, "DDoS被攻击目标状态",
-                    "服务端对外部 URL 无约束访问，可被用来探测内网或读取受信任服务响应。", response.body,
-                    defaultFixSuggestion("SSRF", "/target/ssrf/request"));
-        }
-        return null;
+        return findings;
     }
 
-    private ScanFinding probeXxe() {
+    private List<ScanFinding> probeXxe() {
+        List<ScanFinding> findings = new ArrayList<>();
         try {
             ProbeResponse cases = doGet("/target/xxe/test-cases", Collections.emptyMap());
             if (cases.isBlocked()) {
-                return null;
+                return findings;
             }
             Map<String, Object> caseBody = parseBody(cases.body);
             Map<String, Object> caseData = getNestedMap(caseBody, "data");
             Map<String, Object> testCases = getNestedMap(caseData, "test_cases");
-            String xmlPayload = Objects.toString(testCases.get("xxe_project_config"), "");
-            if (xmlPayload.isBlank()) {
-                return null;
-            }
-            ProbeResponse response = doPostText("/target/xxe/parse", xmlPayload, MediaType.APPLICATION_XML);
-            if (response.isBlocked()) {
-                return null;
-            }
-            if (containsAny(response.body, "XXE漏洞", "has_external_entity", "test_password_123")) {
-                return buildFinding("XXE 漏洞 - XML 外部实体解析接口", "XXE", "HIGH",
-                        "/target/xxe/parse", "POST", "<!DOCTYPE ...>", "has_external_entity",
-                        "XML 解析器未禁用外部实体，攻击者可借此读取项目内文件内容。", response.body,
-                        defaultFixSuggestion("XXE", "/target/xxe/parse"));
+            
+            List<String> xxePayloads = List.of(
+                Objects.toString(testCases.get("xxe_project_config"), ""),
+                Objects.toString(testCases.get("xxe_etc_passwd"), ""),
+                Objects.toString(testCases.get("xxe_simple"), "")
+            );
+            
+            for (String xmlPayload : xxePayloads) {
+                if (xmlPayload.isBlank()) {
+                    continue;
+                }
+                ProbeResponse response = doPostText("/target/xxe/parse", xmlPayload, MediaType.APPLICATION_XML);
+                if (response.isBlocked()) {
+                    continue;
+                }
+                if (containsAny(response.body, "XXE漏洞", "has_external_entity", "test_password_123", "root:")) {
+                    findings.add(buildFinding("XXE 漏洞 - XML 外部实体解析接口", "XXE", "HIGH",
+                            "/target/xxe/parse", "POST", "<!DOCTYPE ...>", "外部实体解析成功",
+                            "XML 解析器未禁用外部实体，攻击者可借此读取项目内文件内容。", response.body,
+                            defaultFixSuggestion("XXE", "/target/xxe/parse"), 47L));
+                }
             }
         } catch (Exception e) {
             log.warn("XXE扫描失败: {}", e.getMessage());
         }
-        return null;
+        return findings;
     }
 
-    private ScanFinding probeCsrf() {
+    private List<ScanFinding> probeCsrf() {
+        List<ScanFinding> findings = new ArrayList<>();
         try {
-            String nickname = "scan_csrf_user";
-            ProbeResponse response = doPostForm("/target/csrf/update-name", Map.of(
-                    "userId", "1",
-                    "nickname", nickname
-            ));
-            if (response.isBlocked()) {
-                return null;
-            }
-            if (containsAny(response.body, "CSRF漏洞", nickname, "昵称修改成功（漏洞接口）")) {
-                return buildFinding("CSRF 漏洞 - 用户昵称修改接口", "CSRF", "MEDIUM",
-                        "/target/csrf/update-name", "POST", nickname, nickname,
-                        "状态修改接口缺少 CSRF Token 校验，可被第三方站点诱导发起跨站请求。", response.body,
-                        defaultFixSuggestion("CSRF", "/target/csrf/update-name"));
+            List<String> nicknames = List.of("scan_csrf_user", "csrf_test_123", "attacker_name");
+            
+            for (String nickname : nicknames) {
+                ProbeResponse response = doPostForm("/target/csrf/update-name", Map.of(
+                        "userId", "1",
+                        "nickname", nickname
+                ));
+                if (response.isBlocked()) {
+                    continue;
+                }
+                if (containsAny(response.body, "CSRF漏洞", nickname, "昵称修改成功（漏洞接口）")) {
+                    findings.add(buildFinding("CSRF 漏洞 - 用户昵称修改接口", "CSRF", "MEDIUM",
+                            "/target/csrf/update-name", "POST", nickname, nickname,
+                            "状态修改接口缺少 CSRF Token 校验，可被第三方站点诱导发起跨站请求。", response.body,
+                            defaultFixSuggestion("CSRF", "/target/csrf/update-name"), 57L));
+                }
             }
         } catch (Exception e) {
             log.warn("CSRF扫描失败: {}", e.getMessage());
         }
-        return null;
+        return findings;
     }
 
     private List<PayloadCase> mergePayloads(List<PayloadCase> defaults, List<String> aiPayloads) {
@@ -723,7 +1012,37 @@ public class VulnScanServiceImpl implements VulnScanService {
             if (entity.getFixSuggestion() == null || entity.getFixSuggestion().isBlank()) {
                 entity.setFixSuggestion(defaultFixSuggestion(entity.getVulnType(), entity.getVulnPath()));
             }
+            
+            Long ruleId = item.get("ruleId") != null ? Long.valueOf(item.get("ruleId").toString()) : null;
+            
+            VulnerabilityMonitorEntity existing = findExistingVulnerabilityByRule(entity, ruleId);
+            if (existing != null) {
+                entity.setId(existing.getId());
+                entity.setRuleCount(existing.getRuleCount());
+                entity.setRuleIds(existing.getRuleIds());
+                entity.setDefenseStatus(existing.getDefenseStatus());
+                entity.setAttackCount(existing.getAttackCount() != null ? existing.getAttackCount() + 1 : 1);
+                entity.setFirstAttackTime(existing.getFirstAttackTime());
+                entity.setLastAttackTime(LocalDateTime.now());
+            } else {
+                entity.setAttackCount(1);
+                entity.setFirstAttackTime(LocalDateTime.now());
+                entity.setLastAttackTime(LocalDateTime.now());
+                if (ruleId != null) {
+                    entity.setRuleIds(String.valueOf(ruleId));
+                    entity.setRuleCount(1);
+                    entity.setDefenseStatus(2);
+                }
+            }
+            
             VulnerabilityMonitorEntity saved = vulnerabilityVerifyService.saveOrUpdateVulnerability(entity);
+            
+            if (saved != null && ruleId != null) {
+                updateVulnerabilityRuleAssociation(saved, ruleId);
+            } else if (saved != null && (saved.getRuleCount() == null || saved.getRuleCount() == 0)) {
+                updateVulnerabilityRuleInfo(saved);
+            }
+            
             item.put("synced", true);
             item.put("syncTime", formatTime(LocalDateTime.now()));
             item.put("vulnerabilityId", saved != null ? saved.getId() : null);
@@ -732,6 +1051,130 @@ public class VulnScanServiceImpl implements VulnScanService {
             item.put("synced", false);
             item.put("syncError", e.getMessage());
             state.warnings.add("自动入库失败：" + item.get("vulnPath") + " - " + e.getMessage());
+        }
+    }
+    
+    private VulnerabilityMonitorEntity findExistingVulnerabilityByRule(VulnerabilityMonitorEntity entity, Long ruleId) {
+        if (ruleId != null) {
+            VulnerabilityMonitorEntity existing = vulnerabilityMonitorMapper.selectByRuleId(ruleId);
+            if (existing != null) {
+                return existing;
+            }
+        }
+        return findExistingVulnerability(entity);
+    }
+    
+    private void updateVulnerabilityRuleAssociation(VulnerabilityMonitorEntity vulnerability, Long ruleId) {
+        try {
+            MonitorRuleEntity rule = monitorRuleMapper.selectById(ruleId);
+            if (rule == null) {
+                return;
+            }
+            
+            String existingRuleIds = vulnerability.getRuleIds();
+            if (existingRuleIds != null && !existingRuleIds.isEmpty()) {
+                if (existingRuleIds.contains(String.valueOf(ruleId))) {
+                    return;
+                }
+                vulnerability.setRuleIds(existingRuleIds + "," + ruleId);
+                vulnerability.setRuleCount(vulnerability.getRuleCount() + 1);
+            } else {
+                vulnerability.setRuleIds(String.valueOf(ruleId));
+                vulnerability.setRuleCount(1);
+            }
+            vulnerability.setDefenseStatus(2);
+            
+            vulnerabilityMonitorMapper.updateDefenseStatus(
+                    vulnerability.getId(),
+                    vulnerability.getDefenseStatus(),
+                    vulnerability.getRuleCount(),
+                    vulnerability.getRuleIds()
+            );
+            
+            VulnerabilityRuleEntity vulnRule = new VulnerabilityRuleEntity();
+            vulnRule.setVulnerabilityId(vulnerability.getId());
+            vulnRule.setRuleId(rule.getId());
+            vulnRule.setRuleName(rule.getRuleName());
+            vulnRule.setAttackType(rule.getAttackType());
+            vulnRule.setRiskLevel(rule.getRiskLevel());
+            
+            try {
+                vulnerabilityRuleMapper.insert(vulnRule);
+            } catch (Exception e) {
+                log.debug("规则关联已存在：vulnId={}, ruleId={}", vulnerability.getId(), ruleId);
+            }
+            
+            log.info("更新漏洞规则关联：vulnId={}, vulnName={}, ruleId={}", 
+                    vulnerability.getId(), vulnerability.getVulnName(), ruleId);
+        } catch (Exception e) {
+            log.warn("更新漏洞规则关联失败：vulnId={}, ruleId={}, error={}", vulnerability.getId(), ruleId, e.getMessage());
+        }
+    }
+
+    private VulnerabilityMonitorEntity findExistingVulnerability(VulnerabilityMonitorEntity entity) {
+        if (entity.getVulnName() != null && !entity.getVulnName().isBlank()) {
+            VulnerabilityMonitorEntity existing = vulnerabilityMonitorMapper.selectByVulnName(entity.getVulnName());
+            if (existing != null) {
+                return existing;
+            }
+        }
+        if (entity.getVulnPath() != null && !entity.getVulnPath().isBlank() 
+                && entity.getVulnType() != null && !entity.getVulnType().isBlank()) {
+            return vulnerabilityMonitorMapper.selectByPathAndType(entity.getVulnPath(), entity.getVulnType());
+        }
+        return null;
+    }
+
+    private void updateVulnerabilityRuleInfo(VulnerabilityMonitorEntity vulnerability) {
+        try {
+            String vulnType = vulnerability.getVulnType();
+            if (vulnType == null || vulnType.isBlank()) {
+                return;
+            }
+            
+            List<MonitorRuleEntity> rules = monitorRuleMapper.selectByAttackType(vulnType);
+            if (rules == null || rules.isEmpty()) {
+                return;
+            }
+            
+            List<Long> ruleIds = rules.stream()
+                    .map(MonitorRuleEntity::getId)
+                    .collect(Collectors.toList());
+            
+            String ruleIdsStr = ruleIds.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
+            
+            vulnerability.setRuleCount(ruleIds.size());
+            vulnerability.setRuleIds(ruleIdsStr);
+            vulnerability.setDefenseStatus(ruleIds.size() > 0 ? 2 : 0);
+            
+            vulnerabilityMonitorMapper.updateDefenseStatus(
+                    vulnerability.getId(),
+                    vulnerability.getDefenseStatus(),
+                    vulnerability.getRuleCount(),
+                    vulnerability.getRuleIds()
+            );
+            
+            for (MonitorRuleEntity rule : rules) {
+                VulnerabilityRuleEntity vulnRule = new VulnerabilityRuleEntity();
+                vulnRule.setVulnerabilityId(vulnerability.getId());
+                vulnRule.setRuleId(rule.getId());
+                vulnRule.setRuleName(rule.getRuleName());
+                vulnRule.setAttackType(rule.getAttackType());
+                vulnRule.setRiskLevel(rule.getRiskLevel());
+                
+                try {
+                    vulnerabilityRuleMapper.insert(vulnRule);
+                } catch (Exception e) {
+                    log.debug("规则关联已存在：vulnId={}, ruleId={}", vulnerability.getId(), rule.getId());
+                }
+            }
+            
+            log.info("更新漏洞规则关联：vulnId={}, vulnName={}, ruleCount={}", 
+                    vulnerability.getId(), vulnerability.getVulnName(), ruleIds.size());
+        } catch (Exception e) {
+            log.warn("更新漏洞规则关联失败：vulnId={}, error={}", vulnerability.getId(), e.getMessage());
         }
     }
 
@@ -748,6 +1191,114 @@ public class VulnScanServiceImpl implements VulnScanService {
         return entity;
     }
 
+    private Long determineRuleId(String vulnType, String payload, String vulnPath) {
+        if (vulnType == null) return null;
+        
+        return switch (vulnType) {
+            case "SQL_INJECTION" -> determineSqlInjectionRuleId(payload);
+            case "XSS" -> determineXssRuleId(payload, vulnPath);
+            case "COMMAND_INJECTION" -> determineCommandInjectionRuleId(payload);
+            case "PATH_TRAVERSAL" -> determinePathTraversalRuleId(payload);
+            case "FILE_INCLUSION" -> determineFileInclusionRuleId(payload);
+            case "SSRF" -> determineSsrfRuleId(payload);
+            case "XXE" -> 47L;
+            case "DESERIALIZATION" -> 53L;
+            case "CSRF" -> 57L;
+            case "DDOS" -> determineDdosRuleId(vulnPath);
+            default -> null;
+        };
+    }
+    
+    private Long determineSqlInjectionRuleId(String payload) {
+        if (payload == null) return 1L;
+        String lower = payload.toLowerCase();
+        if (lower.contains("union") && lower.contains("select")) return 1L;
+        if (lower.contains("or") && lower.contains("1=1")) return 2L;
+        if (lower.contains("and") && lower.contains("=")) return 3L;
+        if (lower.contains("drop")) return 4L;
+        if (lower.contains("sleep")) return 5L;
+        if (lower.contains("benchmark")) return 6L;
+        if (lower.contains("--") || lower.contains("#") || lower.contains("/*")) return 7L;
+        if (lower.contains(";")) return 8L;
+        if (lower.contains("'")) return 9L;
+        return 1L;
+    }
+    
+    private Long determineXssRuleId(String payload, String vulnPath) {
+        if (payload == null) return 10L;
+        String lower = payload.toLowerCase();
+        if (lower.contains("<script")) return 10L;
+        if (lower.contains("javascript:")) return 11L;
+        if (lower.contains("onerror")) return 12L;
+        if (lower.contains("onload")) return 13L;
+        if (lower.contains("onclick")) return 14L;
+        if (lower.contains("alert")) return 15L;
+        if (lower.contains("document")) return 16L;
+        if (lower.contains("<img")) return 17L;
+        if (lower.contains("<svg")) return 18L;
+        if (lower.contains("eval")) return 19L;
+        if (lower.contains("<iframe")) return 20L;
+        return 10L;
+    }
+    
+    private Long determineCommandInjectionRuleId(String payload) {
+        if (payload == null) return 21L;
+        String lower = payload.toLowerCase();
+        if (lower.contains("|")) return 21L;
+        if (lower.contains(";")) return 22L;
+        if (lower.contains("`")) return 23L;
+        if (lower.contains("$(")) return 24L;
+        if (lower.contains("cmd") || lower.contains("powershell")) return 25L;
+        if (lower.contains("ping")) return 26L;
+        if (lower.contains("whoami")) return 27L;
+        if (lower.contains("tasklist")) return 28L;
+        if (lower.contains("cat")) return 29L;
+        return 21L;
+    }
+    
+    private Long determinePathTraversalRuleId(String payload) {
+        if (payload == null) return 30L;
+        String lower = payload.toLowerCase();
+        if (lower.contains("../") || lower.contains("..\\")) return 30L;
+        if (lower.contains("/etc/passwd") || lower.contains("/etc/shadow")) return 31L;
+        if (lower.contains("c:") || lower.contains("d:") || lower.contains("windows")) return 32L;
+        if (lower.contains("%2e%2e") || lower.contains("%2e%2e/")) return 33L;
+        if (lower.contains("%252e")) return 34L;
+        if (lower.contains("application") || lower.contains("config") || lower.contains("database")) return 35L;
+        return 30L;
+    }
+    
+    private Long determineFileInclusionRuleId(String payload) {
+        if (payload == null) return 36L;
+        String lower = payload.toLowerCase();
+        if (lower.contains("include") || lower.contains("require")) return 36L;
+        if (lower.contains("data:")) return 37L;
+        if (lower.contains("php:")) return 38L;
+        if (lower.contains("file:")) return 39L;
+        if (lower.contains("classpath:")) return 40L;
+        return 36L;
+    }
+    
+    private Long determineSsrfRuleId(String payload) {
+        if (payload == null) return 41L;
+        String lower = payload.toLowerCase();
+        if (lower.contains("192.168.") || lower.contains("10.") || lower.contains("172.")) return 41L;
+        if (lower.contains("file:")) return 42L;
+        if (lower.contains("dict:")) return 43L;
+        if (lower.contains("gopher:")) return 44L;
+        if (lower.contains("169.254") || lower.contains("metadata")) return 45L;
+        if (lower.contains("127.0.0.1") || lower.contains("localhost")) return 46L;
+        return 41L;
+    }
+    
+    private Long determineDdosRuleId(String vulnPath) {
+        if (vulnPath == null) return 60L;
+        if (vulnPath.contains("compute-heavy")) return 60L;
+        if (vulnPath.contains("io-delay")) return 60L;
+        if (vulnPath.contains("ping")) return 60L;
+        return 60L;
+    }
+
     private ScanFinding buildFinding(String vulnName,
                                      String vulnType,
                                      String vulnLevel,
@@ -757,7 +1308,8 @@ public class VulnScanServiceImpl implements VulnScanService {
                                      String matchedKeyword,
                                      String description,
                                      String responseBody,
-                                     String fixSuggestion) {
+                                     String fixSuggestion,
+                                     Long ruleId) {
         String finalLevel = normalizeRiskLevel(null, vulnLevel);
         return new ScanFinding(
                 vulnName,
@@ -770,15 +1322,26 @@ public class VulnScanServiceImpl implements VulnScanService {
                 description,
                 summarizeResponse(responseBody),
                 fixSuggestion,
-                null
+                null,
+                ruleId
         );
     }
 
     private ProbeResponse doGet(String path, Map<String, String> params) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(gatewayBaseUrl).path(path);
         params.forEach(builder::queryParam);
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(SCAN_TRAFFIC_HEADER, SCAN_TRAFFIC_VALUE);
+        headers.set(SCAN_SOURCE_HEADER, SCAN_SOURCE_VALUE);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        
         try {
-            ResponseEntity<String> response = restTemplate.getForEntity(builder.build().encode().toUri(), String.class);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    builder.build().encode().toUri(), 
+                    org.springframework.http.HttpMethod.GET, 
+                    entity, 
+                    String.class);
             return new ProbeResponse(response.getStatusCodeValue(), response.getBody());
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             return new ProbeResponse(e.getStatusCode().value(), e.getResponseBodyAsString());
@@ -790,6 +1353,8 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ProbeResponse doPostForm(String path, Map<String, String> formData) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.set(SCAN_TRAFFIC_HEADER, SCAN_TRAFFIC_VALUE);
+        headers.set(SCAN_SOURCE_HEADER, SCAN_SOURCE_VALUE);
         String body = formData.entrySet().stream()
                 .map(entry -> entry.getKey() + "=" + encodeValue(entry.getValue()))
                 .collect(Collectors.joining("&"));
@@ -807,6 +1372,8 @@ public class VulnScanServiceImpl implements VulnScanService {
     private ProbeResponse doPostText(String path, String text, MediaType contentType) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(contentType);
+        headers.set(SCAN_TRAFFIC_HEADER, SCAN_TRAFFIC_VALUE);
+        headers.set(SCAN_SOURCE_HEADER, SCAN_SOURCE_VALUE);
         HttpEntity<String> entity = new HttpEntity<>(text, headers);
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(gatewayBaseUrl + path, entity, String.class);
@@ -997,7 +1564,7 @@ public class VulnScanServiceImpl implements VulnScanService {
 
     @FunctionalInterface
     private interface ScanOperation {
-        ScanFinding execute();
+        List<ScanFinding> execute();
     }
 
     private record ScanPlan(String title, String vulnType, String riskLevel, String method, String path,
@@ -1023,7 +1590,8 @@ public class VulnScanServiceImpl implements VulnScanService {
                                String description,
                                String responseSnippet,
                                String fixSuggestion,
-                               String aiVerdict) {
+                               String aiVerdict,
+                               Long ruleId) {
         Map<String, Object> toMap() {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("vulnName", vulnName);
@@ -1037,6 +1605,7 @@ public class VulnScanServiceImpl implements VulnScanService {
             item.put("responseSnippet", responseSnippet);
             item.put("fixSuggestion", fixSuggestion);
             item.put("aiVerdict", aiVerdict);
+            item.put("ruleId", ruleId);
             item.put("detectedAt", LocalDateTime.now().format(TIME_FORMATTER));
             item.put("source", "AUTO_SCAN");
             item.put("verifyStatus", VerifyStatusConstant.VERIFIED_EXPLOITABLE);

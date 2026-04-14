@@ -205,8 +205,8 @@ public class AttackEventReceiveController {
                 eventDTO.getSourceIp(), eventDTO.getAttackType(), eventDTO.getRiskLevel(), 
                 eventDTO.getConfidence(), eventDTO.getRuleName(), eventDTO.getEventId());
             
-            log.info("攻击事件详情：attackContent={}, queryParams={}", 
-                eventDTO.getAttackContent(), eventDTO.getQueryParams());
+            log.info("攻击事件详情：targetUri={}, ruleId={}, attackContent={}, queryParams={}", 
+                eventDTO.getTargetUri(), eventDTO.getRuleId(), eventDTO.getAttackContent(), eventDTO.getQueryParams());
             
             AttackEventEntity event = attackEventService.getOrCreateEventWithEventId(
                 eventDTO.getSourceIp(), 

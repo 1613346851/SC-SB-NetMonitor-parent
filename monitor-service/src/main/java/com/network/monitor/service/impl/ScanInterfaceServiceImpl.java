@@ -44,6 +44,14 @@ public class ScanInterfaceServiceImpl implements ScanInterfaceService {
     }
 
     @Override
+    public List<ScanInterfaceEntity> getByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return scanInterfaceMapper.selectByIds(ids);
+    }
+
+    @Override
     public List<ScanInterfaceEntity> getByTargetId(Long targetId) {
         return scanInterfaceMapper.selectByTargetId(targetId);
     }

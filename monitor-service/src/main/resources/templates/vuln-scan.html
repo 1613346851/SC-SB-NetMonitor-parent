@@ -69,7 +69,42 @@
                                     <span>全量扫描</span>
                                     <small>扩展链路验证</small>
                                 </label>
+                                <label class="scan-mode-option">
+                                    <input type="radio" name="scanType" value="CUSTOM">
+                                    <span>自定义扫描</span>
+                                    <small>选择指定接口</small>
+                                </label>
                             </div>
+                        </div>
+                        <div class="scan-config-item scan-config-item--wide" id="customScanSection" style="display: none;">
+                            <label class="form-label">选择扫描接口</label>
+                            <div class="custom-scan-toolbar">
+                                <input type="text" id="interfaceSearchInput" class="form-control" placeholder="搜索接口名称或路径..." oninput="filterSelectableInterfaces()">
+                                <select id="vulnTypeFilter" class="form-control" onchange="filterSelectableInterfaces()">
+                                    <option value="">全部漏洞类型</option>
+                                    <option value="SQL_INJECTION">SQL注入</option>
+                                    <option value="XSS">XSS跨站脚本</option>
+                                    <option value="COMMAND_INJECTION">命令注入</option>
+                                    <option value="PATH_TRAVERSAL">路径遍历</option>
+                                    <option value="FILE_INCLUSION">文件包含</option>
+                                    <option value="SSRF">SSRF</option>
+                                    <option value="XXE">XXE</option>
+                                    <option value="CSRF">CSRF</option>
+                                </select>
+                                <select id="riskLevelFilter" class="form-control" onchange="filterSelectableInterfaces()">
+                                    <option value="">全部风险等级</option>
+                                    <option value="CRITICAL">严重</option>
+                                    <option value="HIGH">高危</option>
+                                    <option value="MEDIUM">中危</option>
+                                    <option value="LOW">低危</option>
+                                </select>
+                                <button class="btn btn-sm btn-default" onclick="selectAllInterfaces()">全选</button>
+                                <button class="btn btn-sm btn-default" onclick="deselectAllInterfaces()">取消全选</button>
+                            </div>
+                            <div id="selectableInterfaceList" class="selectable-interface-list">
+                                <div class="loading-text">加载中...</div>
+                            </div>
+                            <div class="selected-count">已选择 <span id="selectedCount">0</span> 个接口</div>
                         </div>
                         <div class="scan-config-item scan-config-item--wide">
                             <label class="form-label">本次扫描接口范围</label>
@@ -93,6 +128,7 @@
                         <table class="data-table has-fixed-action">
                             <thead>
                                 <tr>
+                                    <th style="min-width: 50px;">#</th>
                                     <th style="min-width: 150px;">接口名称</th>
                                     <th style="min-width: 200px;">路径</th>
                                     <th style="min-width: 100px;">漏洞类型</th>
@@ -106,7 +142,7 @@
                             </thead>
                             <tbody id="scanConfigTableBody">
                                 <tr>
-                                    <td colspan="9" class="text-center">加载中...</td>
+                                    <td colspan="10" class="text-center">加载中...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -255,62 +291,176 @@
     </div>
 
     <div id="addInterfaceModal" class="modal-overlay" style="display: none;">
-        <div class="modal">
+        <div class="modal" style="max-width: 850px; max-height: 90vh;">
             <div class="modal-header">
                 <h3 class="modal-title">新增扫描接口</h3>
                 <span class="modal-close" onclick="closeAddInterfaceModal()">&times;</span>
             </div>
-            <div class="modal-body">
+            <div class="modal-body modal-body-scrollable">
                 <form id="addInterfaceForm">
-                    <div class="form-group">
-                        <label class="form-label">接口名称 <span class="required">*</span></label>
-                        <input type="text" id="interfaceName" class="form-control" required placeholder="例如：SQL注入测试接口">
+                    <div class="form-section">
+                        <h4 class="form-section-title">基本信息</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">接口名称 <span class="required">*</span></label>
+                                <input type="text" id="interfaceName" class="form-control" required placeholder="例如：SQL注入测试接口">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">接口路径 <span class="required">*</span></label>
+                                <input type="text" id="interfacePath" class="form-control" required placeholder="例如：/target/sql/query">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">请求方法 <span class="required">*</span></label>
+                                <select id="httpMethod" class="form-control" required>
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="DELETE">DELETE</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">风险等级 <span class="required">*</span></label>
+                                <select id="riskLevel" class="form-control" required>
+                                    <option value="LOW">低危</option>
+                                    <option value="MEDIUM">中危</option>
+                                    <option value="HIGH">高危</option>
+                                    <option value="CRITICAL">严重</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">接口路径 <span class="required">*</span></label>
-                        <input type="text" id="interfacePath" class="form-control" required placeholder="例如：/target/sql/query">
+
+                    <div class="form-section">
+                        <h4 class="form-section-title">接口特征（用于智能推断漏洞类型）</h4>
+                        <div class="form-row">
+                            <div class="form-group form-group-full">
+                                <label class="form-label">业务功能类型 <span class="required">*</span></label>
+                                <select id="businessType" class="form-control" onchange="onBusinessTypeChange()">
+                                    <option value="">请选择业务类型</option>
+                                    <option value="USER_INPUT">用户输入处理</option>
+                                    <option value="DATA_QUERY">数据查询</option>
+                                    <option value="DATA_SUBMIT">数据提交</option>
+                                    <option value="FILE_OPERATION">文件操作</option>
+                                    <option value="FILE_UPLOAD">文件上传</option>
+                                    <option value="URL_FETCH">URL获取</option>
+                                    <option value="COMMAND_EXEC">命令执行</option>
+                                    <option value="AUTH_RELATED">认证相关</option>
+                                    <option value="XML_PROCESS">XML处理</option>
+                                    <option value="CONFIG_ACCESS">配置访问</option>
+                                    <option value="API_PROXY">API代理</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">功能标记</label>
+                            <div class="checkbox-grid">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="dbOperation" onchange="runInference()">
+                                    <span>涉及数据库操作</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="fileOperation" onchange="runInference()">
+                                    <span>涉及文件操作</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="externalRequest" onchange="runInference()">
+                                    <span>发起外部请求</span>
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="authRequired" onchange="runInference()">
+                                    <span>需要认证</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">请求内容类型</label>
+                                <select id="contentType" class="form-control" onchange="runInference()">
+                                    <option value="application/json">application/json</option>
+                                    <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+                                    <option value="multipart/form-data">multipart/form-data</option>
+                                    <option value="application/xml">application/xml</option>
+                                    <option value="text/plain">text/plain</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">输出类型</label>
+                                <select id="outputType" class="form-control" onchange="runInference()">
+                                    <option value="JSON">JSON</option>
+                                    <option value="HTML">HTML</option>
+                                    <option value="XML">XML</option>
+                                    <option value="FILE">FILE</option>
+                                    <option value="BINARY">BINARY</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">HTTP方法 <span class="required">*</span></label>
-                        <select id="httpMethod" class="form-control" required>
-                            <option value="GET">GET</option>
-                            <option value="POST">POST</option>
-                            <option value="PUT">PUT</option>
-                            <option value="DELETE">DELETE</option>
-                        </select>
+
+                    <div class="form-section">
+                        <h4 class="form-section-title">参数配置</h4>
+                        <button type="button" class="btn btn-sm btn-default" onclick="addParamRow()" style="margin-bottom: 12px;">+ 添加参数</button>
+                        <div id="paramConfigList" class="param-config-list">
+                            <div class="param-config-hint text-muted" style="padding: 20px; text-align: center; border: 1px dashed var(--border-color); border-radius: 8px;">
+                                点击上方按钮添加输入参数
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">漏洞类型 <span class="required">*</span></label>
-                        <select id="vulnType" class="form-control" required>
-                            <option value="SQL_INJECTION">SQL注入</option>
-                            <option value="XSS">XSS跨站脚本</option>
-                            <option value="COMMAND_INJECTION">命令注入</option>
-                            <option value="PATH_TRAVERSAL">路径遍历</option>
-                            <option value="FILE_INCLUSION">文件包含</option>
-                            <option value="SSRF">SSRF服务端请求伪造</option>
-                            <option value="XXE">XXE外部实体注入</option>
-                            <option value="CSRF">CSRF跨站请求伪造</option>
-                        </select>
+
+                    <div class="form-section">
+                        <h4 class="form-section-title">智能推断结果</h4>
+                        <p class="inference-desc">根据接口特征，系统推断可能存在以下漏洞：</p>
+                        <div id="inferenceResultList" class="inference-result-list">
+                            <div class="text-muted inference-empty">请先填写接口特征信息后自动推断</div>
+                        </div>
+                        <div style="margin-top: 12px; display: flex; gap: 8px;">
+                            <button type="button" class="btn btn-sm btn-default" onclick="runInference()">重新推断</button>
+                            <select id="manualVulnType" class="form-control form-control-sm" style="width: auto; min-width: 150px;">
+                                <option value="">手动添加漏洞类型</option>
+                                <option value="SQL_INJECTION">SQL注入</option>
+                                <option value="XSS">XSS跨站脚本</option>
+                                <option value="COMMAND_INJECTION">命令注入</option>
+                                <option value="PATH_TRAVERSAL">路径遍历</option>
+                                <option value="FILE_INCLUSION">文件包含</option>
+                                <option value="SSRF">SSRF服务端请求伪造</option>
+                                <option value="XXE">XXE外部实体注入</option>
+                                <option value="CSRF">CSRF跨站请求伪造</option>
+                                <option value="DESERIALIZATION">反序列化</option>
+                                <option value="DDOS">DDoS</option>
+                            </select>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="addManualVulnType()">添加</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">风险等级 <span class="required">*</span></label>
-                        <select id="riskLevel" class="form-control" required>
-                            <option value="LOW">低危</option>
-                            <option value="MEDIUM">中危</option>
-                            <option value="HIGH">高危</option>
-                            <option value="CRITICAL">严重</option>
-                        </select>
+
+                    <div class="form-section">
+                        <h4 class="form-section-title">高级配置（可选）</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">匹配关键词</label>
+                                <input type="text" id="matchKeywords" class="form-control" placeholder="多个用逗号分隔，如：error,exception,success">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">扫描优先级</label>
+                                <input type="number" id="priority" class="form-control" value="100" min="1" max="1000">
+                                <small class="form-hint">数字越小优先级越高</small>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="enabled" checked>
+                                <span>启用此接口</span>
+                            </label>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">扫描优先级</label>
-                        <input type="number" id="priority" class="form-control" value="100" min="1" max="1000">
-                        <small class="form-hint">数字越小优先级越高</small>
-                    </div>
+
+                    <input type="hidden" id="selectedVulnTypes" value="">
                 </form>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-default" onclick="closeAddInterfaceModal()">取消</button>
-                <button class="btn btn-primary" onclick="submitAddInterface()">保存</button>
+                <button class="btn btn-success" onclick="submitAddInterface(true)">保存并启用</button>
+                <button class="btn btn-primary" onclick="submitAddInterface(false)">保存</button>
             </div>
         </div>
     </div>

@@ -23,6 +23,11 @@ public interface ScanInterfaceMapper {
     ScanInterfaceEntity selectById(@Param("id") Long id);
 
     /**
+     * 根据 ID 列表批量查询扫描接口
+     */
+    List<ScanInterfaceEntity> selectByIds(@Param("ids") List<Long> ids);
+
+    /**
      * 根据目标 ID 查询扫描接口
      */
     List<ScanInterfaceEntity> selectByTargetId(@Param("targetId") Long targetId);

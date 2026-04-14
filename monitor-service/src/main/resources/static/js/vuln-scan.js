@@ -5,7 +5,9 @@ let scanPageState = {
     resultSortField: 'detectedAt',
     resultSortOrder: 'desc',
     historySortField: 'startTime',
-    historySortOrder: 'desc'
+    historySortOrder: 'desc',
+    selectableInterfaces: [],
+    selectedInterfaceIds: []
 };
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -22,7 +24,16 @@ function bindScanModeUI() {
         radio.addEventListener('change', () => {
             document.querySelectorAll('.scan-mode-option').forEach(item => item.classList.remove('active'));
             radio.closest('.scan-mode-option')?.classList.add('active');
-            loadScanInterfaces();
+            
+            const customSection = document.getElementById('customScanSection');
+            if (radio.value === 'CUSTOM') {
+                customSection.style.display = 'block';
+                loadSelectableInterfaces();
+                refreshInterfaceTagList();
+            } else {
+                customSection.style.display = 'none';
+                loadScanInterfaces();
+            }
         });
     });
 }
@@ -141,7 +152,7 @@ async function loadScanConfigList() {
             console.error('扫描配置列表格式错误:', result);
             const tbody = document.getElementById('scanConfigTableBody');
             if (tbody) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center">数据格式错误</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center">数据格式错误</td></tr>';
             }
         }
     } catch (error) {
@@ -158,7 +169,7 @@ async function loadScanConfigList() {
             } else {
                 errorMsg = `加载失败: ${error.message || '未知错误'}`;
             }
-            tbody.innerHTML = `<tr><td colspan="9" class="text-center">${errorMsg}<br><small>提示：请确保已执行数据库初始化脚本 init_all.sql</small></td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" class="text-center">${errorMsg}<br><small>提示：请确保已执行数据库初始化脚本 init_all.sql</small></td></tr>`;
         }
     }
 }
@@ -168,11 +179,11 @@ function renderScanConfigTable(list) {
     if (!tbody) return;
 
     if (!list || list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center">暂无配置</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center">暂无配置</td></tr>';
         return;
     }
 
-    tbody.innerHTML = list.map(item => {
+    tbody.innerHTML = list.map((item, index) => {
         let defenseStatusHtml = '';
         const status = item.defenseRuleStatus || 0;
         if (status === 2) {
@@ -185,6 +196,7 @@ function renderScanConfigTable(list) {
         
         return `
         <tr>
+            <td class="text-center" style="color: var(--text-secondary); font-size: 13px;">${index + 1}</td>
             <td>${CellRenderer.renderText(item.interfaceName)}</td>
             <td><code>${CellRenderer.renderText(item.interfacePath)}</code></td>
             <td>${CellRenderer.renderText(item.vulnType)}</td>
@@ -236,43 +248,254 @@ async function toggleDefenseRule(id, currentStatus) {
     }
 }
 
+let paramRowCount = 0;
+let inferenceResults = [];
+
 function showAddInterfaceModal() {
     document.getElementById('addInterfaceModal').style.display = 'flex';
     document.getElementById('addInterfaceForm').reset();
+    document.getElementById('paramConfigList').innerHTML = '<div class="param-config-hint text-muted" style="padding: 20px; text-align: center; border: 1px dashed var(--border-color); border-radius: 8px;">点击上方按钮添加输入参数</div>';
+    document.getElementById('inferenceResultList').innerHTML = '<div class="text-muted inference-empty">请先填写接口特征信息后自动推断</div>';
+    document.getElementById('selectedVulnTypes').value = '';
+    paramRowCount = 0;
+    inferenceResults = [];
 }
 
 function closeAddInterfaceModal() {
     document.getElementById('addInterfaceModal').style.display = 'none';
 }
 
-async function submitAddInterface() {
+function addParamRow() {
+    const container = document.getElementById('paramConfigList');
+    const hint = container.querySelector('.param-config-hint');
+    if (hint) hint.remove();
+    
+    paramRowCount++;
+    const rowId = 'param-row-' + paramRowCount;
+    
+    const rowHtml = `
+        <div class="param-row" id="${rowId}">
+            <input type="text" class="form-control param-name-input" placeholder="参数名" data-field="name">
+            <select class="form-control param-type-select" data-field="type">
+                <option value="string">string</option>
+                <option value="int">int</option>
+                <option value="boolean">boolean</option>
+                <option value="xml">xml</option>
+                <option value="file">file</option>
+            </select>
+            <select class="form-control param-source-select" data-field="source">
+                <option value="query">query</option>
+                <option value="body">body</option>
+                <option value="path">path</option>
+                <option value="header">header</option>
+            </select>
+            <label class="checkbox-label" style="margin: 0;">
+                <input type="checkbox" data-field="required" checked> 必填
+            </label>
+            <button type="button" class="btn-delete-param" onclick="removeParamRow('${rowId}')">×</button>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', rowHtml);
+}
+
+function removeParamRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) {
+        row.remove();
+        const container = document.getElementById('paramConfigList');
+        if (container.querySelectorAll('.param-row').length === 0) {
+            container.innerHTML = '<div class="param-config-hint text-muted" style="padding: 20px; text-align: center; border: 1px dashed var(--border-color); border-radius: 8px;">点击上方按钮添加输入参数</div>';
+        }
+        runInference();
+    }
+}
+
+function collectInputParams() {
+    const rows = document.querySelectorAll('#paramConfigList .param-row');
+    const params = [];
+    rows.forEach(row => {
+        const name = row.querySelector('[data-field="name"]')?.value?.trim();
+        const type = row.querySelector('[data-field="type"]')?.value || 'string';
+        const source = row.querySelector('[data-field="source"]')?.value || 'query';
+        const required = row.querySelector('[data-field="required"]')?.checked;
+        
+        if (name) {
+            params.push({ name, type, source, required: required !== false });
+        }
+    });
+    return params;
+}
+
+function onBusinessTypeChange() {
+    runInference();
+}
+
+async function runInference() {
+    const businessType = document.getElementById('businessType')?.value || '';
+    const httpMethod = document.getElementById('httpMethod')?.value || 'GET';
+    const outputType = document.getElementById('outputType')?.value || 'JSON';
+    const contentType = document.getElementById('contentType')?.value || 'application/json';
+    const authRequired = document.getElementById('authRequired')?.checked ? 1 : 0;
+    const externalRequest = document.getElementById('externalRequest')?.checked ? 1 : 0;
+    const fileOperation = document.getElementById('fileOperation')?.checked ? 1 : 0;
+    const dbOperation = document.getElementById('dbOperation')?.checked ? 1 : 0;
+    const inputParams = collectInputParams();
+
+    const feature = {
+        businessType,
+        httpMethod,
+        outputType,
+        authRequired,
+        contentType,
+        externalRequest,
+        fileOperation,
+        dbOperation,
+        inputParams
+    };
+
+    try {
+        const results = await http.post('/scan-interface/infer-vuln-types', feature);
+        inferenceResults = Array.isArray(results) ? results : [];
+        renderInferenceResults(inferenceResults);
+    } catch (error) {
+        console.error('推断失败:', error);
+        renderInferenceResults([]);
+    }
+}
+
+function renderInferenceResults(results) {
+    const container = document.getElementById('inferenceResultList');
+    
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="text-muted inference-empty">未检测到可能的漏洞类型，可手动添加</div>';
+        document.getElementById('selectedVulnTypes').value = JSON.stringify([]);
+        return;
+    }
+
+    container.innerHTML = results.map((item, index) => `
+        <div class="inference-item">
+            <input type="checkbox" checked onchange="updateSelectedVulnTypes()">
+            <span class="vuln-type-code">${item.vulnType}</span>
+            <span class="inference-reason">- ${item.reason}</span>
+            <button type="button" class="remove-inference-btn" onclick="removeInferenceItem(${index})">×</button>
+        </div>
+    `).join('');
+    
+    updateSelectedVulnTypes();
+}
+
+function removeInferenceItem(index) {
+    inferenceResults.splice(index, 1);
+    renderInferenceResults(inferenceResults);
+}
+
+function addManualVulnType() {
+    const select = document.getElementById('manualVulnType');
+    const vulnType = select.value;
+    
+    if (!vulnType) {
+        message.error('请选择漏洞类型');
+        return;
+    }
+    
+    const exists = inferenceResults.some(item => item.vulnType === vulnType);
+    if (exists) {
+        message.warning('该漏洞类型已存在');
+        return;
+    }
+    
+    const vulnTypeNames = {
+        SQL_INJECTION: 'SQL注入',
+        XSS: 'XSS跨站脚本',
+        COMMAND_INJECTION: '命令注入',
+        PATH_TRAVERSAL: '路径遍历',
+        FILE_INCLUSION: '文件包含',
+        SSRF: 'SSRF服务端请求伪造',
+        XXE: 'XXE外部实体注入',
+        CSRF: 'CSRF跨站请求伪造',
+        DESERIALIZATION: '反序列化',
+        DDOS: 'DDoS'
+    };
+    
+    inferenceResults.push({
+        vulnType: vulnType,
+        reason: '手动添加'
+    });
+    
+    renderInferenceResults(inferenceResults);
+    select.value = '';
+}
+
+function updateSelectedVulnTypes() {
+    const checkboxes = document.querySelectorAll('#inferenceResultList .inference-item input[type="checkbox"]:checked');
+    const selected = [];
+    checkboxes.forEach(cb => {
+        const item = cb.closest('.inference-item');
+        const code = item.querySelector('.vuln-type-code')?.textContent;
+        if (code) selected.push(code);
+    });
+    document.getElementById('selectedVulnTypes').value = JSON.stringify(selected);
+}
+
+async function submitAddInterface(forceEnable) {
     try {
         const interfaceName = document.getElementById('interfaceName').value.trim();
         const interfacePath = document.getElementById('interfacePath').value.trim();
         const httpMethod = document.getElementById('httpMethod').value;
-        const vulnType = document.getElementById('vulnType').value;
         const riskLevel = document.getElementById('riskLevel').value;
         const priority = parseInt(document.getElementById('priority').value) || 100;
+        
+        const businessType = document.getElementById('businessType')?.value || '';
+        const outputType = document.getElementById('outputType')?.value || 'JSON';
+        const contentType = document.getElementById('contentType')?.value || 'application/json';
+        const authRequired = document.getElementById('authRequired')?.checked ? 1 : 0;
+        const externalRequest = document.getElementById('externalRequest')?.checked ? 1 : 0;
+        const fileOperation = document.getElementById('fileOperation')?.checked ? 1 : 0;
+        const dbOperation = document.getElementById('dbOperation')?.checked ? 1 : 0;
+        const matchKeywords = document.getElementById('matchKeywords')?.value?.trim() || '';
+        const enabled = forceEnable ? 1 : (document.getElementById('enabled')?.checked ? 1 : 0);
 
         if (!interfaceName || !interfacePath) {
-            message.error('请填写必填项');
+            message.error('请填写必填项（接口名称和接口路径）');
             return;
         }
+
+        const inputParams = collectInputParams();
+        let selectedVulnTypes = [];
+        try {
+            const val = document.getElementById('selectedVulnTypes')?.value;
+            selectedVulnTypes = val ? JSON.parse(val) : [];
+        } catch (e) {}
+
+        const primaryVulnType = selectedVulnTypes.length > 0 ? selectedVulnTypes[0] : (businessType === 'COMMAND_EXEC' ? 'COMMAND_INJECTION' : 
+                         businessType === 'URL_FETCH' ? 'SSRF' :
+                         businessType === 'XML_PROCESS' ? 'XXE' : 'XSS');
 
         const entity = {
             targetId: 1,
             interfaceName,
             interfacePath,
             httpMethod,
-            vulnType,
+            vulnType: primaryVulnType,
             riskLevel,
             priority,
-            enabled: 1,
+            enabled,
             defenseRuleStatus: 0,
             defenseRuleCount: 0,
             paramsConfig: '{}',
             payloadConfig: '{}',
-            matchRules: '{}'
+            matchRules: matchKeywords ? JSON.stringify({ keywords: matchKeywords.split(',') }) : '{}',
+            businessType: businessType || null,
+            inputParams: JSON.stringify(inputParams),
+            outputType,
+            contentType,
+            authRequired,
+            externalRequest,
+            fileOperation,
+            dbOperation,
+            inferredVulnTypes: JSON.stringify(selectedVulnTypes),
+            scanStatus: 'PENDING'
         };
 
         await http.post('/scan-interface/add', entity);
@@ -399,6 +622,28 @@ function renderRelatedRuleTable(ruleList) {
 
 async function startScan() {
     const scanType = document.querySelector('input[name="scanType"]:checked')?.value || 'QUICK';
+    
+    if (scanType === 'CUSTOM') {
+        if (scanPageState.selectedInterfaceIds.length === 0) {
+            message.error('请至少选择一个接口进行扫描');
+            return;
+        }
+        
+        try {
+            const result = await http.post('/vuln/scan/start-custom', { 
+                interfaceIds: scanPageState.selectedInterfaceIds 
+            });
+            message.success(result.message || '自定义扫描任务已启动');
+            renderProgress(result);
+            renderScanResult(result);
+            togglePolling(result.status);
+        } catch (error) {
+            console.error('启动自定义扫描失败:', error);
+            message.error('启动扫描失败：' + (error.message || '未知错误'));
+        }
+        return;
+    }
+    
     try {
         const result = await http.post('/vuln/scan/start', { scanType });
         message.success(result.message || '扫描任务已启动');
@@ -520,17 +765,198 @@ function sortResults(results) {
             const levelOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
             valueA = levelOrder[valueA] || 0;
             valueB = levelOrder[valueB] || 0;
-        } else if (typeof valueA === 'string') {
-            valueA = valueA.toLowerCase();
-            valueB = valueB.toLowerCase();
         }
         
-        let result = 0;
-        if (valueA < valueB) result = -1;
-        else if (valueA > valueB) result = 1;
+        if (typeof valueA === 'string') valueA = valueA.toLowerCase();
+        if (typeof valueB === 'string') valueB = valueB.toLowerCase();
         
-        return order === 'asc' ? result : -result;
+        if (order === 'asc') {
+            return valueA > valueB ? 1 : (valueA < valueB ? -1 : 0);
+        } else {
+            return valueA < valueB ? 1 : (valueA > valueB ? -1 : 0);
+        }
     });
+}
+
+async function loadSelectableInterfaces() {
+    try {
+        const container = document.getElementById('selectableInterfaceList');
+        if (container) {
+            container.innerHTML = '<div class="text-center text-muted">加载中...</div>';
+        }
+        
+        const vulnType = document.getElementById('vulnTypeFilter')?.value || '';
+        const riskLevel = document.getElementById('riskLevelFilter')?.value || '';
+        
+        const params = {};
+        if (vulnType) params.vulnType = vulnType;
+        if (riskLevel) params.riskLevel = riskLevel;
+        
+        const result = await http.get('/vuln/scan/selectable-interfaces', params);
+        scanPageState.selectableInterfaces = result.interfaces || [];
+        renderSelectableInterfaces();
+    } catch (error) {
+        console.error('加载可选接口失败:', error);
+        document.getElementById('selectableInterfaceList').innerHTML = 
+            '<div class="text-center text-muted">加载失败: ' + (error.message || '未知错误') + '</div>';
+    }
+}
+
+function renderSelectableInterfaces() {
+    const container = document.getElementById('selectableInterfaceList');
+    if (!container) return;
+    
+    const searchTerm = document.getElementById('interfaceSearchInput')?.value?.toLowerCase() || '';
+    
+    const filtered = scanPageState.selectableInterfaces.filter(item => {
+        if (!searchTerm) return true;
+        return (item.interfaceName?.toLowerCase().includes(searchTerm) ||
+                item.interfacePath?.toLowerCase().includes(searchTerm));
+    });
+    
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted">暂无可选接口</div>';
+        updateSelectedCount();
+        updateTotalCount(0);
+        return;
+    }
+    
+    container.innerHTML = filtered.map((item, index) => {
+        const isSelected = scanPageState.selectedInterfaceIds.includes(item.id);
+        const riskClass = getRiskLevelClass(item.riskLevel);
+        
+        return `
+            <label class="selectable-interface-item ${isSelected ? 'selected' : ''}">
+                <span class="interface-index">${index + 1}</span>
+                <input type="checkbox" 
+                       class="interface-checkbox" 
+                       data-id="${item.id}"
+                       ${isSelected ? 'checked' : ''}
+                       onchange="toggleInterfaceSelection(${item.id})">
+                <div class="interface-info">
+                    <div class="interface-name">${CellRenderer.renderText(item.interfaceName)}</div>
+                    <div class="interface-meta">
+                        <code>${CellRenderer.renderText(item.interfacePath)}</code>
+                        <span class="tag ${riskClass}">${item.riskLevel || 'LOW'}</span>
+                        <span class="tag info">${item.vulnType || '-'}</span>
+                    </div>
+                </div>
+            </label>
+        `;
+    }).join('');
+    
+    updateSelectedCount();
+    updateTotalCount(filtered.length);
+}
+
+function toggleInterfaceSelection(id) {
+    const index = scanPageState.selectedInterfaceIds.indexOf(id);
+    if (index > -1) {
+        scanPageState.selectedInterfaceIds.splice(index, 1);
+    } else {
+        scanPageState.selectedInterfaceIds.push(id);
+    }
+    updateSelectedCount();
+    refreshInterfaceTagList();
+    
+    syncCheckboxState(id);
+}
+
+function removeInterfaceFromSelection(id) {
+    const index = scanPageState.selectedInterfaceIds.indexOf(id);
+    if (index > -1) {
+        scanPageState.selectedInterfaceIds.splice(index, 1);
+        updateSelectedCount();
+        refreshInterfaceTagList();
+        syncCheckboxState(id);
+    }
+}
+
+function syncCheckboxState(id) {
+    const isSelected = scanPageState.selectedInterfaceIds.includes(id);
+    const label = document.querySelector(`input[data-id="${id}"]`)?.closest('label');
+    if (label) {
+        label.classList.toggle('selected', isSelected);
+        const cb = label.querySelector('.interface-checkbox');
+        if (cb) cb.checked = isSelected;
+    }
+}
+
+function selectAllInterfaces() {
+    scanPageState.selectableInterfaces.forEach(item => {
+        if (!scanPageState.selectedInterfaceIds.includes(item.id)) {
+            scanPageState.selectedInterfaceIds.push(item.id);
+        }
+    });
+    renderSelectableInterfaces();
+    refreshInterfaceTagList();
+}
+
+function deselectAllInterfaces() {
+    scanPageState.selectedInterfaceIds = [];
+    renderSelectableInterfaces();
+    refreshInterfaceTagList();
+}
+
+function filterSelectableInterfaces() {
+    loadSelectableInterfaces();
+}
+
+function updateSelectedCount() {
+    const countEl = document.getElementById('selectedCount');
+    if (countEl) {
+        countEl.textContent = scanPageState.selectedInterfaceIds.length;
+    }
+}
+
+function updateTotalCount(total) {
+    let countEl = document.getElementById('totalCount');
+    if (!countEl) {
+        const parentEl = document.getElementById('selectableInterfaceList')?.parentElement;
+        if (parentEl) {
+            const selectedDiv = parentEl.querySelector('.selected-count');
+            if (selectedDiv && !document.getElementById('totalCount')) {
+                selectedDiv.insertAdjacentHTML('afterend', '<div class="total-count">共 <span id="totalCount">0</span> 个接口</div>');
+            }
+            countEl = document.getElementById('totalCount');
+        }
+    }
+    if (countEl) {
+        countEl.textContent = total || 0;
+    }
+}
+
+function refreshInterfaceTagList() {
+    const tagContainer = document.getElementById('interfaceTagList');
+    if (!tagContainer) return;
+    
+    const selectedIds = scanPageState.selectedInterfaceIds;
+    
+    if (selectedIds.length === 0) {
+        tagContainer.innerHTML = '<span class="text-muted" style="font-size:13px;">尚未选择任何接口，请从上方列表中勾选需要扫描的接口</span>';
+        return;
+    }
+    
+    const selectedItems = scanPageState.selectableInterfaces.filter(
+        item => selectedIds.includes(item.id)
+    );
+    
+    tagContainer.innerHTML = selectedItems.map(item => `
+        <span class="interface-tag" data-id="${item.id}" title="${CellRenderer.renderText(item.interfaceName)}">
+            <strong>${CellRenderer.renderText(item.httpMethod || 'GET')}</strong>
+            <code>${CellRenderer.renderText(item.interfacePath)}</code>
+            <button type="button" class="tag-remove" onclick="removeInterfaceFromSelection(${item.id})">×</button>
+        </span>
+    `).join('');
+}
+
+function getRiskLevelClass(level) {
+    switch (level) {
+        case 'CRITICAL': return 'danger';
+        case 'HIGH': return 'warning';
+        case 'MEDIUM': return 'info';
+        default: return 'default';
+    }
 }
 
 function sortHistory(historyList) {

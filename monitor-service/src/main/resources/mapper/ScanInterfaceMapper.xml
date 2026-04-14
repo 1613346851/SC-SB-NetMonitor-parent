@@ -18,22 +18,39 @@
         <result column="defense_rule_status" property="defenseRuleStatus"/>
         <result column="defense_rule_count" property="defenseRuleCount"/>
         <result column="defense_rule_note" property="defenseRuleNote"/>
+        <result column="business_type" property="businessType"/>
+        <result column="input_params" property="inputParams"/>
+        <result column="output_type" property="outputType"/>
+        <result column="auth_required" property="authRequired"/>
+        <result column="content_type" property="contentType"/>
+        <result column="external_request" property="externalRequest"/>
+        <result column="file_operation" property="fileOperation"/>
+        <result column="db_operation" property="dbOperation"/>
+        <result column="inferred_vuln_types" property="inferredVulnTypes"/>
+        <result column="scan_status" property="scanStatus"/>
+        <result column="last_scan_time" property="lastScanTime"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <sql id="Base_Column_List">
         id, target_id, interface_name, interface_path, http_method, vuln_type, risk_level,
-        params_config, payload_config, match_rules, enabled, priority, defense_rule_status, defense_rule_count, defense_rule_note, create_time, update_time
+        params_config, payload_config, match_rules, enabled, priority, defense_rule_status, defense_rule_count, defense_rule_note,
+        business_type, input_params, output_type, auth_required, content_type, external_request, file_operation, db_operation,
+        inferred_vuln_types, scan_status, last_scan_time, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.ScanInterfaceEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_scan_interface (
             target_id, interface_name, interface_path, http_method, vuln_type, risk_level,
-            params_config, payload_config, match_rules, enabled, priority, defense_rule_status, defense_rule_count, defense_rule_note, create_time, update_time
+            params_config, payload_config, match_rules, enabled, priority, defense_rule_status, defense_rule_count, defense_rule_note,
+            business_type, input_params, output_type, auth_required, content_type, external_request, file_operation, db_operation,
+            inferred_vuln_types, scan_status, last_scan_time, create_time, update_time
         ) VALUES (
             #{targetId}, #{interfaceName}, #{interfacePath}, #{httpMethod}, #{vulnType}, #{riskLevel},
-            #{paramsConfig}, #{payloadConfig}, #{matchRules}, #{enabled}, #{priority}, #{defenseRuleStatus}, #{defenseRuleCount}, #{defenseRuleNote}, NOW(), NOW()
+            #{paramsConfig}, #{payloadConfig}, #{matchRules}, #{enabled}, #{priority}, #{defenseRuleStatus}, #{defenseRuleCount}, #{defenseRuleNote},
+            #{businessType}, #{inputParams}, #{outputType}, #{authRequired}, #{contentType}, #{externalRequest}, #{fileOperation}, #{dbOperation},
+            #{inferredVulnTypes}, #{scanStatus}, #{lastScanTime}, NOW(), NOW()
         )
     </insert>
 
@@ -41,6 +58,16 @@
         SELECT <include refid="Base_Column_List"/>
         FROM sys_scan_interface
         WHERE id = #{id}
+    </select>
+
+    <select id="selectByIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY priority ASC, create_time DESC
     </select>
 
     <select id="selectByTargetId" resultMap="BaseResultMap">
@@ -126,6 +153,17 @@
             defense_rule_status = #{defenseRuleStatus},
             defense_rule_count = #{defenseRuleCount},
             defense_rule_note = #{defenseRuleNote},
+            business_type = #{businessType},
+            input_params = #{inputParams},
+            output_type = #{outputType},
+            auth_required = #{authRequired},
+            content_type = #{contentType},
+            external_request = #{externalRequest},
+            file_operation = #{fileOperation},
+            db_operation = #{dbOperation},
+            inferred_vuln_types = #{inferredVulnTypes},
+            scan_status = #{scanStatus},
+            last_scan_time = #{lastScanTime},
             update_time = NOW()
         WHERE id = #{id}
     </update>

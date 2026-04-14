@@ -17,6 +17,11 @@ public interface ScanInterfaceService {
     ScanInterfaceEntity getById(Long id);
 
     /**
+     * 根据ID列表批量查询扫描接口
+     */
+    List<ScanInterfaceEntity> getByIds(List<Long> ids);
+
+    /**
      * 查询所有启用的扫描接口
      */
     List<ScanInterfaceEntity> getAllEnabled();

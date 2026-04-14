@@ -87,6 +87,72 @@ public class ScanInterfaceEntity {
     private String defenseRuleNote;
 
     /**
+     * 业务功能类型
+     * USER_INPUT - 用户输入处理
+     * DATA_QUERY - 数据查询
+     * DATA_SUBMIT - 数据提交
+     * FILE_OPERATION - 文件操作
+     * FILE_UPLOAD - 文件上传
+     * URL_FETCH - URL获取
+     * COMMAND_EXEC - 命令执行
+     * AUTH_RELATED - 认证相关
+     * XML_PROCESS - XML处理
+     * CONFIG_ACCESS - 配置访问
+     * API_PROXY - API代理
+     */
+    private String businessType;
+
+    /**
+     * 输入参数描述（JSON数组）
+     */
+    private String inputParams;
+
+    /**
+     * 输出类型（JSON, HTML, XML, FILE, BINARY）
+     */
+    private String outputType = "JSON";
+
+    /**
+     * 是否需要认证（0-否，1-是）
+     */
+    private Integer authRequired = 0;
+
+    /**
+     * 请求内容类型
+     */
+    private String contentType = "application/json";
+
+    /**
+     * 是否发起外部请求（0-否，1-是）
+     */
+    private Integer externalRequest = 0;
+
+    /**
+     * 是否涉及文件操作（0-否，1-是）
+     */
+    private Integer fileOperation = 0;
+
+    /**
+     * 是否涉及数据库操作（0-否，1-是）
+     */
+    private Integer dbOperation = 0;
+
+    /**
+     * 推断的漏洞类型（JSON数组）
+     */
+    private String inferredVulnTypes;
+
+    /**
+     * 扫描状态（PENDING, SCANNING, COMPLETED, FAILED）
+     */
+    private String scanStatus = "PENDING";
+
+    /**
+     * 最后扫描时间
+     */
+    private LocalDateTime lastScanTime;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

