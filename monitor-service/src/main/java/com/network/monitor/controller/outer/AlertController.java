@@ -6,7 +6,6 @@ import com.network.monitor.entity.AlertEntity;
 import com.network.monitor.entity.AlertRuleEntity;
 import com.network.monitor.mapper.AlertMapper;
 import com.network.monitor.service.AlertService;
-import com.network.monitor.service.NotificationService;
 import com.network.monitor.util.SecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,9 +25,6 @@ public class AlertController {
 
     @Autowired
     private AlertService alertService;
-
-    @Autowired
-    private NotificationService notificationService;
 
     @Autowired
     private AlertMapper alertMapper;
@@ -225,34 +221,6 @@ public class AlertController {
         } catch (Exception e) {
             logger.error("切换告警规则状态失败: id={}", id, e);
             return ApiResponse.error("操作失败");
-        }
-    }
-
-    @PostMapping("/test/email")
-    public ApiResponse<Map<String, Object>> testEmailNotification() {
-        try {
-            boolean success = notificationService.sendTestEmail();
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", success);
-            result.put("message", success ? "测试邮件发送成功" : "测试邮件发送失败");
-            return ApiResponse.success(result);
-        } catch (Exception e) {
-            logger.error("测试邮件发送失败", e);
-            return ApiResponse.error("发送失败: " + e.getMessage());
-        }
-    }
-
-    @PostMapping("/test/feishu")
-    public ApiResponse<Map<String, Object>> testFeishuNotification() {
-        try {
-            boolean success = notificationService.sendTestFeishu();
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", success);
-            result.put("message", success ? "测试飞书消息发送成功" : "测试飞书消息发送失败");
-            return ApiResponse.success(result);
-        } catch (Exception e) {
-            logger.error("测试飞书消息发送失败", e);
-            return ApiResponse.error("发送失败: " + e.getMessage());
         }
     }
 

@@ -10,7 +10,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -25,6 +27,19 @@ public class SysConfigController {
 
     @Autowired
     private OperLogService operLogService;
+
+    @GetMapping("/alert.sound")
+    public ApiResponse<Map<String, String>> getAlertSoundConfig() {
+        try {
+            Map<String, String> config = new HashMap<>();
+            config.put("alert.sound.enabled", sysConfigService.getConfigValue("alert.sound.enabled"));
+            config.put("alert.sound.level-threshold", sysConfigService.getConfigValue("alert.sound.level-threshold"));
+            return ApiResponse.success(config);
+        } catch (Exception e) {
+            log.error("获取告警声音配置失败", e);
+            return ApiResponse.error("获取配置失败");
+        }
+    }
 
     @GetMapping("/list")
     public ApiResponse<List<SysConfigEntity>> getAllConfigs() {

@@ -13,16 +13,19 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     
-    const urlParams = new URLSearchParams(window.location.search);
-    const eventIdFromUrl = urlParams.get('id');
-    if (eventIdFromUrl) {
-        loadEventDetail(eventIdFromUrl);
-    }
-    
     initEventTable();
     loadEventStatistics();
     
     initChartsWhenReady();
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventIdFromUrl = urlParams.get('id');
+    if (eventIdFromUrl) {
+        console.log('从URL参数获取事件ID:', eventIdFromUrl);
+        setTimeout(function() {
+            loadEventDetail(eventIdFromUrl);
+        }, 500);
+    }
     
     setInterval(() => {
         loadEventStatistics();
@@ -113,6 +116,8 @@ function searchEvents() {
     const attackType = eventTable.getSearchSelectValue('attackType');
     const riskLevel = eventTable.getSearchSelectValue('riskLevel');
     const status = eventTable.getSearchSelectValue('status');
+    const defenseAction = eventTable.getSearchSelectValue('defenseAction');
+    const defenseSuccess = eventTable.getSearchSelectValue('defenseSuccess');
     const dateRange = eventTable.getDateRangeValue('startDate', 'endDate');
     
     const params = {};
@@ -121,6 +126,8 @@ function searchEvents() {
     if (attackType) params.attackType = attackType;
     if (riskLevel) params.riskLevel = riskLevel;
     if (status !== '') params.status = status;
+    if (defenseAction) params.defenseAction = defenseAction;
+    if (defenseSuccess !== '') params.defenseSuccess = defenseSuccess;
     if (dateRange.startTime) params.startTime = dateRange.startTime;
     if (dateRange.endTime) params.endTime = dateRange.endTime;
     
@@ -133,6 +140,8 @@ function resetSearch() {
     document.getElementById('attackType').value = '';
     document.getElementById('riskLevel').value = '';
     document.getElementById('status').value = '';
+    document.getElementById('defenseAction').value = '';
+    document.getElementById('defenseSuccess').value = '';
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     
@@ -437,8 +446,16 @@ function calculateXAxisInterval(dataLength) {
 }
 
 async function loadEventDetail(eventId) {
+    console.log('加载事件详情, eventId:', eventId);
     try {
         const event = await http.get(`/event/eventId/${eventId}`);
+        console.log('获取到事件数据:', event);
+        
+        if (!event) {
+            message.error('事件不存在');
+            return;
+        }
+        
         currentEventId = eventId;
         
         document.getElementById('modalEventId').textContent = event.eventId;

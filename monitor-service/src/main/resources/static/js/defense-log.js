@@ -49,9 +49,9 @@ function initDefenseTable() {
                     ${cell.renderCell(item.defenseTarget, { maxLength: 20 })}
                     ${cell.renderCell(item.defenseReason, { maxLength: 15 })}
                     <td>${isFirstTag}</td>
-                    <td>${item.expireTime ? dateFormat.format(item.expireTime) : (item.defenseType === 'BLOCK_IP' ? '永久' : '-')}</td>
+                    <td>${item.expireTime ? dateFormat.format(item.expireTime) : (item.defenseType === 'BLOCK_IP' || item.defenseType === 'ADD_BLACKLIST' ? '永久' : '-')}</td>
                     <td>${eventIdLink}</td>
-                    <td>${item.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</td>
+                    <td>${renderExecuteStatus(item.executeStatus, item.defenseType)}</td>
                     <td>${renderOperator(item.operator)}</td>
                     ${cell.renderActionCell([
                         { text: '详情', type: 'primary', onClick: `viewDefenseDetail(${item.id})` }
@@ -69,13 +69,32 @@ function renderDefenseType(type) {
     const typeMap = {
         'BLOCK_IP': '<span class="tag danger">IP封禁</span>',
         'BLACKLIST': '<span class="tag danger">IP封禁</span>',
+        'ADD_BLACKLIST': '<span class="tag danger">IP封禁</span>',
         'RATE_LIMIT': '<span class="tag warning">限流</span>',
         'BLOCK': '<span class="tag danger">请求拦截</span>',
         'BLOCK_REQUEST': '<span class="tag danger">请求拦截</span>',
         'REDIRECT': '<span class="tag info">重定向</span>',
-        'CAPTCHA': '<span class="tag info">验证码</span>'
+        'CAPTCHA': '<span class="tag info">验证码</span>',
+        'ALERT_ONLY': '<span class="tag info">仅告警</span>',
+        'COMPOSITE': '<span class="tag info">组合防御</span>',
+        'MANUAL_BAN': '<span class="tag danger">人工封禁</span>',
+        'MANUAL_UNBAN': '<span class="tag success">人工解封</span>',
+        'TEMP_BAN': '<span class="tag warning">临时封禁</span>',
+        'STATE_RESET': '<span class="tag info">状态重置</span>',
+        'WHITELIST_ADD': '<span class="tag success">加入白名单</span>',
+        'WHITELIST_REMOVE': '<span class="tag">移除白名单</span>'
     };
     return typeMap[type] || type;
+}
+
+function renderExecuteStatus(status, defenseType) {
+    if (defenseType === 'ALERT_ONLY') {
+        return '<span class="tag info">已告警</span>';
+    }
+    if (status === 1) {
+        return '<span class="tag success">成功</span>';
+    }
+    return '<span class="tag danger">失败</span>';
 }
 
 function renderDefenseAction(action) {
@@ -149,6 +168,12 @@ async function viewDefenseDetail(id) {
             ? '<span class="tag info">首次防御</span>'
             : '<span class="tag">非首次</span>';
         
+        const isAlertOnly = detail.defenseType === 'ALERT_ONLY';
+        const isFirstDefense = detail.isFirst === 1;
+        const expireTimeDisplay = detail.expireTime 
+            ? dateFormat.format(detail.expireTime) 
+            : (detail.defenseType === 'BLOCK_IP' || detail.defenseType === 'ADD_BLACKLIST' ? '永久' : '-');
+        
         const content = document.getElementById('defenseDetailContent');
         content.innerHTML = `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -157,12 +182,12 @@ async function viewDefenseDetail(id) {
                     <p><strong>防御时间:</strong> ${dateFormat.format(detail.createTime)}</p>
                     <p><strong>防御类型:</strong> ${renderDefenseType(detail.defenseType)}</p>
                     <p><strong>防御动作:</strong> ${renderDefenseAction(detail.defenseAction)}</p>
-                    <p><strong>是否首次:</strong> ${isFirstHtml}</p>
+                    <p><strong>是否首次:</strong> ${isAlertOnly ? '<span class="tag">不适用</span>' : isFirstHtml}</p>
                 </div>
                 <div>
                     <p><strong>关联事件:</strong> ${eventIdHtml}</p>
-                    <p><strong>执行状态:</strong> ${detail.executeStatus === 1 ? '<span class="tag success">成功</span>' : '<span class="tag danger">失败</span>'}</p>
-                    <p><strong>过期时间:</strong> ${detail.expireTime ? dateFormat.format(detail.expireTime) : (detail.defenseType === 'BLOCK_IP' ? '永久' : '-')}</p>
+                    <p><strong>执行状态:</strong> ${renderExecuteStatus(detail.executeStatus, detail.defenseType)}</p>
+                    <p><strong>过期时间:</strong> ${expireTimeDisplay}</p>
                     <p><strong>操作者:</strong> ${renderOperator(detail.operator)}</p>
                 </div>
             </div>

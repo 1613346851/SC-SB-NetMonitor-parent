@@ -62,11 +62,13 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             stats.put("trafficChange", trafficChange);
             stats.put("attackChange", attackChange);
 
-            long totalDefenses = defenseLogMapper.countAll();
+            long totalDefenses = defenseLogMapper.countAllExcludeAlertOnly();
             stats.put("totalDefense", totalDefenses);
 
-            long todayDefenses = defenseLogMapper.countByCondition(null, null, null, null, todayStart, null);
-            long yesterdayDefenses = defenseLogMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart);
+            long todayDefenses = defenseLogMapper.countByCondition(null, null, null, null, todayStart, null) 
+                - defenseLogMapper.countByCondition(null, "ALERT_ONLY", null, null, todayStart, null);
+            long yesterdayDefenses = defenseLogMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart)
+                - defenseLogMapper.countByCondition(null, "ALERT_ONLY", null, null, yesterdayStart, todayStart);
             double defenseChange = calculateGrowthRate(todayDefenses, yesterdayDefenses);
             stats.put("defenseChange", defenseChange);
 

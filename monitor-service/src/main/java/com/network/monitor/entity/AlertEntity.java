@@ -35,12 +35,6 @@ public class AlertEntity {
 
     private LocalDateTime suppressUntil;
 
-    private String notifyChannels;
-
-    private Integer notifyStatus;
-
-    private LocalDateTime notifyTime;
-
     private String confirmBy;
 
     private LocalDateTime confirmTime;

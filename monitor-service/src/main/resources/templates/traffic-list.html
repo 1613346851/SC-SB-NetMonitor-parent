@@ -26,6 +26,14 @@
                 <div class="filter-bar">
                     <div class="form-inline">
                         <div class="form-group">
+                            <label class="form-label">流量 ID</label>
+                            <input type="text" class="form-control" id="trafficId" placeholder="请输入流量ID" style="width: 140px;">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">事件 ID</label>
+                            <input type="text" class="form-control" id="eventId" placeholder="请输入事件ID" style="width: 140px;">
+                        </div>
+                        <div class="form-group">
                             <label class="form-label">源 IP</label>
                             <input type="text" class="form-control" id="sourceIp" placeholder="请输入源 IP">
                         </div>
@@ -42,6 +50,45 @@
                                 <option value="PUT">PUT</option>
                                 <option value="DELETE">DELETE</option>
                                 <option value="PATCH">PATCH</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">协议类型</label>
+                            <select class="form-control" id="protocol">
+                                <option value="">全部</option>
+                                <option value="HTTP/1.0">HTTP/1.0</option>
+                                <option value="HTTP/1.1">HTTP/1.1</option>
+                                <option value="HTTP/2">HTTP/2</option>
+                                <option value="HTTPS">HTTPS</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">响应状态</label>
+                            <select class="form-control" id="responseStatus">
+                                <option value="">全部</option>
+                                <option value="2xx">2xx 成功</option>
+                                <option value="3xx">3xx 重定向</option>
+                                <option value="4xx">4xx 客户端错误</option>
+                                <option value="5xx">5xx 服务端错误</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">IP 状态</label>
+                            <select class="form-control" id="stateTag">
+                                <option value="">全部</option>
+                                <option value="NORMAL">正常</option>
+                                <option value="SUSPICIOUS">可疑</option>
+                                <option value="ATTACKING">攻击中</option>
+                                <option value="BLOCKED">已防御</option>
+                                <option value="COOLDOWN">冷却期</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">是否聚合</label>
+                            <select class="form-control" id="isAggregated">
+                                <option value="">全部</option>
+                                <option value="0">否</option>
+                                <option value="1">是</option>
                             </select>
                         </div>
                         <div class="form-group">

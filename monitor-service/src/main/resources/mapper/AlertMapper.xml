@@ -15,9 +15,6 @@
         <result column="status" property="status"/>
         <result column="is_suppressed" property="isSuppressed"/>
         <result column="suppress_until" property="suppressUntil"/>
-        <result column="notify_channels" property="notifyChannels"/>
-        <result column="notify_status" property="notifyStatus"/>
-        <result column="notify_time" property="notifyTime"/>
         <result column="confirm_by" property="confirmBy"/>
         <result column="confirm_time" property="confirmTime"/>
         <result column="ignore_reason" property="ignoreReason"/>
@@ -29,18 +26,18 @@
 
     <sql id="Base_Column_List">
         id, alert_id, event_id, attack_id, source_ip, attack_type, alert_level, alert_title, alert_content,
-        status, is_suppressed, suppress_until, notify_channels, notify_status, notify_time,
+        status, is_suppressed, suppress_until,
         confirm_by, confirm_time, ignore_reason, ignore_by, ignore_time, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.AlertEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_alert (
             alert_id, event_id, attack_id, source_ip, attack_type, alert_level, alert_title, alert_content,
-            status, is_suppressed, suppress_until, notify_channels, notify_status, notify_time,
+            status, is_suppressed, suppress_until,
             confirm_by, confirm_time, ignore_reason, ignore_by, ignore_time, create_time, update_time
         ) VALUES (
             #{alertId}, #{eventId}, #{attackId}, #{sourceIp}, #{attackType}, #{alertLevel}, #{alertTitle}, #{alertContent},
-            #{status}, #{isSuppressed}, #{suppressUntil}, #{notifyChannels}, #{notifyStatus}, #{notifyTime},
+            #{status}, #{isSuppressed}, #{suppressUntil},
             #{confirmBy}, #{confirmTime}, #{ignoreReason}, #{ignoreBy}, #{ignoreTime}, #{createTime}, #{updateTime}
         )
     </insert>
@@ -57,9 +54,6 @@
             <if test="status != null">status = #{status},</if>
             <if test="isSuppressed != null">is_suppressed = #{isSuppressed},</if>
             <if test="suppressUntil != null">suppress_until = #{suppressUntil},</if>
-            <if test="notifyChannels != null">notify_channels = #{notifyChannels},</if>
-            <if test="notifyStatus != null">notify_status = #{notifyStatus},</if>
-            <if test="notifyTime != null">notify_time = #{notifyTime},</if>
             <if test="confirmBy != null">confirm_by = #{confirmBy},</if>
             <if test="confirmTime != null">confirm_time = #{confirmTime},</if>
             <if test="ignoreReason != null">ignore_reason = #{ignoreReason},</if>
@@ -178,23 +172,9 @@
         LIMIT #{limit}
     </select>
 
-    <select id="selectUnnotifiedAlerts" resultMap="BaseResultMap">
-        SELECT <include refid="Base_Column_List"/>
-        FROM sys_alert
-        WHERE notify_status = 0 AND status = 0 AND is_suppressed = 0
-        ORDER BY alert_level, id ASC
-        LIMIT #{limit}
-    </select>
-
     <update id="updateStatus">
         UPDATE sys_alert
         SET status = #{status}, update_time = NOW()
-        WHERE id = #{id}
-    </update>
-
-    <update id="updateNotifyStatus">
-        UPDATE sys_alert
-        SET notify_status = #{notifyStatus}, notify_time = #{notifyTime}, update_time = NOW()
         WHERE id = #{id}
     </update>
 

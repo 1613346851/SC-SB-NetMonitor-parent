@@ -118,6 +118,10 @@
         SELECT COUNT(*) FROM sys_defense_log
     </select>
 
+    <select id="countAllExcludeAlertOnly" resultType="long">
+        SELECT COUNT(*) FROM sys_defense_log WHERE defense_type != 'ALERT_ONLY'
+    </select>
+
     <select id="selectValidBlacklists" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM sys_defense_log
@@ -164,6 +168,7 @@
             FROM sys_defense_log
             WHERE execute_time &gt;= #{startTime}
               AND execute_time &lt;= #{endTime}
+              AND defense_type != 'ALERT_ONLY'
             GROUP BY DATE_FORMAT(execute_time, '%Y-%m-%d %H:%i:00')
         ) t
         ORDER BY time

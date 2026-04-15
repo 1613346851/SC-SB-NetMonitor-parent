@@ -110,19 +110,31 @@ function getConfidenceBadge(confidence) {
 }
 
 function viewEventDetail(eventId) {
-    window.location.href = `/event?eventId=${eventId}`;
+    window.location.href = `/event?id=${eventId}`;
 }
 
 function searchTraffic() {
+    const trafficId = trafficTable.getSearchValue('trafficId');
+    const eventId = trafficTable.getSearchValue('eventId');
     const sourceIp = trafficTable.getSearchValue('sourceIp');
     const targetIp = trafficTable.getSearchValue('targetIp');
     const httpMethod = trafficTable.getSearchSelectValue('httpMethod');
+    const protocol = trafficTable.getSearchSelectValue('protocol');
+    const responseStatus = trafficTable.getSearchSelectValue('responseStatus');
+    const stateTag = trafficTable.getSearchSelectValue('stateTag');
+    const isAggregated = trafficTable.getSearchSelectValue('isAggregated');
     const dateRange = trafficTable.getDateRangeValue('startDate', 'endDate');
     
     const params = {};
+    if (trafficId) params.trafficId = trafficId;
+    if (eventId) params.eventId = eventId;
     if (sourceIp) params.sourceIp = sourceIp;
     if (targetIp) params.targetIp = targetIp;
     if (httpMethod) params.httpMethod = httpMethod;
+    if (protocol) params.protocol = protocol;
+    if (responseStatus) params.responseStatus = responseStatus;
+    if (stateTag) params.stateTag = stateTag;
+    if (isAggregated) params.isAggregated = isAggregated;
     if (dateRange.startTime) params.startTime = dateRange.startTime;
     if (dateRange.endTime) params.endTime = dateRange.endTime;
     
@@ -130,9 +142,15 @@ function searchTraffic() {
 }
 
 function resetSearch() {
+    document.getElementById('trafficId').value = '';
+    document.getElementById('eventId').value = '';
     document.getElementById('sourceIp').value = '';
     document.getElementById('targetIp').value = '';
     document.getElementById('httpMethod').value = '';
+    document.getElementById('protocol').value = '';
+    document.getElementById('responseStatus').value = '';
+    document.getElementById('stateTag').value = '';
+    document.getElementById('isAggregated').value = '';
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     

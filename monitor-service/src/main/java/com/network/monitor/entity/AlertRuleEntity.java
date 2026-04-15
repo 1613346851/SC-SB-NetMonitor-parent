@@ -29,8 +29,6 @@ public class AlertRuleEntity {
 
     private Integer suppressDurationSeconds;
 
-    private String notifyChannels;
-
     private Integer enabled;
 
     private Integer priority;
@@ -61,13 +59,5 @@ public class AlertRuleEntity {
             default:
                 return this.alertLevel;
         }
-    }
-
-    public boolean hasEmailChannel() {
-        return this.notifyChannels != null && this.notifyChannels.contains("EMAIL");
-    }
-
-    public boolean hasFeishuChannel() {
-        return this.notifyChannels != null && this.notifyChannels.contains("FEISHU");
     }
 }

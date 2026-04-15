@@ -22,8 +22,6 @@ public class AlertDTO {
 
     private String alertContent;
 
-    private String notifyChannels;
-
     public static AlertDTO fromAttack(Long attackId, String eventId, String sourceIp, String attackType, String riskLevel) {
         return fromAttack(attackId, eventId, sourceIp, attackType, riskLevel, null);
     }

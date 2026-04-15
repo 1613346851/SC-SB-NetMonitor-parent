@@ -35,6 +35,25 @@ public class AttackMonitorController {
     private SysConfigCache sysConfigCache;
 
     /**
+     * 获取风险等级选项列表
+     */
+    @GetMapping("/risk-levels")
+    public ApiResponse<List<Map<String, String>>> getRiskLevels() {
+        try {
+            List<Map<String, String>> riskLevels = List.of(
+                Map.of("value", "CRITICAL", "label", "严重"),
+                Map.of("value", "HIGH", "label", "高风险"),
+                Map.of("value", "MEDIUM", "label", "中风险"),
+                Map.of("value", "LOW", "label", "低风险")
+            );
+            return ApiResponse.success(riskLevels);
+        } catch (Exception e) {
+            log.error("获取风险等级列表失败：", e);
+            return ApiResponse.error("获取失败");
+        }
+    }
+
+    /**
      * 分页查询攻击记录
      */
     @GetMapping("/list")

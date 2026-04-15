@@ -259,6 +259,7 @@
                             <label class="form-label">风险等级</label>
                             <select class="form-control" id="riskLevel">
                                 <option value="">全部</option>
+                                <option value="CRITICAL">严重</option>
                                 <option value="HIGH">高风险</option>
                                 <option value="MEDIUM">中风险</option>
                                 <option value="LOW">低风险</option>
@@ -270,6 +271,24 @@
                                 <option value="">全部</option>
                                 <option value="0">进行中</option>
                                 <option value="1">已结束</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御动作</label>
+                            <select class="form-control" id="defenseAction">
+                                <option value="">全部</option>
+                                <option value="BLOCK_IP">IP封禁</option>
+                                <option value="RATE_LIMIT">限流</option>
+                                <option value="BLOCK_REQUEST">请求拦截</option>
+                                <option value="ALERT_ONLY">仅告警</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御结果</label>
+                            <select class="form-control" id="defenseSuccess">
+                                <option value="">全部</option>
+                                <option value="1">成功</option>
+                                <option value="0">失败</option>
                             </select>
                         </div>
                         <div class="form-group">

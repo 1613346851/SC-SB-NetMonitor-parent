@@ -35,25 +35,34 @@ public class DefenseLogController {
             stats.put("totalDefenses", totalCount);
             stats.put("totalCount", totalCount);
             
+            long alertOnlyCount = defenseLogMapper.countByCondition(null, "ALERT_ONLY", null, null, startTime, endTime);
+            long actualDefenseCount = totalCount - alertOnlyCount;
+            stats.put("actualDefenseCount", actualDefenseCount);
+            
             long successCount = defenseLogMapper.countByCondition(null, null, null, 1, startTime, endTime);
-            stats.put("successDefenses", successCount);
-            stats.put("successCount", successCount);
+            long alertOnlySuccessCount = defenseLogMapper.countByCondition(null, "ALERT_ONLY", null, 1, startTime, endTime);
+            long actualSuccessCount = successCount - alertOnlySuccessCount;
+            stats.put("successDefenses", actualSuccessCount);
+            stats.put("successCount", actualSuccessCount);
             
             long failedCount = defenseLogMapper.countByCondition(null, null, null, 0, startTime, endTime);
             stats.put("failedDefenses", failedCount);
             stats.put("failedCount", failedCount);
             
-            double successRate = totalCount > 0 ? (double) successCount / totalCount * 100 : 0;
+            double successRate = actualDefenseCount > 0 ? (double) actualSuccessCount / actualDefenseCount * 100 : 0;
             stats.put("successRate", Math.round(successRate * 100.0) / 100.0);
             
             long blockIpCount = defenseLogMapper.countByCondition(null, "BLOCK_IP", null, null, startTime, endTime);
-            stats.put("blockCount", blockIpCount);
+            long addBlacklistCount = defenseLogMapper.countByCondition(null, "ADD_BLACKLIST", null, null, startTime, endTime);
+            stats.put("blockCount", blockIpCount + addBlacklistCount);
             
             long rateLimitCount = defenseLogMapper.countByCondition(null, "RATE_LIMIT", null, null, startTime, endTime);
             stats.put("rateLimitCount", rateLimitCount);
             
             long blockRequestCount = defenseLogMapper.countByCondition(null, "BLOCK_REQUEST", null, null, startTime, endTime);
             stats.put("redirectCount", blockRequestCount);
+            
+            stats.put("alertOnlyCount", alertOnlyCount);
 
             return ApiResponse.success(stats);
         } catch (Exception e) {

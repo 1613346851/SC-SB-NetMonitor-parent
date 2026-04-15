@@ -12,7 +12,6 @@
         <result column="threshold_count" property="thresholdCount"/>
         <result column="threshold_window_seconds" property="thresholdWindowSeconds"/>
         <result column="suppress_duration_seconds" property="suppressDurationSeconds"/>
-        <result column="notify_channels" property="notifyChannels"/>
         <result column="enabled" property="enabled"/>
         <result column="priority" property="priority"/>
         <result column="description" property="description"/>
@@ -22,18 +21,18 @@
 
     <sql id="Base_Column_List">
         id, rule_name, rule_code, attack_type, risk_level, alert_level, threshold_count,
-        threshold_window_seconds, suppress_duration_seconds, notify_channels, enabled,
+        threshold_window_seconds, suppress_duration_seconds, enabled,
         priority, description, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.AlertRuleEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_alert_rule (
             rule_name, rule_code, attack_type, risk_level, alert_level, threshold_count,
-            threshold_window_seconds, suppress_duration_seconds, notify_channels, enabled,
+            threshold_window_seconds, suppress_duration_seconds, enabled,
             priority, description, create_time, update_time
         ) VALUES (
             #{ruleName}, #{ruleCode}, #{attackType}, #{riskLevel}, #{alertLevel}, #{thresholdCount},
-            #{thresholdWindowSeconds}, #{suppressDurationSeconds}, #{notifyChannels}, #{enabled},
+            #{thresholdWindowSeconds}, #{suppressDurationSeconds}, #{enabled},
             #{priority}, #{description}, #{createTime}, #{updateTime}
         )
     </insert>
@@ -49,7 +48,6 @@
             <if test="thresholdCount != null">threshold_count = #{thresholdCount},</if>
             <if test="thresholdWindowSeconds != null">threshold_window_seconds = #{thresholdWindowSeconds},</if>
             <if test="suppressDurationSeconds != null">suppress_duration_seconds = #{suppressDurationSeconds},</if>
-            <if test="notifyChannels != null">notify_channels = #{notifyChannels},</if>
             <if test="enabled != null">enabled = #{enabled},</if>
             <if test="priority != null">priority = #{priority},</if>
             <if test="description != null">description = #{description},</if>

@@ -14,8 +14,12 @@
         _toggleBtn: null,
         _badge: null,
         _emptyTip: null,
+        _soundEnabled: true,
+        _soundLevelThreshold: 'HIGH',
+        _audioContext: null,
 
         init() {
+            this._loadSoundConfig();
             this._createStyles();
             this._createContainer();
             this._createToggleButton();
@@ -24,6 +28,59 @@
             this._connectWebSocket();
             this._updateBadge();
             this._initVisibility();
+        },
+
+        async _loadSoundConfig() {
+            try {
+                const config = await fetch('/api/config/alert.sound').then(r => r.json());
+                if (config.data) {
+                    this._soundEnabled = config.data['alert.sound.enabled'] === 'true';
+                    this._soundLevelThreshold = config.data['alert.sound.level-threshold'] || 'HIGH';
+                }
+            } catch (e) {
+                console.log('[AlertNotification] 加载声音配置失败，使用默认值');
+            }
+        },
+
+        _shouldPlaySound(alertLevel) {
+            if (!this._soundEnabled) return false;
+            
+            const levels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+            const alertLevelIndex = levels.indexOf(alertLevel);
+            const thresholdIndex = levels.indexOf(this._soundLevelThreshold);
+            
+            return alertLevelIndex >= thresholdIndex;
+        },
+
+        _playAlertSound() {
+            try {
+                if (!this._audioContext) {
+                    this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                if (this._audioContext.state === 'suspended') {
+                    this._audioContext.resume();
+                }
+                
+                const oscillator = this._audioContext.createOscillator();
+                const gainNode = this._audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this._audioContext.destination);
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, this._audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(660, this._audioContext.currentTime + 0.1);
+                oscillator.frequency.setValueAtTime(880, this._audioContext.currentTime + 0.2);
+                
+                gainNode.gain.setValueAtTime(0.3, this._audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this._audioContext.currentTime + 0.4);
+                
+                oscillator.start(this._audioContext.currentTime);
+                oscillator.stop(this._audioContext.currentTime + 0.4);
+            } catch (e) {
+                console.log('[AlertNotification] 播放声音失败:', e);
+            }
         },
 
         _createStyles() {
@@ -268,12 +325,11 @@
                 }
                 
                 .alert-empty-tip {
-                    background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
-                    color: #9ca3af;
+                    background: transparent;
+                    color: #6b7280;
                     border-radius: 12px;
                     padding: 40px 20px;
                     text-align: center;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
                     animation: emptyTipSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
                 
@@ -534,6 +590,10 @@
             this._savePendingAlerts();
             this._showAlert(alert, true);
             this._updateBadge();
+            
+            if (this._shouldPlaySound(alert.alertLevel)) {
+                this._playAlertSound();
+            }
             
             this._isVisible = true;
             this._container.classList.remove('hidden');

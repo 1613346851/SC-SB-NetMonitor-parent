@@ -365,8 +365,6 @@ public class VulnScanServiceImpl implements VulnScanService {
                     this::probeCsrf);
             case "DESERIALIZATION" -> new ScanPlan(title, vulnType, riskLevel, method, path,
                     this::probeDeserialization);
-            case "DDOS" -> new ScanPlan(title, vulnType, riskLevel, method, path,
-                    this::probeDdos);
             default -> {
                 log.warn("不支持的漏洞类型：{}", vulnType);
                 yield null;
@@ -444,36 +442,6 @@ public class VulnScanServiceImpl implements VulnScanService {
         } catch (Exception e) {
             log.warn("反序列化扫描失败: {}", e.getMessage());
         }
-        return findings;
-    }
-
-    private List<ScanFinding> probeDdos() {
-        List<ScanFinding> findings = new ArrayList<>();
-        
-        ProbeResponse cpuResponse = doGet("/target/ddos/compute-heavy", Collections.emptyMap());
-        if (!cpuResponse.isBlocked() && containsAny(cpuResponse.body, "DDoS攻击目标", "CPU密集型计算完成")) {
-            findings.add(buildFinding("DDoS攻击目标 - CPU密集型接口", "DDOS", "HIGH",
-                    "/target/ddos/compute-heavy", "GET", "N/A", "CPU密集型计算完成",
-                    "CPU密集型计算接口易受DDoS攻击，高频请求可耗尽服务器资源", cpuResponse.body,
-                    defaultFixSuggestion("DDOS", "/target/ddos/compute-heavy"), 60L));
-        }
-        
-        ProbeResponse ioResponse = doGet("/target/ddos/io-delay", Map.of("delay", "100"));
-        if (!ioResponse.isBlocked() && containsAny(ioResponse.body, "DDoS攻击目标", "I/O操作模拟完成")) {
-            findings.add(buildFinding("DDoS攻击目标 - I/O延迟型接口", "DDOS", "MEDIUM",
-                    "/target/ddos/io-delay", "GET", "delay=100", "I/O操作模拟完成",
-                    "I/O延迟接口易受慢速攻击，可长期占用连接资源", ioResponse.body,
-                    defaultFixSuggestion("DDOS", "/target/ddos/io-delay"), 60L));
-        }
-        
-        ProbeResponse pingResponse = doGet("/target/ddos/ping", Collections.emptyMap());
-        if (!pingResponse.isBlocked() && containsAny(pingResponse.body, "pong", "total_requests")) {
-            findings.add(buildFinding("DDoS攻击目标 - Ping洪水接口", "DDOS", "MEDIUM",
-                    "/target/ddos/ping", "GET", "N/A", "pong",
-                    "简单Ping接口易受高频洪水攻击，可冲击网络栈", pingResponse.body,
-                    defaultFixSuggestion("DDOS", "/target/ddos/ping"), 60L));
-        }
-        
         return findings;
     }
 
@@ -1204,7 +1172,6 @@ public class VulnScanServiceImpl implements VulnScanService {
             case "XXE" -> 47L;
             case "DESERIALIZATION" -> 53L;
             case "CSRF" -> 57L;
-            case "DDOS" -> determineDdosRuleId(vulnPath);
             default -> null;
         };
     }
@@ -1289,14 +1256,6 @@ public class VulnScanServiceImpl implements VulnScanService {
         if (lower.contains("169.254") || lower.contains("metadata")) return 45L;
         if (lower.contains("127.0.0.1") || lower.contains("localhost")) return 46L;
         return 41L;
-    }
-    
-    private Long determineDdosRuleId(String vulnPath) {
-        if (vulnPath == null) return 60L;
-        if (vulnPath.contains("compute-heavy")) return 60L;
-        if (vulnPath.contains("io-delay")) return 60L;
-        if (vulnPath.contains("ping")) return 60L;
-        return 60L;
     }
 
     private ScanFinding buildFinding(String vulnName,

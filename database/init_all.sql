@@ -1103,18 +1103,6 @@ INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`,
  '昵称修改接口存在CSRF漏洞，攻击者可构造跨域请求发起攻击',
  '为接口启用CSRF Token校验，并校验请求来源');
 
--- DDoS漏洞（3个漏洞，对应规则ID 60）
-INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
-('DDoS-CPU密集型攻击', 'DDOS', 'HIGH', '/target/ddos/compute-heavy', 0, '60', 1, 2,
- 'CPU密集型计算接口易受DDoS攻击，高频请求可耗尽服务器资源',
- '添加请求频率限制，使用CDN防护，配置资源监控告警'),
-('DDoS-I/O延迟型攻击', 'DDOS', 'MEDIUM', '/target/ddos/io-delay', 0, '60', 1, 2,
- 'I/O延迟接口易受慢速攻击，可长期占用连接资源',
- '设置连接超时时间，限制并发连接数，使用连接池管理'),
-('DDoS-Ping洪水攻击', 'DDOS', 'MEDIUM', '/target/ddos/ping', 0, '60', 1, 2,
- '简单Ping接口易受高频洪水攻击，可冲击网络栈',
- '添加请求频率限制，使用负载均衡，配置防火墙规则');
-
 -- ------------------------------------------------------------
 -- 4.2.1 初始化漏洞-规则关联关系（一对一）
 -- ------------------------------------------------------------
@@ -1200,25 +1188,7 @@ INSERT INTO `sys_scan_interface` (`target_id`, `interface_name`, `interface_path
  '{"userId": {"type": "string", "required": true}, "nickname": {"type": "string", "required": true}}',
  '{"payloadLevel": "BASIC", "customPayloads": []}',
  '{"keywords": ["CSRF漏洞", "昵称修改成功"], "responsePatterns": ["CSRF漏洞", "昵称修改成功（漏洞接口）"]}',
- 1, 55, 2, 3, '已关联3条CSRF检测规则', 'DATA_SUBMIT', '[{"name":"userId","type":"string","source":"body","required":true},{"name":"nickname","type":"string","source":"body","required":true}]', 'JSON', 0, 'application/x-www-form-urlencoded', 0, 0, 1, '["CSRF","XSS"]', 'PENDING'),
-
-(1, 'DDoS CPU密集型接口', '/target/ddos/compute-heavy', 'GET', 'DDOS', 'HIGH',
- '{}',
- '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["CPU密集型计算完成", "fibonacci"], "responsePatterns": ["CPU密集型计算完成"]}',
- 1, 60, 2, 1, '已关联1条DDoS检测规则', 'USER_INPUT', '[]', 'JSON', 0, 'application/json', 0, 0, 0, '["DDOS"]', 'PENDING'),
-
-(1, 'DDoS I/O延迟接口', '/target/ddos/io-delay', 'GET', 'DDOS', 'MEDIUM',
- '{"delay": {"type": "int", "required": false, "testValues": [1000, 5000]}}',
- '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["I/O操作模拟完成", "simulated_delay_ms"], "responsePatterns": ["I/O操作模拟完成"]}',
- 1, 65, 2, 1, '已关联1条DDoS检测规则', 'USER_INPUT', '[{"name":"delay","type":"int","source":"query","required":false}]', 'JSON', 0, 'application/json', 0, 0, 0, '["DDOS"]', 'PENDING'),
-
-(1, 'DDoS Ping接口', '/target/ddos/ping', 'GET', 'DDOS', 'MEDIUM',
- '{}',
- '{"payloadLevel": "BASIC", "customPayloads": []}',
- '{"keywords": ["pong", "total_requests"], "responsePatterns": ["pong"]}',
- 1, 70, 2, 1, '已关联1条DDoS检测规则', 'USER_INPUT', '[]', 'JSON', 0, 'application/json', 0, 0, 0, '["DDOS"]', 'PENDING');
+ 1, 55, 2, 3, '已关联3条CSRF检测规则', 'DATA_SUBMIT', '[{"name":"userId","type":"string","source":"body","required":true},{"name":"nickname","type":"string","source":"body","required":true}]', 'JSON', 0, 'application/x-www-form-urlencoded', 0, 0, 1, '["CSRF","XSS"]', 'PENDING');
 
 -- 初始化Payload库（基础Payload）
 INSERT INTO `sys_payload_library` (`vuln_type`, `payload_level`, `payload_content`, `match_keywords`, `description`, `risk_level`, `enabled`) VALUES
@@ -1299,17 +1269,6 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('alert.enabled', 'true', '是否启用告警功能'),
 ('alert.suppress.duration-seconds', '300', '告警抑制时长(秒)'),
 ('alert.aggregate.window-seconds', '60', '告警聚合时间窗口(秒)'),
-('alert.email.enabled', 'false', '是否启用邮件通知'),
-('alert.email.smtp.host', '', 'SMTP服务器地址'),
-('alert.email.smtp.port', '465', 'SMTP端口'),
-('alert.email.smtp.username', '', 'SMTP用户名'),
-('alert.email.smtp.password', '', 'SMTP密码'),
-('alert.email.smtp.ssl-enabled', 'true', '是否启用SSL'),
-('alert.email.from-address', '', '发件人地址'),
-('alert.email.to-addresses', '', '收件人地址(逗号分隔)'),
-('alert.feishu.enabled', 'false', '是否启用飞书通知'),
-('alert.feishu.webhook-url', '', '飞书机器人Webhook地址'),
-('alert.feishu.secret', '', '飞书机器人签名密钥'),
 ('alert.sound.enabled', 'true', '是否启用告警声音提示'),
 ('alert.sound.level-threshold', 'HIGH', '触发声音提示的最低告警级别');
 
@@ -1590,9 +1549,6 @@ CREATE TABLE `sys_alert` (
     `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态(0-待处理，1-已确认，2-已忽略)',
     `is_suppressed` TINYINT DEFAULT 0 COMMENT '是否被抑制(0-否，1-是)',
     `suppress_until` DATETIME DEFAULT NULL COMMENT '抑制截止时间',
-    `notify_channels` VARCHAR(100) DEFAULT NULL COMMENT '通知渠道(EMAIL/FEISHU，逗号分隔)',
-    `notify_status` TINYINT DEFAULT 0 COMMENT '通知状态(0-未发送，1-已发送，2-发送失败)',
-    `notify_time` DATETIME DEFAULT NULL COMMENT '通知发送时间',
     `confirm_by` VARCHAR(64) DEFAULT NULL COMMENT '确认人',
     `confirm_time` DATETIME DEFAULT NULL COMMENT '确认时间',
     `ignore_reason` VARCHAR(500) DEFAULT NULL COMMENT '忽略原因',
@@ -1608,7 +1564,6 @@ CREATE TABLE `sys_alert` (
     KEY `idx_alert_level` (`alert_level`),
     KEY `idx_status` (`status`),
     KEY `idx_is_suppressed` (`is_suppressed`),
-    KEY `idx_notify_status` (`notify_status`),
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警表';
 
@@ -1624,7 +1579,6 @@ CREATE TABLE `sys_alert_rule` (
     `threshold_count` INT DEFAULT 1 COMMENT '触发阈值(次数)',
     `threshold_window_seconds` INT DEFAULT 60 COMMENT '阈值时间窗口(秒)',
     `suppress_duration_seconds` INT DEFAULT 300 COMMENT '抑制时长(秒)',
-    `notify_channels` VARCHAR(100) DEFAULT 'EMAIL,FEISHU' COMMENT '通知渠道',
     `enabled` TINYINT NOT NULL DEFAULT 1 COMMENT '启用状态(0-禁用，1-启用)',
     `priority` INT DEFAULT 100 COMMENT '规则优先级(数字越小优先级越高)',
     `description` VARCHAR(500) DEFAULT NULL COMMENT '规则描述',
@@ -1676,14 +1630,14 @@ CREATE TABLE `sys_config_sync_status` (
 -- ------------------------------------------------------------
 -- 4.10 初始化告警规则
 -- ------------------------------------------------------------
-INSERT INTO `sys_alert_rule` (`rule_name`, `rule_code`, `attack_type`, `risk_level`, `alert_level`, `threshold_count`, `threshold_window_seconds`, `suppress_duration_seconds`, `notify_channels`, `enabled`, `priority`, `description`) VALUES
-('高危攻击告警', 'HIGH_RISK_ATTACK', NULL, 'HIGH', 'HIGH', 1, 60, 300, 'EMAIL,FEISHU', 1, 10, '检测到高危攻击时立即告警'),
-('严重攻击告警', 'CRITICAL_ATTACK', NULL, 'CRITICAL', 'CRITICAL', 1, 60, 600, 'EMAIL,FEISHU', 1, 5, '检测到严重攻击时立即告警'),
-('DDoS攻击告警', 'DDOS_ATTACK', 'DDOS', NULL, 'HIGH', 1, 30, 180, 'EMAIL,FEISHU', 1, 15, '检测到DDoS攻击时告警'),
-('SQL注入攻击告警', 'SQL_INJECTION_ATTACK', 'SQL_INJECTION', NULL, 'HIGH', 1, 60, 300, 'EMAIL,FEISHU', 1, 20, '检测到SQL注入攻击时告警'),
-('XSS攻击告警', 'XSS_ATTACK', 'XSS', NULL, 'MEDIUM', 3, 60, 180, 'FEISHU', 1, 30, '检测到XSS攻击时告警'),
-('命令注入攻击告警', 'COMMAND_INJECTION_ATTACK', 'COMMAND_INJECTION', NULL, 'CRITICAL', 1, 60, 600, 'EMAIL,FEISHU', 1, 10, '检测到命令注入攻击时告警'),
-('暴力破解告警', 'BRUTE_FORCE_ATTACK', 'BRUTE_FORCE', NULL, 'MEDIUM', 5, 60, 300, 'FEISHU', 1, 25, '检测到暴力破解行为时告警');
+INSERT INTO `sys_alert_rule` (`rule_name`, `rule_code`, `attack_type`, `risk_level`, `alert_level`, `threshold_count`, `threshold_window_seconds`, `suppress_duration_seconds`, `enabled`, `priority`, `description`) VALUES
+('高危攻击告警', 'HIGH_RISK_ATTACK', NULL, 'HIGH', 'HIGH', 1, 60, 300, 1, 10, '检测到高危攻击时立即告警'),
+('严重攻击告警', 'CRITICAL_ATTACK', NULL, 'CRITICAL', 'CRITICAL', 1, 60, 600, 1, 5, '检测到严重攻击时立即告警'),
+('DDoS攻击告警', 'DDOS_ATTACK', 'DDOS', NULL, 'HIGH', 1, 30, 180, 1, 15, '检测到DDoS攻击时告警'),
+('SQL注入攻击告警', 'SQL_INJECTION_ATTACK', 'SQL_INJECTION', NULL, 'HIGH', 1, 60, 300, 1, 20, '检测到SQL注入攻击时告警'),
+('XSS攻击告警', 'XSS_ATTACK', 'XSS', NULL, 'MEDIUM', 3, 60, 180, 1, 30, '检测到XSS攻击时告警'),
+('命令注入攻击告警', 'COMMAND_INJECTION_ATTACK', 'COMMAND_INJECTION', NULL, 'CRITICAL', 1, 60, 600, 1, 10, '检测到命令注入攻击时告警'),
+('暴力破解告警', 'BRUTE_FORCE_ATTACK', 'BRUTE_FORCE', NULL, 'MEDIUM', 5, 60, 300, 1, 25, '检测到暴力破解行为时告警');
 
 -- ------------------------------------------------------------
 -- 4.11 告警相关菜单权限
@@ -1699,8 +1653,6 @@ INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission
 (811, 81, '确认告警', 2, 'alert:confirm', NULL, 1, 0, 0, 'system'),
 (812, 81, '忽略告警', 2, 'alert:ignore', NULL, 2, 0, 0, 'system'),
 (813, 81, '批量确认', 2, 'alert:batch-confirm', NULL, 3, 0, 0, 'system'),
-(821, 82, '编辑邮件配置', 2, 'alert:config:email', NULL, 1, 0, 0, 'system'),
-(822, 82, '编辑飞书配置', 2, 'alert:config:feishu', NULL, 2, 0, 0, 'system'),
 (823, 82, '测试通知', 2, 'alert:config:test', NULL, 3, 0, 0, 'system');
 
 -- 安全管理员告警权限

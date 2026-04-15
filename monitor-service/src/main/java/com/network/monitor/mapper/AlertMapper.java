@@ -54,11 +54,7 @@ public interface AlertMapper {
 
     List<AlertEntity> selectPendingAlerts(@Param("limit") Integer limit);
 
-    List<AlertEntity> selectUnnotifiedAlerts(@Param("limit") Integer limit);
-
     int updateStatus(@Param("id") Long id, @Param("status") Integer status);
-
-    int updateNotifyStatus(@Param("id") Long id, @Param("notifyStatus") Integer notifyStatus, @Param("notifyTime") LocalDateTime notifyTime);
 
     int confirm(@Param("id") Long id, @Param("confirmBy") String confirmBy, @Param("confirmTime") LocalDateTime confirmTime);
 

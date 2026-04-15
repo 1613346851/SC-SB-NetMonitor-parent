@@ -28,8 +28,6 @@ public interface AlertService {
 
     List<AlertEntity> getPendingAlerts(int limit);
 
-    List<AlertEntity> getUnnotifiedAlerts(int limit);
-
     void confirm(Long id, String confirmBy);
 
     void ignore(Long id, String ignoreBy, String ignoreReason);

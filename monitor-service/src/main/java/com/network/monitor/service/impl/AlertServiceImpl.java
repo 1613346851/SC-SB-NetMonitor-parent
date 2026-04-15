@@ -140,11 +140,6 @@ public class AlertServiceImpl implements AlertService {
     }
 
     @Override
-    public List<AlertEntity> getUnnotifiedAlerts(int limit) {
-        return alertMapper.selectUnnotifiedAlerts(limit);
-    }
-
-    @Override
     @Transactional
     public void confirm(Long id, String confirmBy) {
         alertMapper.confirm(id, confirmBy, LocalDateTime.now());
@@ -256,8 +251,6 @@ public class AlertServiceImpl implements AlertService {
         entity.setAlertContent(dto.getAlertContent());
         entity.setStatus(0);
         entity.setIsSuppressed(0);
-        entity.setNotifyChannels(dto.getNotifyChannels() != null ? dto.getNotifyChannels() : "EMAIL,FEISHU");
-        entity.setNotifyStatus(0);
         entity.setCreateTime(LocalDateTime.now());
         entity.setUpdateTime(LocalDateTime.now());
         return entity;

@@ -40,6 +40,8 @@ public interface DefenseLogMapper {
 
     long countAll();
 
+    long countAllExcludeAlertOnly();
+
     List<DefenseLogEntity> selectValidBlacklists();
 
     List<DefenseLogEntity> selectAllBlacklists();
