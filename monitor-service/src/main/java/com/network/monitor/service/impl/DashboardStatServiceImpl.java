@@ -72,11 +72,11 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             double defenseChange = calculateGrowthRate(todayDefenses, yesterdayDefenses);
             stats.put("defenseChange", defenseChange);
 
-            long totalVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, null);
+            long totalVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, null, null);
             stats.put("totalVulnerability", totalVulnerabilities);
 
-            long highRiskVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, "HIGH", null);
-            long verifiedVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, 1);
+            long highRiskVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, "HIGH", null);
+            long verifiedVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, null, 1);
             stats.put("vulnerabilityChange", verifiedVulnerabilities);
 
             stats.put("updateTime", LocalDateTime.now().format(FORMATTER));
@@ -494,7 +494,7 @@ public class DashboardStatServiceImpl implements DashboardStatService {
     @Override
     public long getTotalVulnerabilities(String startTime, String endTime) {
         try {
-            return vulnerabilityMonitorMapper.countByCondition(null, null, null);
+            return vulnerabilityMonitorMapper.countByCondition(null, null, null, null);
         } catch (Exception e) {
             log.error("获取总漏洞数失败：", e);
             return 0;

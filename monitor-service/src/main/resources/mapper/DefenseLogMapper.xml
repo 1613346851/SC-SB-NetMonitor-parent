@@ -178,7 +178,15 @@
         SELECT COUNT(*)
         FROM sys_defense_log
         WHERE event_id = #{eventId}
+          AND is_first = 1
     </select>
+
+    <update id="updateIsFirst">
+        UPDATE sys_defense_log
+        SET is_first = #{isFirst},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
 
     <select id="selectByDefenseTarget" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>

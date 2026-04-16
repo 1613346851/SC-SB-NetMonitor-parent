@@ -217,17 +217,11 @@
 
     <select id="countEventTrend" resultType="com.network.monitor.mapper.AttackEventMapper$EventTrendStat">
         SELECT 
-            STR_TO_DATE(time_str, '%Y-%m-%d %H:%i:%s') AS time,
-            count
-        FROM (
-            SELECT 
-                DATE_FORMAT(start_time, '%Y-%m-%d %H:00:00') AS time_str,
-                COUNT(*) AS count
-            FROM sys_attack_event
-            WHERE start_time &gt;= #{startTime} AND start_time &lt;= #{endTime}
-            GROUP BY DATE_FORMAT(start_time, '%Y-%m-%d %H:00:00')
-        ) t
-        ORDER BY time ASC
+            start_time AS time,
+            1 AS count
+        FROM sys_attack_event
+        WHERE start_time &gt;= #{startTime} AND start_time &lt;= #{endTime}
+        ORDER BY start_time ASC
     </select>
 
     <select id="selectRecentEvents" resultMap="BaseResultMap">

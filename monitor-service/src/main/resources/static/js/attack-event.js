@@ -568,7 +568,12 @@ async function loadEventDetail(eventId) {
         
     } catch (error) {
         console.error('加载事件详情失败:', error);
-        message.error('加载事件详情失败');
+        const errorMsg = error.message || '加载事件详情失败';
+        if (errorMsg.includes('事件不存在')) {
+            message.error('事件不存在，可能已被删除或ID无效');
+        } else {
+            message.error('加载事件详情失败: ' + errorMsg);
+        }
     }
 }
 

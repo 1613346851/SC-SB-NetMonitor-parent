@@ -31,6 +31,9 @@ public interface TrafficMonitorMapper {
             @Param("targetIp") String targetIp,
             @Param("httpMethod") String httpMethod,
             @Param("requestUri") String requestUri,
+            @Param("responseStatus") Integer responseStatus,
+            @Param("stateTag") String stateTag,
+            @Param("isAggregated") Integer isAggregated,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
             @Param("offset") Integer offset,
@@ -46,6 +49,9 @@ public interface TrafficMonitorMapper {
             @Param("targetIp") String targetIp,
             @Param("httpMethod") String httpMethod,
             @Param("requestUri") String requestUri,
+            @Param("responseStatus") Integer responseStatus,
+            @Param("stateTag") String stateTag,
+            @Param("isAggregated") Integer isAggregated,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime
     );

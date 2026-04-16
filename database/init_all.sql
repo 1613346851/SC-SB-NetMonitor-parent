@@ -727,9 +727,42 @@ INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `des
 ('SQL注入-DROP语句', 'SQL_INJECTION', '(?i)\\bDROP\\b.*\\bTABLE\\b', '检测DROP TABLE恶意注入', 'CRITICAL', 1, 5),
 ('SQL注入-SLEEP延时', 'SQL_INJECTION', '(?i)\\bSLEEP\\b\\s*\\(', '检测SLEEP时间盲注', 'MEDIUM', 1, 20),
 ('SQL注入-BENCHMARK延时', 'SQL_INJECTION', '(?i)\\bBENCHMARK\\b\\s*\\(', '检测BENCHMARK时间盲注', 'MEDIUM', 1, 20),
-('SQL注入-注释符号', 'SQL_INJECTION', '(--|#|/\\*)', '检测SQL注释符号', 'LOW', 1, 50),
+('SQL注入-注释符号', 'SQL_INJECTION', '(--|#|/\\*)', '检测SQL注释符号（已禁用，太宽泛）', 'LOW', 0, 50),
 ('SQL注入-堆叠查询', 'SQL_INJECTION', ';\\s*(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\\b', '检测堆叠查询攻击', 'HIGH', 1, 15),
-('SQL注入-单引号闭合', 'SQL_INJECTION', '\'', '检测单引号注入尝试', 'LOW', 1, 100);
+('SQL注入-单引号闭合', 'SQL_INJECTION', '\'', '检测单引号注入尝试（已禁用，太宽泛）', 'LOW', 0, 100),
+('SQL注入-子查询', 'SQL_INJECTION', '(?i)\\(\\s*SELECT\\s+', '检测子查询注入', 'HIGH', 1, 12),
+('SQL注入-嵌套子查询', 'SQL_INJECTION', '(?i)\\(\\s*\\(\\s*SELECT', '检测嵌套子查询', 'HIGH', 1, 10),
+('SQL注入-SELECT FROM子查询', 'SQL_INJECTION', '(?i)\\bFROM\\s*\\(\\s*SELECT', '检测FROM子查询', 'HIGH', 1, 12),
+('SQL注入-information_schema', 'SQL_INJECTION', '(?i)information_schema', '检测information_schema系统库访问', 'HIGH', 1, 8),
+('SQL注入-mysql系统表', 'SQL_INJECTION', '(?i)mysql\\.(user|db|host|tables_priv)', '检测MySQL系统表访问', 'HIGH', 1, 8),
+('SQL注入-sys系统库', 'SQL_INJECTION', '(?i)\\bsys\\.(database|table|schema)', '检测sys系统库访问', 'HIGH', 1, 10),
+('SQL注入-performance_schema', 'SQL_INJECTION', '(?i)performance_schema', '检测performance_schema访问', 'MEDIUM', 1, 15),
+('SQL注入-COUNT函数', 'SQL_INJECTION', '(?i)\\bCOUNT\\s*\\(\\s*\\*\\s*\\)', '检测COUNT(*)聚合函数', 'MEDIUM', 1, 25),
+('SQL注入-聚合函数组合', 'SQL_INJECTION', '(?i)\\b(SUM|AVG|MAX|MIN|COUNT)\\s*\\(.*\\).*\\bFROM\\b', '检测聚合函数与FROM组合', 'MEDIUM', 1, 20),
+('SQL注入-AND子查询', 'SQL_INJECTION', '(?i)\\bAND\\s*\\(\\s*SELECT', '检测AND子查询注入', 'HIGH', 1, 10),
+('SQL注入-OR子查询', 'SQL_INJECTION', '(?i)\\bOR\\s*\\(\\s*SELECT', '检测OR子查询注入', 'HIGH', 1, 10),
+('SQL注入-AND布尔条件', 'SQL_INJECTION', '(?i)\\bAND\\s+\\d+\\s*[><=!]', '检测AND布尔条件注入', 'MEDIUM', 1, 18),
+('SQL注入-OR布尔条件', 'SQL_INJECTION', '(?i)\\bOR\\s+\\d+\\s*[><=!]', '检测OR布尔条件注入', 'MEDIUM', 1, 18),
+('SQL注入-EXTRACTVALUE', 'SQL_INJECTION', '(?i)\\bEXTRACTVALUE\\s*\\(', '检测EXTRACTVALUE函数注入', 'HIGH', 1, 10),
+('SQL注入-UPDATEXML', 'SQL_INJECTION', '(?i)\\bUPDATEXML\\s*\\(', '检测UPDATEXML函数注入', 'HIGH', 1, 10),
+('SQL注入-LOAD_FILE', 'SQL_INJECTION', '(?i)\\bLOAD_FILE\\s*\\(', '检测LOAD_FILE函数注入', 'HIGH', 1, 8),
+('SQL注入-INTO OUTFILE', 'SQL_INJECTION', '(?i)\\bINTO\\s+(OUT|DUMP)FILE', '检测INTO OUTFILE写入', 'CRITICAL', 1, 5),
+('SQL注入-INTO DUMPFILE', 'SQL_INJECTION', '(?i)\\bINTO\\s+DUMPFILE', '检测INTO DUMPFILE写入', 'CRITICAL', 1, 5),
+('SQL注入-CONCAT函数', 'SQL_INJECTION', '(?i)\\bCONCAT\\s*\\(.*\\bSELECT\\b', '检测CONCAT与SELECT组合', 'MEDIUM', 1, 20),
+('SQL注入-GROUP_CONCAT', 'SQL_INJECTION', '(?i)\\bGROUP_CONCAT\\s*\\(', '检测GROUP_CONCAT函数', 'MEDIUM', 1, 22),
+('SQL注入-CHAR函数注入', 'SQL_INJECTION', '(?i)\\bCHAR\\s*\\(\\s*\\d+\\s*,', '检测CHAR函数编码绕过', 'MEDIUM', 1, 20),
+('SQL注入-IF条件延时', 'SQL_INJECTION', '(?i)\\bIF\\s*\\(.*\\bSLEEP\\b', '检测IF+SLEEP时间盲注', 'HIGH', 1, 12),
+('SQL注入-CASE WHEN延时', 'SQL_INJECTION', '(?i)\\bCASE\\s+WHEN.*\\bSLEEP\\b', '检测CASE WHEN时间盲注', 'HIGH', 1, 12),
+('SQL注入-WAITFOR延时', 'SQL_INJECTION', '(?i)\\bWAITFOR\\s+(DELAY|TIME)', '检测SQL Server WAITFOR延时', 'HIGH', 1, 15),
+('SQL注入-pg_sleep', 'SQL_INJECTION', '(?i)\\bpg_sleep\\s*\\(', '检测PostgreSQL时间盲注', 'HIGH', 1, 15),
+('SQL注入-报错注入-floor', 'SQL_INJECTION', '(?i)\\bfloor\\s*\\(.*\\bRAND\\b', '检测floor报错注入', 'HIGH', 1, 12),
+('SQL注入-报错注入-exp', 'SQL_INJECTION', '(?i)\\bexp\\s*\\(.*\\~', '检测exp报错注入', 'HIGH', 1, 12),
+('SQL注入-报错注入-bigint', 'SQL_INJECTION', '(?i)\\bBIGINT\\s*\\(.*\\~', '检测bigint报错注入', 'HIGH', 1, 12),
+('SQL注入-INTO OUTFILE权限', 'SQL_INJECTION', '(?i)\\bINTO\\s+OUTFILE\\s+[\'"]/', '检测文件写入权限利用', 'CRITICAL', 1, 3),
+('SQL注入-UDF提权', 'SQL_INJECTION', '(?i)\\bCREATE\\s+(AGGREGATE\\s+)?FUNCTION', '检测UDF提权尝试', 'CRITICAL', 1, 3),
+('SQL注入-EXEC执行', 'SQL_INJECTION', '(?i)\\bEXEC\\s+(xp_|sp_)', '检测SQL Server扩展存储过程', 'CRITICAL', 1, 5),
+('SQL注入-xp_cmdshell', 'SQL_INJECTION', '(?i)xp_cmdshell', '检测xp_cmdshell命令执行', 'CRITICAL', 1, 3),
+('SQL注入-SP_OACREATE', 'SQL_INJECTION', '(?i)SP_OA(CREATE|METHOD)', '检测OLE自动化对象创建', 'CRITICAL', 1, 3);
 
 -- 2.2 XSS攻击检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
@@ -755,7 +788,42 @@ INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `des
 ('命令注入-ping命令', 'COMMAND_INJECTION', '(?i)ping\\s+\\d+\\.\\d+\\.\\d+\\.\\d+', '检测ping命令注入', 'MEDIUM', 1, 25),
 ('命令注入-whoami', 'COMMAND_INJECTION', '(?i)\\bwhoami\\b', '检测whoami命令', 'HIGH', 1, 20),
 ('命令注入-tasklist', 'COMMAND_INJECTION', '(?i)\\btasklist\\b', '检测tasklist命令', 'MEDIUM', 1, 30),
-('命令注入-cat命令', 'COMMAND_INJECTION', '(?i)\\bcat\\s+[/\\w\\-\\.]+', '检测cat文件读取', 'HIGH', 1, 20);
+('命令注入-cat命令', 'COMMAND_INJECTION', '(?i)\\bcat\\s+[/\\w\\-\\.]+', '检测cat文件读取', 'HIGH', 1, 20),
+('命令注入-dir命令', 'COMMAND_INJECTION', '(?i)\\bdir\\s+', '检测dir目录遍历命令', 'HIGH', 1, 20),
+('命令注入-dir命令变体', 'COMMAND_INJECTION', '(?i)\\bdir\\b.*[a-zA-Z]:', '检测dir命令访问特定驱动器', 'HIGH', 1, 20),
+('命令注入-systeminfo', 'COMMAND_INJECTION', '(?i)\\bsysteminfo\\b', '检测systeminfo系统信息获取命令', 'HIGH', 1, 15),
+('命令注入-ver命令', 'COMMAND_INJECTION', '(?i)\\bver\\b', '检测ver版本信息获取命令', 'MEDIUM', 1, 30),
+('命令注入-ipconfig', 'COMMAND_INJECTION', '(?i)\\bipconfig\\b', '检测ipconfig网络配置命令', 'MEDIUM', 1, 25),
+('命令注入-netstat', 'COMMAND_INJECTION', '(?i)\\bnetstat\\b', '检测netstat网络状态命令', 'MEDIUM', 1, 25),
+('命令注入-arp命令', 'COMMAND_INJECTION', '(?i)\\barp\\s+-', '检测arp命令', 'MEDIUM', 1, 25),
+('命令注入-route命令', 'COMMAND_INJECTION', '(?i)\\broute\\s+', '检测route路由命令', 'MEDIUM', 1, 25),
+('命令注入-net命令', 'COMMAND_INJECTION', '(?i)\\bnet\\s+(user|localgroup|group|accounts)', '检测net用户/组管理命令', 'HIGH', 1, 15),
+('命令注入-net use', 'COMMAND_INJECTION', '(?i)\\bnet\\s+use\\b', '检测net use共享连接命令', 'HIGH', 1, 20),
+('命令注入-net view', 'COMMAND_INJECTION', '(?i)\\bnet\\s+view\\b', '检测net view网络资源查看命令', 'MEDIUM', 1, 25),
+('命令注入-wmic', 'COMMAND_INJECTION', '(?i)\\bwmic\\b', '检测wmic命令', 'HIGH', 1, 15),
+('命令注入-sc命令', 'COMMAND_INJECTION', '(?i)\\bsc\\s+(query|start|stop|create|delete)', '检测sc服务控制命令', 'HIGH', 1, 20),
+('命令注入-services.msc', 'COMMAND_INJECTION', '(?i)services\\.msc', '检测服务管理器调用', 'MEDIUM', 1, 30),
+('命令注入-type命令', 'COMMAND_INJECTION', '(?i)\\btype\\s+[a-zA-Z]', '检测type文件查看命令', 'HIGH', 1, 20),
+('命令注入-copy命令', 'COMMAND_INJECTION', '(?i)\\bcopy\\s+', '检测copy文件复制命令', 'MEDIUM', 1, 25),
+('命令注入-xcopy命令', 'COMMAND_INJECTION', '(?i)\\bxcopy\\s+', '检测xcopy命令', 'MEDIUM', 1, 25),
+('命令注入-move命令', 'COMMAND_INJECTION', '(?i)\\bmove\\s+', '检测move文件移动命令', 'MEDIUM', 1, 25),
+('命令注入-del命令', 'COMMAND_INJECTION', '(?i)\\b(del|erase)\\s+', '检测del/erase文件删除命令', 'HIGH', 1, 20),
+('命令注入-format命令', 'COMMAND_INJECTION', '(?i)\\bformat\\s+[a-zA-Z]:', '检测format格式化命令', 'CRITICAL', 1, 5),
+('命令注入-nslookup', 'COMMAND_INJECTION', '(?i)\\bnslookup\\b', '检测nslookup DNS查询命令', 'MEDIUM', 1, 30),
+('命令注入-tracert', 'COMMAND_INJECTION', '(?i)\\btracert\\b', '检测tracert路由追踪命令', 'MEDIUM', 1, 30),
+('命令注入-netsh', 'COMMAND_INJECTION', '(?i)\\bnetsh\\b', '检测netsh网络配置命令', 'HIGH', 1, 15),
+('命令注入-reg命令', 'COMMAND_INJECTION', '(?i)\\breg\\s+(query|add|delete|import|export)', '检测reg注册表操作命令', 'HIGH', 1, 15),
+('命令注入-at命令', 'COMMAND_INJECTION', '(?i)\\bat\\s+', '检测at计划任务命令', 'HIGH', 1, 20),
+('命令注入-schtasks', 'COMMAND_INJECTION', '(?i)\\bschtasks\\b', '检测schtasks计划任务命令', 'HIGH', 1, 15),
+('命令注入-runas', 'COMMAND_INJECTION', '(?i)\\brunas\\s+', '检测runas提权命令', 'HIGH', 1, 15),
+('命令注入-shutdown', 'COMMAND_INJECTION', '(?i)\\bshutdown\\s+', '检测shutdown关机命令', 'CRITICAL', 1, 5),
+('命令注入-restart', 'COMMAND_INJECTION', '(?i)\\brestart\\b', '检测restart重启命令', 'CRITICAL', 1, 5),
+('命令注入-whoami绕过', 'COMMAND_INJECTION', '(?i)who[^a-zA-Z]ami', '检测whoami绕过变体(如who^ami)', 'HIGH', 1, 18),
+('命令注入-命令绕过-插入字符', 'COMMAND_INJECTION', '(?i)\\b(who|wh)o[^a-zA-Z]*(ami|am i)\\b', '检测插入字符绕过', 'HIGH', 1, 18),
+('命令注入-大小写混合', 'COMMAND_INJECTION', '(?i)\\b[wW][hH][oO][aA][mM][iI]\\b', '检测大小写混合绕过', 'HIGH', 1, 18),
+('命令注入-引号绕过', 'COMMAND_INJECTION', '(?i)who[\'\'"]ami', '检测引号绕过变体', 'HIGH', 1, 18),
+('命令注入-命令参数注入', 'COMMAND_INJECTION', '(?i)[&|;`]\\s*(dir|type|cat|whoami|net|systeminfo|ipconfig|netstat|tasklist|wmic|reg|sc|netsh)', '检测命令参数注入', 'HIGH', 1, 10),
+('命令注入-常见命令组合', 'COMMAND_INJECTION', '(?i)(dir|type|cat)\\s+.*[cC]:\\\\', '检测Windows路径访问命令', 'HIGH', 1, 15);
 
 -- 2.4 路径遍历检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
@@ -772,16 +840,45 @@ INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `des
 ('文件包含-data协议', 'FILE_INCLUSION', '(?i)data://', '检测data协议', 'HIGH', 1, 10),
 ('文件包含-php协议', 'FILE_INCLUSION', '(?i)php://', '检测php://协议', 'HIGH', 1, 10),
 ('文件包含-file协议', 'FILE_INCLUSION', '(?i)file://', '检测file://协议', 'HIGH', 1, 10),
-('文件包含-classpath', 'FILE_INCLUSION', '(?i)classpath:', '检测classpath协议', 'HIGH', 1, 10);
+('文件包含-classpath', 'FILE_INCLUSION', '(?i)classpath:', '检测classpath协议', 'HIGH', 1, 10),
+('文件包含-应用配置', 'FILE_INCLUSION', '(?i)(path|file)\\s*[=:]\\s*["\']?application\\.(yml|yaml|properties)', '检测应用配置文件包含', 'HIGH', 1, 10),
+('文件包含-数据库配置', 'FILE_INCLUSION', '(?i)(path|file)\\s*[=:]\\s*["\']?database\\.(yml|yaml|properties|xml)', '检测数据库配置文件包含', 'HIGH', 1, 10),
+('文件包含-POM文件', 'FILE_INCLUSION', '(?i)(path|file)\\s*[=:]\\s*["\']?pom\\.xml', '检测POM构建文件包含', 'MEDIUM', 1, 15),
+('文件包含-Linux密码文件', 'FILE_INCLUSION', '(?i)(path|file)\\s*[=:]\\s*["\']?/etc/(passwd|shadow|hosts)', '检测Linux敏感文件包含', 'CRITICAL', 1, 5),
+('文件包含-Windows系统文件', 'FILE_INCLUSION', '(?i)(path|file)\\s*[=:]\\s*["\']?(c:|d:|e:)\\\\(windows|users|program)', '检测Windows系统文件包含', 'HIGH', 1, 10),
+('文件包含-日志文件', 'FILE_INCLUSION', '(?i)(path|file)\\s*[=:]\\s*["\']?.*\\.log', '检测日志文件包含尝试', 'MEDIUM', 1, 20),
+('文件包含-密钥文件', 'FILE_INCLUSION', '(?i)(path|file)\\s*[=:]\\s*["\']?.*(id_rsa|id_dsa|\\.pem|\\.key|\\.p12)', '检测密钥文件包含尝试', 'CRITICAL', 1, 5),
+('文件包含-PHP远程包含', 'FILE_INCLUSION', '(?i)(path|file|page)\\s*[=:]\\s*["\']?https?://.*\\.php', '检测PHP远程文件包含', 'HIGH', 1, 10),
+('文件包含-PHP伪协议', 'FILE_INCLUSION', '(?i)(path|file|page)\\s*[=:]\\s*["\']?php://', '检测PHP伪协议文件包含', 'HIGH', 1, 8),
+('文件包含-Java配置', 'FILE_INCLUSION', '(?i)(path|file)\\s*[=:]\\s*["\']?WEB-INF/', '检测Java WEB-INF目录包含', 'HIGH', 1, 10);
 
 -- 2.6 SSRF检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('SSRF-内网IP', 'SSRF', '(?i)(url|uri|target|host|domain|site|link|src|source)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost|192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)', '检测内网IP请求', 'HIGH', 1, 10),
-('SSRF-file协议', 'SSRF', '(?i)(url|uri|target|host|domain)\\s*[=:]\\s*["\']?file://', '检测file协议SSRF', 'HIGH', 1, 8),
-('SSRF-dict协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?dict://', '检测dict协议SSRF', 'HIGH', 1, 8),
-('SSRF-gopher协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?gopher://', '检测gopher协议SSRF', 'HIGH', 1, 8),
+('SSRF-内网IP', 'SSRF', '(?i)(url|uri|target|host|domain|site|link|src|source)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost|192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)', '检测内网IP请求（已禁用，太宽泛）', 'HIGH', 0, 10),
+('SSRF-file协议', 'SSRF', '(?i)(url|uri|target|host|domain)\\s*[=:]\\s*["\']?file://', '检测file协议SSRF（已禁用，太宽泛）', 'HIGH', 0, 8),
+('SSRF-dict协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?dict://', '检测dict协议SSRF（已禁用，太宽泛）', 'HIGH', 0, 8),
+('SSRF-gopher协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?gopher://', '检测gopher协议SSRF（已禁用，太宽泛）', 'HIGH', 0, 8),
 ('SSRF-云元数据', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(169\\.254\\.169\\.254|metadata\\.azure|metadata\\.google)', '检测云元数据SSRF', 'HIGH', 1, 5),
-('SSRF-本地回环', 'SSRF', '(?i)url\\s*=\\s*["\']?https?://(127\\.0\\.0\\.1|localhost)', '检测本地回环SSRF', 'HIGH', 1, 10);
+('SSRF-本地回环', 'SSRF', '(?i)url\\s*=\\s*["\']?https?://(127\\.0\\.0\\.1|localhost)', '检测本地回环SSRF（已禁用，太宽泛）', 'HIGH', 0, 10),
+('SSRF-云元数据-AWS', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://169\\.254\\.169\\.254', '检测AWS云元数据SSRF攻击', 'CRITICAL', 1, 5),
+('SSRF-云元数据-GCP', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://metadata\\.google', '检测GCP云元数据SSRF攻击', 'CRITICAL', 1, 5),
+('SSRF-云元数据-Azure', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://169\\.254\\.169\\.254/metadata', '检测Azure云元数据SSRF攻击', 'CRITICAL', 1, 5),
+('SSRF-内网IP-10段', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://10\\.\\d+\\.\\d+\\.\\d+', '检测10.x.x.x内网SSRF', 'HIGH', 1, 10),
+('SSRF-内网IP-172段', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://172\\.(1[6-9]|2[0-9]|3[01])\\.\\d+\\.\\d+', '检测172.16-31.x.x内网SSRF', 'HIGH', 1, 10),
+('SSRF-内网IP-192段', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://192\\.168\\.\\d+\\.\\d+', '检测192.168.x.x内网SSRF', 'HIGH', 1, 10),
+('SSRF-IPv6回环', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://\\[::1\\]', '检测IPv6回环SSRF攻击', 'HIGH', 1, 10),
+('SSRF-IPv6本地', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://\\[::ffff:127', '检测IPv6映射的本地SSRF', 'HIGH', 1, 10),
+('SSRF-file协议增强', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?file:///', '检测file协议读取本地文件', 'HIGH', 1, 8),
+('SSRF-dict协议增强', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?dict://', '检测dict协议端口探测', 'HIGH', 1, 8),
+('SSRF-gopher协议增强', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?gopher://', '检测gopher协议SSRF攻击', 'HIGH', 1, 8),
+('SSRF-sftp协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?sftp://', '检测sftp协议SSRF', 'MEDIUM', 1, 15),
+('SSRF-ldap协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?ldap://', '检测ldap协议SSRF', 'HIGH', 1, 10),
+('SSRF-本地敏感端口-SSH', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost):22/', '检测本地SSH服务SSRF', 'HIGH', 1, 10),
+('SSRF-本地敏感端口-MySQL', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost):3306/', '检测本地MySQL服务SSRF', 'HIGH', 1, 10),
+('SSRF-本地敏感端口-Redis', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost):6379/', '检测本地Redis服务SSRF', 'HIGH', 1, 10),
+('SSRF-本地敏感端口-MongoDB', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost):27017/', '检测本地MongoDB服务SSRF', 'HIGH', 1, 10),
+('SSRF-DNS重绑定', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://[a-z0-9.-]+\\.(spoofed|rebinder|nip\\.io|sslip\\.io)', '检测DNS重绑定SSRF攻击', 'HIGH', 1, 12),
+('SSRF-短链接服务', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(bit\\.ly|tinyurl|t\\.co|goo\\.gl|is\\.gd)/', '检测短链接可能绕过SSRF过滤', 'MEDIUM', 1, 20);
 
 -- 2.7 XXE检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
@@ -1280,7 +1377,7 @@ INSERT INTO `sys_config` (`config_key`, `config_value`, `description`) VALUES
 ('traffic.push.aggregate-interval-ms', '5000', '聚合推送统计周期(毫秒)');
 
 -- ============================================================
--- 二、网关配置（需要同步到网关，共110项）
+-- 二、网关配置（需要同步到网关，共111项）
 -- ============================================================
 
 -- ------------------------------------------------------------

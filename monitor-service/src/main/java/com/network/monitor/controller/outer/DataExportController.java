@@ -1,6 +1,5 @@
 package com.network.monitor.controller.outer;
 
-import com.network.monitor.common.ApiResponse;
 import com.network.monitor.common.util.CsvFileUtil;
 import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.TrafficMonitorEntity;
@@ -115,7 +114,7 @@ public class DataExportController {
         LocalDateTime endDateTime = parseDateTime(endTime);
 
         return trafficMonitorMapper.selectByCondition(
-                sourceIp, null, null, requestUri, startDateTime, endDateTime, 0, 10000, "id DESC"
+                sourceIp, null, null, requestUri, null, null, null, startDateTime, endDateTime, 0, 10000, "id DESC"
         );
     }
 

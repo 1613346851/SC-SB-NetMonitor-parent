@@ -59,7 +59,7 @@
         }
         .defense-types {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -109,23 +109,6 @@
             </header>
 
             <main class="content">
-                <div class="filter-bar">
-                    <div class="form-inline">
-                        <div class="form-group">
-                            <label class="form-label">开始日期</label>
-                            <input type="date" class="form-control" id="startDate">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">结束日期</label>
-                            <input type="date" class="form-control" id="endDate">
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-primary" onclick="refreshData()">查询</button>
-                            <button class="btn btn-default" onclick="exportReport()">导出报告</button>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-value" id="totalDefenses">0</div>
@@ -156,7 +139,11 @@
                     </div>
                     <div class="type-card">
                         <div class="type-value" id="redirectCount">0</div>
-                        <div class="type-label">重定向次数</div>
+                        <div class="type-label">请求拦截次数</div>
+                    </div>
+                    <div class="type-card">
+                        <div class="type-value" id="alertOnlyCount">0</div>
+                        <div class="type-label">仅告警次数</div>
                     </div>
                 </div>
 
@@ -168,6 +155,47 @@
                     <div class="chart-card">
                         <h3>各类型防御成功率</h3>
                         <div class="chart-container" id="successRateChart"></div>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">开始日期</label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">结束日期</label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御类型</label>
+                            <select class="form-control" id="listDefenseType">
+                                <option value="">全部</option>
+                                <option value="BLOCK_IP">IP封禁</option>
+                                <option value="RATE_LIMIT">限流</option>
+                                <option value="BLOCK_REQUEST">请求拦截</option>
+                                <option value="ALERT_ONLY">仅告警</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">执行状态</label>
+                            <select class="form-control" id="listExecuteStatus">
+                                <option value="">全部</option>
+                                <option value="1">成功</option>
+                                <option value="0">失败</option>
+                                <option value="alert">已告警</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御目标</label>
+                            <input type="text" class="form-control" id="listDefenseTarget" placeholder="请输入防御目标">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="refreshData()">查询</button>
+                            <button class="btn btn-default" onclick="resetDefenseListSearch()">重置</button>
+                            <button class="btn btn-info" onclick="exportReport()">导出报告</button>
+                        </div>
                     </div>
                 </div>
 

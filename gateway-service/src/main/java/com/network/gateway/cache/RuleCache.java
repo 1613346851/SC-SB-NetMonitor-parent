@@ -31,6 +31,8 @@ public class RuleCache {
 
     private final Map<Long, Pattern> compiledPatterns = new ConcurrentHashMap<>();
 
+    private volatile List<AttackRuleDTO> sortedAllRules = new ArrayList<>();
+
     private volatile long lastSyncTime = 0;
 
     private volatile int totalHitCount = 0;
@@ -73,8 +75,15 @@ public class RuleCache {
             typeRules.sort(Comparator.comparingInt(r -> r.getPriority() != null ? r.getPriority() : 100));
         }
 
+        rebuildSortedAllRules();
+
         lastSyncTime = System.currentTimeMillis();
         logger.info("添加规则成功: id={}, name={}, type={}", rule.getId(), rule.getRuleName(), attackType);
+    }
+
+    private void rebuildSortedAllRules() {
+        sortedAllRules = new ArrayList<>(ruleById.values());
+        sortedAllRules.sort(Comparator.comparingInt(r -> r.getPriority() != null ? r.getPriority() : 100));
     }
 
     public synchronized void updateRule(AttackRuleDTO rule) {
@@ -104,6 +113,7 @@ public class RuleCache {
                     rulesByType.remove(attackType);
                 }
             }
+            rebuildSortedAllRules();
             logger.info("移除规则成功: id={}, name={}", ruleId, removed.getRuleName());
         }
     }
@@ -128,6 +138,7 @@ public class RuleCache {
         ruleById.clear();
         rulesByType.clear();
         compiledPatterns.clear();
+        sortedAllRules = new ArrayList<>();
         logger.info("规则缓存已清空");
     }
 
@@ -196,21 +207,19 @@ public class RuleCache {
 
         totalHitCount++;
 
-        for (List<AttackRuleDTO> rules : rulesByType.values()) {
-            for (AttackRuleDTO rule : rules) {
-                Pattern pattern = compiledPatterns.get(rule.getId());
-                if (pattern == null) {
-                    continue;
-                }
+        for (AttackRuleDTO rule : sortedAllRules) {
+            Pattern pattern = compiledPatterns.get(rule.getId());
+            if (pattern == null) {
+                continue;
+            }
 
-                try {
-                    if (pattern.matcher(content).find()) {
-                        totalMatchCount++;
-                        return new MatchResult(rule, content);
-                    }
-                } catch (Exception e) {
-                    logger.error("规则匹配异常: ruleId={}, error={}", rule.getId(), e.getMessage());
+            try {
+                if (pattern.matcher(content).find()) {
+                    totalMatchCount++;
+                    return new MatchResult(rule, content);
                 }
+            } catch (Exception e) {
+                logger.error("规则匹配异常: ruleId={}, error={}", rule.getId(), e.getMessage());
             }
         }
 

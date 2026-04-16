@@ -82,6 +82,15 @@
             <if test="requestUri != null and requestUri != ''">
                 AND request_uri LIKE CONCAT('%', #{requestUri}, '%')
             </if>
+            <if test="responseStatus != null">
+                AND response_status = #{responseStatus}
+            </if>
+            <if test="stateTag != null and stateTag != ''">
+                AND state_tag = #{stateTag}
+            </if>
+            <if test="isAggregated != null">
+                AND is_aggregated = #{isAggregated}
+            </if>
             <if test="startTime != null">
                 AND request_time &gt;= #{startTime}
             </if>
@@ -115,6 +124,15 @@
             </if>
             <if test="requestUri != null and requestUri != ''">
                 AND request_uri LIKE CONCAT('%', #{requestUri}, '%')
+            </if>
+            <if test="responseStatus != null">
+                AND response_status = #{responseStatus}
+            </if>
+            <if test="stateTag != null and stateTag != ''">
+                AND state_tag = #{stateTag}
+            </if>
+            <if test="isAggregated != null">
+                AND is_aggregated = #{isAggregated}
             </if>
             <if test="startTime != null">
                 AND request_time &gt;= #{startTime}

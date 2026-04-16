@@ -262,10 +262,10 @@ public class MonitorServiceDefenseClient {
         pushDDoSAttackEvent(event);
     }
 
-    public void pushAttackEvent(AttackEventDTO event) throws RestClientException {
+    public String pushAttackEvent(AttackEventDTO event) throws RestClientException {
         if (event == null) {
             logger.warn("尝试推送空的攻击事件");
-            return;
+            return null;
         }
 
         String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
@@ -292,8 +292,10 @@ public class MonitorServiceDefenseClient {
             );
 
             if (isResponseSuccessful(response)) {
-                logger.info("攻击事件推送成功: ip={}, type={}, rule={}", 
-                    event.getSourceIp(), event.getAttackType(), event.getRuleName());
+                String returnedEventId = extractEventIdFromResponse(response.getBody());
+                logger.info("攻击事件推送成功: ip={}, type={}, rule={}, returnedEventId={}", 
+                    event.getSourceIp(), event.getAttackType(), event.getRuleName(), returnedEventId);
+                return returnedEventId;
             } else {
                 String errorMsg = extractErrorMessage(response.getBody());
                 logger.error("攻击事件推送失败: ip={}, type={}, 响应内容[{}]", 
@@ -310,6 +312,22 @@ public class MonitorServiceDefenseClient {
                 event.getSourceIp(), event.getAttackType(), e);
             throw new RestClientException("推送攻击事件时发生未知异常", e);
         }
+    }
+    
+    private String extractEventIdFromResponse(String responseBody) {
+        if (responseBody == null || responseBody.isEmpty()) {
+            return null;
+        }
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(responseBody);
+            if (root.has("data") && !root.get("data").isNull()) {
+                return root.get("data").asText();
+            }
+        } catch (Exception e) {
+            logger.warn("解析响应中的eventId失败: {}", e.getMessage());
+        }
+        return null;
     }
 
     public void pushBlacklistEvent(BlacklistEventDTO event) throws RestClientException {

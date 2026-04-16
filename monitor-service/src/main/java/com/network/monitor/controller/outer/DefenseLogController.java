@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletResponse;
+import java.io.PrintWriter;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -100,11 +103,14 @@ public class DefenseLogController {
                         Map<String, Long> stats = new HashMap<>();
                         stats.put("success", 0L);
                         stats.put("fail", 0L);
+                        stats.put("alert", 0L);
                         return stats;
                     });
                     
                     Map<String, Long> stats = dailyStats.get(dateKey);
-                    if (log.getExecuteStatus() != null && log.getExecuteStatus() == 1) {
+                    if ("ALERT_ONLY".equals(log.getDefenseType())) {
+                        stats.put("alert", stats.get("alert") + 1);
+                    } else if (log.getExecuteStatus() != null && log.getExecuteStatus() == 1) {
                         stats.put("success", stats.get("success") + 1);
                     } else {
                         stats.put("fail", stats.get("fail") + 1);
@@ -119,6 +125,7 @@ public class DefenseLogController {
                 item.put("date", entry.getKey().substring(5));
                 item.put("success", entry.getValue().get("success"));
                 item.put("fail", entry.getValue().get("fail"));
+                item.put("alert", entry.getValue().get("alert"));
                 result.add(item);
             }
 
@@ -143,6 +150,7 @@ public class DefenseLogController {
             typeNameMap.put("BLOCK_IP", "IP封禁");
             typeNameMap.put("RATE_LIMIT", "限流");
             typeNameMap.put("BLOCK_REQUEST", "请求拦截");
+            typeNameMap.put("ALERT_ONLY", "仅告警");
             
             for (Map.Entry<String, String> entry : typeNameMap.entrySet()) {
                 String typeCode = entry.getKey();
@@ -302,10 +310,64 @@ public class DefenseLogController {
         }
     }
 
-    private long countFirstDefense(LocalDateTime startTime, LocalDateTime endTime) {
-        List<DefenseLogEntity> logs = defenseLogMapper.selectByCondition(
-            null, null, null, null, startTime, endTime, 0, Integer.MAX_VALUE, null, null
-        );
-        return logs.stream().filter(log -> log.getIsFirst() != null && log.getIsFirst() == 1).count();
+    @GetMapping("/export-report")
+    public void exportReport(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            HttpServletResponse response) {
+        try {
+            LocalDateTime startTime = parseDateTime(startDate);
+            LocalDateTime endTime = parseDateTime(endDate);
+
+            if (startTime == null) {
+                startTime = LocalDateTime.now().minusDays(7);
+            }
+            if (endTime == null) {
+                endTime = LocalDateTime.now();
+            }
+
+            long totalCount = defenseLogMapper.countByCondition(null, null, null, null, startTime, endTime);
+            long alertOnlyCount = defenseLogMapper.countByCondition(null, "ALERT_ONLY", null, null, startTime, endTime);
+            long actualDefenseCount = totalCount - alertOnlyCount;
+            
+            long successCount = defenseLogMapper.countByCondition(null, null, null, 1, startTime, endTime);
+            long alertOnlySuccessCount = defenseLogMapper.countByCondition(null, "ALERT_ONLY", null, 1, startTime, endTime);
+            long actualSuccessCount = successCount - alertOnlySuccessCount;
+            long failedCount = defenseLogMapper.countByCondition(null, null, null, 0, startTime, endTime);
+            
+            long blockIpCount = defenseLogMapper.countByCondition(null, "BLOCK_IP", null, null, startTime, endTime);
+            long addBlacklistCount = defenseLogMapper.countByCondition(null, "ADD_BLACKLIST", null, null, startTime, endTime);
+            long rateLimitCount = defenseLogMapper.countByCondition(null, "RATE_LIMIT", null, null, startTime, endTime);
+            long blockRequestCount = defenseLogMapper.countByCondition(null, "BLOCK_REQUEST", null, null, startTime, endTime);
+
+            response.setContentType("text/csv;charset=UTF-8");
+            response.setHeader("Content-Disposition", "attachment;filename=defense_report_" + 
+                LocalDate.now().toString() + ".csv");
+            
+            PrintWriter writer = response.getWriter();
+            writer.println("\uFEFF");
+            writer.println("防御效果评估报告");
+            writer.println("统计时间范围," + startTime.format(DATE_FORMATTER) + " 至 " + endTime.format(DATE_FORMATTER));
+            writer.println();
+            writer.println("统计项目,数值");
+            writer.println("总防御次数," + actualDefenseCount);
+            writer.println("成功防御," + actualSuccessCount);
+            writer.println("失败防御," + failedCount);
+            double successRate = actualDefenseCount > 0 ? (double) actualSuccessCount / actualDefenseCount * 100 : 0;
+            writer.println("成功率," + String.format("%.1f", successRate) + "%");
+            writer.println("仅告警次数," + alertOnlyCount);
+            writer.println();
+            writer.println("防御类型统计,次数");
+            writer.println("IP封禁," + (blockIpCount + addBlacklistCount));
+            writer.println("限流," + rateLimitCount);
+            writer.println("请求拦截," + blockRequestCount);
+            writer.println("仅告警," + alertOnlyCount);
+            writer.println();
+            writer.println("导出时间," + LocalDateTime.now().format(DATE_FORMATTER));
+            
+            writer.flush();
+        } catch (Exception e) {
+            log.error("导出防御报告失败：", e);
+        }
     }
 }

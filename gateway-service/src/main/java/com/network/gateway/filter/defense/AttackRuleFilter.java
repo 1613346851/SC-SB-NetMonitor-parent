@@ -113,7 +113,13 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
             VulnerabilityCache.VulnMatchResult vulnResult = detectVulnerabilityByPath(uri);
             if (vulnResult != null) {
-                handleVulnAlertOnly(exchange, sourceIp, vulnResult, startTime, "Phase1-Vuln");
+                if (shouldDetectBody(request)) {
+                    exchange.getAttributes().put("pending_vuln_result", vulnResult);
+                    exchange.getAttributes().put("pending_vuln_start_time", startTime);
+                    logger.debug("Phase1漏洞匹配，延迟告警等待Phase2规则检测: vuln={}", vulnResult.getVulnName());
+                } else {
+                    handleVulnAlertOnly(exchange, sourceIp, vulnResult, startTime, "Phase1-Vuln");
+                }
             }
 
             if (shouldDetectBody(request)) {
@@ -258,13 +264,25 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                         RuleCache.MatchResult bodyResult = ruleCache.matchAll(bodyContent);
                         if (bodyResult != null) {
                             logger.info("请求体匹配规则: rule={}, 立即返回拦截响应", bodyResult.getRuleName());
+                            exchange.getAttributes().remove("pending_vuln_result");
+                            exchange.getAttributes().remove("pending_vuln_start_time");
                             return handleAttackDetected(exchange, sourceIp, bodyResult, startTime, "Phase2-Rule");
                         }
 
-                        VulnerabilityCache.VulnMatchResult vulnResult = detectVulnerabilityByPath(request.getURI().getPath());
-                        if (vulnResult != null) {
-                            logger.info("请求体检测阶段匹配漏洞: vuln={}, 只产生告警不拦截", vulnResult.getVulnName());
-                            handleVulnAlertOnly(exchange, sourceIp, vulnResult, startTime, "Phase2-Vuln");
+                        VulnerabilityCache.VulnMatchResult pendingVuln = exchange.getAttribute("pending_vuln_result");
+                        Long pendingStartTime = exchange.getAttribute("pending_vuln_start_time");
+                        if (pendingVuln != null) {
+                            logger.info("Phase2规则未匹配，处理Phase1延迟的漏洞告警: vuln={}", pendingVuln.getVulnName());
+                            handleVulnAlertOnly(exchange, sourceIp, pendingVuln, 
+                                pendingStartTime != null ? pendingStartTime : startTime, "Phase1-Vuln-Delayed");
+                            exchange.getAttributes().remove("pending_vuln_result");
+                            exchange.getAttributes().remove("pending_vuln_start_time");
+                        } else {
+                            VulnerabilityCache.VulnMatchResult vulnResult = detectVulnerabilityByPath(request.getURI().getPath());
+                            if (vulnResult != null) {
+                                logger.info("请求体检测阶段匹配漏洞: vuln={}, 只产生告警不拦截", vulnResult.getVulnName());
+                                handleVulnAlertOnly(exchange, sourceIp, vulnResult, startTime, "Phase2-Vuln");
+                            }
                         }
 
                         ServerHttpRequest newRequest = new ServerHttpRequestDecorator(request) {
@@ -340,27 +358,34 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                 exchange.getRequest().getURI().getPath(), finalEventId);
 
         Mono.fromRunnable(() -> {
+            String actualEventId = finalEventId;
             try {
-                defenseClient.pushAttackEvent(attackEvent);
-                logger.debug("推送攻击事件成功: eventId={}, ip={}, type={}, rule={}", 
-                    finalEventId, sourceIp, finalAttackType, rule.getRuleName());
+                String returnedEventId = defenseClient.pushAttackEvent(attackEvent);
+                if (returnedEventId != null && !returnedEventId.isEmpty()) {
+                    actualEventId = returnedEventId;
+                    logger.info("使用监测服务返回的事件ID: originalEventId={}, actualEventId={}", finalEventId, actualEventId);
+                } else {
+                    logger.warn("监测服务未返回事件ID，使用网关生成的ID: eventId={}", finalEventId);
+                }
+                logger.info("推送攻击事件成功: eventId={}, ip={}, type={}, rule={}", 
+                    actualEventId, sourceIp, finalAttackType, rule.getRuleName());
             } catch (Exception e) {
-                logger.error("推送攻击事件失败: {}", e.getMessage());
+                logger.error("推送攻击事件失败，使用网关生成的ID: eventId={}, error={}", finalEventId, e.getMessage());
             }
 
             try {
                 long processingTime = System.currentTimeMillis() - startTime;
-                TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, finalEventId, finalAttackType, finalRiskLevel, processingTime);
+                TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, actualEventId, finalAttackType, finalRiskLevel, processingTime);
                 trafficClient.pushTraffic(trafficDTO);
-                logger.debug("推送攻击流量数据成功: eventId={}, ip={}, type={}", 
-                    finalEventId, sourceIp, finalAttackType);
+                logger.info("推送攻击流量数据成功: eventId={}, ip={}, type={}", 
+                    actualEventId, sourceIp, finalAttackType);
             } catch (Exception e) {
                 logger.error("推送攻击流量数据失败: {}", e.getMessage());
             }
 
             DefenseLogDTO logDTO = DefenseLogUtil.buildBlockLog(
                     sourceIp,
-                    finalEventId,
+                    actualEventId,
                     DefenseResultBO.RiskLevel.valueOf(finalRiskLevel),
                     String.format("攻击规则匹配: %s [%s]", rule.getRuleName(), finalAttackType)
             );
@@ -372,6 +397,7 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
             try {
                 defenseClient.pushDefenseLog(logDTO);
+                logger.info("推送防御日志成功: eventId={}, ip={}, type={}", actualEventId, sourceIp, finalAttackType);
             } catch (Exception e) {
                 logger.error("推送攻击检测日志失败: {}", e.getMessage());
             }
@@ -384,6 +410,13 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                                      VulnerabilityCache.VulnMatchResult vulnResult, 
                                      long startTime, String phase) {
         VulnerabilityCache.VulnerabilityInfo vuln = vulnResult.getFirstVuln();
+        
+        if (vulnResult.hasDefenseRule()) {
+            logger.info("漏洞[{}]已配置防御规则，跳过漏洞告警（由规则匹配处理）: ip={}, uri={}", 
+                vuln.getVulnName(), sourceIp, exchange.getRequest().getURI().getPath());
+            return;
+        }
+        
         String attackType = vulnResult.getVulnType();
         String riskLevel = convertVulnLevelToRiskLevel(vulnResult.getVulnLevel());
         String vulnName = vulnResult.getVulnName();
@@ -406,29 +439,36 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                 exchange.getRequest().getURI().getPath(), finalEventId, vulnResult.hasDefenseRule());
         
         Mono.fromRunnable(() -> {
+            String actualEventId = finalEventId;
             try {
-                defenseClient.pushAttackEvent(attackEvent);
-                logger.debug("推送漏洞攻击事件成功: eventId={}, ip={}, vulnId={}, vulnName={}", 
-                    finalEventId, sourceIp, finalVulnId, finalVulnName);
+                String returnedEventId = defenseClient.pushAttackEvent(attackEvent);
+                if (returnedEventId != null && !returnedEventId.isEmpty()) {
+                    actualEventId = returnedEventId;
+                    logger.info("使用监测服务返回的事件ID: originalEventId={}, actualEventId={}", finalEventId, actualEventId);
+                } else {
+                    logger.warn("监测服务未返回事件ID，使用网关生成的ID: eventId={}", finalEventId);
+                }
+                logger.info("推送漏洞攻击事件成功: eventId={}, ip={}, vulnId={}, vulnName={}", 
+                    actualEventId, sourceIp, finalVulnId, finalVulnName);
             } catch (Exception e) {
-                logger.error("推送漏洞攻击事件失败: {}", e.getMessage());
+                logger.error("推送漏洞攻击事件失败，使用网关生成的ID: eventId={}, error={}", finalEventId, e.getMessage());
             }
 
             try {
                 long processingTime = System.currentTimeMillis() - startTime;
-                TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, finalEventId, 
+                TrafficMonitorDTO trafficDTO = buildTrafficDTO(exchange, sourceIp, actualEventId, 
                     finalAttackType, finalRiskLevel, processingTime);
                 trafficDTO.setAbnormalReason("漏洞路径匹配(仅告警): " + finalVulnName);
                 trafficClient.pushTraffic(trafficDTO);
-                logger.debug("推送漏洞攻击流量数据成功: eventId={}, ip={}, vulnName={}", 
-                    finalEventId, sourceIp, finalVulnName);
+                logger.info("推送漏洞攻击流量数据成功: eventId={}, ip={}, vulnName={}", 
+                    actualEventId, sourceIp, finalVulnName);
             } catch (Exception e) {
                 logger.error("推送漏洞攻击流量数据失败: {}", e.getMessage());
             }
 
             DefenseLogDTO logDTO = DefenseLogUtil.buildAlertLog(
                     sourceIp,
-                    finalEventId,
+                    actualEventId,
                     DefenseResultBO.RiskLevel.valueOf(finalRiskLevel),
                     String.format("漏洞路径匹配(仅告警): %s [%s]", finalVulnName, finalAttackType)
             );
@@ -440,6 +480,7 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
 
             try {
                 defenseClient.pushDefenseLog(logDTO);
+                logger.info("推送防御日志成功: eventId={}, ip={}, vulnName={}", actualEventId, sourceIp, finalVulnName);
             } catch (Exception e) {
                 logger.error("推送漏洞告警日志失败: {}", e.getMessage());
             }

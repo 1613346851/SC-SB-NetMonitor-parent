@@ -22,7 +22,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -284,7 +283,7 @@ public class IpProfileServiceImpl implements IpProfileService {
         }
 
         List<TrafficMonitorEntity> traffic = trafficMonitorMapper.selectByCondition(
-                ip, null, null, null, null, null, 0, 1, "create_time ASC"
+                ip, null, null, null, null, null, null, null, null, 0, 1, "create_time ASC"
         );
         if (!traffic.isEmpty()) {
             firstTraffic = traffic.get(0).getCreateTime();
@@ -311,7 +310,7 @@ public class IpProfileServiceImpl implements IpProfileService {
         }
 
         List<TrafficMonitorEntity> traffic = trafficMonitorMapper.selectByCondition(
-                ip, null, null, null, null, null, 0, 1, "create_time DESC"
+                ip, null, null, null, null, null, null, null, null, 0, 1, "create_time DESC"
         );
         if (!traffic.isEmpty()) {
             lastTraffic = traffic.get(0).getCreateTime();
@@ -389,7 +388,7 @@ public class IpProfileServiceImpl implements IpProfileService {
         );
 
         List<TrafficMonitorEntity> traffic = trafficMonitorMapper.selectByCondition(
-                ip, null, null, null, startTime, endTime, 0, 10000, null
+                ip, null, null, null, null, null, null, startTime, endTime, 0, 10000, null
         );
 
         Map<String, Long> attackByDate = attacks.stream()

@@ -137,7 +137,13 @@ function searchDefense() {
     const params = {};
     if (eventId) params.eventId = eventId;
     if (defenseType) params.defenseType = defenseType;
-    if (executeStatus !== '') params.executeStatus = executeStatus;
+    if (executeStatus !== '') {
+        if (executeStatus === 'alert') {
+            params.defenseType = 'ALERT_ONLY';
+        } else {
+            params.executeStatus = executeStatus;
+        }
+    }
     if (defenseTarget) params.defenseTarget = defenseTarget;
     if (dateRange.startTime) params.startTime = dateRange.startTime;
     if (dateRange.endTime) params.endTime = dateRange.endTime;

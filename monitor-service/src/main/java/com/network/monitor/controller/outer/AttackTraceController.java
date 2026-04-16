@@ -155,11 +155,11 @@ public class AttackTraceController {
         try {
             int offset = (pageNum - 1) * pageSize;
             List<TrafficMonitorEntity> list = trafficMonitorMapper.selectByCondition(
-                    ip, null, httpMethod, requestUri, startTime, endTime,
+                    ip, null, httpMethod, requestUri, null, null, null, startTime, endTime,
                     offset, pageSize, "create_time DESC"
             );
             long total = trafficMonitorMapper.countByCondition(
-                    ip, null, httpMethod, requestUri, startTime, endTime
+                    ip, null, httpMethod, requestUri, null, null, null, startTime, endTime
             );
 
             Map<String, Object> data = new HashMap<>();

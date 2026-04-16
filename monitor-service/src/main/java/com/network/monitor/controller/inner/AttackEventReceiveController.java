@@ -199,7 +199,7 @@ public class AttackEventReceiveController {
     }
     
     @PostMapping("/attack-event")
-    public ApiResponse<Void> receiveAttackEvent(@RequestBody AttackEventDTO eventDTO) {
+    public ApiResponse<String> receiveAttackEvent(@RequestBody AttackEventDTO eventDTO) {
         try {
             log.info("接收到攻击事件：ip={}, type={}, risk={}, confidence={}, rule={}, eventId={}", 
                 eventDTO.getSourceIp(), eventDTO.getAttackType(), eventDTO.getRiskLevel(), 
@@ -217,6 +217,9 @@ public class AttackEventReceiveController {
             );
             
             String eventId = event != null ? event.getEventId() : null;
+            
+            log.info("攻击事件处理结果: 传入eventId={}, 返回eventId={}, ip={}, attackType={}", 
+                eventDTO.getEventId(), eventId, eventDTO.getSourceIp(), eventDTO.getAttackType());
             
             AttackMonitorDTO attackDTO = new AttackMonitorDTO();
             attackDTO.setSourceIp(eventDTO.getSourceIp());
@@ -267,7 +270,7 @@ public class AttackEventReceiveController {
             log.info("攻击事件处理完成：ip={}, type={}, 已生成防御决策", 
                 eventDTO.getSourceIp(), eventDTO.getAttackType());
             
-            return ApiResponse.success();
+            return ApiResponse.success("处理成功", eventId);
         } catch (Exception e) {
             log.error("处理攻击事件失败：", e);
             return ApiResponse.error("处理攻击事件失败：" + e.getMessage());

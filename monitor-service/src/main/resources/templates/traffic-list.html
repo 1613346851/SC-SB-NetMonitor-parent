@@ -66,10 +66,17 @@
                             <label class="form-label">响应状态</label>
                             <select class="form-control" id="responseStatus">
                                 <option value="">全部</option>
-                                <option value="2xx">2xx 成功</option>
-                                <option value="3xx">3xx 重定向</option>
-                                <option value="4xx">4xx 客户端错误</option>
-                                <option value="5xx">5xx 服务端错误</option>
+                                <option value="200">200 正常响应</option>
+                                <option value="400">400 请求拦截</option>
+                                <option value="403">403 IP黑名单</option>
+                                <option value="429">429 限流状态</option>
+                                <option value="301">301 重定向</option>
+                                <option value="302">302 重定向</option>
+                                <option value="401">401 未授权</option>
+                                <option value="404">404 未找到</option>
+                                <option value="500">500 服务器错误</option>
+                                <option value="502">502 网关错误</option>
+                                <option value="503">503 服务不可用</option>
                             </select>
                         </div>
                         <div class="form-group">

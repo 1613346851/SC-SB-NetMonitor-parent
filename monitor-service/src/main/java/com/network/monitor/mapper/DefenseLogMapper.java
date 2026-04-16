@@ -74,6 +74,8 @@ public interface DefenseLogMapper {
             @Param("defenseTarget") String defenseTarget
     );
 
+    int updateIsFirst(@Param("id") Long id, @Param("isFirst") Integer isFirst);
+
     class TrendStat {
         private LocalDateTime time;
         private Long count;

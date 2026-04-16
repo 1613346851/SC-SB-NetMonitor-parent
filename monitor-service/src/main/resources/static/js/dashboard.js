@@ -315,8 +315,21 @@ async function loadTrafficTrend() {
             type: 'line',
             smooth: true,
             data: trafficValues,
+            symbol: 'circle',
+            symbolSize: 4,
+            lineStyle: {
+                width: 2,
+                type: 'solid'
+            },
             areaStyle: {
-                color: 'rgba(79, 70, 229, 0.1)'
+                color: {
+                    type: 'linear',
+                    x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(79, 70, 229, 0.3)' },
+                        { offset: 1, color: 'rgba(79, 70, 229, 0.05)' }
+                    ]
+                }
             },
             itemStyle: {
                 color: '#4f46e5'
@@ -329,8 +342,21 @@ async function loadTrafficTrend() {
             type: 'line',
             smooth: true,
             data: attackValues,
+            symbol: 'triangle',
+            symbolSize: 6,
+            lineStyle: {
+                width: 2,
+                type: 'dashed'
+            },
             areaStyle: {
-                color: 'rgba(245, 34, 45, 0.1)'
+                color: {
+                    type: 'linear',
+                    x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(245, 34, 45, 0.25)' },
+                        { offset: 1, color: 'rgba(245, 34, 45, 0.02)' }
+                    ]
+                }
             },
             itemStyle: {
                 color: '#f5222d'
@@ -343,8 +369,21 @@ async function loadTrafficTrend() {
             type: 'line',
             smooth: true,
             data: defenseValues,
+            symbol: 'diamond',
+            symbolSize: 6,
+            lineStyle: {
+                width: 2,
+                type: 'dotted'
+            },
             areaStyle: {
-                color: 'rgba(82, 196, 26, 0.1)'
+                color: {
+                    type: 'linear',
+                    x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(82, 196, 26, 0.25)' },
+                        { offset: 1, color: 'rgba(82, 196, 26, 0.02)' }
+                    ]
+                }
             },
             itemStyle: {
                 color: '#52c41a'
@@ -379,7 +418,13 @@ async function loadTrafficTrend() {
                 }
             },
             yAxis: {
-                type: 'value'
+                type: 'value',
+                splitLine: {
+                    show: true,
+                    lineStyle: {
+                        type: 'dashed'
+                    }
+                }
             },
             grid: {
                 left: '3%',

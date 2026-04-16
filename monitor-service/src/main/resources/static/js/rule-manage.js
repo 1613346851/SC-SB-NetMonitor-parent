@@ -101,9 +101,9 @@ function initWhitelistTable() {
 
 function renderWhitelistType(type) {
     const typeMap = {
-        'PATH': '<span class="tag tag-info">路径白名单</span>',
-        'HEADER': '<span class="tag tag-warning">请求头白名单</span>',
-        'IP': '<span class="tag tag-success">IP白名单</span>'
+        'PATH': '<span class="tag info">路径白名单</span>',
+        'HEADER': '<span class="tag warning">请求头白名单</span>',
+        'IP': '<span class="tag success">IP白名单</span>'
     };
     return typeMap[type] || '<span class="tag">' + type + '</span>';
 }

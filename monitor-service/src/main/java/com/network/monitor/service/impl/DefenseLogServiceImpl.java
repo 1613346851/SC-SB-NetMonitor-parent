@@ -42,6 +42,15 @@ public class DefenseLogServiceImpl implements DefenseLogService {
             
             defenseLogMapper.insert(entity);
             
+            if (entity.getEventId() != null && !entity.getEventId().isEmpty() && entity.getIsFirst() == 1) {
+                int firstDefenseCount = defenseLogMapper.countByEventId(entity.getEventId());
+                if (firstDefenseCount > 1) {
+                    defenseLogMapper.updateIsFirst(entity.getId(), 0);
+                    entity.setIsFirst(0);
+                    log.info("并发情况下修正首次防御标记：id={}, eventId={}, isFirst=0", entity.getId(), entity.getEventId());
+                }
+            }
+            
             log.info("接收并保存防御日志成功：defenseType={}, defenseTarget={}, defenseAction={}, executeStatus={}, isFirst={}, eventId={}", 
                 logDTO.getDefenseType(), logDTO.getDefenseTarget(), logDTO.getDefenseAction(), logDTO.getExecuteStatus(), entity.getIsFirst(), entity.getEventId());
 
