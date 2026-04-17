@@ -22,57 +22,6 @@
             </header>
 
             <main class="content">
-                <div class="filter-bar">
-                    <div class="form-inline">
-                        <div class="form-group">
-                            <label class="form-label">IP地址</label>
-                            <input type="text" class="form-control" id="searchIp" placeholder="请输入IP地址">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">攻击类型</label>
-                            <select class="form-control" id="attackType">
-                                <option value="">全部</option>
-                                <option value="DDOS">DDoS 攻击</option>
-                                <option value="SQL_INJECTION">SQL 注入</option>
-                                <option value="XSS">XSS 攻击</option>
-                                <option value="COMMAND_INJECTION">命令注入</option>
-                                <option value="PATH_TRAVERSAL">路径遍历</option>
-                                <option value="RATE_LIMIT">限流触发</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">风险等级</label>
-                            <select class="form-control" id="riskLevel">
-                                <option value="">全部</option>
-                                <option value="CRITICAL">严重</option>
-                                <option value="HIGH">高风险</option>
-                                <option value="MEDIUM">中风险</option>
-                                <option value="LOW">低风险</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">开始时间</label>
-                            <input type="datetime-local" class="form-control" id="startTime">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">结束时间</label>
-                            <input type="datetime-local" class="form-control" id="endTime">
-                        </div>
-                        <div class="form-group">
-                            <button class="btn btn-primary" onclick="searchTraces()">查询</button>
-                            <button class="btn btn-default" onclick="resetSearch()">重置</button>
-                        </div>
-                    </div>
-                    <div class="quick-search">
-                        <span class="quick-label">快捷筛选：</span>
-                        <button class="quick-btn active" onclick="quickSearch('all', event)">全部</button>
-                        <button class="quick-btn" onclick="quickSearch('today', event)">今天</button>
-                        <button class="quick-btn" onclick="quickSearch('yesterday', event)">昨天</button>
-                        <button class="quick-btn" onclick="quickSearch('week', event)">近7天</button>
-                        <button class="quick-btn" onclick="quickSearch('month', event)">近30天</button>
-                    </div>
-                </div>
-
                 <div class="stats-overview" id="statsOverview">
                     <div class="stat-card-overview">
                         <div class="stat-icon success">🛡️</div>
@@ -132,6 +81,57 @@
                                 <div id="geoChart" style="width: 100%; height: 300px;"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">IP地址</label>
+                            <input type="text" class="form-control" id="searchIp" placeholder="请输入IP地址">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">攻击类型</label>
+                            <select class="form-control" id="attackType">
+                                <option value="">全部</option>
+                                <option value="DDOS">DDoS 攻击</option>
+                                <option value="SQL_INJECTION">SQL 注入</option>
+                                <option value="XSS">XSS 攻击</option>
+                                <option value="COMMAND_INJECTION">命令注入</option>
+                                <option value="PATH_TRAVERSAL">路径遍历</option>
+                                <option value="RATE_LIMIT">限流触发</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">风险等级</label>
+                            <select class="form-control" id="riskLevel">
+                                <option value="">全部</option>
+                                <option value="CRITICAL">严重</option>
+                                <option value="HIGH">高风险</option>
+                                <option value="MEDIUM">中风险</option>
+                                <option value="LOW">低风险</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">开始时间</label>
+                            <input type="datetime-local" class="form-control" id="startTime">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">结束时间</label>
+                            <input type="datetime-local" class="form-control" id="endTime">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="searchTraces()">查询</button>
+                            <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                        </div>
+                    </div>
+                    <div class="quick-search">
+                        <span class="quick-label">快捷筛选：</span>
+                        <button class="quick-btn active" onclick="quickSearch('all', event)">全部</button>
+                        <button class="quick-btn" onclick="quickSearch('today', event)">今天</button>
+                        <button class="quick-btn" onclick="quickSearch('yesterday', event)">昨天</button>
+                        <button class="quick-btn" onclick="quickSearch('week', event)">近7天</button>
+                        <button class="quick-btn" onclick="quickSearch('month', event)">近30天</button>
                     </div>
                 </div>
 

@@ -1,5 +1,6 @@
 package com.network.monitor.service.impl;
 
+import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.dto.AttackChainDTO;
 import com.network.monitor.dto.GeoIpDTO;
 import com.network.monitor.dto.IpProfileDTO;
@@ -47,6 +48,9 @@ public class IpProfileServiceImpl implements IpProfileService {
 
     @Autowired
     private IpBlacklistMapper ipBlacklistMapper;
+    
+    @Autowired
+    private IpAttackStateCache ipAttackStateCache;
 
     @Override
     public IpProfileDTO getIpProfile(String ip) {
@@ -283,7 +287,7 @@ public class IpProfileServiceImpl implements IpProfileService {
         }
 
         List<TrafficMonitorEntity> traffic = trafficMonitorMapper.selectByCondition(
-                ip, null, null, null, null, null, null, null, null, 0, 1, "create_time ASC"
+                null, null, ip, null, null, null, null, null, null, null, null, null, 0, 1, "create_time ASC"
         );
         if (!traffic.isEmpty()) {
             firstTraffic = traffic.get(0).getCreateTime();
@@ -310,7 +314,7 @@ public class IpProfileServiceImpl implements IpProfileService {
         }
 
         List<TrafficMonitorEntity> traffic = trafficMonitorMapper.selectByCondition(
-                ip, null, null, null, null, null, null, null, null, 0, 1, "create_time DESC"
+                null, null, ip, null, null, null, null, null, null, null, null, null, 0, 1, "create_time DESC"
         );
         if (!traffic.isEmpty()) {
             lastTraffic = traffic.get(0).getCreateTime();
@@ -388,7 +392,7 @@ public class IpProfileServiceImpl implements IpProfileService {
         );
 
         List<TrafficMonitorEntity> traffic = trafficMonitorMapper.selectByCondition(
-                ip, null, null, null, null, null, null, startTime, endTime, 0, 10000, null
+                null, null, ip, null, null, null, null, null, null, null, startTime, endTime, 0, 10000, null
         );
 
         Map<String, Long> attackByDate = attacks.stream()
@@ -429,24 +433,19 @@ public class IpProfileServiceImpl implements IpProfileService {
             return "已封禁";
         }
 
-        AttackEventEntity ongoingEvent = attackEventMapper.selectOngoingEventByIp(ip);
-        if (ongoingEvent != null) {
-            return "攻击中";
-        }
-
-        AttackMonitorEntity lastAttack = findLastAttack(ip);
-        if (lastAttack != null) {
-            LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
-            if (lastAttack.getCreateTime().isAfter(oneHourAgo)) {
-                return "活跃";
-            }
-            LocalDateTime sixHoursAgo = LocalDateTime.now().minusHours(6);
-            if (lastAttack.getCreateTime().isAfter(sixHoursAgo)) {
+        int state = ipAttackStateCache.getState(ip);
+        switch (state) {
+            case 2:
+                return "攻击中";
+            case 3:
+                return "已防御";
+            case 4:
                 return "冷却中";
-            }
+            case 1:
+                return "可疑";
+            default:
+                return "正常";
         }
-
-        return "正常";
     }
 
     private Integer getCurrentState(String ip) {
@@ -455,24 +454,7 @@ public class IpProfileServiceImpl implements IpProfileService {
             return 3;
         }
 
-        AttackEventEntity ongoingEvent = attackEventMapper.selectOngoingEventByIp(ip);
-        if (ongoingEvent != null) {
-            return 2;
-        }
-
-        AttackMonitorEntity lastAttack = findLastAttack(ip);
-        if (lastAttack != null) {
-            LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
-            if (lastAttack.getCreateTime().isAfter(oneHourAgo)) {
-                return 2;
-            }
-            LocalDateTime sixHoursAgo = LocalDateTime.now().minusHours(6);
-            if (lastAttack.getCreateTime().isAfter(sixHoursAgo)) {
-                return 4;
-            }
-        }
-
-        return 0;
+        return ipAttackStateCache.getState(ip);
     }
 
     private String getAttackTitle(AttackMonitorEntity attack) {

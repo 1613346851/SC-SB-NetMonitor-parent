@@ -286,6 +286,86 @@ public class RuleManageController {
     }
 
     /**
+     * 批量启用规则
+     */
+    @PutMapping("/batch-enable")
+    public ApiResponse<Void> batchEnableRules(@RequestBody List<Long> ids, HttpServletRequest request) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要启用的规则");
+            }
+            for (Long id : ids) {
+                monitorRuleMapper.updateEnabled(id, 1);
+                MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
+                if (rule != null) {
+                    rule.setEnabled(1);
+                    ruleSyncService.syncRuleToGatewayAsync(rule, "UPDATE");
+                }
+            }
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理",
+                "批量启用规则，共" + ids.size() + "条", "batchEnable", "/api/rule/batch-enable", getClientIp(request), 0);
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量启用规则失败：", e);
+            return ApiResponse.error("批量启用失败");
+        }
+    }
+
+    /**
+     * 批量禁用规则
+     */
+    @PutMapping("/batch-disable")
+    public ApiResponse<Void> batchDisableRules(@RequestBody List<Long> ids, HttpServletRequest request) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要禁用的规则");
+            }
+            for (Long id : ids) {
+                monitorRuleMapper.updateEnabled(id, 0);
+                MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
+                if (rule != null) {
+                    rule.setEnabled(0);
+                    ruleSyncService.syncRuleToGatewayAsync(rule, "UPDATE");
+                }
+            }
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理",
+                "批量禁用规则，共" + ids.size() + "条", "batchDisable", "/api/rule/batch-disable", getClientIp(request), 0);
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量禁用规则失败：", e);
+            return ApiResponse.error("批量禁用失败");
+        }
+    }
+
+    /**
+     * 批量删除规则
+     */
+    @DeleteMapping("/batch")
+    @Transactional
+    public ApiResponse<Void> batchDeleteRules(@RequestBody List<Long> ids, HttpServletRequest request) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要删除的规则");
+            }
+            for (Long id : ids) {
+                MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
+                if (rule != null) {
+                    interfaceRuleMapper.deleteByRuleId(id);
+                    vulnerabilityRuleMapper.deleteByRuleId(id);
+                    monitorRuleMapper.deleteById(id);
+                    ruleSyncService.syncRuleDeleteToGatewayAsync(id);
+                }
+            }
+            operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "规则管理",
+                "批量删除规则，共" + ids.size() + "条", "batchDelete", "/api/rule/batch", getClientIp(request), 0);
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量删除规则失败：", e);
+            return ApiResponse.error("批量删除失败");
+        }
+    }
+
+    /**
      * 更新接口的防御规则状态
      */
     private void updateInterfaceDefenseStatus(Long interfaceId) {

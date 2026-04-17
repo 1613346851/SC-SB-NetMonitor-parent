@@ -854,12 +854,15 @@ INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `des
 
 -- 2.6 SSRF检测规则
 INSERT INTO `sys_monitor_rule` (`rule_name`, `attack_type`, `rule_content`, `description`, `risk_level`, `enabled`, `priority`) VALUES
-('SSRF-内网IP', 'SSRF', '(?i)(url|uri|target|host|domain|site|link|src|source)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost|192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)', '检测内网IP请求（已禁用，太宽泛）', 'HIGH', 0, 10),
-('SSRF-file协议', 'SSRF', '(?i)(url|uri|target|host|domain)\\s*[=:]\\s*["\']?file://', '检测file协议SSRF（已禁用，太宽泛）', 'HIGH', 0, 8),
-('SSRF-dict协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?dict://', '检测dict协议SSRF（已禁用，太宽泛）', 'HIGH', 0, 8),
-('SSRF-gopher协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?gopher://', '检测gopher协议SSRF（已禁用，太宽泛）', 'HIGH', 0, 8),
+('SSRF-内网IP', 'SSRF', '(?i)(url|uri|target|host|domain|site|link|src|source)\\s*[=:]\\s*["\']?https?://(127\\.0\\.0\\.1|localhost|192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.)', '检测内网IP请求', 'HIGH', 1, 10),
+('SSRF-file协议', 'SSRF', '(?i)(url|uri|target|host|domain)\\s*[=:]\\s*["\']?file://', '检测file协议SSRF', 'HIGH', 1, 8),
+('SSRF-dict协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?dict://', '检测dict协议SSRF', 'HIGH', 1, 8),
+('SSRF-gopher协议', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?gopher://', '检测gopher协议SSRF', 'HIGH', 1, 8),
 ('SSRF-云元数据', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://(169\\.254\\.169\\.254|metadata\\.azure|metadata\\.google)', '检测云元数据SSRF', 'HIGH', 1, 5),
-('SSRF-本地回环', 'SSRF', '(?i)url\\s*=\\s*["\']?https?://(127\\.0\\.0\\.1|localhost)', '检测本地回环SSRF（已禁用，太宽泛）', 'HIGH', 0, 10),
+('SSRF-本地回环', 'SSRF', '(?i)url\\s*=\\s*["\']?https?://(127\\.0\\.0\\.1|localhost)', '检测本地回环SSRF', 'HIGH', 1, 10),
+('SSRF-内网SQL接口', 'SSRF', '(?i)url\\s*=\\s*["\']?https?://(127\\.0\\.0\\.1|localhost)[^"\']*?/target/sql/', '检测通过SSRF访问内网SQL注入接口', 'CRITICAL', 1, 5),
+('SSRF-内网XSS接口', 'SSRF', '(?i)url\\s*=\\s*["\']?https?://(127\\.0\\.0\\.1|localhost)[^"\']*?/target/xss/', '检测通过SSRF访问内网XSS接口', 'CRITICAL', 1, 5),
+('SSRF-内网敏感接口', 'SSRF', '(?i)url\\s*=\\s*["\']?https?://(127\\.0\\.0\\.1|localhost)[^"\']*?/target/(ddos|file|xxe|deserial|csrf)/', '检测通过SSRF访问内网敏感服务接口', 'HIGH', 1, 8),
 ('SSRF-云元数据-AWS', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://169\\.254\\.169\\.254', '检测AWS云元数据SSRF攻击', 'CRITICAL', 1, 5),
 ('SSRF-云元数据-GCP', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://metadata\\.google', '检测GCP云元数据SSRF攻击', 'CRITICAL', 1, 5),
 ('SSRF-云元数据-Azure', 'SSRF', '(?i)(url|uri|target|host)\\s*[=:]\\s*["\']?https?://169\\.254\\.169\\.254/metadata', '检测Azure云元数据SSRF攻击', 'CRITICAL', 1, 5),
@@ -1131,84 +1134,157 @@ INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`,
  '文件加载接口存在文件包含漏洞，攻击者可使用classpath:协议加载资源',
  '限制接口仅加载预定义资源，并校验文件类型与资源根目录');
 
--- SSRF漏洞（6个漏洞，对应规则ID 41-46）
+-- SSRF漏洞（9个漏洞，对应规则ID 118-126）
 INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
-('SSRF-内网IP访问攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '41', 1, 2,
+('SSRF-内网IP访问攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '118', 1, 2,
  'URL请求接口存在SSRF漏洞，攻击者可访问内网IP探测内部服务',
  '限制协议类型，禁用重定向，使用白名单验证目标地址'),
-('SSRF-file协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '42', 1, 2,
+('SSRF-file协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '119', 1, 2,
  'URL请求接口存在SSRF漏洞，攻击者可使用file://协议读取本地文件',
  '限制协议类型，禁用重定向，使用白名单验证目标地址'),
-('SSRF-dict协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '43', 1, 2,
+('SSRF-dict协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '120', 1, 2,
  'URL请求接口存在SSRF漏洞，攻击者可使用dict://协议探测端口',
  '限制协议类型，禁用重定向，使用白名单验证目标地址'),
-('SSRF-gopher协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '44', 1, 2,
+('SSRF-gopher协议攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '121', 1, 2,
  'URL请求接口存在SSRF漏洞，攻击者可使用gopher://协议发送任意请求',
  '限制协议类型，禁用重定向，使用白名单验证目标地址'),
-('SSRF-云元数据攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '45', 1, 2,
+('SSRF-云元数据攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '122', 1, 2,
  'URL请求接口存在SSRF漏洞，攻击者可访问云元数据服务获取敏感信息',
  '限制协议类型，禁用重定向，使用白名单验证目标地址'),
-('SSRF-本地回环攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '46', 1, 2,
+('SSRF-本地回环攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '123', 1, 2,
  'URL请求接口存在SSRF漏洞，攻击者可访问localhost绕过防火墙',
- '限制协议类型，禁用重定向，使用白名单验证目标地址');
+ '限制协议类型，禁用重定向，使用白名单验证目标地址'),
+('SSRF-内网SQL接口攻击', 'SSRF', 'CRITICAL', '/target/ssrf/request', 0, '124', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可通过SSRF访问内网SQL注入接口进行二次攻击',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址，禁止访问内网敏感接口'),
+('SSRF-内网XSS接口攻击', 'SSRF', 'CRITICAL', '/target/ssrf/request', 0, '125', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可通过SSRF访问内网XSS接口进行二次攻击',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址，禁止访问内网敏感接口'),
+('SSRF-内网敏感接口攻击', 'SSRF', 'HIGH', '/target/ssrf/request', 0, '126', 1, 2,
+ 'URL请求接口存在SSRF漏洞，攻击者可通过SSRF访问内网敏感服务接口（DDoS、文件包含、XXE等）',
+ '限制协议类型，禁用重定向，使用白名单验证目标地址，禁止访问内网敏感接口');
 
--- XXE漏洞（6个漏洞，对应规则ID 47-52）
+-- XXE漏洞（6个漏洞，对应规则ID 146-151）
 INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
-('XXE-DOCTYPE ENTITY攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '47', 1, 2,
+('XXE-DOCTYPE ENTITY攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '146', 1, 2,
  'XML解析接口存在XXE漏洞，攻击者可声明外部实体读取文件',
  '禁用DTD和外部实体解析，使用安全的XML解析配置'),
-('XXE-SYSTEM关键字攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '48', 1, 2,
+('XXE-SYSTEM关键字攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '147', 1, 2,
  'XML解析接口存在XXE漏洞，攻击者可使用SYSTEM关键字加载外部资源',
  '禁用DTD和外部实体解析，使用安全的XML解析配置'),
-('XXE-PUBLIC关键字攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '49', 1, 2,
+('XXE-PUBLIC关键字攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '148', 1, 2,
  'XML解析接口存在XXE漏洞，攻击者可使用PUBLIC关键字加载外部资源',
  '禁用DTD和外部实体解析，使用安全的XML解析配置'),
-('XXE-file协议攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '50', 1, 2,
+('XXE-file协议攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '149', 1, 2,
  'XML解析接口存在XXE漏洞，攻击者可使用file://协议读取本地文件',
  '禁用DTD和外部实体解析，使用安全的XML解析配置'),
-('XXE-http协议攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '51', 1, 2,
+('XXE-http协议攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '150', 1, 2,
  'XML解析接口存在XXE漏洞，攻击者可使用http://协议发起SSRF攻击',
  '禁用DTD和外部实体解析，使用安全的XML解析配置'),
-('XXE-参数实体攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '52', 1, 2,
+('XXE-参数实体攻击', 'XXE', 'HIGH', '/target/xxe/parse', 0, '151', 1, 2,
  'XML解析接口存在XXE漏洞，攻击者可使用参数实体绕过过滤',
  '禁用DTD和外部实体解析，使用安全的XML解析配置');
 
--- 反序列化漏洞（4个漏洞，对应规则ID 53-56）
+-- 反序列化漏洞（4个漏洞，对应规则ID 152-155）
 INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
-('反序列化-Java序列化对象攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '53', 1, 2,
+('反序列化-Java序列化对象攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '152', 1, 2,
  '反序列化接口存在漏洞，攻击者可注入恶意Java序列化对象执行代码',
  '使用类白名单校验，避免反序列化不可信数据'),
-('反序列化-PHP序列化攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '54', 1, 2,
+('反序列化-PHP序列化攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '153', 1, 2,
  '反序列化接口存在漏洞，攻击者可注入PHP序列化字符串执行代码',
  '使用类白名单校验，避免反序列化不可信数据'),
-('反序列化-Python pickle攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '55', 1, 2,
+('反序列化-Python pickle攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '154', 1, 2,
  '反序列化接口存在漏洞，攻击者可注入Python pickle对象执行代码',
  '使用类白名单校验，避免反序列化不可信数据'),
-('反序列化-Base64编码Java攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '56', 1, 2,
+('反序列化-Base64编码Java攻击', 'DESERIALIZATION', 'HIGH', '/target/deserial/parse', 0, '155', 1, 2,
  '反序列化接口存在漏洞，攻击者可注入Base64编码的Java序列化对象',
  '使用类白名单校验，避免反序列化不可信数据');
 
--- CSRF漏洞（3个漏洞，对应规则ID 57-59）
+-- CSRF漏洞（3个漏洞，对应规则ID 156-158）
 INSERT INTO `sys_vulnerability_monitor` (`vuln_name`, `vuln_type`, `vuln_level`, `vuln_path`, `verify_status`, `rule_ids`, `rule_count`, `defense_status`, `description`, `fix_suggestion`) VALUES
-('CSRF-表单自动提交攻击', 'CSRF', 'MEDIUM', '/target/csrf/update-name', 0, '57', 1, 2,
+('CSRF-表单自动提交攻击', 'CSRF', 'MEDIUM', '/target/csrf/update-name', 0, '156', 1, 2,
  '昵称修改接口存在CSRF漏洞，攻击者可构造自动提交表单发起攻击',
  '为接口启用CSRF Token校验，并校验请求来源'),
-('CSRF-隐藏字段攻击', 'CSRF', 'LOW', '/target/csrf/update-name', 0, '58', 1, 2,
+('CSRF-隐藏字段攻击', 'CSRF', 'LOW', '/target/csrf/update-name', 0, '157', 1, 2,
  '昵称修改接口存在CSRF漏洞，攻击者可使用隐藏字段构造攻击页面',
  '为接口启用CSRF Token校验，并校验请求来源'),
-('CSRF-跨域请求攻击', 'CSRF', 'LOW', '/target/csrf/update-name', 0, '59', 1, 2,
+('CSRF-跨域请求攻击', 'CSRF', 'LOW', '/target/csrf/update-name', 0, '158', 1, 2,
  '昵称修改接口存在CSRF漏洞，攻击者可构造跨域请求发起攻击',
  '为接口启用CSRF Token校验，并校验请求来源');
 
 -- ------------------------------------------------------------
 -- 4.2.1 初始化漏洞-规则关联关系（一对一）
+-- 使用规则名称动态关联，避免硬编码ID
 -- ------------------------------------------------------------
 INSERT INTO `sys_vulnerability_rule` (`vulnerability_id`, `rule_id`, `rule_name`, `attack_type`, `risk_level`)
-SELECT v.id, v.rule_ids, 
-       (SELECT r.rule_name FROM sys_monitor_rule r WHERE r.id = CAST(v.rule_ids AS UNSIGNED)),
-       v.vuln_type,
-       v.vuln_level
+SELECT v.id, r.id, r.rule_name, v.vuln_type, v.vuln_level
 FROM sys_vulnerability_monitor v
+JOIN sys_monitor_rule r ON r.rule_name = 
+    CASE 
+        WHEN v.vuln_name = 'SQL注入-UNION查询攻击' THEN 'SQL注入-UNION查询'
+        WHEN v.vuln_name = 'SQL注入-OR恒真攻击' THEN 'SQL注入-OR恒真'
+        WHEN v.vuln_name = 'SQL注入-AND布尔盲注' THEN 'SQL注入-AND恒真'
+        WHEN v.vuln_name = 'SQL注入-DROP语句攻击' THEN 'SQL注入-DROP语句'
+        WHEN v.vuln_name = 'SQL注入-SLEEP延时盲注' THEN 'SQL注入-SLEEP延时'
+        WHEN v.vuln_name = 'SQL注入-BENCHMARK延时攻击' THEN 'SQL注入-BENCHMARK延时'
+        WHEN v.vuln_name = 'SQL注入-注释符号绕过' THEN 'SQL注入-注释符号'
+        WHEN v.vuln_name = 'SQL注入-堆叠查询攻击' THEN 'SQL注入-堆叠查询'
+        WHEN v.vuln_name = 'SQL注入-单引号闭合攻击' THEN 'SQL注入-单引号闭合'
+        WHEN v.vuln_name = 'XSS存储型-script标签注入' THEN 'XSS-script标签'
+        WHEN v.vuln_name = 'XSS存储型-javascript协议注入' THEN 'XSS-javascript协议'
+        WHEN v.vuln_name = 'XSS存储型-onerror事件注入' THEN 'XSS-onerror事件'
+        WHEN v.vuln_name = 'XSS存储型-onload事件注入' THEN 'XSS-onload事件'
+        WHEN v.vuln_name = 'XSS存储型-onclick事件注入' THEN 'XSS-onclick事件'
+        WHEN v.vuln_name = 'XSS存储型-alert函数注入' THEN 'XSS-alert函数'
+        WHEN v.vuln_name = 'XSS存储型-document对象注入' THEN 'XSS-document对象'
+        WHEN v.vuln_name = 'XSS存储型-img标签注入' THEN 'XSS-img标签注入'
+        WHEN v.vuln_name = 'XSS存储型-SVG标签注入' THEN 'XSS-SVG标签注入'
+        WHEN v.vuln_name = 'XSS存储型-eval函数注入' THEN 'XSS-eval函数'
+        WHEN v.vuln_name = 'XSS存储型-iframe标签注入' THEN 'XSS-iframe标签'
+        WHEN v.vuln_name = '命令注入-管道符攻击' THEN '命令注入-管道符'
+        WHEN v.vuln_name = '命令注入-分号攻击' THEN '命令注入-分号'
+        WHEN v.vuln_name = '命令注入-反引号攻击' THEN '命令注入-反引号'
+        WHEN v.vuln_name = '命令注入-$()执行攻击' THEN '命令注入-$()执行'
+        WHEN v.vuln_name = '命令注入-Windows cmd攻击' THEN '命令注入-Windows cmd'
+        WHEN v.vuln_name = '命令注入-ping命令攻击' THEN '命令注入-ping命令'
+        WHEN v.vuln_name = '命令注入-whoami攻击' THEN '命令注入-whoami'
+        WHEN v.vuln_name = '命令注入-tasklist攻击' THEN '命令注入-tasklist'
+        WHEN v.vuln_name = '命令注入-cat命令攻击' THEN '命令注入-cat命令'
+        WHEN v.vuln_name = '路径遍历-父目录引用攻击' THEN '路径遍历-父目录引用'
+        WHEN v.vuln_name = '路径遍历-Linux敏感文件攻击' THEN '路径遍历-Linux敏感文件'
+        WHEN v.vuln_name = '路径遍历-Windows敏感路径攻击' THEN '路径遍历-Windows敏感路径'
+        WHEN v.vuln_name = '路径遍历-URL编码绕过攻击' THEN '路径遍历-URL编码绕过'
+        WHEN v.vuln_name = '路径遍历-双重编码攻击' THEN '路径遍历-双重编码'
+        WHEN v.vuln_name = '路径遍历-配置文件攻击' THEN '路径遍历-配置文件'
+        WHEN v.vuln_name = '文件包含-PHP函数攻击' THEN '文件包含-PHP函数'
+        WHEN v.vuln_name = '文件包含-data协议攻击' THEN '文件包含-data协议'
+        WHEN v.vuln_name = '文件包含-php协议攻击' THEN '文件包含-php协议'
+        WHEN v.vuln_name = '文件包含-file协议攻击' THEN '文件包含-file协议'
+        WHEN v.vuln_name = '文件包含-classpath协议攻击' THEN '文件包含-classpath'
+        WHEN v.vuln_name = 'SSRF-内网IP访问攻击' THEN 'SSRF-内网IP'
+        WHEN v.vuln_name = 'SSRF-file协议攻击' THEN 'SSRF-file协议'
+        WHEN v.vuln_name = 'SSRF-dict协议攻击' THEN 'SSRF-dict协议'
+        WHEN v.vuln_name = 'SSRF-gopher协议攻击' THEN 'SSRF-gopher协议'
+        WHEN v.vuln_name = 'SSRF-云元数据攻击' THEN 'SSRF-云元数据'
+        WHEN v.vuln_name = 'SSRF-本地回环攻击' THEN 'SSRF-本地回环'
+        WHEN v.vuln_name = 'SSRF-内网SQL接口攻击' THEN 'SSRF-内网SQL接口'
+        WHEN v.vuln_name = 'SSRF-内网XSS接口攻击' THEN 'SSRF-内网XSS接口'
+        WHEN v.vuln_name = 'SSRF-内网敏感接口攻击' THEN 'SSRF-内网敏感接口'
+        WHEN v.vuln_name = 'XXE-DOCTYPE ENTITY攻击' THEN 'XXE-DOCTYPE ENTITY'
+        WHEN v.vuln_name = 'XXE-SYSTEM关键字攻击' THEN 'XXE-SYSTEM关键字'
+        WHEN v.vuln_name = 'XXE-PUBLIC关键字攻击' THEN 'XXE-PUBLIC关键字'
+        WHEN v.vuln_name = 'XXE-file协议攻击' THEN 'XXE-file协议'
+        WHEN v.vuln_name = 'XXE-http协议攻击' THEN 'XXE-http协议'
+        WHEN v.vuln_name = 'XXE-参数实体攻击' THEN 'XXE-参数实体'
+        WHEN v.vuln_name = '反序列化-Java序列化对象攻击' THEN '反序列化-Java头'
+        WHEN v.vuln_name = '反序列化-PHP序列化攻击' THEN '反序列化-PHP序列化'
+        WHEN v.vuln_name = '反序列化-Python pickle攻击' THEN '反序列化-Python pickle'
+        WHEN v.vuln_name = '反序列化-Base64编码Java攻击' THEN '反序列化-Base64 Java'
+        WHEN v.vuln_name = 'CSRF-表单自动提交攻击' THEN 'CSRF-表单自动提交'
+        WHEN v.vuln_name = 'CSRF-隐藏字段攻击' THEN 'CSRF-隐藏字段'
+        WHEN v.vuln_name = 'CSRF-跨域请求攻击' THEN 'CSRF-跨域请求'
+        ELSE CONCAT('UNKNOWN-', v.vuln_name)
+    END
 WHERE v.rule_ids IS NOT NULL;
 
 -- ------------------------------------------------------------
@@ -1538,23 +1614,33 @@ INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission
 (2, 0, '流量监测', 0, 'traffic', '/traffic', NULL, 'monitor', 2, 0, 0, 'system'),
 (3, 0, '攻击监测', 0, 'attack', '/attack', NULL, 'warning', 3, 0, 0, 'system'),
 (4, 0, '防御管理', 0, 'defense', '/defense', NULL, 'security', 4, 0, 0, 'system'),
-(5, 0, '漏洞监测', 1, 'vulnerability', '/vulnerability', '/vulnerability', 'bug', 5, 0, 0, 'system'),
+(5, 0, '漏洞监测', 0, 'vulnerability', '/vulnerability', NULL, 'bug', 5, 0, 0, 'system'),
 (6, 0, '数据报表', 1, 'report', '/report', '/report', 'chart', 6, 0, 0, 'system'),
 (7, 0, '系统管理', 0, 'system', '/system', NULL, 'setting', 7, 0, 0, 'system');
 
 -- 二级菜单 - 流量监测
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(21, 2, '流量列表', 1, 'traffic:list', '/traffic/list', '/traffic-list', 'list', 1, 0, 0, 'system');
+(21, 2, '流量列表', 1, 'traffic:list', '/traffic/list', '/traffic-list', 'list', 1, 0, 0, 'system'),
+(22, 2, 'IP画像', 1, 'traffic:ip-profile', '/traffic/ip-profile', '/ip-profile', 'user', 2, 0, 0, 'system');
 
 -- 二级菜单 - 攻击监测
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(31, 3, '攻击列表', 1, 'attack:list', '/attack/list', '/attack-list', 'list', 1, 0, 0, 'system');
+(31, 3, '攻击列表', 1, 'attack:list', '/attack/list', '/attack-list', 'list', 1, 0, 0, 'system'),
+(32, 3, '溯源查询', 1, 'attack:trace', '/attack/trace', '/trace-search', 'search', 2, 0, 0, 'system');
 
 -- 二级菜单 - 防御管理
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
 (41, 4, '黑名单管理', 1, 'blacklist:list', '/defense/blacklist', '/blacklist-manage', 'lock', 1, 0, 0, 'system'),
 (42, 4, '防御日志', 1, 'defense:log', '/defense/log', '/defense-log', 'file-text', 2, 0, 0, 'system'),
-(43, 4, '规则管理', 1, 'rule:list', '/defense/rule', '/rule-manage', 'tool', 3, 0, 0, 'system');
+(43, 4, '规则管理', 1, 'rule:list', '/defense/rule', '/rule-manage', 'tool', 3, 0, 0, 'system'),
+(44, 4, '白名单管理', 1, 'whitelist:list', '/defense/whitelist', '/whitelist-manage', 'unlock', 4, 0, 0, 'system'),
+(45, 4, '防御效果评估', 1, 'defense:evaluation', '/defense/evaluation', '/defense-evaluation', 'bar-chart', 5, 0, 0, 'system');
+
+-- 二级菜单 - 漏洞监测
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(51, 5, '漏洞列表', 1, 'vulnerability:list', '/vulnerability/list', '/vulnerability-monitor', 'list', 1, 0, 0, 'system'),
+(52, 5, '漏洞扫描', 1, 'vulnerability:scan', '/vulnerability/scan', '/vuln-scan', 'scan', 2, 0, 0, 'system'),
+(53, 5, '扫描目标', 1, 'vulnerability:target', '/vulnerability/target', '/scan-target-manage', 'target', 3, 0, 0, 'system');
 
 -- 二级菜单 - 系统管理
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
@@ -1593,6 +1679,24 @@ INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission
 (733, 73, '删除角色', 2, 'role:delete', NULL, 3, 0, 0, 'system'),
 (734, 73, '分配权限', 2, 'role:assignPerm', NULL, 4, 0, 0, 'system');
 
+-- 按钮权限 - 白名单管理
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(441, 44, '新增白名单', 2, 'whitelist:add', NULL, 1, 0, 0, 'system'),
+(442, 44, '编辑白名单', 2, 'whitelist:edit', NULL, 2, 0, 0, 'system'),
+(443, 44, '删除白名单', 2, 'whitelist:delete', NULL, 3, 0, 0, 'system');
+
+-- 按钮权限 - 漏洞扫描
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(521, 52, '启动扫描', 2, 'vulnerability:scan:start', NULL, 1, 0, 0, 'system'),
+(522, 52, '停止扫描', 2, 'vulnerability:scan:stop', NULL, 2, 0, 0, 'system'),
+(523, 52, '导出报告', 2, 'vulnerability:scan:export', NULL, 3, 0, 0, 'system');
+
+-- 按钮权限 - 扫描目标管理
+INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
+(531, 53, '新增目标', 2, 'vulnerability:target:add', NULL, 1, 0, 0, 'system'),
+(532, 53, '编辑目标', 2, 'vulnerability:target:edit', NULL, 2, 0, 0, 'system'),
+(533, 53, '删除目标', 2, 'vulnerability:target:delete', NULL, 3, 0, 0, 'system');
+
 -- ------------------------------------------------------------
 -- 4.6 初始化角色权限关联
 -- 超级管理员拥有所有权限
@@ -1602,14 +1706,24 @@ SELECT 1, id FROM `sys_menu` WHERE del_flag = 0;
 
 -- 安全管理员权限（监控、防御操作）
 INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
-(2, 1), (2, 2), (2, 21), (2, 3), (2, 31), (2, 4), (2, 41), (2, 42), (2, 43),
-(2, 411), (2, 412), (2, 413), (2, 414), (2, 431), (2, 432), (2, 433), (2, 434),
-(2, 5), (2, 6);
+(2, 1), (2, 2), (2, 21), (2, 22), 
+(2, 3), (2, 31), (2, 32), 
+(2, 4), (2, 41), (2, 42), (2, 43), (2, 44), (2, 45),
+(2, 411), (2, 412), (2, 413), (2, 414), 
+(2, 431), (2, 432), (2, 433), (2, 434),
+(2, 441), (2, 442), (2, 443),
+(2, 5), (2, 51), (2, 52), (2, 53),
+(2, 521), (2, 522), (2, 523),
+(2, 531), (2, 532), (2, 533),
+(2, 6);
 
 -- 审计管理员权限（仅查看）
 INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
-(3, 1), (3, 2), (3, 21), (3, 3), (3, 31), (3, 4), (3, 41), (3, 42), (3, 43),
-(3, 5), (3, 6), (3, 75);
+(3, 1), (3, 2), (3, 21), (3, 22), 
+(3, 3), (3, 31), (3, 32), 
+(3, 4), (3, 41), (3, 42), (3, 43), (3, 44), (3, 45),
+(3, 5), (3, 51), (3, 52), (3, 53),
+(3, 6), (3, 75);
 
 -- ------------------------------------------------------------
 -- 4.7 管理员账号初始化说明

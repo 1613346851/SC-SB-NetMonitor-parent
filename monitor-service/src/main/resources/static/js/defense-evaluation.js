@@ -5,14 +5,33 @@
 let defenseChart = null;
 let successRateChart = null;
 let defenseLogTable;
+let echartsReady = false;
+let echartsRetryCount = 0;
 
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
-    document.getElementById('startDate').value = DateUtil.daysAgo(7);
-    
-    loadDefenseStatistics();
+function initCharts() {
+    if (typeof echarts === 'undefined') {
+        echartsRetryCount++;
+        if (echartsRetryCount <= 3) {
+            console.log('Waiting for ECharts to load...');
+        }
+        if (echartsRetryCount > 30) {
+            console.error('ECharts failed to load after 3 seconds');
+            return;
+        }
+        setTimeout(initCharts, 100);
+        return;
+    }
+    echartsReady = true;
     loadDefenseTrend();
     loadSuccessRateByType();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('listEndDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('listStartDate').value = DateUtil.daysAgo(7);
+    
+    loadDefenseStatistics();
+    initCharts();
     initDefenseLogTable();
     
     setInterval(() => {
@@ -69,8 +88,8 @@ function searchDefenseList() {
     const defenseType = document.getElementById('listDefenseType').value;
     const executeStatus = document.getElementById('listExecuteStatus').value;
     const defenseTarget = document.getElementById('listDefenseTarget').value;
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
+    const startDate = document.getElementById('listStartDate').value;
+    const endDate = document.getElementById('listEndDate').value;
     
     const params = {};
     if (defenseType) params.defenseType = defenseType;
@@ -89,6 +108,8 @@ function searchDefenseList() {
 }
 
 function resetDefenseListSearch() {
+    document.getElementById('listStartDate').value = DateUtil.daysAgo(7);
+    document.getElementById('listEndDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('listDefenseType').value = '';
     document.getElementById('listExecuteStatus').value = '';
     document.getElementById('listDefenseTarget').value = '';
@@ -194,10 +215,7 @@ function renderDefenseAction(action) {
 
 async function loadDefenseStatistics() {
     try {
-        const startDate = document.getElementById('startDate').value;
-        const endDate = document.getElementById('endDate').value;
-        
-        const stats = await http.get(`/defense/statistics?startDate=${startDate}&endDate=${endDate}`);
+        const stats = await http.get('/defense/statistics');
         
         document.getElementById('totalDefenses').textContent = stats.actualDefenseCount || 0;
         document.getElementById('successDefenses').textContent = stats.successDefenses || 0;
@@ -219,11 +237,12 @@ async function loadDefenseStatistics() {
 }
 
 async function loadDefenseTrend() {
+    if (typeof echarts === 'undefined') {
+        console.warn('ECharts not loaded, skipping loadDefenseTrend');
+        return;
+    }
     try {
-        const startDate = document.getElementById('startDate').value;
-        const endDate = document.getElementById('endDate').value;
-        
-        const data = await http.get(`/defense/trend?startDate=${startDate}&endDate=${endDate}`);
+        const data = await http.get('/defense/trend');
         
         const chartDom = document.getElementById('defenseTrendChart');
         defenseChart = echarts.init(chartDom);
@@ -292,11 +311,12 @@ async function loadDefenseTrend() {
 }
 
 async function loadSuccessRateByType() {
+    if (typeof echarts === 'undefined') {
+        console.warn('ECharts not loaded, skipping loadSuccessRateByType');
+        return;
+    }
     try {
-        const startDate = document.getElementById('startDate').value;
-        const endDate = document.getElementById('endDate').value;
-        
-        const data = await http.get(`/defense/success-rate-by-type?startDate=${startDate}&endDate=${endDate}`);
+        const data = await http.get('/defense/success-rate-by-type');
         
         const chartDom = document.getElementById('successRateChart');
         successRateChart = echarts.init(chartDom);
@@ -359,16 +379,9 @@ async function loadSuccessRateByType() {
     }
 }
 
-function refreshData() {
-    loadDefenseStatistics();
-    loadDefenseTrend();
-    loadSuccessRateByType();
-    searchDefenseList();
-}
-
 function exportReport() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
+    const startDate = document.getElementById('listStartDate').value;
+    const endDate = document.getElementById('listEndDate').value;
     
     const token = StorageUtil.get(AppConfig.AUTH.TOKEN_KEY);
     if (!token) {

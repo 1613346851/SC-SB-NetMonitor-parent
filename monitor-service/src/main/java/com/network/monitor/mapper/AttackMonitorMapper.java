@@ -55,6 +55,11 @@ public interface AttackMonitorMapper {
     int updateHandled(@Param("id") Long id, @Param("handled") Integer handled, @Param("handleRemark") String handleRemark);
 
     /**
+     * 根据ID删除攻击记录
+     */
+    int deleteById(@Param("id") Long id);
+
+    /**
      * 查询未处理的高危攻击记录
      */
     List<AttackMonitorEntity> selectUnHandledHighRisk();

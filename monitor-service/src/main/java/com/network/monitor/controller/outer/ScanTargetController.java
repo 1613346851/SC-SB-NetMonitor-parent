@@ -2,11 +2,14 @@ package com.network.monitor.controller.outer;
 
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.entity.ScanTargetEntity;
+import com.network.monitor.service.OperLogService;
 import com.network.monitor.service.ScanTargetService;
+import com.network.monitor.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +20,9 @@ public class ScanTargetController {
 
     @Autowired
     private ScanTargetService scanTargetService;
+    
+    @Autowired
+    private OperLogService operLogService;
 
     @GetMapping("/{id}")
     public ApiResponse<ScanTargetEntity> getById(@PathVariable Long id) {
@@ -74,9 +80,11 @@ public class ScanTargetController {
     }
 
     @PostMapping("/add")
-    public ApiResponse<ScanTargetEntity> add(@RequestBody ScanTargetEntity entity) {
+    public ApiResponse<ScanTargetEntity> add(@RequestBody ScanTargetEntity entity, HttpServletRequest request) {
         try {
             ScanTargetEntity created = scanTargetService.create(entity);
+            operLogService.logOperation(SecurityUtil.getCurrentUsername(), "INSERT", "扫描目标管理", 
+                "新增扫描目标：" + entity.getTargetName(), "add", "/api/scan-target/add", getClientIp(request), 0);
             return ApiResponse.success(created);
         } catch (Exception e) {
             log.error("创建扫描目标失败：", e);
@@ -85,9 +93,11 @@ public class ScanTargetController {
     }
 
     @PutMapping("/update")
-    public ApiResponse<ScanTargetEntity> update(@RequestBody ScanTargetEntity entity) {
+    public ApiResponse<ScanTargetEntity> update(@RequestBody ScanTargetEntity entity, HttpServletRequest request) {
         try {
             ScanTargetEntity updated = scanTargetService.update(entity);
+            operLogService.logOperation(SecurityUtil.getCurrentUsername(), "UPDATE", "扫描目标管理", 
+                "更新扫描目标：" + entity.getTargetName(), "update", "/api/scan-target/update", getClientIp(request), 0);
             return ApiResponse.success(updated);
         } catch (Exception e) {
             log.error("更新扫描目标失败：", e);
@@ -96,10 +106,12 @@ public class ScanTargetController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Boolean> delete(@PathVariable Long id) {
+    public ApiResponse<Boolean> delete(@PathVariable Long id, HttpServletRequest request) {
         try {
             boolean success = scanTargetService.delete(id);
             if (success) {
+                operLogService.logOperation(SecurityUtil.getCurrentUsername(), "DELETE", "扫描目标管理", 
+                    "删除扫描目标：" + id, "delete", "/api/scan-target/" + id, getClientIp(request), 0);
                 return ApiResponse.success(true);
             } else {
                 return ApiResponse.error("删除失败");
@@ -111,10 +123,12 @@ public class ScanTargetController {
     }
 
     @PutMapping("/{id}/enabled")
-    public ApiResponse<Boolean> updateEnabled(@PathVariable Long id, @RequestParam Integer enabled) {
+    public ApiResponse<Boolean> updateEnabled(@PathVariable Long id, @RequestParam Integer enabled, HttpServletRequest request) {
         try {
             boolean success = scanTargetService.updateEnabled(id, enabled);
             if (success) {
+                operLogService.logOperation(SecurityUtil.getCurrentUsername(), "UPDATE", "扫描目标管理", 
+                    (enabled == 1 ? "启用" : "禁用") + "扫描目标：" + id, "updateEnabled", "/api/scan-target/" + id + "/enabled", getClientIp(request), 0);
                 return ApiResponse.success(true);
             } else {
                 return ApiResponse.error("更新失败");
@@ -123,5 +137,16 @@ public class ScanTargetController {
             log.error("更新扫描目标启用状态失败：", e);
             return ApiResponse.error("更新失败");
         }
+    }
+    
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

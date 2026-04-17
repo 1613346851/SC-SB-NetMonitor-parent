@@ -38,10 +38,10 @@ public class CsvFileUtil {
      */
     public static void writeCsv(Writer writer, List<String> headers, List<Map<String, Object>> data, boolean ignoreNull) {
         try {
-            // 写入表头
+            writer.write('\uFEFF');
+
             writeHeader(writer, headers);
 
-            // 写入数据行
             for (Map<String, Object> row : data) {
                 writeRow(writer, headers, row, ignoreNull);
             }

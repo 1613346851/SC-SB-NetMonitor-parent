@@ -113,14 +113,17 @@ function renderBlacklistStatus(status) {
 }
 
 function searchBlacklist() {
-    const ipAddress = blacklistTable.getSearchValue('ipAddress');
+    const ipAddress = document.getElementById('ipAddress').value.trim();
+    const statusFilter = document.getElementById('statusFilter').value;
     const params = {};
-    if (ipAddress) params.ipAddress = ipAddress;
+    if (ipAddress) params.ip = ipAddress;
+    if (statusFilter) params.status = parseInt(statusFilter);
     blacklistTable.search(params);
 }
 
 function resetSearch() {
     document.getElementById('ipAddress').value = '';
+    document.getElementById('statusFilter').value = '';
     blacklistTable.resetSearch();
 }
 

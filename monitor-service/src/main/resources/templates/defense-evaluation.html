@@ -162,11 +162,11 @@
                     <div class="form-inline">
                         <div class="form-group">
                             <label class="form-label">开始日期</label>
-                            <input type="date" class="form-control" id="startDate">
+                            <input type="date" class="form-control" id="listStartDate">
                         </div>
                         <div class="form-group">
                             <label class="form-label">结束日期</label>
-                            <input type="date" class="form-control" id="endDate">
+                            <input type="date" class="form-control" id="listEndDate">
                         </div>
                         <div class="form-group">
                             <label class="form-label">防御类型</label>
@@ -192,7 +192,7 @@
                             <input type="text" class="form-control" id="listDefenseTarget" placeholder="请输入防御目标">
                         </div>
                         <div class="form-group">
-                            <button class="btn btn-primary" onclick="refreshData()">查询</button>
+                            <button class="btn btn-primary" onclick="searchDefenseList()">查询</button>
                             <button class="btn btn-default" onclick="resetDefenseListSearch()">重置</button>
                             <button class="btn btn-info" onclick="exportReport()">导出报告</button>
                         </div>

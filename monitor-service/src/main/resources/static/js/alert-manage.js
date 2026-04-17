@@ -329,6 +329,7 @@ function batchConfirm() {
     http.post('/alert/batch-confirm', selectedIds)
         .then(function() {
             message.success('批量确认成功');
+            clearSelection();
             loadStats();
             alertTable.refresh();
         })
@@ -338,26 +339,16 @@ function batchConfirm() {
         });
 }
 
-function batchDelete() {
-    if (selectedIds.length === 0) {
-        message.warning('请选择要删除的告警');
-        return;
+function clearSelection() {
+    selectedIds = [];
+    const selectAll = document.getElementById('selectAll');
+    if (selectAll) {
+        selectAll.checked = false;
     }
-    
-    if (!confirm('确定要批量删除选中的 ' + selectedIds.length + ' 条告警吗？此操作不可恢复。')) {
-        return;
-    }
-    
-    http.delete('/alert/batch', selectedIds)
-        .then(function() {
-            message.success('批量删除成功');
-            loadStats();
-            alertTable.refresh();
-        })
-        .catch(function(error) {
-            console.error('批量删除失败:', error);
-            message.error('批量删除失败');
-        });
+    const checkboxes = document.querySelectorAll('.alert-checkbox');
+    checkboxes.forEach(function(cb) {
+        cb.checked = false;
+    });
 }
 
 function getLevelClass(level) {

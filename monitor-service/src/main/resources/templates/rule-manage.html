@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>规则管理 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .batch-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .checkbox-cell {
+            width: 40px;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -73,11 +83,17 @@
                     <div class="table-container">
                         <div class="table-header">
                             <h3 class="table-title">攻击规则</h3>
+                            <div class="batch-actions">
+                                <button class="btn btn-sm btn-success" onclick="batchEnableRules()">批量启用</button>
+                                <button class="btn btn-sm btn-warning" onclick="batchDisableRules()">批量禁用</button>
+                                <button class="btn btn-sm btn-danger" onclick="batchDeleteRules()">批量删除</button>
+                            </div>
                         </div>
                         <div class="table-wrapper" style="position: relative;">
                             <table class="data-table has-fixed-action">
                                 <thead>
                                     <tr>
+                                        <th class="checkbox-cell"><input type="checkbox" id="selectAllRules" onchange="toggleSelectAllRules()"></th>
                                         <th data-sort="id" style="min-width: 60px;">ID</th>
                                         <th data-sort="ruleName" style="min-width: 120px;">规则名称</th>
                                         <th data-sort="attackType" style="min-width: 100px;">攻击类型</th>
@@ -89,7 +105,7 @@
                                 </thead>
                                 <tbody id="ruleTableBody">
                                     <tr>
-                                        <td colspan="7" class="text-center">加载中...</td>
+                                        <td colspan="8" class="text-center">加载中...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -134,12 +150,18 @@
                     <div class="table-container">
                         <div class="table-header">
                             <h3 class="table-title">检测白名单</h3>
-                            <button class="btn btn-primary" onclick="showAddWhitelistModal()">+ 新增白名单</button>
+                            <div class="batch-actions">
+                                <button class="btn btn-sm btn-primary" onclick="showAddWhitelistModal()">+ 新增白名单</button>
+                                <button class="btn btn-sm btn-success" onclick="batchEnableWhitelists()">批量启用</button>
+                                <button class="btn btn-sm btn-warning" onclick="batchDisableWhitelists()">批量禁用</button>
+                                <button class="btn btn-sm btn-danger" onclick="batchDeleteWhitelists()">批量删除</button>
+                            </div>
                         </div>
                         <div class="table-wrapper" style="position: relative;">
                             <table class="data-table has-fixed-action">
                                 <thead>
                                     <tr>
+                                        <th class="checkbox-cell"><input type="checkbox" id="selectAllWhitelists" onchange="toggleSelectAllWhitelists()"></th>
                                         <th data-sort="id" style="min-width: 60px;">ID</th>
                                         <th data-sort="whitelistType" style="min-width: 100px;">白名单类型</th>
                                         <th style="min-width: 200px;">白名单值</th>
@@ -151,7 +173,7 @@
                                 </thead>
                                 <tbody id="whitelistTableBody">
                                     <tr>
-                                        <td colspan="7" class="text-center">加载中...</td>
+                                        <td colspan="8" class="text-center">加载中...</td>
                                     </tr>
                                 </tbody>
                             </table>

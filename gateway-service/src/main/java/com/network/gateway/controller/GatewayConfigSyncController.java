@@ -349,9 +349,14 @@ public class GatewayConfigSyncController {
             }
 
             String operation = ruleDTO.getOperation();
+            Integer enabled = ruleDTO.getEnabled();
+            
             if ("DELETE".equals(operation)) {
                 ruleCache.removeRule(ruleDTO.getId());
                 logger.info("删除规则成功: id={}", ruleDTO.getId());
+            } else if (enabled == null || enabled != 1) {
+                ruleCache.removeRule(ruleDTO.getId());
+                logger.info("规则已禁用，从缓存移除: id={}, enabled={}", ruleDTO.getId(), enabled);
             } else if ("ADD".equals(operation) || "UPDATE".equals(operation)) {
                 ruleCache.addRule(ruleDTO);
                 logger.info("同步规则成功: id={}, operation={}", ruleDTO.getId(), operation);

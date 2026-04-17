@@ -173,6 +173,60 @@ public class WhitelistController {
         }
     }
 
+    @PutMapping("/batch-enable")
+    public ApiResponse<Void> batchEnable(@RequestBody List<Long> ids, HttpServletRequest request) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要启用的白名单");
+            }
+            for (Long id : ids) {
+                whitelistService.toggleEnabled(id, 1);
+            }
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "白名单管理",
+                    "批量启用白名单，共" + ids.size() + "条", "batchEnable", "/api/whitelist/batch-enable", getClientIp(request), 0);
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量启用白名单失败：", e);
+            return ApiResponse.error("批量启用失败");
+        }
+    }
+
+    @PutMapping("/batch-disable")
+    public ApiResponse<Void> batchDisable(@RequestBody List<Long> ids, HttpServletRequest request) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要禁用的白名单");
+            }
+            for (Long id : ids) {
+                whitelistService.toggleEnabled(id, 0);
+            }
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "白名单管理",
+                    "批量禁用白名单，共" + ids.size() + "条", "batchDisable", "/api/whitelist/batch-disable", getClientIp(request), 0);
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量禁用白名单失败：", e);
+            return ApiResponse.error("批量禁用失败");
+        }
+    }
+
+    @DeleteMapping("/batch")
+    public ApiResponse<Void> batchDelete(@RequestBody List<Long> ids, HttpServletRequest request) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要删除的白名单");
+            }
+            for (Long id : ids) {
+                whitelistService.delete(id);
+            }
+            operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "白名单管理",
+                    "批量删除白名单，共" + ids.size() + "条", "batchDelete", "/api/whitelist/batch", getClientIp(request), 0);
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量删除白名单失败：", e);
+            return ApiResponse.error("批量删除失败");
+        }
+    }
+
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {

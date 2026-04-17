@@ -7,12 +7,21 @@ let topAttackersData = [];
 let topAttackersSortField = 'attackCount';
 let topAttackersSortOrder = 'desc';
 
+function initReportCharts() {
+    if (typeof echarts === 'undefined') {
+        console.warn('ECharts not loaded yet, retrying...');
+        setTimeout(initReportCharts, 100);
+        return;
+    }
+    loadReportData();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = DateUtil.daysAgo(30);
     
     initTopAttackersTableSorting();
-    loadReportData();
+    initReportCharts();
 });
 
 function initTopAttackersTableSorting() {
@@ -316,6 +325,48 @@ function renderTrafficTrendChart(data) {
     });
     
     chart.setOption(option, { notMerge: true });
+}
+
+function exportReport() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    
+    const token = StorageUtil.get(AppConfig.AUTH.TOKEN_KEY);
+    if (!token) {
+        message.error('请先登录');
+        return;
+    }
+    
+    fetch(`${AppConfig.API_BASE_URL}/report/export?startDate=${startDate}&endDate=${endDate}`, {
+        method: 'GET',
+        headers: {
+            [AppConfig.AUTH.TOKEN_HEADER]: `${AppConfig.AUTH.TOKEN_PREFIX}${token}`
+        }
+    })
+    .then(response => {
+        if (response.status === 401) {
+            AuthService.handleUnauthorized();
+            throw new Error('登录已过期');
+        }
+        if (!response.ok) {
+            throw new Error('导出失败');
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `data_report_${startDate}_${endDate}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        message.success('导出成功');
+    })
+    .catch(error => {
+        message.error(error.message || '导出失败');
+    });
 }
 
 function calculateXAxisIntervalReport(dataLength) {

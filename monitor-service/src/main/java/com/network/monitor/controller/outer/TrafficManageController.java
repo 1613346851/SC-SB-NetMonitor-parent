@@ -40,9 +40,12 @@ public class TrafficManageController {
      */
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getTrafficList(
+            @RequestParam(required = false) String trafficId,
+            @RequestParam(required = false) String eventId,
             @RequestParam(required = false) String sourceIp,
             @RequestParam(required = false) String targetIp,
             @RequestParam(required = false) String httpMethod,
+            @RequestParam(required = false) String protocol,
             @RequestParam(required = false) String requestUri,
             @RequestParam(required = false) Integer responseStatus,
             @RequestParam(required = false) String stateTag,
@@ -70,12 +73,12 @@ public class TrafficManageController {
             String orderBy = buildOrderBy(sortField, sortOrder);
             
             List<TrafficMonitorEntity> list = trafficMonitorMapper.selectByCondition(
-                sourceIp, targetIp, httpMethod, requestUri, responseStatus, stateTag, isAggregated,
+                trafficId, eventId, sourceIp, targetIp, httpMethod, protocol, requestUri, responseStatus, stateTag, isAggregated,
                 startDateTime, endDateTime, offset, pageSize, orderBy
             );
             
             long total = trafficMonitorMapper.countByCondition(
-                sourceIp, targetIp, httpMethod, requestUri, responseStatus, stateTag, isAggregated,
+                trafficId, eventId, sourceIp, targetIp, httpMethod, protocol, requestUri, responseStatus, stateTag, isAggregated,
                 startDateTime, endDateTime
             );
 
@@ -130,9 +133,12 @@ public class TrafficManageController {
      */
     @GetMapping("/export")
     public void exportTraffic(
+            @RequestParam(required = false) String trafficId,
+            @RequestParam(required = false) String eventId,
             @RequestParam(required = false) String sourceIp,
             @RequestParam(required = false) String targetIp,
             @RequestParam(required = false) String httpMethod,
+            @RequestParam(required = false) String protocol,
             @RequestParam(required = false) String requestUri,
             @RequestParam(required = false) Integer responseStatus,
             @RequestParam(required = false) String stateTag,
@@ -150,7 +156,7 @@ public class TrafficManageController {
             String orderBy = buildOrderBy(sortField, sortOrder);
             
             List<TrafficMonitorEntity> list = trafficMonitorMapper.selectByCondition(
-                sourceIp, targetIp, httpMethod, requestUri, responseStatus, stateTag, isAggregated,
+                trafficId, eventId, sourceIp, targetIp, httpMethod, protocol, requestUri, responseStatus, stateTag, isAggregated,
                 startDateTime, endDateTime, 0, 10000, orderBy
             );
             

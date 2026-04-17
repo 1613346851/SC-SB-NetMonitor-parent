@@ -70,6 +70,12 @@
         SELECT <include refid="Base_Column_List"/>
         FROM sys_traffic_monitor
         <where>
+            <if test="trafficId != null and trafficId != ''">
+                AND traffic_id LIKE CONCAT('%', #{trafficId}, '%')
+            </if>
+            <if test="eventId != null and eventId != ''">
+                AND event_id LIKE CONCAT('%', #{eventId}, '%')
+            </if>
             <if test="sourceIp != null and sourceIp != ''">
                 AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
             </if>
@@ -78,6 +84,9 @@
             </if>
             <if test="httpMethod != null and httpMethod != ''">
                 AND http_method = #{httpMethod}
+            </if>
+            <if test="protocol != null and protocol != ''">
+                AND protocol = #{protocol}
             </if>
             <if test="requestUri != null and requestUri != ''">
                 AND request_uri LIKE CONCAT('%', #{requestUri}, '%')
@@ -113,6 +122,12 @@
         SELECT COUNT(*)
         FROM sys_traffic_monitor
         <where>
+            <if test="trafficId != null and trafficId != ''">
+                AND traffic_id LIKE CONCAT('%', #{trafficId}, '%')
+            </if>
+            <if test="eventId != null and eventId != ''">
+                AND event_id LIKE CONCAT('%', #{eventId}, '%')
+            </if>
             <if test="sourceIp != null and sourceIp != ''">
                 AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
             </if>
@@ -121,6 +136,9 @@
             </if>
             <if test="httpMethod != null and httpMethod != ''">
                 AND http_method = #{httpMethod}
+            </if>
+            <if test="protocol != null and protocol != ''">
+                AND protocol = #{protocol}
             </if>
             <if test="requestUri != null and requestUri != ''">
                 AND request_uri LIKE CONCAT('%', #{requestUri}, '%')

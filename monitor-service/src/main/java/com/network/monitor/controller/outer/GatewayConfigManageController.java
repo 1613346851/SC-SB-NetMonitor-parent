@@ -41,9 +41,6 @@ public class GatewayConfigManageController {
             result.put("configCount", gatewayConfigService.getGatewayConfigCount());
             result.put("timestamp", System.currentTimeMillis());
             
-            operLogService.logOperation(authService.getCurrentUsername(), "QUERY", "网关配置", 
-                "检查网关健康状态", "health", "/api/gateway/config/health", getClientIp(request), 0);
-            
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("检查网关健康状态失败", e);
@@ -58,9 +55,6 @@ public class GatewayConfigManageController {
     public ApiResponse<ConfigSyncStatusDTO> getSyncStatus(HttpServletRequest request) {
         try {
             ConfigSyncStatusDTO status = configSyncService.getSyncStatus();
-            
-            operLogService.logOperation(authService.getCurrentUsername(), "QUERY", "网关配置", 
-                "查询配置同步状态", "syncStatus", "/api/gateway/config/sync/status", getClientIp(request), 0);
             
             return ApiResponse.success(status);
         } catch (Exception e) {
@@ -157,9 +151,6 @@ public class GatewayConfigManageController {
     public ApiResponse<List<Map<String, Object>>> getGatewayConfigList(HttpServletRequest request) {
         try {
             List<Map<String, Object>> configList = gatewayConfigService.getGatewayConfigList();
-            
-            operLogService.logOperation(authService.getCurrentUsername(), "QUERY", "网关配置", 
-                "查询网关配置列表", "list", "/api/gateway/config/list", getClientIp(request), 0);
             
             return ApiResponse.success(configList);
         } catch (Exception e) {

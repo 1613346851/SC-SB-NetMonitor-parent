@@ -5,10 +5,13 @@ import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.TrafficMonitorEntity;
 import com.network.monitor.mapper.AttackMonitorMapper;
 import com.network.monitor.mapper.TrafficMonitorMapper;
+import com.network.monitor.service.OperLogService;
+import com.network.monitor.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -36,6 +39,9 @@ public class DataExportController {
 
     @Autowired
     private AttackMonitorMapper attackMonitorMapper;
+    
+    @Autowired
+    private OperLogService operLogService;
 
     /**
      * 导出流量数据为 CSV
@@ -46,6 +52,7 @@ public class DataExportController {
             @RequestParam(required = false) String requestUri,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime,
+            HttpServletRequest request,
             HttpServletResponse response) {
 
         try {
@@ -65,6 +72,9 @@ public class DataExportController {
             // 导出 CSV
             exportCsv(response, "traffic_data", headers, csvData);
 
+            operLogService.logOperation(SecurityUtil.getCurrentUsername(), "EXPORT", "流量管理", 
+                "导出流量数据，共" + dataList.size() + "条", "export", "/api/export/traffic", getClientIp(request), 0);
+
             log.info("导出流量数据 CSV 成功，记录数：{}", dataList.size());
         } catch (Exception e) {
             log.error("导出流量数据 CSV 失败：", e);
@@ -80,6 +90,7 @@ public class DataExportController {
             @RequestParam(required = false) String riskLevel,
             @RequestParam(required = false) String sourceIp,
             @RequestParam(required = false) Integer handled,
+            HttpServletRequest request,
             HttpServletResponse response) {
 
         try {
@@ -99,6 +110,9 @@ public class DataExportController {
             // 导出 CSV
             exportCsv(response, "attack_data", headers, csvData);
 
+            operLogService.logOperation(SecurityUtil.getCurrentUsername(), "EXPORT", "攻击监测", 
+                "导出攻击数据，共" + dataList.size() + "条", "export", "/api/export/attack", getClientIp(request), 0);
+
             log.info("导出攻击数据 CSV 成功，记录数：{}", dataList.size());
         } catch (Exception e) {
             log.error("导出攻击数据 CSV 失败：", e);
@@ -114,7 +128,7 @@ public class DataExportController {
         LocalDateTime endDateTime = parseDateTime(endTime);
 
         return trafficMonitorMapper.selectByCondition(
-                sourceIp, null, null, requestUri, null, null, null, startDateTime, endDateTime, 0, 10000, "id DESC"
+                null, null, sourceIp, null, null, null, requestUri, null, null, null, startDateTime, endDateTime, 0, 10000, "id DESC"
         );
     }
 
@@ -215,5 +229,16 @@ public class DataExportController {
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

@@ -115,6 +115,11 @@
         WHERE id = #{id}
     </update>
 
+    <delete id="deleteById">
+        DELETE FROM sys_attack_monitor
+        WHERE id = #{id}
+    </delete>
+
     <select id="selectUnHandledHighRisk" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM sys_attack_monitor

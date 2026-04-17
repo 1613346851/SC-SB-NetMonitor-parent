@@ -249,11 +249,13 @@
                 const avatarEl = document.querySelector('.user-avatar');
                 const nameEl = document.querySelector('.user-name');
                 
+                const displayName = user.nickname || user.username || '用户';
+                
                 if (avatarEl) {
-                    avatarEl.textContent = (user.username || user.realName || 'A').charAt(0).toUpperCase();
+                    avatarEl.textContent = displayName.charAt(0).toUpperCase();
                 }
                 if (nameEl) {
-                    nameEl.textContent = user.realName || user.username || '管理员';
+                    nameEl.textContent = displayName;
                 }
             }
         },

@@ -7,6 +7,7 @@
 let attackTable;
 let currentAttackId = null;
 let currentEventId = null;
+let selectedIds = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
@@ -91,7 +92,7 @@ function initAttackTable() {
         defaultSortOrder: 'desc',
         tableBodyEl: 'attackTableBody',
         paginationEl: 'pagination',
-        colspan: 10,
+        colspan: 11,
         fixedAction: true,
         enableTooltip: true,
         renderRow: function(item) {
@@ -105,6 +106,7 @@ function initAttackTable() {
             
             return `
                 <tr>
+                    <td class="checkbox-cell"><input type="checkbox" class="attack-checkbox" value="${item.id}" onchange="updateSelectedIds()"></td>
                     <td>${item.id || '-'}</td>
                     ${cell.renderCell(item.eventId, { maxLength: 16 })}
                     <td>${dateFormat.format(item.createTime)}</td>
@@ -270,3 +272,83 @@ document.getElementById('attackDetailModal')?.addEventListener('click', function
         closeAttackDetail();
     }
 });
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.attack-checkbox');
+    
+    checkboxes.forEach(function(cb) {
+        cb.checked = selectAll.checked;
+    });
+    
+    updateSelectedIds();
+}
+
+function updateSelectedIds() {
+    const checkboxes = document.querySelectorAll('.attack-checkbox:checked');
+    selectedIds = Array.from(checkboxes).map(function(cb) {
+        return parseInt(cb.value);
+    });
+    
+    const selectAll = document.getElementById('selectAll');
+    const allCheckboxes = document.querySelectorAll('.attack-checkbox');
+    if (allCheckboxes.length > 0) {
+        selectAll.checked = selectedIds.length === allCheckboxes.length;
+    }
+}
+
+function batchHandle() {
+    if (selectedIds.length === 0) {
+        message.warning('请选择要处理的攻击记录');
+        return;
+    }
+    
+    if (!confirm('确定要批量处理选中的 ' + selectedIds.length + ' 条攻击记录吗？')) {
+        return;
+    }
+    
+    http.put('/attack/batch-handle', selectedIds)
+        .then(function() {
+            message.success('批量处理成功');
+            clearSelection();
+            attackTable.loadData();
+        })
+        .catch(function(error) {
+            console.error('批量处理失败:', error);
+            message.error('批量处理失败');
+        });
+}
+
+function batchDelete() {
+    if (selectedIds.length === 0) {
+        message.warning('请选择要删除的攻击记录');
+        return;
+    }
+    
+    if (!confirm('确定要批量删除选中的 ' + selectedIds.length + ' 条攻击记录吗？此操作不可恢复。')) {
+        return;
+    }
+    
+    http.delete('/attack/batch', selectedIds)
+        .then(function() {
+            message.success('批量删除成功');
+            clearSelection();
+            attackTable.loadData();
+        })
+        .catch(function(error) {
+            console.error('批量删除失败:', error);
+            message.error('批量删除失败');
+        });
+}
+
+function clearSelection() {
+    selectedIds = [];
+    const selectAll = document.getElementById('selectAll');
+    if (selectAll) {
+        selectAll.checked = false;
+    }
+    const checkboxes = document.querySelectorAll('.attack-checkbox');
+    checkboxes.forEach(function(cb) {
+        cb.checked = false;
+    });
+}

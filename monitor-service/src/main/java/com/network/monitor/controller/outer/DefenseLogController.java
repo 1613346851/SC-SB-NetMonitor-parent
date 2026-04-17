@@ -29,8 +29,8 @@ public class DefenseLogController {
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
         try {
-            LocalDateTime startTime = parseDateTime(startDate);
-            LocalDateTime endTime = parseDateTime(endDate);
+            LocalDateTime startTime = parseStartDate(startDate);
+            LocalDateTime endTime = parseEndDate(endDate);
 
             Map<String, Object> stats = new HashMap<>();
             
@@ -79,8 +79,8 @@ public class DefenseLogController {
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
         try {
-            LocalDateTime startTime = parseDateTime(startDate);
-            LocalDateTime endTime = parseDateTime(endDate);
+            LocalDateTime startTime = parseStartDate(startDate);
+            LocalDateTime endTime = parseEndDate(endDate);
 
             if (startTime == null) {
                 startTime = LocalDateTime.now().minusDays(7);
@@ -141,8 +141,8 @@ public class DefenseLogController {
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
         try {
-            LocalDateTime startTime = parseDateTime(startDate);
-            LocalDateTime endTime = parseDateTime(endDate);
+            LocalDateTime startTime = parseStartDate(startDate);
+            LocalDateTime endTime = parseEndDate(endDate);
 
             List<Map<String, Object>> result = new ArrayList<>();
             
@@ -202,10 +202,18 @@ public class DefenseLogController {
             LocalDateTime startTime = null;
             LocalDateTime endTime = null;
             if (startDate != null && !startDate.isEmpty()) {
-                startTime = LocalDateTime.parse(startDate.replace(" ", "T").substring(0, 19));
+                if (startDate.length() == 10) {
+                    startTime = LocalDate.parse(startDate).atStartOfDay();
+                } else {
+                    startTime = LocalDateTime.parse(startDate.replace(" ", "T").substring(0, 19));
+                }
             }
             if (endDate != null && !endDate.isEmpty()) {
-                endTime = LocalDateTime.parse(endDate.replace(" ", "T").substring(0, 19));
+                if (endDate.length() == 10) {
+                    endTime = LocalDate.parse(endDate).atTime(23, 59, 59);
+                } else {
+                    endTime = LocalDateTime.parse(endDate.replace(" ", "T").substring(0, 19));
+                }
             }
 
             List<DefenseLogEntity> list = defenseLogMapper.selectByCondition(
@@ -304,6 +312,27 @@ public class DefenseLogController {
             return null;
         }
         try {
+            if (dateStr.length() == 10) {
+                return LocalDate.parse(dateStr).atStartOfDay();
+            }
+            return LocalDateTime.parse(dateStr.replace(" ", "T").substring(0, 19));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private LocalDateTime parseStartDate(String dateStr) {
+        return parseDateTime(dateStr);
+    }
+
+    private LocalDateTime parseEndDate(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return null;
+        }
+        try {
+            if (dateStr.length() == 10) {
+                return LocalDate.parse(dateStr).atTime(23, 59, 59);
+            }
             return LocalDateTime.parse(dateStr.replace(" ", "T").substring(0, 19));
         } catch (Exception e) {
             return null;
@@ -316,8 +345,8 @@ public class DefenseLogController {
             @RequestParam(required = false) String endDate,
             HttpServletResponse response) {
         try {
-            LocalDateTime startTime = parseDateTime(startDate);
-            LocalDateTime endTime = parseDateTime(endDate);
+            LocalDateTime startTime = parseStartDate(startDate);
+            LocalDateTime endTime = parseEndDate(endDate);
 
             if (startTime == null) {
                 startTime = LocalDateTime.now().minusDays(7);

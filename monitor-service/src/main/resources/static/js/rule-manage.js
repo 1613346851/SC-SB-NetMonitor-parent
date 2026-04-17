@@ -1,6 +1,8 @@
 let ruleTable;
 let whitelistTable;
 let currentTab = 'rules';
+let selectedRuleIds = [];
+let selectedWhitelistIds = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     initRuleTable();
@@ -35,7 +37,7 @@ function initRuleTable() {
         defaultSortOrder: 'desc',
         tableBodyEl: 'ruleTableBody',
         paginationEl: 'pagination',
-        colspan: 7,
+        colspan: 8,
         fixedAction: true,
         enableTooltip: true,
         renderRow: function(item) {
@@ -43,6 +45,7 @@ function initRuleTable() {
             
             return `
                 <tr>
+                    <td class="checkbox-cell"><input type="checkbox" class="rule-checkbox" value="${item.id}" onchange="updateSelectedRuleIds()"></td>
                     <td>${item.id || '-'}</td>
                     ${cell.renderCell(item.ruleName, { maxLength: 40 })}
                     <td>${cell.renderAttackType(item.attackType)}</td>
@@ -72,7 +75,7 @@ function initWhitelistTable() {
         defaultSortOrder: 'desc',
         tableBodyEl: 'whitelistTableBody',
         paginationEl: 'whitelistPagination',
-        colspan: 7,
+        colspan: 8,
         fixedAction: true,
         enableTooltip: true,
         renderRow: function(item) {
@@ -80,6 +83,7 @@ function initWhitelistTable() {
             
             return `
                 <tr>
+                    <td class="checkbox-cell"><input type="checkbox" class="whitelist-checkbox" value="${item.id}" onchange="updateSelectedWhitelistIds()"></td>
                     <td>${item.id || '-'}</td>
                     <td>${renderWhitelistType(item.whitelistType)}</td>
                     ${cell.renderCell(item.whitelistValue, { maxLength: 50 })}
@@ -396,3 +400,207 @@ document.addEventListener('keydown', function(e) {
         closeWhitelistModal();
     }
 });
+
+function toggleSelectAllRules() {
+    const selectAll = document.getElementById('selectAllRules');
+    const checkboxes = document.querySelectorAll('.rule-checkbox');
+    
+    checkboxes.forEach(function(cb) {
+        cb.checked = selectAll.checked;
+    });
+    
+    updateSelectedRuleIds();
+}
+
+function updateSelectedRuleIds() {
+    const checkboxes = document.querySelectorAll('.rule-checkbox:checked');
+    selectedRuleIds = Array.from(checkboxes).map(function(cb) {
+        return parseInt(cb.value);
+    });
+    
+    const selectAll = document.getElementById('selectAllRules');
+    const allCheckboxes = document.querySelectorAll('.rule-checkbox');
+    if (allCheckboxes.length > 0) {
+        selectAll.checked = selectedRuleIds.length === allCheckboxes.length;
+    }
+}
+
+function toggleSelectAllWhitelists() {
+    const selectAll = document.getElementById('selectAllWhitelists');
+    const checkboxes = document.querySelectorAll('.whitelist-checkbox');
+    
+    checkboxes.forEach(function(cb) {
+        cb.checked = selectAll.checked;
+    });
+    
+    updateSelectedWhitelistIds();
+}
+
+function updateSelectedWhitelistIds() {
+    const checkboxes = document.querySelectorAll('.whitelist-checkbox:checked');
+    selectedWhitelistIds = Array.from(checkboxes).map(function(cb) {
+        return parseInt(cb.value);
+    });
+    
+    const selectAll = document.getElementById('selectAllWhitelists');
+    const allCheckboxes = document.querySelectorAll('.whitelist-checkbox');
+    if (allCheckboxes.length > 0) {
+        selectAll.checked = selectedWhitelistIds.length === allCheckboxes.length;
+    }
+}
+
+function batchEnableRules() {
+    if (selectedRuleIds.length === 0) {
+        message.warning('请选择要启用的规则');
+        return;
+    }
+    
+    if (!confirm('确定要批量启用选中的 ' + selectedRuleIds.length + ' 条规则吗？')) {
+        return;
+    }
+    
+    http.put('/rule/batch-enable', selectedRuleIds)
+        .then(function() {
+            message.success('批量启用成功');
+            clearRuleSelection();
+            ruleTable.refresh();
+        })
+        .catch(function(error) {
+            console.error('批量启用失败:', error);
+            message.error('批量启用失败');
+        });
+}
+
+function batchDisableRules() {
+    if (selectedRuleIds.length === 0) {
+        message.warning('请选择要禁用的规则');
+        return;
+    }
+    
+    if (!confirm('确定要批量禁用选中的 ' + selectedRuleIds.length + ' 条规则吗？')) {
+        return;
+    }
+    
+    http.put('/rule/batch-disable', selectedRuleIds)
+        .then(function() {
+            message.success('批量禁用成功');
+            clearRuleSelection();
+            ruleTable.refresh();
+        })
+        .catch(function(error) {
+            console.error('批量禁用失败:', error);
+            message.error('批量禁用失败');
+        });
+}
+
+function batchDeleteRules() {
+    if (selectedRuleIds.length === 0) {
+        message.warning('请选择要删除的规则');
+        return;
+    }
+    
+    if (!confirm('确定要批量删除选中的 ' + selectedRuleIds.length + ' 条规则吗？此操作不可恢复。')) {
+        return;
+    }
+    
+    http.delete('/rule/batch', selectedRuleIds)
+        .then(function() {
+            message.success('批量删除成功');
+            clearRuleSelection();
+            ruleTable.refresh();
+        })
+        .catch(function(error) {
+            console.error('批量删除失败:', error);
+            message.error('批量删除失败');
+        });
+}
+
+function batchEnableWhitelists() {
+    if (selectedWhitelistIds.length === 0) {
+        message.warning('请选择要启用的白名单');
+        return;
+    }
+    
+    if (!confirm('确定要批量启用选中的 ' + selectedWhitelistIds.length + ' 条白名单吗？')) {
+        return;
+    }
+    
+    http.put('/whitelist/batch-enable', selectedWhitelistIds)
+        .then(function() {
+            message.success('批量启用成功');
+            clearWhitelistSelection();
+            whitelistTable.refresh();
+        })
+        .catch(function(error) {
+            console.error('批量启用失败:', error);
+            message.error('批量启用失败');
+        });
+}
+
+function batchDisableWhitelists() {
+    if (selectedWhitelistIds.length === 0) {
+        message.warning('请选择要禁用的白名单');
+        return;
+    }
+    
+    if (!confirm('确定要批量禁用选中的 ' + selectedWhitelistIds.length + ' 条白名单吗？')) {
+        return;
+    }
+    
+    http.put('/whitelist/batch-disable', selectedWhitelistIds)
+        .then(function() {
+            message.success('批量禁用成功');
+            clearWhitelistSelection();
+            whitelistTable.refresh();
+        })
+        .catch(function(error) {
+            console.error('批量禁用失败:', error);
+            message.error('批量禁用失败');
+        });
+}
+
+function batchDeleteWhitelists() {
+    if (selectedWhitelistIds.length === 0) {
+        message.warning('请选择要删除的白名单');
+        return;
+    }
+    
+    if (!confirm('确定要批量删除选中的 ' + selectedWhitelistIds.length + ' 条白名单吗？此操作不可恢复。')) {
+        return;
+    }
+    
+    http.delete('/whitelist/batch', selectedWhitelistIds)
+        .then(function() {
+            message.success('批量删除成功');
+            clearWhitelistSelection();
+            whitelistTable.refresh();
+        })
+        .catch(function(error) {
+            console.error('批量删除失败:', error);
+            message.error('批量删除失败');
+        });
+}
+
+function clearRuleSelection() {
+    selectedRuleIds = [];
+    const selectAll = document.getElementById('selectAllRules');
+    if (selectAll) {
+        selectAll.checked = false;
+    }
+    const checkboxes = document.querySelectorAll('.rule-checkbox');
+    checkboxes.forEach(function(cb) {
+        cb.checked = false;
+    });
+}
+
+function clearWhitelistSelection() {
+    selectedWhitelistIds = [];
+    const selectAll = document.getElementById('selectAllWhitelists');
+    if (selectAll) {
+        selectAll.checked = false;
+    }
+    const checkboxes = document.querySelectorAll('.whitelist-checkbox');
+    checkboxes.forEach(function(cb) {
+        cb.checked = false;
+    });
+}

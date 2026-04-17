@@ -411,8 +411,8 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                                      long startTime, String phase) {
         VulnerabilityCache.VulnerabilityInfo vuln = vulnResult.getFirstVuln();
         
-        if (vulnResult.hasDefenseRule()) {
-            logger.info("漏洞[{}]已配置防御规则，跳过漏洞告警（由规则匹配处理）: ip={}, uri={}", 
+        if (hasEnabledDefenseRule(vuln)) {
+            logger.info("漏洞[{}]已配置启用的防御规则，跳过漏洞告警（由规则匹配处理）: ip={}, uri={}", 
                 vuln.getVulnName(), sourceIp, exchange.getRequest().getURI().getPath());
             return;
         }
@@ -485,6 +485,38 @@ public class AttackRuleFilter implements GlobalFilter, Ordered {
                 logger.error("推送漏洞告警日志失败: {}", e.getMessage());
             }
         }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+    }
+
+    private boolean hasEnabledDefenseRule(VulnerabilityCache.VulnerabilityInfo vuln) {
+        if (vuln == null) {
+            return false;
+        }
+        
+        Integer ruleCount = vuln.getRuleCount();
+        if (ruleCount == null || ruleCount <= 0) {
+            return false;
+        }
+        
+        String ruleIds = vuln.getRuleIds();
+        if (ruleIds == null || ruleIds.isEmpty()) {
+            return false;
+        }
+        
+        String[] ids = ruleIds.split(",");
+        for (String idStr : ids) {
+            try {
+                Long ruleId = Long.parseLong(idStr.trim());
+                if (ruleCache.getRuleById(ruleId) != null) {
+                    logger.debug("漏洞[{}]关联的规则[id={}]已启用", vuln.getVulnName(), ruleId);
+                    return true;
+                }
+            } catch (NumberFormatException e) {
+                logger.warn("解析规则ID失败: {}", idStr);
+            }
+        }
+        
+        logger.debug("漏洞[{}]关联的{}条规则均未启用", vuln.getVulnName(), ruleCount);
+        return false;
     }
 
     private String convertVulnLevelToRiskLevel(String vulnLevel) {

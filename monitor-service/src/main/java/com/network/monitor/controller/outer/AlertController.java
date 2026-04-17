@@ -6,12 +6,14 @@ import com.network.monitor.entity.AlertEntity;
 import com.network.monitor.entity.AlertRuleEntity;
 import com.network.monitor.mapper.AlertMapper;
 import com.network.monitor.service.AlertService;
+import com.network.monitor.service.OperLogService;
 import com.network.monitor.util.SecurityUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +30,9 @@ public class AlertController {
 
     @Autowired
     private AlertMapper alertMapper;
+    
+    @Autowired
+    private OperLogService operLogService;
 
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getAlertList(
@@ -83,10 +88,12 @@ public class AlertController {
     }
 
     @PostMapping("/{id}/confirm")
-    public ApiResponse<Void> confirmAlert(@PathVariable Long id) {
+    public ApiResponse<Void> confirmAlert(@PathVariable Long id, HttpServletRequest request) {
         try {
             String username = SecurityUtil.getCurrentUsername();
             alertService.confirm(id, username);
+            operLogService.logOperation(username, "UPDATE", "告警管理", 
+                "确认告警：" + id, "confirm", "/api/alert/" + id + "/confirm", getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             logger.error("确认告警失败: id={}", id, e);
@@ -97,11 +104,14 @@ public class AlertController {
     @PostMapping("/{id}/ignore")
     public ApiResponse<Void> ignoreAlert(
             @PathVariable Long id,
-            @RequestBody(required = false) Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request) {
         try {
             String username = SecurityUtil.getCurrentUsername();
             String reason = body != null ? body.get("reason") : null;
             alertService.ignore(id, username, reason);
+            operLogService.logOperation(username, "UPDATE", "告警管理", 
+                "忽略告警：" + id, "ignore", "/api/alert/" + id + "/ignore", getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             logger.error("忽略告警失败: id={}", id, e);
@@ -110,13 +120,15 @@ public class AlertController {
     }
 
     @PostMapping("/batch-confirm")
-    public ApiResponse<Void> batchConfirm(@RequestBody List<Long> ids) {
+    public ApiResponse<Void> batchConfirm(@RequestBody List<Long> ids, HttpServletRequest request) {
         try {
             if (ids == null || ids.isEmpty()) {
                 return ApiResponse.error("请选择要确认的告警");
             }
             String username = SecurityUtil.getCurrentUsername();
             alertService.batchConfirm(ids, username);
+            operLogService.logOperation(username, "UPDATE", "告警管理", 
+                "批量确认告警，共" + ids.size() + "条", "batchConfirm", "/api/alert/batch-confirm", getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             logger.error("批量确认告警失败", e);
@@ -125,9 +137,11 @@ public class AlertController {
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteAlert(@PathVariable Long id) {
+    public ApiResponse<Void> deleteAlert(@PathVariable Long id, HttpServletRequest request) {
         try {
             alertService.delete(id);
+            operLogService.logOperation(SecurityUtil.getCurrentUsername(), "DELETE", "告警管理", 
+                "删除告警：" + id, "delete", "/api/alert/" + id, getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             logger.error("删除告警失败: id={}", id, e);
@@ -136,12 +150,14 @@ public class AlertController {
     }
 
     @DeleteMapping("/batch")
-    public ApiResponse<Void> batchDelete(@RequestBody List<Long> ids) {
+    public ApiResponse<Void> batchDelete(@RequestBody List<Long> ids, HttpServletRequest request) {
         try {
             if (ids == null || ids.isEmpty()) {
                 return ApiResponse.error("请选择要删除的告警");
             }
             alertService.batchDelete(ids);
+            operLogService.logOperation(SecurityUtil.getCurrentUsername(), "DELETE", "告警管理", 
+                "批量删除告警，共" + ids.size() + "条", "batchDelete", "/api/alert/batch", getClientIp(request), 0);
             return ApiResponse.success();
         } catch (Exception e) {
             logger.error("批量删除告警失败", e);
@@ -252,5 +268,16 @@ public class AlertController {
             case "firstOccurTime": return "first_occur_time";
             default: return "id";
         }
+    }
+    
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

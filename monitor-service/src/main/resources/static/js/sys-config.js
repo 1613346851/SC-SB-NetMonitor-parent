@@ -34,6 +34,7 @@ const GATEWAY_SYNC_CONFIG_KEYS = [
     'ddos.rate-limit-trigger-window-seconds',
     'ddos.slow-attack.threshold-rps',
     'ddos.global-attack.related-ip-threshold',
+    'defense.decision.rate-limit-threshold',
     'state.normal-to-suspicious.threshold-rps',
     'state.normal-to-suspicious.window-ms',
     'state.normal-to-suspicious.slide-step-ms',
@@ -290,7 +291,7 @@ function applyFilters() {
     let list = [...configList];
 
     if (currentFilterMode === 'GATEWAY_ONLY') {
-        list = list.filter(item => item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX));
+        list = list.filter(item => GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
     } else if (currentFilterMode === 'DDOS_ONLY') {
         list = list.filter(item => item.configKey && item.configKey.startsWith(DDOS_CONFIG_PREFIX));
     } else if (currentFilterMode === 'DEFENSE_ONLY') {
@@ -300,11 +301,9 @@ function applyFilters() {
     }
 
     if (category === 'GATEWAY') {
-        list = list.filter(item => item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX));
+        list = list.filter(item => GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
     } else if (category === 'MONITOR') {
-        list = list.filter(item => 
-            !(item.configKey && item.configKey.startsWith(GATEWAY_CONFIG_PREFIX))
-        );
+        list = list.filter(item => !GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
     }
 
     if (keyword) {
@@ -777,18 +776,12 @@ async function saveGatewayDefenseConfig() {
             successCount++;
         }
 
-        const pushResponse = await http.post('/gateway/config/sync', { configs });
+        await http.post('/gateway/config/sync', { configs });
         
-        if (pushResponse.success) {
-            message.success(`已保存 ${successCount} 项配置并推送到网关`);
-            closeGatewayDefenseModal();
-            await loadConfigList();
-            checkGatewayStatus();
-        } else {
-            message.warning('配置已保存，但推送到网关失败');
-            closeGatewayDefenseModal();
-            await loadConfigList();
-        }
+        message.success(`已保存 ${successCount} 项配置并推送到网关`);
+        closeGatewayDefenseModal();
+        await loadConfigList();
+        checkGatewayStatus();
     } catch (error) {
         console.error('保存网关防御配置失败:', error);
         message.error('保存配置失败：' + (error.message || '未知错误'));

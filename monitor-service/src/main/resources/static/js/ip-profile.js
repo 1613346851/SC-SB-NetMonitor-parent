@@ -38,20 +38,27 @@ function renderProfile(profile) {
     }
     document.getElementById('profileLocation').textContent = location.length > 0 ? location.join(' · ') : '未知位置';
     
-    let statusText = profile.currentStatus || '正常';
+    let statusText = '正常';
     let statusClass = 'status-normal';
+    
     if (profile.isBlacklisted) {
         statusText = '已封禁';
         statusClass = 'status-blacklisted';
     } else if (profile.currentState === 2) {
         statusText = '攻击中';
         statusClass = 'status-attacking';
+    } else if (profile.currentState === 3) {
+        statusText = '已防御';
+        statusClass = 'status-defended';
+    } else if (profile.currentState === 4) {
+        statusText = '冷却中';
+        statusClass = 'status-defended';
     } else if (profile.currentState === 1) {
         statusText = '可疑';
         statusClass = 'status-suspicious';
-    } else if (profile.currentState === 5) {
-        statusText = '冷却中';
-        statusClass = 'status-defended';
+    } else {
+        statusText = '正常';
+        statusClass = 'status-normal';
     }
     document.getElementById('profileStatus').textContent = statusText;
     document.getElementById('profileStatus').className = 'profile-status ' + statusClass;

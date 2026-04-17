@@ -14,6 +14,14 @@
         .event-link:hover {
             text-decoration: underline;
         }
+        .batch-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .checkbox-cell {
+            width: 40px;
+        }
     </style>
 </head>
 <body>
@@ -90,11 +98,16 @@
                 <div class="table-container">
                     <div class="table-header">
                         <h3 class="table-title">攻击记录</h3>
+                        <div class="batch-actions">
+                            <button class="btn btn-sm btn-success" onclick="batchHandle()">批量处理</button>
+                            <button class="btn btn-sm btn-danger" onclick="batchDelete()">批量删除</button>
+                        </div>
                     </div>
                     <div class="table-wrapper" style="position: relative;">
                         <table class="data-table has-fixed-action">
                             <thead>
                                 <tr>
+                                    <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
                                     <th data-sort="id" style="min-width: 60px;">ID</th>
                                     <th data-sort="eventId" style="min-width: 140px;">事件ID</th>
                                     <th data-sort="attackTime" style="min-width: 150px;">攻击时间</th>
@@ -109,7 +122,7 @@
                             </thead>
                             <tbody id="attackTableBody">
                                 <tr>
-                                    <td colspan="10" class="text-center">加载中...</td>
+                                    <td colspan="11" class="text-center">加载中...</td>
                                 </tr>
                             </tbody>
                         </table>

@@ -147,6 +147,38 @@ public class AttackMonitorController {
         }
     }
 
+    @PutMapping("/batch-handle")
+    public ApiResponse<Void> batchHandleAttack(@RequestBody List<Long> ids) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要处理的攻击记录");
+            }
+            for (Long id : ids) {
+                attackMonitorMapper.updateHandled(id, 1, "批量处理");
+            }
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量处理攻击记录失败：", e);
+            return ApiResponse.error("批量处理失败");
+        }
+    }
+
+    @DeleteMapping("/batch")
+    public ApiResponse<Void> batchDeleteAttack(@RequestBody List<Long> ids) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要删除的攻击记录");
+            }
+            for (Long id : ids) {
+                attackMonitorMapper.deleteById(id);
+            }
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量删除攻击记录失败：", e);
+            return ApiResponse.error("批量删除失败");
+        }
+    }
+
     /**
      * 导出攻击数据为CSV
      */

@@ -1,7 +1,10 @@
 package com.network.monitor.controller.outer;
 
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.common.util.CsvFileUtil;
 import com.network.monitor.service.DashboardStatService;
+import com.network.monitor.service.OperLogService;
+import com.network.monitor.util.SecurityUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +12,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +36,9 @@ public class ReportController {
 
     @Autowired
     private DashboardStatService dashboardStatService;
+    
+    @Autowired
+    private OperLogService operLogService;
 
     /**
      * 获取报表核心统计汇总
@@ -130,5 +145,103 @@ public class ReportController {
             log.error("获取攻击源 IP 统计失败：", e);
             return ApiResponse.error("获取数据失败");
         }
+    }
+
+    @GetMapping("/export")
+    public void exportReport(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        try {
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("总流量数", dashboardStatService.getTotalTraffic(startDate, endDate));
+            summary.put("总攻击次数", dashboardStatService.getTotalAttacks(startDate, endDate));
+            summary.put("总漏洞数", dashboardStatService.getTotalVulnerabilities(startDate, endDate));
+            summary.put("总防御次数", dashboardStatService.getTotalDefenses(startDate, endDate));
+
+            List<Map<String, Object>> trafficTrend = dashboardStatService.getTrafficTrend(startDate, endDate);
+            List<Map<String, Object>> attackTrend = dashboardStatService.getAttackTrend(startDate, endDate);
+            List<Map<String, Object>> attackType = dashboardStatService.getAttackTypeDistribution();
+            List<Map<String, Object>> riskLevel = dashboardStatService.getRiskLevelDistribution();
+            List<Map<String, Object>> topAttackers = dashboardStatService.getTopSourceIps();
+
+            List<String> headers = List.of(
+                    "指标", "数值"
+            );
+
+            List<Map<String, Object>> csvData = new ArrayList<>();
+            
+            csvData.add(createRow("=== 统计摘要 ===", ""));
+            csvData.add(createRow("总流量数", summary.get("总流量数")));
+            csvData.add(createRow("总攻击次数", summary.get("总攻击次数")));
+            csvData.add(createRow("总漏洞数", summary.get("总漏洞数")));
+            csvData.add(createRow("总防御次数", summary.get("总防御次数")));
+            csvData.add(createRow("", ""));
+            
+            csvData.add(createRow("=== 流量趋势 ===", ""));
+            for (Map<String, Object> item : trafficTrend) {
+                csvData.add(createRow(item.get("date"), item.get("count")));
+            }
+            csvData.add(createRow("", ""));
+            
+            csvData.add(createRow("=== 攻击趋势 ===", ""));
+            for (Map<String, Object> item : attackTrend) {
+                csvData.add(createRow(item.get("date"), item.get("count")));
+            }
+            csvData.add(createRow("", ""));
+            
+            csvData.add(createRow("=== 攻击类型分布 ===", ""));
+            for (Map<String, Object> item : attackType) {
+                csvData.add(createRow(item.get("name"), item.get("value")));
+            }
+            csvData.add(createRow("", ""));
+            
+            csvData.add(createRow("=== 风险等级分布 ===", ""));
+            for (Map<String, Object> item : riskLevel) {
+                csvData.add(createRow(item.get("name"), item.get("value")));
+            }
+            csvData.add(createRow("", ""));
+            
+            csvData.add(createRow("=== 攻击源 IP Top 10 ===", ""));
+            for (Map<String, Object> item : topAttackers) {
+                csvData.add(createRow(item.get("ip"), item.get("count")));
+            }
+
+            String fileName = CsvFileUtil.generateCsvFileName("data_report");
+            response.setContentType("text/csv;charset=UTF-8");
+            response.setHeader("Content-Disposition", 
+                    "attachment;filename=" + URLEncoder.encode(fileName, StandardCharsets.UTF_8.toString()));
+            response.setCharacterEncoding("UTF-8");
+
+            try (Writer writer = new BufferedWriter(new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8))) {
+                CsvFileUtil.writeCsv(writer, headers, csvData, true);
+            }
+
+            operLogService.logOperation(SecurityUtil.getCurrentUsername(), "EXPORT", "数据报表", 
+                "导出数据报表", "export", "/api/report/export", getClientIp(request), 0);
+
+            log.info("导出数据报表 CSV 成功");
+        } catch (Exception e) {
+            log.error("导出数据报表 CSV 失败：", e);
+        }
+    }
+
+    private Map<String, Object> createRow(Object col1, Object col2) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("指标", col1 != null ? col1.toString() : "");
+        row.put("数值", col2 != null ? col2.toString() : "");
+        return row;
+    }
+    
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }
