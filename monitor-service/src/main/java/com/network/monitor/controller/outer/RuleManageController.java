@@ -60,19 +60,60 @@ public class RuleManageController {
     private VulnerabilityMonitorMapper vulnerabilityMonitorMapper;
 
     /**
-     * 根据 ID 查询规则
+     * 根据 ID 查询规则（包含关联漏洞信息）
      */
     @GetMapping("/{id}")
-    public ApiResponse<MonitorRuleEntity> getRuleById(@PathVariable Long id) {
+    public ApiResponse<Map<String, Object>> getRuleById(@PathVariable Long id) {
         try {
             MonitorRuleEntity rule = monitorRuleMapper.selectById(id);
             if (rule == null) {
                 return ApiResponse.notFound("规则不存在");
             }
-            return ApiResponse.success(rule);
+            
+            List<VulnerabilityRuleEntity> vulnRules = vulnerabilityRuleMapper.selectByRuleId(id);
+            List<Long> vulnIds = vulnRules.stream()
+                    .map(VulnerabilityRuleEntity::getVulnerabilityId)
+                    .collect(Collectors.toList());
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("rule", rule);
+            result.put("vulnerabilityIds", vulnIds);
+            
+            return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("查询规则详情失败：", e);
             return ApiResponse.error("查询失败");
+        }
+    }
+
+    /**
+     * 获取可关联的漏洞列表（用于下拉选择）
+     */
+    @GetMapping("/available-vulnerabilities")
+    public ApiResponse<List<Map<String, Object>>> getAvailableVulnerabilities(
+            @RequestParam(required = false) String keyword) {
+        try {
+            List<VulnerabilityMonitorEntity> vulns;
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                vulns = vulnerabilityMonitorMapper.selectByKeyword(keyword.trim());
+            } else {
+                vulns = vulnerabilityMonitorMapper.selectAll();
+            }
+            
+            List<Map<String, Object>> result = vulns.stream().map(vuln -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", vuln.getId());
+                map.put("vulnName", vuln.getVulnName());
+                map.put("vulnType", vuln.getVulnType());
+                map.put("vulnLevel", vuln.getVulnLevel());
+                map.put("vulnPath", vuln.getVulnPath());
+                return map;
+            }).collect(Collectors.toList());
+            
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("获取漏洞列表失败：", e);
+            return ApiResponse.error("获取失败");
         }
     }
 
@@ -135,14 +176,37 @@ public class RuleManageController {
      * 新增规则
      */
     @PostMapping("/add")
-    public ApiResponse<Void> addRule(@RequestBody MonitorRuleEntity rule, HttpServletRequest request) {
+    @Transactional
+    public ApiResponse<Void> addRule(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         try {
+            MonitorRuleEntity rule = new MonitorRuleEntity();
+            rule.setRuleName((String) body.get("ruleName"));
+            rule.setAttackType((String) body.get("attackType"));
+            rule.setRuleContent((String) body.get("ruleContent"));
+            rule.setDescription((String) body.get("description"));
+            rule.setRiskLevel((String) body.get("riskLevel"));
+            rule.setPriority(body.get("priority") != null ? ((Number) body.get("priority")).intValue() : 100);
+            rule.setEnabled(body.get("enabled") != null ? ((Number) body.get("enabled")).intValue() : 1);
             rule.setCreateTime(LocalDateTime.now());
             rule.setUpdateTime(LocalDateTime.now());
-            if (rule.getEnabled() == null) {
-                rule.setEnabled(1);
-            }
+            
             monitorRuleMapper.insert(rule);
+            
+            List<Integer> vulnIds = (List<Integer>) body.get("vulnerabilityIds");
+            if (vulnIds != null && !vulnIds.isEmpty()) {
+                for (Integer vulnId : vulnIds) {
+                    VulnerabilityRuleEntity vr = new VulnerabilityRuleEntity();
+                    vr.setVulnerabilityId(vulnId.longValue());
+                    vr.setRuleId(rule.getId());
+                    vr.setRuleName(rule.getRuleName());
+                    vr.setAttackType(rule.getAttackType());
+                    vr.setRiskLevel(rule.getRiskLevel());
+                    vulnerabilityRuleMapper.insert(vr);
+                    
+                    updateVulnerabilityDefenseStatus(vulnId.longValue());
+                }
+            }
+            
             operLogService.logOperation(authService.getCurrentUsername(), "INSERT", "规则管理", 
                 "新增规则：" + rule.getRuleName(), "add", "/api/rule/add", getClientIp(request), 0);
             
@@ -159,10 +223,55 @@ public class RuleManageController {
      * 更新规则
      */
     @PutMapping("/update")
-    public ApiResponse<Void> updateRule(@RequestBody MonitorRuleEntity rule, HttpServletRequest request) {
+    @Transactional
+    public ApiResponse<Void> updateRule(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         try {
+            Long ruleId = ((Number) body.get("id")).longValue();
+            MonitorRuleEntity existingRule = monitorRuleMapper.selectById(ruleId);
+            if (existingRule == null) {
+                return ApiResponse.notFound("规则不存在");
+            }
+            
+            MonitorRuleEntity rule = new MonitorRuleEntity();
+            rule.setId(ruleId);
+            rule.setRuleName((String) body.get("ruleName"));
+            rule.setAttackType((String) body.get("attackType"));
+            rule.setRuleContent((String) body.get("ruleContent"));
+            rule.setDescription((String) body.get("description"));
+            rule.setRiskLevel((String) body.get("riskLevel"));
+            rule.setPriority(body.get("priority") != null ? ((Number) body.get("priority")).intValue() : 100);
+            rule.setEnabled(body.get("enabled") != null ? ((Number) body.get("enabled")).intValue() : 1);
+            rule.setCreateTime(existingRule.getCreateTime());
             rule.setUpdateTime(LocalDateTime.now());
+            
             monitorRuleMapper.update(rule);
+            
+            List<Long> oldVulnIds = vulnerabilityRuleMapper.selectVulnerabilityIdsByRuleId(ruleId);
+            
+            vulnerabilityRuleMapper.deleteByRuleId(ruleId);
+            
+            List<Integer> newVulnIds = (List<Integer>) body.get("vulnerabilityIds");
+            if (newVulnIds != null && !newVulnIds.isEmpty()) {
+                for (Integer vulnId : newVulnIds) {
+                    VulnerabilityRuleEntity vr = new VulnerabilityRuleEntity();
+                    vr.setVulnerabilityId(vulnId.longValue());
+                    vr.setRuleId(ruleId);
+                    vr.setRuleName(rule.getRuleName());
+                    vr.setAttackType(rule.getAttackType());
+                    vr.setRiskLevel(rule.getRiskLevel());
+                    vulnerabilityRuleMapper.insert(vr);
+                }
+            }
+            
+            for (Long vulnId : oldVulnIds) {
+                updateVulnerabilityDefenseStatus(vulnId);
+            }
+            if (newVulnIds != null) {
+                for (Integer vulnId : newVulnIds) {
+                    updateVulnerabilityDefenseStatus(vulnId.longValue());
+                }
+            }
+            
             operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "规则管理", 
                 "更新规则ID：" + rule.getId(), "update", "/api/rule/update", getClientIp(request), 0);
             

@@ -35,6 +35,11 @@ public interface WhitelistService {
     List<WhitelistEntity> getByCondition(String whitelistType, String whitelistValue, Integer enabled, int page, int size);
 
     /**
+     * 分页查询白名单（支持排序）
+     */
+    List<WhitelistEntity> getByConditionWithSort(String whitelistType, String whitelistValue, Integer enabled, int offset, int limit, String sortField, String sortOrder);
+
+    /**
      * 统计白名单数量
      */
     long countByCondition(String whitelistType, String whitelistValue, Integer enabled);

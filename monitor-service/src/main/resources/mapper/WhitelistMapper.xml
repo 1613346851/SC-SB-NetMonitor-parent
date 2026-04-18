@@ -69,6 +69,45 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
+    <select id="selectByConditionWithSort" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_detection_whitelist
+        <where>
+            <if test="whitelistType != null and whitelistType != ''">
+                AND whitelist_type = #{whitelistType}
+            </if>
+            <if test="whitelistValue != null and whitelistValue != ''">
+                AND whitelist_value LIKE CONCAT('%', #{whitelistValue}, '%')
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+        <choose>
+            <when test="sortField != null and sortField != '' and sortOrder != null and sortOrder != ''">
+                <if test="sortField == 'id'">
+                    ORDER BY id ${sortOrder}
+                </if>
+                <if test="sortField == 'whitelistType'">
+                    ORDER BY whitelist_type ${sortOrder}
+                </if>
+                <if test="sortField == 'priority'">
+                    ORDER BY priority ${sortOrder}
+                </if>
+                <if test="sortField == 'enabled'">
+                    ORDER BY enabled ${sortOrder}
+                </if>
+                <if test="sortField == 'createTime'">
+                    ORDER BY create_time ${sortOrder}
+                </if>
+            </when>
+            <otherwise>
+                ORDER BY id DESC
+            </otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
     <select id="countByCondition" resultType="long">
         SELECT COUNT(*)
         FROM sys_detection_whitelist

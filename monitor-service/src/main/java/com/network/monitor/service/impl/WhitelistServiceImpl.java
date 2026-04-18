@@ -45,6 +45,11 @@ public class WhitelistServiceImpl implements WhitelistService {
     }
 
     @Override
+    public List<WhitelistEntity> getByConditionWithSort(String whitelistType, String whitelistValue, Integer enabled, int offset, int limit, String sortField, String sortOrder) {
+        return whitelistMapper.selectByConditionWithSort(whitelistType, whitelistValue, enabled, offset, limit, sortField, sortOrder);
+    }
+
+    @Override
     public long countByCondition(String whitelistType, String whitelistValue, Integer enabled) {
         return whitelistMapper.countByCondition(whitelistType, whitelistValue, enabled);
     }

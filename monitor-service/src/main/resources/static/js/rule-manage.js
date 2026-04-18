@@ -3,10 +3,14 @@ let whitelistTable;
 let currentTab = 'rules';
 let selectedRuleIds = [];
 let selectedWhitelistIds = [];
+let allVulnerabilities = [];
+let selectedVulnIds = [];
+let vulnSearchTimeout = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     initRuleTable();
     initWhitelistTable();
+    initVulnSelectEvents();
 });
 
 function switchTab(tab) {
@@ -192,14 +196,21 @@ function editRule(id) {
     http.get('/rule/' + id)
         .then(result => {
             if (result) {
-                document.getElementById('ruleId').value = result.id;
-                document.getElementById('ruleNameInput').value = result.ruleName || '';
-                document.getElementById('attackTypeInput').value = result.attackType || '';
-                document.getElementById('ruleExpressionInput').value = result.ruleContent || '';
-                document.getElementById('descriptionInput').value = result.description || '';
-                document.getElementById('riskLevelInput').value = result.riskLevel || 'MEDIUM';
-                document.getElementById('priorityInput').value = result.priority || 100;
-                document.getElementById('enabledInput').value = result.enabled !== undefined ? result.enabled : 1;
+                const rule = result.rule;
+                const vulnIds = result.vulnerabilityIds || [];
+                
+                document.getElementById('ruleId').value = rule.id;
+                document.getElementById('ruleNameInput').value = rule.ruleName || '';
+                document.getElementById('attackTypeInput').value = rule.attackType || '';
+                document.getElementById('ruleExpressionInput').value = rule.ruleContent || '';
+                document.getElementById('descriptionInput').value = rule.description || '';
+                document.getElementById('riskLevelInput').value = rule.riskLevel || 'MEDIUM';
+                document.getElementById('priorityInput').value = rule.priority || 100;
+                document.getElementById('enabledInput').value = rule.enabled !== undefined ? rule.enabled : 1;
+                
+                selectedVulnIds = vulnIds.map(function(id) { return parseInt(id); });
+                renderSelectedVulns();
+                loadVulnerabilities('');
                 
                 document.getElementById('ruleModalTitle').textContent = '编辑规则';
                 document.getElementById('ruleModal').style.display = 'flex';
@@ -270,6 +281,10 @@ function openAddRuleModal() {
     document.getElementById('priorityInput').value = '100';
     document.getElementById('enabledInput').value = '1';
     
+    selectedVulnIds = [];
+    renderSelectedVulns();
+    loadVulnerabilities('');
+    
     document.getElementById('ruleModalTitle').textContent = '新增规则';
     document.getElementById('ruleModal').style.display = 'flex';
 }
@@ -328,7 +343,8 @@ function saveRule() {
         description: description,
         riskLevel: riskLevel,
         priority: priority,
-        enabled: enabled
+        enabled: enabled,
+        vulnerabilityIds: selectedVulnIds
     };
     
     const isEdit = id && id !== '';
@@ -603,4 +619,152 @@ function clearWhitelistSelection() {
     checkboxes.forEach(function(cb) {
         cb.checked = false;
     });
+}
+
+function initVulnSelectEvents() {
+    const searchInput = document.getElementById('vulnSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const keyword = e.target.value.trim();
+            if (vulnSearchTimeout) {
+                clearTimeout(vulnSearchTimeout);
+            }
+            vulnSearchTimeout = setTimeout(function() {
+                loadVulnerabilities(keyword);
+            }, 300);
+        });
+        
+        searchInput.addEventListener('focus', function() {
+            showVulnDropdown();
+        });
+    }
+    
+    document.addEventListener('click', function(e) {
+        const container = document.getElementById('vulnSelectContainer');
+        if (container && !container.contains(e.target)) {
+            hideVulnDropdown();
+        }
+    });
+}
+
+function toggleVulnDropdown() {
+    const dropdown = document.getElementById('vulnDropdown');
+    if (dropdown.style.display === 'none') {
+        showVulnDropdown();
+    } else {
+        hideVulnDropdown();
+    }
+}
+
+function showVulnDropdown() {
+    const dropdown = document.getElementById('vulnDropdown');
+    dropdown.style.display = 'block';
+}
+
+function hideVulnDropdown() {
+    const dropdown = document.getElementById('vulnDropdown');
+    dropdown.style.display = 'none';
+}
+
+function loadVulnerabilities(keyword) {
+    const url = keyword ? '/rule/available-vulnerabilities?keyword=' + encodeURIComponent(keyword) : '/rule/available-vulnerabilities';
+    
+    http.get(url)
+        .then(function(result) {
+            allVulnerabilities = result || [];
+            renderVulnDropdown();
+        })
+        .catch(function(error) {
+            console.error('加载漏洞列表失败:', error);
+            allVulnerabilities = [];
+            renderVulnDropdown();
+        });
+}
+
+function renderVulnDropdown() {
+    const listEl = document.getElementById('vulnSelectList');
+    
+    if (allVulnerabilities.length === 0) {
+        listEl.innerHTML = '<div class="vuln-empty">暂无可关联的漏洞</div>';
+        return;
+    }
+    
+    let html = '';
+    allVulnerabilities.forEach(function(vuln) {
+        const isSelected = selectedVulnIds.indexOf(vuln.id) !== -1;
+        const levelClass = 'vuln-level-' + (vuln.vulnLevel || 'MEDIUM');
+        
+        html += '<div class="vuln-select-item' + (isSelected ? ' selected' : '') + '" onclick="toggleVulnSelect(' + vuln.id + ')">';
+        html += '<div class="vuln-select-item-header">';
+        html += '<span class="vuln-select-item-id">ID: ' + vuln.id + '</span>';
+        html += '<span class="vuln-select-item-level ' + levelClass + '">' + formatVulnLevel(vuln.vulnLevel) + '</span>';
+        html += '</div>';
+        html += '<div class="vuln-select-item-name">' + escapeHtml(vuln.vulnName || '') + '</div>';
+        html += '<div class="vuln-select-item-info">' + escapeHtml(vuln.vulnType || '') + ' | ' + escapeHtml(vuln.vulnPath || '') + '</div>';
+        html += '</div>';
+    });
+    
+    listEl.innerHTML = html;
+}
+
+function toggleVulnSelect(vulnId) {
+    const index = selectedVulnIds.indexOf(vulnId);
+    if (index === -1) {
+        selectedVulnIds.push(vulnId);
+    } else {
+        selectedVulnIds.splice(index, 1);
+    }
+    renderSelectedVulns();
+    renderVulnDropdown();
+}
+
+function renderSelectedVulns() {
+    const container = document.getElementById('selectedVulns');
+    
+    if (selectedVulnIds.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    selectedVulnIds.forEach(function(vulnId) {
+        const vuln = allVulnerabilities.find(function(v) { return v.id === vulnId; });
+        const displayName = vuln ? ('ID:' + vulnId + ' ' + (vuln.vulnName || '')) : ('ID:' + vulnId);
+        
+        html += '<span class="selected-vuln-tag">';
+        html += escapeHtml(displayName);
+        html += '<span class="remove-btn" onclick="removeVulnSelect(' + vulnId + ')">×</span>';
+        html += '</span>';
+    });
+    
+    container.innerHTML = html;
+}
+
+function removeVulnSelect(vulnId) {
+    const index = selectedVulnIds.indexOf(vulnId);
+    if (index !== -1) {
+        selectedVulnIds.splice(index, 1);
+        renderSelectedVulns();
+        renderVulnDropdown();
+    }
+}
+
+function formatVulnLevel(level) {
+    const levelMap = {
+        'CRITICAL': '严重',
+        'HIGH': '高危',
+        'MEDIUM': '中危',
+        'LOW': '低危'
+    };
+    return levelMap[level] || level || '中危';
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }

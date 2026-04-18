@@ -48,6 +48,18 @@ public interface WhitelistMapper {
             @Param("limit") int limit);
 
     /**
+     * 根据条件分页查询白名单（支持排序）
+     */
+    List<WhitelistEntity> selectByConditionWithSort(
+            @Param("whitelistType") String whitelistType,
+            @Param("whitelistValue") String whitelistValue,
+            @Param("enabled") Integer enabled,
+            @Param("offset") int offset,
+            @Param("limit") int limit,
+            @Param("sortField") String sortField,
+            @Param("sortOrder") String sortOrder);
+
+    /**
      * 根据条件统计白名单数量
      */
     long countByCondition(

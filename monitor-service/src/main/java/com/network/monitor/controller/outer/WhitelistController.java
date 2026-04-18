@@ -48,7 +48,9 @@ public class WhitelistController {
             @RequestParam(required = false) String whitelistValue,
             @RequestParam(required = false) Integer enabled,
             @RequestParam(defaultValue = "1") int pageNum,
-            @RequestParam(defaultValue = "10") int pageSize) {
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(defaultValue = "id") String sortField,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         try {
             if (pageNum < 1) {
                 pageNum = 1;
@@ -57,7 +59,9 @@ public class WhitelistController {
                 pageSize = 10;
             }
 
-            List<WhitelistEntity> list = whitelistService.getByCondition(whitelistType, whitelistValue, enabled, pageNum, pageSize);
+            int offset = (pageNum - 1) * pageSize;
+            
+            List<WhitelistEntity> list = whitelistService.getByConditionWithSort(whitelistType, whitelistValue, enabled, offset, pageSize, sortField, sortOrder);
             long total = whitelistService.countByCondition(whitelistType, whitelistValue, enabled);
 
             Map<String, Object> result = new HashMap<>();

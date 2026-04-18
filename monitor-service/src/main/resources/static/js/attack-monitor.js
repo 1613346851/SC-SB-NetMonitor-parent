@@ -319,28 +319,6 @@ function batchHandle() {
         });
 }
 
-function batchDelete() {
-    if (selectedIds.length === 0) {
-        message.warning('请选择要删除的攻击记录');
-        return;
-    }
-    
-    if (!confirm('确定要批量删除选中的 ' + selectedIds.length + ' 条攻击记录吗？此操作不可恢复。')) {
-        return;
-    }
-    
-    http.delete('/attack/batch', selectedIds)
-        .then(function() {
-            message.success('批量删除成功');
-            clearSelection();
-            attackTable.loadData();
-        })
-        .catch(function(error) {
-            console.error('批量删除失败:', error);
-            message.error('批量删除失败');
-        });
-}
-
 function clearSelection() {
     selectedIds = [];
     const selectAll = document.getElementById('selectAll');
