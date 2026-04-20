@@ -99,4 +99,14 @@
         WHERE status = 1
         AND (current_expire_time IS NULL OR current_expire_time &gt; NOW())
     </select>
+
+    <select id="selectActiveByIp" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_ip_blacklist
+        WHERE ip_address = #{ip}
+        AND status = 1
+        AND (current_expire_time IS NULL OR current_expire_time &gt; NOW())
+        ORDER BY update_time DESC
+        LIMIT 1
+    </select>
 </mapper>

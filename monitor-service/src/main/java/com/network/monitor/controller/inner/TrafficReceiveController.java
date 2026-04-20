@@ -1,8 +1,11 @@
 package com.network.monitor.controller.inner;
 
+import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.dto.AttackMonitorDTO;
+import com.network.monitor.dto.TrafficAggregateDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;
+import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.TrafficMonitorEntity;
 import com.network.monitor.entity.VulnerabilityMonitorEntity;
@@ -11,12 +14,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 流量数据接收控制器（对内跨服务接口）
- * 安全验证由 CrossServiceSecurityInterceptor 统一处理
- */
 @Slf4j
 @RestController
 @RequestMapping("/api/inner/traffic")
@@ -29,16 +29,10 @@ public class TrafficReceiveController {
     private RuleEngineService ruleEngineService;
 
     @Autowired
-    private DDoSDetectService ddosDetectService;
-
-    @Autowired
     private VulnerabilityVerifyService vulnerabilityVerifyService;
 
     @Autowired
     private VulnerabilityStatService vulnerabilityStatService;
-
-    @Autowired
-    private AttackDetectService attackDetectService;
 
     @Autowired
     private DefenseDecisionService defenseDecisionService;
@@ -50,21 +44,36 @@ public class TrafficReceiveController {
     private AttackStoreService attackStoreService;
 
     @Autowired
-    private AttackDetectService attackDetectServiceImpl;
+    private AttackEventService attackEventService;
 
-    /**
-     * 接收网关推送的流量数据（同步处理）
-     * 安全验证由 CrossServiceSecurityInterceptor 拦截器统一处理
-     */
+    @Autowired
+    private IpAttackStateCache attackStateCache;
+
     @PostMapping("/receive")
     public ApiResponse<Void> receiveTraffic(@RequestBody TrafficMonitorDTO trafficDTO) {
         try {
-            log.info("接收到流量数据：sourceIp={}, uri={}, method={}", 
-                trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getHttpMethod());
+            if (trafficDTO.isAggregated()) {
+                log.info("接收到聚合流量数据：sourceIp={}, uri={}, method={}, requestCount={}, stateTag={}", 
+                    trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getHttpMethod(),
+                    trafficDTO.getRequestCount(), trafficDTO.getStateTag());
+            } else {
+                log.info("接收到流量数据：sourceIp={}, uri={}, method={}", 
+                    trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getHttpMethod());
+            }
+
+            if (trafficDTO.isSkipPush()) {
+                log.debug("流量标记为跳过推送，跳过处理: sourceIp={}", trafficDTO.getSourceIp());
+                return ApiResponse.success();
+            }
 
             processTrafficSync(trafficDTO);
 
-            log.info("流量数据处理完成：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+            if (trafficDTO.isAggregated()) {
+                log.info("聚合流量数据处理完成：sourceIp={}, uri={}, requestCount={}", 
+                    trafficDTO.getSourceIp(), trafficDTO.getRequestUri(), trafficDTO.getRequestCount());
+            } else {
+                log.info("流量数据处理完成：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+            }
             return ApiResponse.success();
         } catch (Exception e) {
             log.error("接收流量数据失败：sourceIp={}, error={}", 
@@ -73,19 +82,14 @@ public class TrafficReceiveController {
         }
     }
 
-    /**
-     * 同步处理流量数据（确保数据写入数据库）
-     */
     public void processTrafficSync(TrafficMonitorDTO trafficDTO) {
         try {
             log.debug("开始预处理流量：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
             
-            // 1. 预处理流量（解码等）
             trafficAnalyzeService.preprocessTraffic(trafficDTO);
 
             log.debug("开始保存流量数据：sourceIp={}, uri={}", trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
             
-            // 2. 保存原始流量数据到数据库
             TrafficMonitorEntity trafficEntity = trafficStoreService.convertToEntity(trafficDTO);
             Long trafficId = trafficStoreService.saveTraffic(trafficEntity);
             
@@ -93,42 +97,62 @@ public class TrafficReceiveController {
                 throw new RuntimeException("保存流量数据失败：sourceIp=" + trafficDTO.getSourceIp());
             }
             
+            if (trafficDTO.isAggregated()) {
+                log.info("聚合流量数据已保存：trafficId={}, sourceIp={}, uri={}, requestCount={}", 
+                    trafficId, trafficDTO.getSourceIp(), trafficEntity.getRequestUri(), trafficDTO.getRequestCount());
+                return;
+            }
+            
             log.info("流量数据已保存：trafficId={}, sourceIp={}, uri={}", 
                 trafficId, trafficDTO.getSourceIp(), trafficEntity.getSourceIp());
-
-            // 3. 执行规则引擎检测
-            List<AttackMonitorDTO> detectedAttacks = ruleEngineService.executeMatching(trafficDTO);
-
-            // 4. 执行 DDoS 检测
-            AttackMonitorDTO ddosAttack = ddosDetectService.detect(trafficDTO);
-            if (ddosAttack != null) {
-                detectedAttacks.add(ddosAttack);
+            
+            if (trafficDTO.getEventId() != null && !trafficDTO.getEventId().isEmpty()) {
+                log.info("流量数据包含eventId，网关已识别攻击，更新攻击记录的trafficId：eventId={}, trafficId={}, ip={}, uri={}", 
+                    trafficDTO.getEventId(), trafficId, trafficDTO.getSourceIp(), trafficDTO.getRequestUri());
+                
+                attackStoreService.updateTrafficIdByEventId(trafficDTO.getEventId(), trafficId);
+                return;
             }
 
-            // 5. 处理检测到的攻击
+            List<AttackMonitorDTO> detectedAttacks = ruleEngineService.executeMatching(trafficDTO);
+            if (detectedAttacks == null) {
+                detectedAttacks = new ArrayList<>();
+            }
+
             if (!detectedAttacks.isEmpty()) {
                 for (AttackMonitorDTO attack : detectedAttacks) {
-                    // 设置关联的流量 ID
                     attack.setTrafficId(trafficId);
                     
-                    // 6. 漏洞验证（如果命中预设漏洞）
                     VulnerabilityMonitorEntity matchedVuln = vulnerabilityVerifyService.verifyAttack(attack);
                     
-                    // 7. 保存攻击记录到数据库
+                    String gatewayEventId = trafficDTO.getEventId();
+                    AttackEventEntity event = attackEventService.getOrCreateEventWithEventId(
+                        attack.getSourceIp(),
+                        attack.getAttackType(),
+                        attack.getRiskLevel(),
+                        attack.getConfidence() != null ? attack.getConfidence() : 80,
+                        gatewayEventId
+                    );
+                    
+                    if (event != null) {
+                        attack.setEventId(event.getEventId());
+                    }
+                    
                     AttackMonitorEntity attackEntity = attackStoreService.convertToEntity(attack);
                     Long attackId = attackStoreService.saveAttack(attackEntity);
                     
-                    // 8. 更新漏洞统计
-                    if (attackId != null && matchedVuln != null) {
-                        // 漏洞验证后更新统计
-                        vulnerabilityStatService.incrementAttackCount(
-                            matchedVuln.getId(), // 使用命中的漏洞 ID
-                            attackId
-                        );
+                    if (attackId != null) {
+                        attack.setAttackId(attackId);
+                        
+                        if (matchedVuln != null) {
+                            vulnerabilityStatService.incrementAttackCount(
+                                matchedVuln.getId(),
+                                attackId
+                            );
+                        }
+                        
+                        defenseDecisionService.generateDefenseDecision(attack);
                     }
-                    
-                    // 9. 生成防御决策（高风险攻击）
-                    defenseDecisionService.generateDefenseDecision(attack);
                 }
 
                 log.info("流量检测完成：trafficId={}, 检测到攻击数={}", trafficId, detectedAttacks.size());
@@ -140,4 +164,100 @@ public class TrafficReceiveController {
             throw new RuntimeException("处理流量数据失败", e);
         }
     }
+
+    @PostMapping("/aggregate")
+    public ApiResponse<Void> receiveAggregateTraffic(@RequestBody TrafficAggregateDTO aggregateDTO) {
+        try {
+            log.info("接收到聚合流量数据: ip={}, state={}, totalRequests={}, uriGroups={}, samples={}", 
+                aggregateDTO.getIp(), 
+                aggregateDTO.getStateName(),
+                aggregateDTO.getTotalRequests(),
+                aggregateDTO.getUriGroupCount(),
+                aggregateDTO.getSampleCount());
+
+            if (aggregateDTO.hasTransition()) {
+                log.info("检测到状态转换: ip={}, {} -> {}, reason={}", 
+                    aggregateDTO.getIp(),
+                    aggregateDTO.getTransition().getFromState(),
+                    aggregateDTO.getTransition().getToState(),
+                    aggregateDTO.getTransition().getReason());
+            }
+
+            List<TrafficAggregateDTO.UriGroupStatsDTO> uriGroups = aggregateDTO.getUriGroups();
+            if (uriGroups != null && !uriGroups.isEmpty()) {
+                for (TrafficAggregateDTO.UriGroupStatsDTO uriGroup : uriGroups) {
+                    TrafficMonitorDTO trafficDTO = convertUriGroupToTrafficDTO(aggregateDTO, uriGroup);
+                    
+                    trafficAnalyzeService.preprocessTraffic(trafficDTO);
+                    
+                    TrafficMonitorEntity trafficEntity = trafficStoreService.convertToEntity(trafficDTO);
+                    Long trafficId = trafficStoreService.saveTraffic(trafficEntity);
+                    
+                    if (trafficId != null) {
+                        log.debug("聚合流量分组已保存: trafficId={}, ip={}, uri={}, count={}", 
+                            trafficId, aggregateDTO.getIp(), uriGroup.getUriPattern(), uriGroup.getCount());
+                    }
+                }
+            }
+
+            if (aggregateDTO.getEventId() != null && !aggregateDTO.getEventId().isEmpty()) {
+                int totalRequests = aggregateDTO.getTotalRequests();
+                if (totalRequests > 0) {
+                    attackEventService.addTotalRequests(aggregateDTO.getEventId(), totalRequests);
+                    log.debug("更新事件总请求数：eventId={}, addCount={}", 
+                        aggregateDTO.getEventId(), totalRequests);
+                }
+            }
+
+            log.info("聚合流量数据处理完成: ip={}, totalRequests={}, rps={}", 
+                aggregateDTO.getIp(), aggregateDTO.getTotalRequests(), aggregateDTO.getRps());
+            
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("接收聚合流量数据失败: ip={}, error={}", 
+                aggregateDTO.getIp(), e.getMessage(), e);
+            return ApiResponse.error("接收聚合流量数据失败：" + e.getMessage());
+        }
+    }
+
+    private TrafficMonitorDTO convertUriGroupToTrafficDTO(TrafficAggregateDTO aggregate, TrafficAggregateDTO.UriGroupStatsDTO uriGroup) {
+        TrafficMonitorDTO dto = new TrafficMonitorDTO();
+        
+        dto.setRequestId(aggregate.getRequestId());
+        dto.setRequestTime(aggregate.getRequestTime());
+        dto.setSourceIp(aggregate.getIp());
+        dto.setTargetIp(uriGroup.getTargetIp() != null ? uriGroup.getTargetIp() : "0.0.0.0");
+        dto.setTargetPort(uriGroup.getTargetPort());
+        dto.setSourcePort(uriGroup.getSourcePort());
+        dto.setProtocol(uriGroup.getProtocol());
+        dto.setUserAgent(uriGroup.getUserAgent());
+        dto.setRequestUri(uriGroup.getUriPattern());
+        dto.setHttpMethod(uriGroup.getHttpMethod());
+        dto.setStateTag(aggregate.getStateName());
+        dto.setStateValue(aggregate.getState());
+        dto.setRequestHeaders(uriGroup.getHeaders());
+        
+        if (aggregate.getEventId() != null && !aggregate.getEventId().isEmpty()) {
+            dto.setEventId(aggregate.getEventId());
+        }
+        
+        if (aggregate.getTransition() != null) {
+            dto.setConfidence(aggregate.getTransition().getConfidence());
+        } else {
+            dto.setConfidence(aggregate.getConfidence());
+        }
+        
+        dto.setRequestCount(uriGroup.getCount());
+        dto.setErrorCount(uriGroup.getErrorCount());
+        dto.setAvgProcessingTime(uriGroup.getAvgProcessingTime());
+        dto.setIsAggregated(true);
+        dto.setAggregateStartTime(aggregate.getStartTime());
+        dto.setAggregateEndTime(aggregate.getEndTime());
+        
+        dto.setResponseStatus(uriGroup.getResponseStatus());
+        dto.setResponseTime(uriGroup.getAvgProcessingTime());
+        
+        return dto;
+    }
 }
+

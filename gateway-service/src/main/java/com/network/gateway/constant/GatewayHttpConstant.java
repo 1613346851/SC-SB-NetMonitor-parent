@@ -43,6 +43,8 @@ public class GatewayHttpConstant {
         public static final String CONTENT_TYPE = "Content-Type";
         /** 内容长度 */
         public static final String CONTENT_LENGTH = "Content-Length";
+        /** 主机头 */
+        public static final String HOST = "Host";
     }
 
     /**
@@ -74,9 +76,15 @@ public class GatewayHttpConstant {
         /** 流量监控接口路径 */
         public static final String TRAFFIC_MONITOR_ENDPOINT = "/api/inner/traffic/receive";
         /** 防御日志接口路径 */
-        public static final String DEFENSE_LOG_ENDPOINT = "/api/monitor/defense/log";
+        public static final String DEFENSE_LOG_ENDPOINT = "/api/inner/defense/log/sync";
         /** 防御指令接口路径 */
         public static final String DEFENSE_COMMAND_ENDPOINT = "/api/monitor/defense/command";
+        /** DDoS攻击事件接口路径 */
+        public static final String DDOS_ATTACK_EVENT_ENDPOINT = "/api/inner/attack/ddos-event";
+        /** 攻击事件接口路径 */
+        public static final String ATTACK_EVENT_ENDPOINT = "/api/inner/attack/attack-event";
+        /** 黑名单事件接口路径 */
+        public static final String BLACKLIST_EVENT_ENDPOINT = "/api/inner/blacklist/event";
         
         /** 连接超时时间（毫秒） */
         public static final int CONNECT_TIMEOUT = 5000;

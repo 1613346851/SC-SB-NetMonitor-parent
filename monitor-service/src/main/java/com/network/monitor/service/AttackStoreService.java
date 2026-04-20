@@ -18,4 +18,9 @@ public interface AttackStoreService {
      * 从 DTO 转换为 Entity
      */
     AttackMonitorEntity convertToEntity(AttackMonitorDTO dto);
+    
+    /**
+     * 根据事件ID更新攻击记录的流量ID
+     */
+    void updateTrafficIdByEventId(String eventId, Long trafficId);
 }

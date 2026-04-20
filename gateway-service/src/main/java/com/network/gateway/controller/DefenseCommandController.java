@@ -1,6 +1,7 @@
 package com.network.gateway.controller;
 
 import com.network.gateway.bo.DefenseResultBO;
+import com.network.gateway.cache.IpAttackStateCache;
 import com.network.gateway.cache.IpBlacklistCache;
 import com.network.gateway.cache.RequestRateLimitCache;
 import com.network.gateway.dto.DefenseCommandDTO;
@@ -20,31 +21,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * 防御指令接收控制器
- * 提供 REST 接口供监控服务推送高危攻击防御指令
- * 支持 Token 鉴权和请求来源验证
- *
- * @author network-monitor
- * @since 1.0.0
- */
 @RestController
 @RequestMapping("/api/gateway/defense")
 public class DefenseCommandController {
 
     private static final Logger logger = LoggerFactory.getLogger(DefenseCommandController.class);
 
-    /**
-     * 配置的授权 Token（从配置文件中读取）
-     * 默认值：NetMonitor2026SecureToken
-     */
     @Value("${gateway.defense.auth.token:NetMonitor2026SecureToken}")
     private String configuredAuthToken;
 
-    /**
-     * 允许的监控服务 IP 地址列表（从配置文件中读取）
-     * 默认值：127.0.0.1,localhost
-     */
     @Value("${gateway.defense.auth.allowed-ips:127.0.0.1,localhost}")
     private String allowedMonitorServiceIps;
 
@@ -62,6 +47,9 @@ public class DefenseCommandController {
 
     @Autowired
     private RequestRateLimitCache rateLimitCache;
+
+    @Autowired
+    private IpAttackStateCache attackStateCache;
 
     /**
      * 接收防御指令
@@ -205,34 +193,57 @@ public class DefenseCommandController {
         return false;
     }
 
-    /**
-     * 执行防御指令
-     *
-     * @param commandDTO 防御指令 DTO
-     * @return true 表示执行成功
-     */
     private boolean executeDefenseCommand(DefenseCommandDTO commandDTO) {
         DefenseCommandDTO.DefenseType defenseType = commandDTO.getDefenseType();
         String sourceIp = commandDTO.getSourceIp();
         Long expireTime = commandDTO.getExpireTimestamp();
+        String eventId = commandDTO.getEventId();
+        String action = commandDTO.getAction();
+        
+        logger.info("执行防御指令: defenseType={}, sourceIp={}, action={}, expireTime={}", 
+            defenseType, sourceIp, action, expireTime);
 
-        return switch (defenseType) {
+        boolean success = switch (defenseType) {
             case BLACKLIST -> {
-                boolean added = blacklistFilter.addToBlacklist(sourceIp, expireTime);
-                yield added;
+                if ("REMOVE".equals(action)) {
+                    logger.info("执行黑名单移除操作: IP={}", sourceIp);
+                    boolean removed = blacklistFilter.removeFromBlacklist(sourceIp);
+                    if (removed) {
+                        attackStateCache.markAsCooldown(sourceIp);
+                        logger.info("IP[{}]已从黑名单移除，状态更新为COOLDOWN", sourceIp);
+                    } else {
+                        logger.warn("IP[{}]从黑名单移除失败，可能不在黑名单中", sourceIp);
+                    }
+                    yield removed;
+                } else {
+                    logger.info("执行黑名单添加操作: IP={}, expireTime={}", sourceIp, expireTime);
+                    if (eventId != null) {
+                        attackStateCache.markAsDefended(sourceIp, eventId);
+                        logger.info("IP[{}]已预先标记为DEFENDED状态，eventId={}", sourceIp, eventId);
+                    }
+                    boolean added = blacklistFilter.addToBlacklist(sourceIp, expireTime);
+                    if (added) {
+                        logger.info("IP[{}]已成功加入黑名单", sourceIp);
+                    }
+                    yield added;
+                }
             }
             case RATE_LIMIT -> {
-                // 请求限流通常通过缓存自动处理，这里可以更新限流阈值
-                int threshold = commandDTO.getRateLimitThreshold() != null ? 
-                              commandDTO.getRateLimitThreshold() : 5; // 默认 5 次/秒
-                logger.info("更新 IP[{}] 的限流阈值为{}次/秒", sourceIp, threshold);
-                yield true; // 限流配置更新成功
+                int threshold = commandDTO.getRateLimitThreshold() != null ?
+                        commandDTO.getRateLimitThreshold() : 5;
+                rateLimitCache.setCustomThreshold(sourceIp, threshold, expireTime);
+                rateLimitCache.resetRequestCount(sourceIp);
+                logger.info("更新 IP[{}] 的限流阈值为{}次/秒，expireTime={}", sourceIp, threshold, expireTime);
+                yield true;
             }
+
             case BLOCK -> {
-                maliciousRequestFilter.addMaliciousIp(sourceIp);
+                logger.info("请求拦截防御：IP[{}]，eventId={}，拦截已由攻击规则检测过滤器实时执行", sourceIp, eventId);
                 yield true;
             }
         };
+
+        return success;
     }
 
     /**
@@ -255,8 +266,11 @@ public class DefenseCommandController {
             status.put("rateLimitFilter", Map.of(
                     "enabled", true,
                     "activeIpCount", rateLimitFilter.getActiveIpCount(),
+                    "defaultThreshold", rateLimitFilter.getDefaultThreshold(),
+                    "customThresholdCount", rateLimitCache.getCustomThresholdCount(),
                     "statistics", rateLimitFilter.getStatistics()
             ));
+
             
             status.put("maliciousRequestFilter", Map.of(
                     "enabled", true,
@@ -330,12 +344,6 @@ public class DefenseCommandController {
         }
     }
 
-    /**
-     * 从黑名单中移除 IP
-     *
-     * @param ip IP 地址
-     * @return 响应结果
-     */
     @DeleteMapping("/blacklist/remove/{ip}")
     public ResponseEntity<Map<String, Object>> removeFromBlacklist(@PathVariable String ip) {
         Map<String, Object> response = new HashMap<>();
@@ -344,10 +352,14 @@ public class DefenseCommandController {
             boolean removed = blacklistFilter.removeFromBlacklist(ip);
             
             if (removed) {
+                attackStateCache.markAsCooldown(ip);
+                logger.info("从黑名单移除 IP: {}，状态更新为COOLDOWN", ip);
+            }
+            
+            if (removed) {
                 response.put("success", true);
                 response.put("message", "IP 已从黑名单中移除");
                 response.put("ip", ip);
-                logger.info("从黑名单移除 IP: {}", ip);
             } else {
                 response.put("success", false);
                 response.put("message", "IP 不在黑名单中或移除失败");
@@ -357,6 +369,63 @@ public class DefenseCommandController {
             
         } catch (Exception e) {
             logger.error("从黑名单移除 IP 时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/state/sync")
+    public ResponseEntity<Map<String, Object>> syncAttackState(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            String ip = (String) request.get("ip");
+            Integer state = (Integer) request.get("state");
+            String eventId = (String) request.get("eventId");
+            
+            if (ip == null || ip.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "IP 地址不能为空");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            if (state != null) {
+                if (eventId != null) {
+                    attackStateCache.updateState(ip, state, eventId);
+                } else {
+                    attackStateCache.updateState(ip, state);
+                }
+                logger.info("同步攻击状态：ip={}, state={}, eventId={}", ip, state, eventId);
+            }
+            
+            response.put("success", true);
+            response.put("message", "攻击状态同步成功");
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("同步攻击状态时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/state/reset/{ip}")
+    public ResponseEntity<Map<String, Object>> resetAttackState(@PathVariable String ip) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            attackStateCache.resetToNormal(ip);
+            logger.info("重置攻击状态：ip={}", ip);
+            
+            response.put("success", true);
+            response.put("message", "攻击状态已重置");
+            response.put("ip", ip);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("重置攻击状态时发生异常", e);
             response.put("success", false);
             response.put("message", "操作失败：" + e.getMessage());
             return ResponseEntity.status(500).body(response);
@@ -383,6 +452,149 @@ public class DefenseCommandController {
             
         } catch (Exception e) {
             logger.error("重置请求计数时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @Autowired
+    private com.network.gateway.service.StateInterventionService interventionService;
+
+    @PostMapping("/intervention/reset")
+    public ResponseEntity<Map<String, Object>> forceResetToNormal(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            String ip = (String) request.get("ip");
+            String operator = (String) request.getOrDefault("operator", "MANUAL");
+            String reason = (String) request.getOrDefault("reason", "人工干预重置");
+            
+            if (ip == null || ip.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "IP 地址不能为空");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            interventionService.forceResetToNormal(ip, operator, reason);
+            
+            response.put("success", true);
+            response.put("message", "状态已强制重置为NORMAL");
+            response.put("ip", ip);
+            logger.info("人工干预：强制重置状态, ip={}, operator={}", ip, operator);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("强制重置状态时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/intervention/ban")
+    public ResponseEntity<Map<String, Object>> forceBan(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            String ip = (String) request.get("ip");
+            Long duration = request.get("duration") != null ? 
+                ((Number) request.get("duration")).longValue() : null;
+            String operator = (String) request.getOrDefault("operator", "MANUAL");
+            String reason = (String) request.getOrDefault("reason", "紧急封禁");
+            
+            if (ip == null || ip.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "IP 地址不能为空");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            interventionService.forceBan(ip, duration, operator, reason);
+            
+            long expireTime = duration != null ? 
+                System.currentTimeMillis() + duration * 1000 : Long.MAX_VALUE;
+            blacklistFilter.addToBlacklist(ip, expireTime);
+            
+            response.put("success", true);
+            response.put("message", "已强制封禁IP");
+            response.put("ip", ip);
+            response.put("duration", duration);
+            logger.info("人工干预：紧急封禁, ip={}, duration={}, operator={}", ip, duration, operator);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("强制封禁时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/intervention/batch-reset")
+    public ResponseEntity<Map<String, Object>> batchResetToNormal(@RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            @SuppressWarnings("unchecked")
+            java.util.List<String> ips = (java.util.List<String>) request.get("ips");
+            String operator = (String) request.getOrDefault("operator", "MANUAL");
+            String reason = (String) request.getOrDefault("reason", "批量重置");
+            
+            if (ips == null || ips.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "IP 列表不能为空");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            interventionService.batchResetToNormal(ips, operator, reason);
+            
+            response.put("success", true);
+            response.put("message", "批量重置成功");
+            response.put("count", ips.size());
+            logger.info("人工干预：批量重置状态, count={}, operator={}", ips.size(), operator);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("批量重置状态时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @GetMapping("/intervention/logs/{ip}")
+    public ResponseEntity<Map<String, Object>> getInterventionLogs(@PathVariable String ip) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            java.util.List<com.network.gateway.dto.StateInterventionLog> logs = 
+                interventionService.getInterventionLogs(ip);
+            
+            response.put("success", true);
+            response.put("ip", ip);
+            response.put("logs", logs);
+            response.put("count", logs.size());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("获取干预日志时发生异常", e);
+            response.put("success", false);
+            response.put("message", "操作失败：" + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @GetMapping("/intervention/stats")
+    public ResponseEntity<Map<String, Object>> getInterventionStats() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            response.put("success", true);
+            response.put("stats", interventionService.getStats());
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("获取干预统计时发生异常", e);
             response.put("success", false);
             response.put("message", "操作失败：" + e.getMessage());
             return ResponseEntity.status(500).body(response);

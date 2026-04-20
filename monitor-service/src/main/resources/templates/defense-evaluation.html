@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>防御效果评估 - 网络监测系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-card .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .stat-card .stat-label {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .stat-card.success .stat-value {
+            color: #10b981;
+        }
+        .stat-card.danger .stat-value {
+            color: #ef4444;
+        }
+        .stat-card.highlight .stat-value {
+            color: #4f46e5;
+        }
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .chart-card h3 {
+            font-size: 16px;
+            margin: 0 0 16px 0;
+            color: #1f2937;
+        }
+        .chart-container {
+            height: 300px;
+        }
+        .defense-types {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .type-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .type-card .type-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .type-card .type-label {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .event-link {
+            color: #4f46e5;
+            text-decoration: none;
+            font-family: monospace;
+        }
+        .event-link:hover {
+            text-decoration: underline;
+        }
+        .filter-bar {
+            margin-bottom: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <div th:replace="~{fragments/common :: mobileMenuToggle}"></div>
+                    <h2>防御效果评估</h2>
+                </div>
+                <div class="header-right">
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+
+            <main class="content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalDefenses">0</div>
+                        <div class="stat-label">总防御次数</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-value" id="successDefenses">0</div>
+                        <div class="stat-label">成功防御</div>
+                    </div>
+                    <div class="stat-card danger">
+                        <div class="stat-value" id="failedDefenses">0</div>
+                        <div class="stat-label">失败防御</div>
+                    </div>
+                    <div class="stat-card highlight">
+                        <div class="stat-value" id="successRate">0%</div>
+                        <div class="stat-label">成功率</div>
+                    </div>
+                </div>
+
+                <div class="defense-types">
+                    <div class="type-card">
+                        <div class="type-value" id="blockCount">0</div>
+                        <div class="type-label">IP封禁次数</div>
+                    </div>
+                    <div class="type-card">
+                        <div class="type-value" id="rateLimitCount">0</div>
+                        <div class="type-label">限流次数</div>
+                    </div>
+                    <div class="type-card">
+                        <div class="type-value" id="redirectCount">0</div>
+                        <div class="type-label">请求拦截次数</div>
+                    </div>
+                    <div class="type-card">
+                        <div class="type-value" id="alertOnlyCount">0</div>
+                        <div class="type-label">仅告警次数</div>
+                    </div>
+                </div>
+
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <h3>防御趋势</h3>
+                        <div class="chart-container" id="defenseTrendChart"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>各类型防御成功率</h3>
+                        <div class="chart-container" id="successRateChart"></div>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">开始日期</label>
+                            <input type="date" class="form-control" id="listStartDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">结束日期</label>
+                            <input type="date" class="form-control" id="listEndDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御类型</label>
+                            <select class="form-control" id="listDefenseType">
+                                <option value="">全部</option>
+                                <option value="BLOCK_IP">IP封禁</option>
+                                <option value="RATE_LIMIT">限流</option>
+                                <option value="BLOCK_REQUEST">请求拦截</option>
+                                <option value="ALERT_ONLY">仅告警</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">执行状态</label>
+                            <select class="form-control" id="listExecuteStatus">
+                                <option value="">全部</option>
+                                <option value="1">成功</option>
+                                <option value="0">失败</option>
+                                <option value="alert">已告警</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御目标</label>
+                            <input type="text" class="form-control" id="listDefenseTarget" placeholder="请输入防御目标">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="searchDefenseList()">查询</button>
+                            <button class="btn btn-default" onclick="resetDefenseListSearch()">重置</button>
+                            <button class="btn btn-info" onclick="exportReport()">导出报告</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3 class="table-title">最近防御记录</h3>
+                        <a href="/defense" class="btn btn-link">查看全部</a>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table has-fixed-action">
+                            <thead>
+                                <tr>
+                                    <th data-sort="createTime" style="min-width: 150px;">时间</th>
+                                    <th data-sort="defenseType" style="min-width: 100px;">防御类型</th>
+                                    <th data-sort="defenseTarget" style="min-width: 120px;">防御目标</th>
+                                    <th data-sort="defenseAction" style="min-width: 100px;">防御动作</th>
+                                    <th data-sort="executeStatus" style="min-width: 80px;">执行结果</th>
+                                    <th style="min-width: 120px;">关联事件</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentDefenseBody">
+                                <tr>
+                                    <td colspan="7" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-container" style="padding: 16px 24px;">
+                        <div class="pagination" id="defensePagination"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="defenseDetailModal" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">防御详情</h3>
+                <span class="modal-close" onclick="closeDefenseDetailModal()">&times;</span>
+            </div>
+            <div class="modal-body" id="defenseDetailContent">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeDefenseDetailModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/core/resource-loader.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/defense-evaluation.js}"></script>
+    <script>
+        ResourceLoader.loadEcharts().then(function() {
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
+        }).catch(function(e) {
+            console.error('ECharts 加载失败:', e);
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
+        });
+    </script>
+</body>
+</html>

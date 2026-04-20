@@ -8,9 +8,8 @@ import lombok.Data;
 @Data
 public class DefenseLogDTO {
 
-    /**
-     * 关联攻击 ID
-     */
+    private String eventId;
+
     private Long attackId;
 
     /**
@@ -57,4 +56,14 @@ public class DefenseLogDTO {
      * 操作人
      */
     private String operator;
+
+    /**
+     * 攻击类型
+     */
+    private String attackType;
+
+    /**
+     * 风险等级
+     */
+    private String riskLevel;
 }

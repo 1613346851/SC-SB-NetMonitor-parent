@@ -40,10 +40,16 @@ public class TrafficManageController {
      */
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getTrafficList(
+            @RequestParam(required = false) String trafficId,
+            @RequestParam(required = false) String eventId,
             @RequestParam(required = false) String sourceIp,
             @RequestParam(required = false) String targetIp,
             @RequestParam(required = false) String httpMethod,
+            @RequestParam(required = false) String protocol,
             @RequestParam(required = false) String requestUri,
+            @RequestParam(required = false) Integer responseStatus,
+            @RequestParam(required = false) String stateTag,
+            @RequestParam(required = false) Integer isAggregated,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime,
             @RequestParam(defaultValue = "1") int pageNum,
@@ -52,6 +58,13 @@ public class TrafficManageController {
             @RequestParam(defaultValue = "desc") String sortOrder) {
 
         try {
+            if (pageNum < 1) {
+                pageNum = 1;
+            }
+            if (pageSize < 1 || pageSize > 100) {
+                pageSize = 10;
+            }
+            
             int offset = (pageNum - 1) * pageSize;
             
             LocalDateTime startDateTime = parseDateTime(startTime);
@@ -60,11 +73,13 @@ public class TrafficManageController {
             String orderBy = buildOrderBy(sortField, sortOrder);
             
             List<TrafficMonitorEntity> list = trafficMonitorMapper.selectByCondition(
-                sourceIp, targetIp, httpMethod, requestUri, startDateTime, endDateTime, offset, pageSize, orderBy
+                trafficId, eventId, sourceIp, targetIp, httpMethod, protocol, requestUri, responseStatus, stateTag, isAggregated,
+                startDateTime, endDateTime, offset, pageSize, orderBy
             );
             
             long total = trafficMonitorMapper.countByCondition(
-                sourceIp, targetIp, httpMethod, requestUri, startDateTime, endDateTime
+                trafficId, eventId, sourceIp, targetIp, httpMethod, protocol, requestUri, responseStatus, stateTag, isAggregated,
+                startDateTime, endDateTime
             );
 
             Map<String, Object> result = new HashMap<>();
@@ -118,10 +133,16 @@ public class TrafficManageController {
      */
     @GetMapping("/export")
     public void exportTraffic(
+            @RequestParam(required = false) String trafficId,
+            @RequestParam(required = false) String eventId,
             @RequestParam(required = false) String sourceIp,
             @RequestParam(required = false) String targetIp,
             @RequestParam(required = false) String httpMethod,
+            @RequestParam(required = false) String protocol,
             @RequestParam(required = false) String requestUri,
+            @RequestParam(required = false) Integer responseStatus,
+            @RequestParam(required = false) String stateTag,
+            @RequestParam(required = false) Integer isAggregated,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime,
             @RequestParam(defaultValue = "id") String sortField,
@@ -135,7 +156,8 @@ public class TrafficManageController {
             String orderBy = buildOrderBy(sortField, sortOrder);
             
             List<TrafficMonitorEntity> list = trafficMonitorMapper.selectByCondition(
-                sourceIp, targetIp, httpMethod, requestUri, startDateTime, endDateTime, 0, 10000, orderBy
+                trafficId, eventId, sourceIp, targetIp, httpMethod, protocol, requestUri, responseStatus, stateTag, isAggregated,
+                startDateTime, endDateTime, 0, 10000, orderBy
             );
             
             operLogService.logOperation(authService.getCurrentUsername(), "EXPORT", "流量管理", 

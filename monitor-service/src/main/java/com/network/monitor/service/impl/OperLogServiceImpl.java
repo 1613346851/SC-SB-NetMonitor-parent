@@ -7,7 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class OperLogServiceImpl implements OperLogService {
@@ -24,6 +26,61 @@ public class OperLogServiceImpl implements OperLogService {
     public List<OperLogEntity> listLogs(String username, String operType, Integer operStatus, 
                                          String startTime, String endTime) {
         return operLogMapper.selectList(username, operType, operStatus, startTime, endTime);
+    }
+    
+    @Override
+    public Map<String, Object> listLogsWithPaging(String username, String operType, Integer operStatus,
+                                                   String startTime, String endTime, int pageNum, int pageSize,
+                                                   String sortField, String sortOrder) {
+        if (pageNum < 1) {
+            pageNum = 1;
+        }
+        if (pageSize < 1 || pageSize > 100) {
+            pageSize = 10;
+        }
+        
+        String dbSortField = convertToDbColumn(sortField);
+        if (dbSortField == null) {
+            dbSortField = "oper_time";
+        }
+        if (!"asc".equalsIgnoreCase(sortOrder) && !"desc".equalsIgnoreCase(sortOrder)) {
+            sortOrder = "desc";
+        }
+        
+        int offset = (pageNum - 1) * pageSize;
+        
+        List<OperLogEntity> list = operLogMapper.selectListWithPaging(
+            username, operType, operStatus, startTime, endTime, offset, pageSize, dbSortField, sortOrder
+        );
+        
+        long total = operLogMapper.countList(username, operType, operStatus, startTime, endTime);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("list", list);
+        result.put("total", total);
+        result.put("pageNum", pageNum);
+        result.put("pageSize", pageSize);
+        
+        return result;
+    }
+    
+    private String convertToDbColumn(String field) {
+        if (field == null || field.isEmpty()) {
+            return null;
+        }
+        Map<String, String> fieldMap = new HashMap<>();
+        fieldMap.put("id", "id");
+        fieldMap.put("operName", "username");
+        fieldMap.put("username", "username");
+        fieldMap.put("operType", "oper_type");
+        fieldMap.put("module", "oper_module");
+        fieldMap.put("operModule", "oper_module");
+        fieldMap.put("operIp", "oper_ip");
+        fieldMap.put("status", "oper_status");
+        fieldMap.put("operStatus", "oper_status");
+        fieldMap.put("operTime", "oper_time");
+        fieldMap.put("createTime", "oper_time");
+        return fieldMap.get(field);
     }
     
     @Override

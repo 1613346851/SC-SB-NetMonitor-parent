@@ -6,7 +6,9 @@ const CONFIG = {
     ENDPOINTS: {
         VULN: '/target/xxe/parse',
         SAFE: '/target/xxe/safe-parse',
-        TEST_CASES: '/target/xxe/test-cases'
+        TEST_CASES: '/target/xxe/test-cases',
+        LOGS: '/target/xxe/logs',
+        RESET_DB: '/target/db/reset/xxe'
     }
 };
 
@@ -20,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     bindEventListeners();
     VulnCommon.updateStatus('ready', '就绪');
+    updateLogCount();
     console.log('XXE漏洞测试平台初始化完成');
 }
 
@@ -189,5 +192,134 @@ function clearOutput() {
                 <h4 class="fw-bold text-dark">欢迎使用XXE漏洞测试平台</h4>
                 <p class="mb-0 lead">请输入XML内容或点击测试用例开始解析测试</p>
             </div>`;
+    }
+}
+
+async function getXxeLogs() {
+    VulnCommon.showLoading(true);
+    VulnCommon.updateStatus('executing', '获取解析日志...');
+
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.LOGS);
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const logs = data.data.logs || [];
+            let content = '';
+
+            if (logs.length === 0) {
+                content = '<div class="alert alert-info mb-0"><i class="fas fa-info-circle me-2"></i>暂无解析日志</div>';
+            } else {
+                content = `
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>包含外部实体</th>
+                                    <th>解析结果</th>
+                                    <th>创建时间</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                
+                logs.forEach(log => {
+                    const hasExternal = log.hasExternalEntity ? 
+                        '<span class="badge bg-danger">是</span>' : 
+                        '<span class="badge bg-success">否</span>';
+                    const resultPreview = log.parseResult ? 
+                        VulnCommon.escapeHtml(log.parseResult.substring(0, 50)) + '...' : '-';
+                    
+                    content += `
+                        <tr>
+                            <td>${log.id}</td>
+                            <td>${hasExternal}</td>
+                            <td><small>${resultPreview}</small></td>
+                            <td><small>${log.createTime || '-'}</small></td>
+                        </tr>`;
+                });
+
+                content += '</tbody></table></div>';
+            }
+
+            const html = `
+                <div class="result-card border-info">
+                    <div class="result-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fas fa-database text-info me-2"></i>
+                            XXE解析日志
+                        </h6>
+                        <small class="text-muted">共 ${logs.length} 条记录</small>
+                    </div>
+                    <div class="result-body">${content}</div>
+                </div>`;
+
+            VulnCommon.appendResult('outputContainer', html);
+        }
+    } catch (error) {
+        handleError(error);
+    } finally {
+        VulnCommon.showLoading(false);
+        VulnCommon.updateStatus('ready', '就绪');
+    }
+}
+
+async function resetDatabase() {
+    if (!confirm('确定要重置XXE日志表吗？这将删除所有解析日志！')) {
+        return;
+    }
+
+    VulnCommon.showLoading(true);
+    VulnCommon.updateStatus('executing', '重置数据库...');
+
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.RESET_DB, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const html = `
+                <div class="result-card border-success">
+                    <div class="result-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            数据表重置成功
+                        </h6>
+                    </div>
+                    <div class="result-body">
+                        <div class="alert alert-success mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            已删除 <strong>${data.data.deleted_count}</strong> 条记录
+                        </div>
+                    </div>
+                </div>`;
+
+            VulnCommon.appendResult('outputContainer', html);
+            VulnCommon.showNotification('数据表已重置', 'success');
+            updateLogCount();
+        }
+    } catch (error) {
+        handleError(error);
+    } finally {
+        VulnCommon.showLoading(false);
+        VulnCommon.updateStatus('ready', '就绪');
+    }
+}
+
+async function updateLogCount() {
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.LOGS);
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const count = (data.data.logs || []).length;
+            const countElement = document.getElementById('logCount');
+            if (countElement) {
+                countElement.textContent = count;
+            }
+        }
+    } catch (error) {
+        console.error('获取日志数量失败:', error);
     }
 }

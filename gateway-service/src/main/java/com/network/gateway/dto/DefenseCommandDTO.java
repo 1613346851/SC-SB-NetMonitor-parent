@@ -69,6 +69,11 @@ public class DefenseCommandDTO implements Serializable {
     private Integer rateLimitThreshold;
 
     /**
+     * 操作类型（ADD-添加，REMOVE-移除）
+     */
+    private String action;
+
+    /**
      * 防御类型枚举
      */
     public enum DefenseType {
@@ -117,11 +122,12 @@ public class DefenseCommandDTO implements Serializable {
 
     /**
      * 检查指令是否已过期
+     * 如果 expireTimestamp 为 null，表示永久有效，不会过期
      *
      * @return true表示已过期
      */
     public boolean isExpired() {
-        return System.currentTimeMillis() > this.expireTimestamp;
+        return this.expireTimestamp != null && System.currentTimeMillis() > this.expireTimestamp;
     }
 
     /**
@@ -184,12 +190,10 @@ public class DefenseCommandDTO implements Serializable {
         return sb.toString();
     }
 
-    /**
-     * 获取剩余有效时间（毫秒）
-     *
-     * @return 剩余时间
-     */
     public long getRemainingTime() {
+        if (this.expireTimestamp == null) {
+            return -1;
+        }
         long remaining = this.expireTimestamp - System.currentTimeMillis();
         return Math.max(0, remaining);
     }

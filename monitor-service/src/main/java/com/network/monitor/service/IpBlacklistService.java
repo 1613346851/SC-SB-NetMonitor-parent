@@ -8,6 +8,8 @@ import java.util.List;
 
 public interface IpBlacklistService {
 
+    void addToBlacklist(String ip, String reason, LocalDateTime expireTime, String operator, String banType, Long attackId, Long trafficId, Long ruleId, String eventId);
+
     void addToBlacklist(String ip, String reason, LocalDateTime expireTime, String operator, String banType, Long attackId, Long trafficId, Long ruleId);
 
     void extendBlacklist(String ip, Long extendSeconds, String operator);

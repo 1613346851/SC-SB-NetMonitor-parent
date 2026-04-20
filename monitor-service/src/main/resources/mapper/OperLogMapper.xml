@@ -52,6 +52,52 @@
         ORDER BY oper_time DESC
     </select>
     
+    <select id="selectListWithPaging" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_oper_log
+        <where>
+            <if test="username != null and username != ''">
+                AND username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="operType != null and operType != ''">
+                AND oper_type = #{operType}
+            </if>
+            <if test="operStatus != null">
+                AND oper_status = #{operStatus}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND oper_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND oper_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY ${sortField} ${sortOrder}
+        LIMIT #{offset}, #{pageSize}
+    </select>
+    
+    <select id="countList" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_oper_log
+        <where>
+            <if test="username != null and username != ''">
+                AND username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="operType != null and operType != ''">
+                AND oper_type = #{operType}
+            </if>
+            <if test="operStatus != null">
+                AND oper_status = #{operStatus}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND oper_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND oper_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+    
     <insert id="insert" parameterType="com.network.monitor.entity.OperLogEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_oper_log (username, oper_type, oper_module, oper_content, oper_method, oper_url, 
                                   oper_ip, oper_location, oper_status, error_msg, cost_time)

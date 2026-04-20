@@ -53,6 +53,32 @@
         ORDER BY create_time DESC
     </select>
     
+    <select id="selectListPaged" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_user
+        WHERE del_flag = 0
+        <if test="username != null and username != ''">
+            AND username LIKE CONCAT('%', #{username}, '%')
+        </if>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <select id="countList" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_user
+        WHERE del_flag = 0
+        <if test="username != null and username != ''">
+            AND username LIKE CONCAT('%', #{username}, '%')
+        </if>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+    </select>
+    
     <select id="countByUsername" resultType="int">
         SELECT COUNT(*)
         FROM sys_user

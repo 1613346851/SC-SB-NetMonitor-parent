@@ -28,6 +28,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/auth/login",
                         "/api/auth/logout",
                         "/api/config/public/**",
+                        "/api/config/alert.sound",
                         "/api/inner/**"
                 )
                 .order(1);

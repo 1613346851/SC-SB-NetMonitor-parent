@@ -71,6 +71,11 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
             entity.setTrafficId(dto.getRequestId());
         }
         
+        // 设置关联事件ID
+        if (dto.getEventId() != null) {
+            entity.setEventId(dto.getEventId());
+        }
+        
         // 转换时间字段
         if (dto.getRequestTime() != null && !dto.getRequestTime().isEmpty()) {
             try {
@@ -86,7 +91,11 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
         // 转换 Map 类型为 JSON 字符串
         if (dto.getQueryParams() != null) {
             try {
-                entity.setQueryParams(mapToJson(dto.getQueryParams()));
+                String queryParamsJson = mapToJson(dto.getQueryParams());
+                if (queryParamsJson != null && !queryParamsJson.isEmpty()) {
+                    entity.setQueryParams(queryParamsJson);
+                    log.debug("转换查询参数为 JSON: length={}", queryParamsJson.length());
+                }
             } catch (JsonProcessingException e) {
                 log.warn("转换查询参数为 JSON 失败：{}", e.getMessage());
                 entity.setQueryParams(dto.getQueryParams().toString());
@@ -99,6 +108,72 @@ public class TrafficStoreServiceImpl implements TrafficStoreService {
             } catch (JsonProcessingException e) {
                 log.warn("转换请求头为 JSON 失败：{}", e.getMessage());
                 entity.setRequestHeaders(dto.getRequestHeaders().toString());
+            }
+        }
+
+        // 处理聚合字段
+        if (dto.getRequestCount() != null) {
+            entity.setRequestCount(dto.getRequestCount());
+        } else {
+            entity.setRequestCount(1);
+        }
+        
+        if (dto.getStateTag() != null) {
+            entity.setStateTag(dto.getStateTag());
+        } else {
+            entity.setStateTag("NORMAL");
+        }
+        
+        if (dto.getStateValue() != null) {
+            entity.setStateValue(dto.getStateValue());
+        } else {
+            entity.setStateValue(0);
+        }
+        
+        if (dto.getConfidence() != null) {
+            entity.setConfidence(dto.getConfidence());
+        } else {
+            entity.setConfidence(0);
+        }
+        
+        if (dto.getIsAggregated() != null && dto.getIsAggregated()) {
+            entity.setIsAggregated(1);
+        } else {
+            entity.setIsAggregated(0);
+        }
+        
+        if (dto.getErrorCount() != null) {
+            entity.setErrorCount(dto.getErrorCount());
+        } else {
+            entity.setErrorCount(0);
+        }
+        
+        if (dto.getAvgProcessingTime() != null) {
+            entity.setAvgProcessingTime(dto.getAvgProcessingTime());
+        }
+        
+        if (dto.getContentType() != null && !dto.getContentType().isEmpty()) {
+            entity.setContentType(dto.getContentType());
+        } else {
+            entity.setContentType("unknown");
+        }
+        
+        // 转换聚合时间字段
+        if (dto.getAggregateStartTime() != null && !dto.getAggregateStartTime().isEmpty()) {
+            try {
+                entity.setAggregateStartTime(LocalDateTime.parse(
+                    dto.getAggregateStartTime().replace(" ", "T")));
+            } catch (Exception e) {
+                log.warn("转换聚合开始时间失败：{}", e.getMessage());
+            }
+        }
+        
+        if (dto.getAggregateEndTime() != null && !dto.getAggregateEndTime().isEmpty()) {
+            try {
+                entity.setAggregateEndTime(LocalDateTime.parse(
+                    dto.getAggregateEndTime().replace(" ", "T")));
+            } catch (Exception e) {
+                log.warn("转换聚合结束时间失败：{}", e.getMessage());
             }
         }
 

@@ -26,14 +26,29 @@ public class PageController {
         return "attack-monitor";
     }
 
+    @GetMapping("/event")
+    public String attackEvent() {
+        return "attack-event";
+    }
+
     @GetMapping("/vulnerability")
     public String vulnerabilityMonitor() {
         return "vulnerability-monitor";
     }
 
+    @GetMapping("/scan")
+    public String vulnerabilityScan() {
+        return "vuln-scan";
+    }
+
     @GetMapping("/defense")
     public String defenseLog() {
         return "defense-log";
+    }
+
+    @GetMapping("/defense-evaluation")
+    public String defenseEvaluation() {
+        return "defense-evaluation";
     }
 
     @GetMapping("/rule")
@@ -49,6 +64,21 @@ public class PageController {
     @GetMapping("/blacklist")
     public String blacklistManage() {
         return "blacklist-manage";
+    }
+
+    @GetMapping("/alert")
+    public String alertManage() {
+        return "alert-manage";
+    }
+
+    @GetMapping("/trace")
+    public String traceSearch() {
+        return "trace-search";
+    }
+
+    @GetMapping("/ip-profile")
+    public String ipProfile() {
+        return "ip-profile";
     }
 
     @GetMapping("/config")

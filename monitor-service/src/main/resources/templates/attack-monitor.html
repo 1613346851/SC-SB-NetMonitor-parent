@@ -5,6 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>攻击监测 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .event-link {
+            color: #4f46e5;
+            text-decoration: none;
+            font-family: monospace;
+        }
+        .event-link:hover {
+            text-decoration: underline;
+        }
+        .batch-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .checkbox-cell {
+            width: 40px;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -13,6 +31,7 @@
         <div class="main-container">
             <header class="header">
                 <div class="header-left">
+                    <div th:replace="~{fragments/common :: mobileMenuToggle}"></div>
                     <h2>攻击监测</h2>
                 </div>
                 <div class="header-right">
@@ -23,6 +42,10 @@
             <main class="content">
                 <div class="filter-bar">
                     <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">事件 ID</label>
+                            <input type="text" class="form-control" id="eventId" placeholder="输入事件ID筛选" style="width: 160px;">
+                        </div>
                         <div class="form-group">
                             <label class="form-label">源 IP</label>
                             <input type="text" class="form-control" id="sourceIp" placeholder="请输入源 IP">
@@ -43,6 +66,7 @@
                             <label class="form-label">风险等级</label>
                             <select class="form-control" id="riskLevel">
                                 <option value="">全部</option>
+                                <option value="CRITICAL">严重</option>
                                 <option value="HIGH">高风险</option>
                                 <option value="MEDIUM">中风险</option>
                                 <option value="LOW">低风险</option>
@@ -74,25 +98,30 @@
                 <div class="table-container">
                     <div class="table-header">
                         <h3 class="table-title">攻击记录</h3>
+                        <div class="batch-actions">
+                            <button class="btn btn-sm btn-success" onclick="batchHandle()">批量处理</button>
+                        </div>
                     </div>
-                    <div class="table-wrapper">
-                        <table class="data-table">
+                    <div class="table-wrapper" style="position: relative;">
+                        <table class="data-table has-fixed-action">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>攻击时间</th>
-                                    <th>源 IP</th>
-                                    <th>目标 IP</th>
-                                    <th>攻击类型</th>
-                                    <th>风险等级</th>
-                                    <th>置信度</th>
-                                    <th>状态</th>
+                                    <th class="checkbox-cell"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                                    <th data-sort="id" style="min-width: 60px;">ID</th>
+                                    <th data-sort="eventId" style="min-width: 140px;">事件ID</th>
+                                    <th data-sort="attackTime" style="min-width: 150px;">攻击时间</th>
+                                    <th data-sort="sourceIp" style="min-width: 120px;">源 IP</th>
+                                    <th style="min-width: 200px;">目标 URI</th>
+                                    <th data-sort="attackType" style="min-width: 100px;">攻击类型</th>
+                                    <th data-sort="riskLevel" style="min-width: 100px;">风险等级</th>
+                                    <th data-sort="confidence" style="min-width: 80px;">置信度</th>
+                                    <th data-sort="handled" style="min-width: 80px;">状态</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
                             <tbody id="attackTableBody">
                                 <tr>
-                                    <td colspan="9" class="text-center">加载中...</td>
+                                    <td colspan="11" class="text-center">加载中...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -106,7 +135,7 @@
     </div>
 
     <div id="attackDetailModal" class="modal-overlay" style="display: none;">
-        <div class="modal" style="width: 800px;">
+        <div class="modal">
             <div class="modal-header">
                 <h3 class="modal-title">攻击详情</h3>
                 <span class="modal-close" onclick="closeAttackDetail()">&times;</span>
@@ -115,12 +144,14 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-default" onclick="closeAttackDetail()">关闭</button>
+                <button class="btn btn-info" onclick="viewEventDetail()" id="viewEventBtn" style="display: none;">查看事件</button>
                 <button class="btn btn-primary" onclick="handleAttack()" id="handleBtn">标记为已处理</button>
             </div>
         </div>
     </div>
 
     <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/core/resource-loader.js}"></script>
     <script th:src="@{/js/utils/storage.js}"></script>
     <script th:src="@{/js/utils/date.js}"></script>
     <script th:src="@{/js/utils/message.js}"></script>
@@ -132,6 +163,7 @@
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
     <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/components/data-update-handler.js}"></script>
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/attack-monitor.js}"></script>
     <script>

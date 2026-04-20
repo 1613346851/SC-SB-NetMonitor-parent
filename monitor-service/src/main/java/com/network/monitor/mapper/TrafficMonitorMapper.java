@@ -27,10 +27,16 @@ public interface TrafficMonitorMapper {
      * 分页查询流量记录
      */
     List<TrafficMonitorEntity> selectByCondition(
+            @Param("trafficId") String trafficId,
+            @Param("eventId") String eventId,
             @Param("sourceIp") String sourceIp,
             @Param("targetIp") String targetIp,
             @Param("httpMethod") String httpMethod,
+            @Param("protocol") String protocol,
             @Param("requestUri") String requestUri,
+            @Param("responseStatus") Integer responseStatus,
+            @Param("stateTag") String stateTag,
+            @Param("isAggregated") Integer isAggregated,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
             @Param("offset") Integer offset,
@@ -42,6 +48,24 @@ public interface TrafficMonitorMapper {
      * 统计总记录数
      */
     long countByCondition(
+            @Param("trafficId") String trafficId,
+            @Param("eventId") String eventId,
+            @Param("sourceIp") String sourceIp,
+            @Param("targetIp") String targetIp,
+            @Param("httpMethod") String httpMethod,
+            @Param("protocol") String protocol,
+            @Param("requestUri") String requestUri,
+            @Param("responseStatus") Integer responseStatus,
+            @Param("stateTag") String stateTag,
+            @Param("isAggregated") Integer isAggregated,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
+
+    /**
+     * 统计总请求数（使用request_count字段求和）
+     */
+    long sumRequestCountByCondition(
             @Param("sourceIp") String sourceIp,
             @Param("targetIp") String targetIp,
             @Param("httpMethod") String httpMethod,

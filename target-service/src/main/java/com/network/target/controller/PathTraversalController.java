@@ -29,6 +29,11 @@ import java.util.Map;
 @Slf4j
 public class PathTraversalController {
 
+    private static final List<String> ALLOWED_FILES = List.of(
+            "test.txt",
+            "config/test.properties"
+    );
+
     private final ResourceLoader resourceLoader;
 
     public PathTraversalController(ResourceLoader resourceLoader) {
@@ -37,7 +42,6 @@ public class PathTraversalController {
 
     /**
      * 漏洞接口：直接拼接用户输入的文件名，无任何过滤
-     * 攻击场景：用户可以使用 ../ 读取任意文件
      */
     @GetMapping("/read")
     public ApiResponse readFileVulnerable(@RequestParam("filename") String filename) {
@@ -48,13 +52,12 @@ public class PathTraversalController {
             log.info("当前工作目录: {}", baseDir);
 
             String[] possibleTestFilesPaths = getTestFilesPaths(baseDir);
-            
             for (String testFilesPath : possibleTestFilesPaths) {
                 Path basePath = Paths.get(testFilesPath);
                 Path filePath = basePath.resolve(filename).normalize();
-                
+
                 log.info("尝试路径: {}", filePath);
-                
+
                 File file = filePath.toFile();
                 if (file.exists() && file.isFile()) {
                     String content = Files.readString(file.toPath(), StandardCharsets.UTF_8);
@@ -101,19 +104,15 @@ public class PathTraversalController {
 
     private String[] getTestFilesPaths(String baseDir) {
         return new String[] {
-            baseDir + "/target-service/src/main/resources/static/test-files",
-            baseDir + "/src/main/resources/static/test-files",
-            baseDir + "/src/main/resources/static/test-files",
-            "src/main/resources/static/test-files"
+                baseDir + "/target-service/src/main/resources/static/test-files",
+                baseDir + "/src/main/resources/static/test-files",
+                baseDir + "/src/main/resources/static/test-files",
+                "src/main/resources/static/test-files"
         };
     }
 
     /**
-     * 安全接口：对文件名进行白名单校验和路径规范化
-     * 防护措施：
-     * 1. 过滤 ../ 等危险字符
-     * 2. 路径规范化后检查是否在允许目录内
-     * 3. 文件名白名单校验
+     * 安全接口：对白名单文件执行规范化路径校验
      */
     @GetMapping("/safe-read")
     public ApiResponse readFileSafe(@RequestParam("filename") String filename) {
@@ -124,48 +123,42 @@ public class PathTraversalController {
                 return ApiResponse.error().message("文件名不能为空");
             }
 
-            if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            String normalizedInput = normalizeRelativePath(filename);
+            if (normalizedInput == null) {
                 log.warn("【安全拦截】检测到非法路径字符：{}", filename);
                 return ApiResponse.error()
-                        .message("非法文件名：禁止使用路径遍历字符")
+                        .message("非法文件名：仅允许白名单内的相对路径")
                         .data("filename", filename)
-                        .data("blocked_reason", "文件名包含非法字符（.. / \\）");
+                        .data("blocked_reason", "文件名包含非法字符或路径遍历片段");
             }
 
-            List<String> allowedFiles = List.of(
-                "test.txt",
-                "config/test.properties",
-                "readme.txt",
-                "sample.txt"
-            );
-
-            boolean isAllowed = allowedFiles.stream()
-                    .anyMatch(allowed -> allowed.equals(filename));
-
-            if (!isAllowed) {
-                log.warn("【安全拦截】文件不在白名单中：{}", filename);
+            if (!ALLOWED_FILES.contains(normalizedInput)) {
+                log.warn("【安全拦截】文件不在白名单中：{} -> {}", filename, normalizedInput);
                 return ApiResponse.error()
                         .message("文件不在允许列表中")
                         .data("filename", filename)
-                        .data("allowed_files", allowedFiles);
+                        .data("normalized_filename", normalizedInput)
+                        .data("allowed_files", ALLOWED_FILES);
             }
 
-            Resource resource = resourceLoader.getResource("classpath:static/test-files/" + filename);
+            Resource resource = resourceLoader.getResource("classpath:static/test-files/" + normalizedInput);
             if (!resource.exists()) {
                 return ApiResponse.error()
                         .message("文件不存在")
-                        .data("filename", filename);
+                        .data("filename", filename)
+                        .data("normalized_filename", normalizedInput);
             }
 
             String content = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            log.info("【安全接口】成功读取文件：{}", filename);
+            log.info("【安全接口】成功读取文件：{} -> {}", filename, normalizedInput);
 
             return ApiResponse.success()
                     .message("文件读取成功（安全接口）")
                     .data("filename", filename)
+                    .data("normalized_filename", normalizedInput)
                     .data("content", content)
-                    .data("file_path", "classpath:static/test-files/" + filename)
-                    .data("security_note", "已通过白名单校验和路径过滤");
+                    .data("file_path", "classpath:static/test-files/" + normalizedInput)
+                    .data("security_note", "已通过白名单校验和规范化路径校验");
 
         } catch (IOException e) {
             log.error("安全文件读取异常", e);
@@ -180,15 +173,31 @@ public class PathTraversalController {
     @GetMapping("/list-files")
     public ApiResponse listAllowedFiles() {
         List<Map<String, String>> files = new ArrayList<>();
-        
         files.add(createFileInfo("test.txt", "基础测试文本文件", "txt"));
         files.add(createFileInfo("config/test.properties", "配置文件示例", "properties"));
-        files.add(createFileInfo("readme.txt", "说明文档", "txt"));
 
         return ApiResponse.success()
                 .message("获取文件列表成功")
                 .data("files", files)
-                .data("base_path", "/target/path/read?filename=");
+                .data("base_path", "/target/path/read?filename=")
+                .data("safe_base_path", "/target/path/safe-read?filename=");
+    }
+
+    private String normalizeRelativePath(String filename) {
+        String candidate = filename.trim().replace('\\', '/');
+        while (candidate.startsWith("/")) {
+            candidate = candidate.substring(1);
+        }
+        if (candidate.isEmpty() || candidate.contains(":")) {
+            return null;
+        }
+
+        Path normalizedPath = Paths.get(candidate).normalize();
+        String normalized = normalizedPath.toString().replace('\\', '/');
+        if (normalized.startsWith("../") || normalized.equals("..") || candidate.contains("..")) {
+            return null;
+        }
+        return normalized;
     }
 
     private Map<String, String> createFileInfo(String name, String desc, String type) {

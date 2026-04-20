@@ -3,24 +3,169 @@
  * 负责仪表盘数据加载、图表渲染、实时告警等功能
  */
 
-// 页面初始化
+let recentAttacksTable;
+
 document.addEventListener('DOMContentLoaded', async function() {
-    // 并行加载所有数据，提升加载速度
+    initRecentAttacksTable();
+    
     await Promise.all([
         loadDashboardStats(),
+        loadEventStats(),
         loadTrafficTrend(),
         loadAttackTypeDistribution(),
         loadVulnerabilityLevelDistribution(),
-        loadRecentAttacks()
+        loadRecentEvents()
     ]);
     
-    // 5 秒后刷新最新告警
-    setInterval(loadRecentAttacks, 5000);
+    initDataUpdateHandler();
 });
 
-/**
- * 时间范围变化时自动调整统计精度
- */
+function initDataUpdateHandler() {
+    if (typeof DataUpdateHandler === 'undefined') {
+        console.warn('DataUpdateHandler未加载');
+        return;
+    }
+    
+    DataUpdateHandler.connect(
+        function() {
+            DataUpdateHandler.onDataUpdate(function(message) {
+                handleDataUpdate(message);
+            });
+        },
+        function() {
+            console.warn('数据更新WebSocket连接断开');
+        }
+    );
+}
+
+function handleDataUpdate(message) {
+    if (!message || !message.type) return;
+    
+    switch (message.type) {
+        case 'ALERT_RECORD':
+            handleAlertUpdate(message.data);
+            break;
+        case 'ATTACK_RECORD':
+            handleAttackUpdate(message.data);
+            break;
+        case 'STATS_UPDATE':
+            handleStatsUpdate(message.data);
+            break;
+        case 'EVENT_STATS_UPDATE':
+            handleEventStatsUpdate(message.data);
+            break;
+    }
+}
+
+function handleAlertUpdate(alertData) {
+    if (!alertData || !recentAttacksTable) return;
+    
+    const currentData = recentAttacksTable.getCurrentData() || [];
+    const existingIndex = currentData.findIndex(item => item.id === alertData.id);
+    
+    if (existingIndex >= 0) {
+        currentData[existingIndex] = alertData;
+    } else {
+        currentData.unshift(alertData);
+        if (currentData.length > 10) {
+            currentData.pop();
+        }
+    }
+    
+    recentAttacksTable.updateData(currentData);
+}
+
+function handleAttackUpdate(attackData) {
+    loadDashboardStats();
+}
+
+function handleStatsUpdate(statsData) {
+    if (statsData.totalTraffic !== undefined) {
+        document.getElementById('totalTraffic').textContent = statsData.totalTraffic;
+    }
+    if (statsData.totalAttack !== undefined) {
+        document.getElementById('totalAttack').textContent = statsData.totalAttack;
+    }
+    if (statsData.totalVulnerability !== undefined) {
+        document.getElementById('totalVulnerability').textContent = statsData.totalVulnerability;
+    }
+    if (statsData.totalDefense !== undefined) {
+        document.getElementById('totalDefense').textContent = statsData.totalDefense;
+    }
+}
+
+function handleEventStatsUpdate(eventStats) {
+    if (eventStats.totalEvents !== undefined) {
+        const el = document.getElementById('totalEvents');
+        if (el) el.textContent = eventStats.totalEvents;
+    }
+    if (eventStats.activeEvents !== undefined) {
+        const el = document.getElementById('activeEvents');
+        if (el) el.textContent = eventStats.activeEvents;
+    }
+    if (eventStats.criticalEvents !== undefined) {
+        const el = document.getElementById('criticalEvents');
+        if (el) el.textContent = eventStats.criticalEvents;
+    }
+}
+
+function initRecentAttacksTable() {
+    recentAttacksTable = TableUtils.createInstance({
+        instanceName: 'recentAttacksTable',
+        apiUrl: '/alert/list',
+        pageSize: 10,
+        defaultSortField: 'createTime',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'recentAttacks',
+        paginationEl: null,
+        colspan: 6,
+        enablePagination: false,
+        renderRow: function(alert) {
+            const levelClass = {
+                'CRITICAL': 'tag danger',
+                'HIGH': 'tag danger',
+                'MEDIUM': 'tag warning',
+                'LOW': 'tag info'
+            }[alert.alertLevel] || 'tag';
+            
+            const levelText = {
+                'CRITICAL': '严重',
+                'HIGH': '高风险',
+                'MEDIUM': '中风险',
+                'LOW': '低风险'
+            }[alert.alertLevel] || alert.alertLevel;
+            
+            const statusText = alert.status === 0 ? '待处理' : (alert.status === 1 ? '已确认' : '已忽略');
+            const statusClass = alert.status === 0 ? 'tag warning' : (alert.status === 1 ? 'tag success' : 'tag');
+            
+            const attackTypeText = {
+                'SQL_INJECTION': 'SQL注入',
+                'XSS': '跨站脚本',
+                'COMMAND_INJECTION': '命令注入',
+                'PATH_TRAVERSAL': '路径遍历',
+                'FILE_INCLUSION': '文件包含',
+                'DDOS': 'DDoS攻击',
+                'BRUTE_FORCE': '暴力破解',
+                'SCANNER': '扫描器探测'
+            }[alert.attackType] || alert.attackType || '-';
+            
+            return `
+                <tr onclick="window.location.href='/alert?alertId=${alert.alertId}'" style="cursor: pointer;">
+                    <td>${alert.alertId || '-'}</td>
+                    <td>${DateUtil.format(alert.createTime)}</td>
+                    <td>${CellRenderer.renderText(alert.sourceIp)}</td>
+                    <td>${attackTypeText}</td>
+                    <td><span class="${levelClass}">${levelText}</span></td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
+                </tr>
+            `;
+        }
+    });
+    
+    window.recentAttacksTable = recentAttacksTable;
+    recentAttacksTable.loadData();
+}
+
 function onTimeRangeChange() {
     const timeRange = document.getElementById('trafficTimeRange').value;
     
@@ -45,9 +190,6 @@ function onTimeRangeChange() {
     loadTrafficTrend();
 }
 
-/**
- * 获取自动推荐的统计精度
- */
 function getAutoInterval(timeRange) {
     const recommendations = {
         '1h': '5m',
@@ -115,6 +257,24 @@ async function loadDashboardStats() {
     }
 }
 
+async function loadEventStats() {
+    try {
+        const stats = await http.get('/event/statistics');
+        
+        const ongoingEventsEl = document.getElementById('ongoingEvents');
+        if (ongoingEventsEl) {
+            ongoingEventsEl.textContent = stats.ongoingEvents || 0;
+        }
+        
+        const totalEventsEl = document.getElementById('totalEvents');
+        if (totalEventsEl) {
+            totalEventsEl.textContent = stats.totalEvents || 0;
+        }
+    } catch (error) {
+        console.error('加载事件统计失败:', error);
+    }
+}
+
 async function loadTrafficTrend() {
     try {
         const timeRangeSelect = document.getElementById('trafficTimeRange');
@@ -155,11 +315,24 @@ async function loadTrafficTrend() {
             type: 'line',
             smooth: true,
             data: trafficValues,
+            symbol: 'circle',
+            symbolSize: 4,
+            lineStyle: {
+                width: 2,
+                type: 'solid'
+            },
             areaStyle: {
-                color: 'rgba(24, 144, 255, 0.1)'
+                color: {
+                    type: 'linear',
+                    x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(79, 70, 229, 0.3)' },
+                        { offset: 1, color: 'rgba(79, 70, 229, 0.05)' }
+                    ]
+                }
             },
             itemStyle: {
-                color: '#1890ff'
+                color: '#4f46e5'
             }
         });
         
@@ -169,8 +342,21 @@ async function loadTrafficTrend() {
             type: 'line',
             smooth: true,
             data: attackValues,
+            symbol: 'triangle',
+            symbolSize: 6,
+            lineStyle: {
+                width: 2,
+                type: 'dashed'
+            },
             areaStyle: {
-                color: 'rgba(245, 34, 45, 0.1)'
+                color: {
+                    type: 'linear',
+                    x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(245, 34, 45, 0.25)' },
+                        { offset: 1, color: 'rgba(245, 34, 45, 0.02)' }
+                    ]
+                }
             },
             itemStyle: {
                 color: '#f5222d'
@@ -183,8 +369,21 @@ async function loadTrafficTrend() {
             type: 'line',
             smooth: true,
             data: defenseValues,
+            symbol: 'diamond',
+            symbolSize: 6,
+            lineStyle: {
+                width: 2,
+                type: 'dotted'
+            },
             areaStyle: {
-                color: 'rgba(82, 196, 26, 0.1)'
+                color: {
+                    type: 'linear',
+                    x: 0, y: 0, x2: 0, y2: 1,
+                    colorStops: [
+                        { offset: 0, color: 'rgba(82, 196, 26, 0.25)' },
+                        { offset: 1, color: 'rgba(82, 196, 26, 0.02)' }
+                    ]
+                }
             },
             itemStyle: {
                 color: '#52c41a'
@@ -219,7 +418,13 @@ async function loadTrafficTrend() {
                 }
             },
             yAxis: {
-                type: 'value'
+                type: 'value',
+                splitLine: {
+                    show: true,
+                    lineStyle: {
+                        type: 'dashed'
+                    }
+                }
             },
             grid: {
                 left: '3%',
@@ -319,7 +524,6 @@ async function loadAttackTypeDistribution() {
             return;
         }
         
-        // 处理无数据情况
         const seriesData = (chartData && chartData.length > 0) ? chartData : [{
             name: '无数据',
             value: 1
@@ -378,15 +582,59 @@ async function loadVulnerabilityLevelDistribution() {
             return;
         }
         
-        // 处理无数据情况
-        const seriesData = (chartData && chartData.length > 0) ? chartData : [{
-            name: '无数据',
-            value: 1
-        }];
+        const levelNameMap = {
+            'CRITICAL': '严重',
+            'HIGH': '高风险',
+            'MEDIUM': '中风险',
+            'LOW': '低风险',
+            '严重': '严重',
+            '高风险': '高风险',
+            '中风险': '中风险',
+            '低风险': '低风险'
+        };
+        
+        const levelColorMap = {
+            'CRITICAL': '#9a60b4',
+            'HIGH': '#ee6666',
+            'MEDIUM': '#fac858',
+            'LOW': '#91cc75',
+            '严重': '#9a60b4',
+            '高风险': '#ee6666',
+            '中风险': '#fac858',
+            '低风险': '#91cc75'
+        };
+        
+        const levelOrder = ['严重', '高风险', '中风险', '低风险'];
+        
+        let seriesData = [];
+        if (chartData && chartData.length > 0) {
+            seriesData = chartData.map(item => {
+                const originalName = item.name || '未知';
+                const chineseName = levelNameMap[originalName] || originalName;
+                return {
+                    name: chineseName,
+                    value: item.value,
+                    itemStyle: {
+                        color: levelColorMap[originalName] || '#d9d9d9'
+                    }
+                };
+            }).sort((a, b) => {
+                const indexA = levelOrder.indexOf(a.name);
+                const indexB = levelOrder.indexOf(b.name);
+                return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+            });
+        } else {
+            seriesData = [{
+                name: '无数据',
+                value: 1,
+                itemStyle: { color: '#d9d9d9' }
+            }];
+        }
         
         const option = {
             tooltip: {
-                trigger: 'item'
+                trigger: 'item',
+                formatter: chartData && chartData.length > 0 ? '{b}: {c} ({d}%)' : '{b}'
             },
             legend: {
                 orient: 'vertical',
@@ -399,9 +647,6 @@ async function loadVulnerabilityLevelDistribution() {
                 label: {
                     show: true,
                     formatter: chartData && chartData.length > 0 ? '{b}: {c}' : '{b}'
-                },
-                itemStyle: {
-                    color: chartData && chartData.length > 0 ? undefined : '#d9d9d9'
                 },
                 emphasis: {
                     itemStyle: {
@@ -423,28 +668,34 @@ async function loadVulnerabilityLevelDistribution() {
     }
 }
 
-async function loadRecentAttacks() {
+async function loadRecentEvents() {
     try {
-        const response = await http.get('/attack/unhandled/high-risk');
-        const attacks = response || [];
+        const events = await http.get('/event/recent?limit=5');
         
-        const tbody = document.getElementById('recentAttacks');
+        const tbody = document.getElementById('recentEvents');
+        if (!tbody) return;
         
-        if (!attacks || attacks.length === 0) {
+        if (!events || events.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="text-center">暂无数据</td></tr>';
             return;
         }
         
-        tbody.innerHTML = attacks.map(attack => `
-            <tr>
-                <td>${dateFormat.format(attack.attackTime)}</td>
-                <td>${attack.sourceIp}</td>
-                <td>${tableRenderer.renderAttackType(attack.attackType)}</td>
-                <td>${tableRenderer.renderRiskLevel(attack.riskLevel)}</td>
-                <td>${tableRenderer.renderStatus(attack.handled)}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = events.map(event => {
+            const statusTag = event.status === 0 
+                ? '<span class="tag warning">进行中</span>'
+                : '<span class="tag success">已结束</span>';
+            
+            return `
+                <tr onclick="window.location.href='/event?id=${event.eventId}'" style="cursor: pointer;">
+                    <td><span class="event-id" title="${event.eventId}">${event.eventId.substring(0, 12)}...</span></td>
+                    <td>${DateUtil.format(event.startTime)}</td>
+                    <td>${CellRenderer.renderText(event.sourceIp)}</td>
+                    <td>${TableRenderer.renderAttackType(event.attackType)}</td>
+                    <td>${statusTag}</td>
+                </tr>
+            `;
+        }).join('');
     } catch (error) {
-        console.error('加载最新告警失败:', error);
+        console.error('加载最近事件失败:', error);
     }
 }

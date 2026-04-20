@@ -46,6 +46,15 @@ spring:
             - RewritePath=/target/(?<segment>.*),/target/page/${segment}
             - AddResponseHeader=X-Gateway-Version, 1.0.0
         
+        # 靶场服务静态资源路由（lib目录）- 必须在 target_service_route 之前
+        - id: target_static_lib_route
+          uri: http://localhost:9001
+          predicates:
+            - Path=/target/lib/**
+          filters:
+            - StripPrefix=1
+            - AddResponseHeader=X-Gateway-Version, 1.0.0
+        
         # 靶场服务 API 路由
         - id: target_service_route
           uri: http://localhost:9001
@@ -53,7 +62,6 @@ spring:
             - Path=/target/**
           filters:
             - StripPrefix=0
-            # 添加响应头
             - AddResponseHeader=X-Gateway-Version, 1.0.0
         
         # 静态资源路由
@@ -92,7 +100,7 @@ spring:
       # 全局超时配置
       httpclient:
         connect-timeout: 5000
-        response-timeout: 30s
+        response-timeout: 60s
         pool:
           max-idle-time: 15s
           max-connections: 1000
@@ -111,12 +119,14 @@ management:
   endpoints:
     web:
       exposure:
-        include: routes, health, gateway, logfile, metrics, env
+        include: routes, health, gateway, logfile, metrics, env, prometheus
       base-path: /actuator
   endpoint:
     health:
       show-details: always
     gateway:
+      enabled: true
+    prometheus:
       enabled: true
   
   # 指标配置
@@ -131,25 +141,18 @@ management:
           request:
             autotime:
               enabled: true
+    tags:
+      application: ${spring.application.name}
 
-# 日志配置
-logging:
-  level:
-    com.network.gateway: DEBUG
-    org.springframework.cloud.gateway: INFO
-    org.springframework.web.reactive: INFO
-    reactor.netty: INFO
-    org.apache.http: WARN
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-  file:
-    name: logs/gateway-service.log
-    max-size: 10MB
-    max-history: 30
-
-# 自定义配置
+# 网关告警配置
 gateway:
+  alert:
+    enabled: true
+  
+  # 监控服务配置
+  monitor-service:
+    url: http://localhost:9002
+  
   # 流量采集配置
   traffic:
     collection:
@@ -188,6 +191,12 @@ gateway:
     malicious-request:
       enabled: true
       
+  # 配置同步配置
+  config:
+    sync:
+      enabled: true
+      interval: 300000  # 5分钟同步一次
+      
   # 缓存配置
   cache:
     cleanup-interval: 60000  # 1分钟清理一次
@@ -207,3 +216,19 @@ gateway:
       - "*"
     allow-credentials: true
     max-age: 3600
+
+# 日志配置
+logging:
+  level:
+    com.network.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
+    org.springframework.web.reactive: INFO
+    reactor.netty: INFO
+    org.apache.http: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/gateway-service.log
+    max-size: 10MB
+    max-history: 30

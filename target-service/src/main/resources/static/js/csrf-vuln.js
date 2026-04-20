@@ -10,10 +10,12 @@ const CONFIG = {
         USER_INFO: '/target/csrf/user-info',
         ATTACK_PAGE: '/target/csrf/attack-page'
     },
-    DEFAULT_USER_ID: 1
+    DEFAULT_USER_ID: 1,
+    DEFAULT_TOKEN_HEADER: 'X-CSRF-TOKEN'
 };
 
 let currentToken = null;
+let currentTokenHeader = CONFIG.DEFAULT_TOKEN_HEADER;
 let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -30,12 +32,20 @@ function initializeApp() {
 function bindEventListeners() {
     document.getElementById('vulnUpdateBtn')?.addEventListener('click', () => {
         const nickname = document.getElementById('nicknameInput')?.value.trim();
-        if (nickname) updateNicknameVulnerable(nickname);
+        if (nickname) {
+            updateNicknameVulnerable(nickname);
+        } else {
+            VulnCommon.showNotification('请输入昵称', 'warning');
+        }
     });
 
     document.getElementById('safeUpdateBtn')?.addEventListener('click', () => {
         const nickname = document.getElementById('nicknameInput')?.value.trim();
-        if (nickname) updateNicknameSafe(nickname);
+        if (nickname) {
+            updateNicknameSafe(nickname);
+        } else {
+            VulnCommon.showNotification('请输入昵称', 'warning');
+        }
     });
 }
 
@@ -46,7 +56,7 @@ async function getUserInfo() {
     try {
         const response = await fetch(`${CONFIG.ENDPOINTS.USER_INFO}?userId=${CONFIG.DEFAULT_USER_ID}`);
         const data = await response.json();
-        
+
         if (data.code === 200 && data.data?.user) {
             currentUser = data.data.user;
             displayUserInfo(currentUser);
@@ -81,22 +91,25 @@ function displayUserInfo(user) {
                 <strong>${VulnCommon.escapeHtml(user.email || 'N/A')}</strong>
             </div>`;
     }
-    
+
     document.getElementById('nicknameInput').value = user.nickname || '';
 }
 
 async function getCsrfToken() {
     VulnCommon.showLoading(true);
-    VulnCommon.updateStatus('executing', '获取Token...');
+    VulnCommon.updateStatus('executing', '获取Spring Security Token...');
 
     try {
-        const response = await fetch(`${CONFIG.ENDPOINTS.GET_TOKEN}?userId=${CONFIG.DEFAULT_USER_ID}`);
+        const response = await fetch(`${CONFIG.ENDPOINTS.GET_TOKEN}?userId=${CONFIG.DEFAULT_USER_ID}`, {
+            credentials: 'same-origin'
+        });
         const data = await response.json();
-        
+
         if (data.code === 200 && data.data?.csrf_token) {
             currentToken = data.data.csrf_token;
-            displayToken(currentToken);
-            VulnCommon.showNotification('Token获取成功', 'success');
+            currentTokenHeader = data.data.header_name || CONFIG.DEFAULT_TOKEN_HEADER;
+            displayToken(currentToken, currentTokenHeader, data.data.parameter_name || '_csrf');
+            VulnCommon.showNotification('Spring Security CSRF Token 获取成功', 'success');
         }
     } catch (error) {
         handleError(error);
@@ -106,11 +119,19 @@ async function getCsrfToken() {
     }
 }
 
-function displayToken(token) {
+function displayToken(token, headerName, parameterName) {
     const panel = document.getElementById('tokenPanel');
     if (panel) {
         panel.innerHTML = `
-            <div class="token-display">
+            <div class="token-display small">
+                <div class="mb-2">
+                    <span class="text-muted">请求头：</span>
+                    <code class="bg-light px-2 py-1 rounded">${VulnCommon.escapeHtml(headerName)}</code>
+                </div>
+                <div class="mb-2">
+                    <span class="text-muted">参数名：</span>
+                    <code class="bg-light px-2 py-1 rounded">${VulnCommon.escapeHtml(parameterName)}</code>
+                </div>
                 <code class="d-block p-2 bg-light rounded" style="word-break: break-all; font-size: 0.75rem;">
                     ${VulnCommon.escapeHtml(token)}
                 </code>
@@ -120,7 +141,7 @@ function displayToken(token) {
 
 async function updateNicknameVulnerable(nickname) {
     VulnCommon.showLoading(true);
-    VulnCommon.updateStatus('executing', '修改中...');
+    VulnCommon.updateStatus('executing', '漏洞修改中...');
 
     try {
         const formData = new FormData();
@@ -129,13 +150,14 @@ async function updateNicknameVulnerable(nickname) {
 
         const response = await fetch(CONFIG.ENDPOINTS.VULN_UPDATE, {
             method: 'POST',
-            body: formData
+            body: formData,
+            credentials: 'same-origin'
         });
         const data = await response.json();
         showResult(data, '漏洞修改');
-        
+
         if (data.code === 200) {
-            getUserInfo();
+            await getUserInfo();
         }
     } catch (error) {
         handleError(error);
@@ -147,7 +169,7 @@ async function updateNicknameVulnerable(nickname) {
 
 async function updateNicknameSafe(nickname) {
     if (!currentToken) {
-        VulnCommon.showNotification('请先获取CSRF Token', 'warning');
+        VulnCommon.showNotification('请先获取Spring Security CSRF Token', 'warning');
         return;
     }
 
@@ -158,19 +180,22 @@ async function updateNicknameSafe(nickname) {
         const formData = new FormData();
         formData.append('userId', CONFIG.DEFAULT_USER_ID);
         formData.append('nickname', nickname);
-        formData.append('token', currentToken);
 
         const response = await fetch(CONFIG.ENDPOINTS.SAFE_UPDATE, {
             method: 'POST',
-            body: formData
+            headers: {
+                [currentTokenHeader]: currentToken
+            },
+            body: formData,
+            credentials: 'same-origin'
         });
         const data = await response.json();
         showResult(data, '安全修改');
-        
+
         if (data.code === 200) {
             currentToken = null;
-            document.getElementById('tokenPanel').innerHTML = '<small class="text-muted">Token已使用，请重新获取</small>';
-            getUserInfo();
+            document.getElementById('tokenPanel').innerHTML = '<small class="text-muted">Token 已消费，请重新获取新的 Spring Security CSRF Token</small>';
+            await getUserInfo();
         }
     } catch (error) {
         handleError(error);
@@ -181,8 +206,7 @@ async function updateNicknameSafe(nickname) {
 }
 
 function openAttackPage() {
-    const attackUrl = CONFIG.ENDPOINTS.ATTACK_PAGE;
-    window.open(attackUrl, '_blank', 'width=600,height=400');
+    window.open(CONFIG.ENDPOINTS.ATTACK_PAGE, '_blank', 'width=600,height=400');
     VulnCommon.showNotification('已打开攻击演示页面', 'info');
 }
 
@@ -213,6 +237,14 @@ function showResult(data, operation) {
             <div class="mb-3">
                 <span class="text-muted">新昵称：</span>
                 <code class="bg-light px-2 py-1 rounded">${VulnCommon.escapeHtml(data.data.new_nickname)}</code>
+            </div>`;
+    }
+
+    if (data.data?.token_header) {
+        content += `
+            <div class="mb-3">
+                <span class="text-muted">校验请求头：</span>
+                <code class="bg-light px-2 py-1 rounded">${VulnCommon.escapeHtml(data.data.token_header)}</code>
             </div>`;
     }
 
@@ -279,7 +311,7 @@ function clearOutput() {
             <div class="welcome-message text-center text-muted d-flex flex-column justify-content-center align-items-center h-100">
                 <i class="fas fa-user-shield fa-4x mb-4 text-primary"></i>
                 <h4 class="fw-bold text-dark">欢迎使用CSRF漏洞测试平台</h4>
-                <p class="mb-0 lead">请先获取用户信息，然后测试昵称修改功能</p>
+                <p class="mb-0 lead">请先获取用户信息，再对比无 Token 与 Spring Security Token 的差异</p>
             </div>`;
     }
 }

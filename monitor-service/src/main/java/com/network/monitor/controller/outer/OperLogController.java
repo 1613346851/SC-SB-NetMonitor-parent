@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/system/log")
@@ -16,13 +17,20 @@ public class OperLogController {
     private OperLogService operLogService;
 
     @GetMapping("/list")
-    public ApiResponse<List<OperLogEntity>> list(@RequestParam(required = false) String username,
-                                                  @RequestParam(required = false) String operType,
-                                                  @RequestParam(required = false) Integer operStatus,
-                                                  @RequestParam(required = false) String startTime,
-                                                  @RequestParam(required = false) String endTime) {
-        List<OperLogEntity> logs = operLogService.listLogs(username, operType, operStatus, startTime, endTime);
-        return ApiResponse.success(logs);
+    public ApiResponse<Map<String, Object>> list(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String operType,
+            @RequestParam(required = false) Integer operStatus,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime,
+            @RequestParam(defaultValue = "1") int pageNum,
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(defaultValue = "operTime") String sortField,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
+        Map<String, Object> result = operLogService.listLogsWithPaging(
+            username, operType, operStatus, startTime, endTime, pageNum, pageSize, sortField, sortOrder
+        );
+        return ApiResponse.success(result);
     }
     
     @GetMapping("/{id}")

@@ -4,6 +4,7 @@
 
     <resultMap id="BaseResultMap" type="com.network.monitor.entity.DefenseLogEntity">
         <id column="id" property="id"/>
+        <result column="event_id" property="eventId"/>
         <result column="defense_type" property="defenseType"/>
         <result column="defense_action" property="defenseAction"/>
         <result column="defense_target" property="defenseTarget"/>
@@ -13,6 +14,7 @@
         <result column="defense_reason" property="defenseReason"/>
         <result column="expire_time" property="expireTime"/>
         <result column="execute_status" property="executeStatus"/>
+        <result column="is_first" property="isFirst"/>
         <result column="execute_result" property="executeResult"/>
         <result column="operator" property="operator"/>
         <result column="execute_time" property="executeTime"/>
@@ -26,17 +28,17 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, defense_type, defense_action, defense_target, attack_id, traffic_id, rule_id, defense_reason,
-        expire_time, execute_status, execute_result, operator, execute_time, create_time, update_time
+        id, event_id, defense_type, defense_action, defense_target, attack_id, traffic_id, rule_id, defense_reason,
+        expire_time, execute_status, is_first, execute_result, operator, execute_time, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.DefenseLogEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_defense_log (
-            defense_type, defense_action, defense_target, attack_id, traffic_id, rule_id, defense_reason,
-            expire_time, execute_status, execute_result, operator, execute_time, create_time, update_time
+            event_id, defense_type, defense_action, defense_target, attack_id, traffic_id, rule_id, defense_reason,
+            expire_time, execute_status, is_first, execute_result, operator, execute_time, create_time, update_time
         ) VALUES (
-            #{defenseType}, #{defenseAction}, #{defenseTarget}, #{attackId}, #{trafficId}, #{ruleId}, #{defenseReason},
-            #{expireTime}, #{executeStatus}, #{executeResult}, #{operator}, #{executeTime}, #{createTime}, #{updateTime}
+            #{eventId}, #{defenseType}, #{defenseAction}, #{defenseTarget}, #{attackId}, #{trafficId}, #{ruleId}, #{defenseReason},
+            #{expireTime}, #{executeStatus}, #{isFirst}, #{executeResult}, #{operator}, #{executeTime}, #{createTime}, #{updateTime}
         )
     </insert>
 
@@ -50,11 +52,17 @@
         SELECT <include refid="Base_Column_List"/>
         FROM sys_defense_log
         <where>
+            <if test="eventId != null and eventId != ''">
+                AND event_id = #{eventId}
+            </if>
             <if test="defenseType != null and defenseType != ''">
                 AND defense_type = #{defenseType}
             </if>
             <if test="defenseTarget != null and defenseTarget != ''">
-                AND defense_target = #{defenseTarget}
+                AND defense_target LIKE CONCAT('%', #{defenseTarget}, '%')
+            </if>
+            <if test="executeStatus != null">
+                AND execute_status = #{executeStatus}
             </if>
             <if test="startTime != null">
                 AND execute_time &gt;= #{startTime}
@@ -63,7 +71,17 @@
                 AND execute_time &lt;= #{endTime}
             </if>
         </where>
-        ORDER BY execute_time DESC
+        <choose>
+            <when test="sortField != null and sortOrder != null">
+                <if test="sortField == 'id'">ORDER BY id ${sortOrder}</if>
+                <if test="sortField == 'createTime'">ORDER BY execute_time ${sortOrder}</if>
+                <if test="sortField == 'expireTime'">ORDER BY expire_time ${sortOrder}</if>
+                <if test="sortField == 'executeStatus'">ORDER BY execute_status ${sortOrder}</if>
+            </when>
+            <otherwise>
+                ORDER BY execute_time DESC
+            </otherwise>
+        </choose>
         LIMIT #{offset}, #{limit}
     </select>
 
@@ -71,11 +89,17 @@
         SELECT COUNT(*)
         FROM sys_defense_log
         <where>
+            <if test="eventId != null and eventId != ''">
+                AND event_id = #{eventId}
+            </if>
             <if test="defenseType != null and defenseType != ''">
                 AND defense_type = #{defenseType}
             </if>
             <if test="defenseTarget != null and defenseTarget != ''">
-                AND defense_target = #{defenseTarget}
+                AND defense_target LIKE CONCAT('%', #{defenseTarget}, '%')
+            </if>
+            <if test="executeStatus != null">
+                AND execute_status = #{executeStatus}
             </if>
             <if test="startTime != null">
                 AND execute_time &gt;= #{startTime}
@@ -92,6 +116,10 @@
 
     <select id="countAll" resultType="long">
         SELECT COUNT(*) FROM sys_defense_log
+    </select>
+
+    <select id="countAllExcludeAlertOnly" resultType="long">
+        SELECT COUNT(*) FROM sys_defense_log WHERE defense_type != 'ALERT_ONLY'
     </select>
 
     <select id="selectValidBlacklists" resultMap="BaseResultMap">
@@ -140,8 +168,68 @@
             FROM sys_defense_log
             WHERE execute_time &gt;= #{startTime}
               AND execute_time &lt;= #{endTime}
+              AND defense_type != 'ALERT_ONLY'
             GROUP BY DATE_FORMAT(execute_time, '%Y-%m-%d %H:%i:00')
         ) t
         ORDER BY time
+    </select>
+
+    <select id="countByEventId" resultType="int">
+        SELECT COUNT(*)
+        FROM sys_defense_log
+        WHERE event_id = #{eventId}
+          AND is_first = 1
+    </select>
+
+    <update id="updateIsFirst">
+        UPDATE sys_defense_log
+        SET is_first = #{isFirst},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectByDefenseTarget" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_defense_log
+        WHERE defense_target = #{defenseTarget}
+        <if test="startTime != null">
+            AND execute_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND execute_time &lt;= #{endTime}
+        </if>
+        <choose>
+            <when test="sortField != null and sortField != ''">
+                ORDER BY ${sortField}
+                <if test="sortOrder != null and sortOrder != ''">
+                    ${sortOrder}
+                </if>
+            </when>
+            <otherwise>
+                ORDER BY execute_time DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByDefenseTarget" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_defense_log
+        WHERE defense_target = #{defenseTarget}
+        <if test="startTime != null">
+            AND execute_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND execute_time &lt;= #{endTime}
+        </if>
+    </select>
+
+    <select id="countBlocksByIp" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_defense_log
+        WHERE defense_target = #{defenseTarget}
+          AND defense_type = 'BLOCK_IP'
+          AND defense_action = 'ADD'
+          AND execute_status = 1
     </select>
 </mapper>

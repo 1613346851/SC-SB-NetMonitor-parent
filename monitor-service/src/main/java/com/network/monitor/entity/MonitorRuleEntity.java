@@ -37,24 +37,24 @@ public class MonitorRuleEntity {
     private String description;
 
     /**
-     * 风险等级（HIGH/MEDIUM/LOW）
+     * 风险等级（CRITICAL/HIGH/MEDIUM/LOW）
      */
     private String riskLevel;
 
     /**
      * 启用状态（0-禁用，1-启用）
      */
-    private Integer enabled;
+    private Integer enabled = 1;
 
     /**
      * 规则优先级（数字越小优先级越高）
      */
-    private Integer priority;
+    private Integer priority = 100;
 
     /**
      * 命中次数统计
      */
-    private Integer hitCount;
+    private Integer hitCount = 0;
 
     /**
      * 最后命中时间

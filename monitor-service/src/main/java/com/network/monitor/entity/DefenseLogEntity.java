@@ -9,6 +9,8 @@ public class DefenseLogEntity {
 
     private Long id;
 
+    private String eventId;
+
     private String defenseType;
 
     private String defenseAction;
@@ -26,6 +28,8 @@ public class DefenseLogEntity {
     private LocalDateTime expireTime;
 
     private Integer executeStatus;
+
+    private Integer isFirst;
 
     private String executeResult;
 

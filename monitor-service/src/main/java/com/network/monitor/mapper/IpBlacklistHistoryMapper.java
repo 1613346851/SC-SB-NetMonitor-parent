@@ -28,4 +28,6 @@ public interface IpBlacklistHistoryMapper {
     int deleteByBlacklistId(@Param("blacklistId") Long blacklistId);
 
     long countByBlacklistId(@Param("blacklistId") Long blacklistId);
+
+    int countByIp(@Param("ip") String ip);
 }

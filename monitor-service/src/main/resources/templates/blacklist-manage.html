@@ -13,11 +13,12 @@
         <div class="main-container">
             <header class="header">
                 <div class="header-left">
+                    <div th:replace="~{fragments/common :: mobileMenuToggle}"></div>
                     <h2>黑名单管理</h2>
                 </div>
                 <div class="header-right">
-                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                     <button class="btn btn-primary" onclick="showAddBlacklistModal()">+ 添加 IP</button>
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
                 </div>
             </header>
 
@@ -27,6 +28,14 @@
                         <div class="form-group">
                             <label class="form-label">IP 地址</label>
                             <input type="text" class="form-control" id="ipAddress" placeholder="请输入 IP 地址">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">状态</label>
+                            <select class="form-control" id="statusFilter">
+                                <option value="">全部</option>
+                                <option value="1">封禁中</option>
+                                <option value="2">已解禁</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <button class="btn btn-primary" onclick="searchBlacklist()">查询</button>
@@ -43,14 +52,14 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>IP 地址</th>
+                                    <th data-sort="id">ID</th>
+                                    <th data-sort="ip">IP 地址</th>
                                     <th>拉黑原因</th>
-                                    <th>过期时间</th>
+                                    <th data-sort="expireTime">过期时间</th>
                                     <th>剩余时间</th>
-                                    <th>累计封禁</th>
-                                    <th>状态</th>
-                                    <th>创建时间</th>
+                                    <th data-sort="totalBanCount">累计封禁</th>
+                                    <th data-sort="status">状态</th>
+                                    <th data-sort="createTime">创建时间</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -79,7 +88,8 @@
                 <form id="blacklistForm">
                     <div class="form-group">
                         <label class="form-label">IP 地址 <span style="color: red;">*</span></label>
-                        <input type="text" class="form-control" id="ipInput" required placeholder="请输入 IP 地址">
+                        <input type="text" class="form-control" id="ipInput" required placeholder="请输入 IPv4 或 IPv6 地址">
+                        <small style="color: #666; font-size: 12px;">支持 IPv4 地址（如 192.168.1.1）和 IPv6 地址（如 ::1、2001:db8::1）</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label">拉黑原因</label>
@@ -167,6 +177,30 @@
         </div>
     </div>
 
+    <div id="unblockModal" class="modal-overlay" style="display: none;">
+        <div class="modal" style="width: 500px;">
+            <div class="modal-header">
+                <h3>解禁 IP</h3>
+                <span class="modal-close" onclick="closeUnblockModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="unblockIpInput">
+                <div class="form-group">
+                    <label class="form-label">IP 地址</label>
+                    <input type="text" class="form-control" id="unblockIpDisplay" disabled style="background: #f5f5f5;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">解禁原因</label>
+                    <textarea class="form-control" id="unblockReason" rows="3" placeholder="请输入解禁原因（可选）"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-default" onclick="closeUnblockModal()">取消</button>
+                <button class="btn btn-warning" onclick="unblockIp()">确定解禁</button>
+            </div>
+        </div>
+    </div>
+
     <script th:src="@{/js/core/config.js}"></script>
     <script th:src="@{/js/utils/storage.js}"></script>
     <script th:src="@{/js/utils/date.js}"></script>
@@ -177,6 +211,7 @@
     <script th:src="@{/js/core/page-init.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/components/pagination.js}"></script>
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/blacklist-manage.js}"></script>

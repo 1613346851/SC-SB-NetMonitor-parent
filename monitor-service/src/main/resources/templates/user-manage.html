@@ -14,47 +14,64 @@
         <div class="main-container">
             <header class="header">
                 <div class="header-left">
+                    <div th:replace="~{fragments/common :: mobileMenuToggle}"></div>
                     <h2>用户管理</h2>
                 </div>
                 <div class="header-right">
+                    <button class="btn btn-success" onclick="showAddModal()">+ 新增用户</button>
                     <div th:replace="~{fragments/common :: userDropdown}"></div>
                 </div>
             </header>
             
             <main class="content">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="search-bar">
-                            <input type="text" id="searchUsername" class="form-control" placeholder="用户名">
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">用户名</label>
+                            <input type="text" id="searchUsername" class="form-control" placeholder="请输入用户名">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">状态</label>
                             <select id="searchStatus" class="form-control">
                                 <option value="">全部状态</option>
                                 <option value="0">正常</option>
                                 <option value="1">禁用</option>
                                 <option value="2">锁定</option>
                             </select>
-                            <button class="btn btn-primary" onclick="searchUsers()">搜索</button>
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="searchUsers()">查询</button>
                             <button class="btn btn-default" onclick="resetSearch()">重置</button>
                         </div>
-                        <button class="btn btn-success" onclick="showAddModal()">+ 新增用户</button>
                     </div>
-                    
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>用户名</th>
-                                <th>昵称</th>
-                                <th>手机号</th>
-                                <th>邮箱</th>
-                                <th>状态</th>
-                                <th>创建时间</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="userTableBody">
-                            <tr><td colspan="8" class="text-center">加载中...</td></tr>
-                        </tbody>
-                    </table>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3 class="table-title">用户列表</h3>
+                    </div>
+                    <div class="table-wrapper" style="position: relative;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th data-sort="id" style="min-width: 60px;">ID</th>
+                                    <th data-sort="username" style="min-width: 100px;">用户名</th>
+                                    <th style="min-width: 100px;">昵称</th>
+                                    <th style="min-width: 120px;">手机号</th>
+                                    <th style="min-width: 150px;">邮箱</th>
+                                    <th data-sort="status" style="min-width: 80px;">状态</th>
+                                    <th data-sort="createTime" style="min-width: 150px;">创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userTableBody">
+                                <tr><td colspan="8" class="text-center">加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-container" style="padding: 16px 24px;">
+                        <div class="pagination" id="pagination"></div>
+                    </div>
                 </div>
             </main>
         </div>
@@ -144,6 +161,7 @@
     <script th:src="@{/js/core/page-init.js}"></script>
     <script th:src="@{/js/components/modal.js}"></script>
     <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
     <script th:src="@{/js/utils.js}"></script>
     <script th:src="@{/js/user-manage.js}"></script>
     <script>

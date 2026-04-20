@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.ScanInterfaceMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.ScanInterfaceEntity">
+        <id column="id" property="id"/>
+        <result column="target_id" property="targetId"/>
+        <result column="interface_name" property="interfaceName"/>
+        <result column="interface_path" property="interfacePath"/>
+        <result column="http_method" property="httpMethod"/>
+        <result column="vuln_type" property="vulnType"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="params_config" property="paramsConfig"/>
+        <result column="payload_config" property="payloadConfig"/>
+        <result column="match_rules" property="matchRules"/>
+        <result column="enabled" property="enabled"/>
+        <result column="priority" property="priority"/>
+        <result column="defense_rule_status" property="defenseRuleStatus"/>
+        <result column="defense_rule_count" property="defenseRuleCount"/>
+        <result column="defense_rule_note" property="defenseRuleNote"/>
+        <result column="business_type" property="businessType"/>
+        <result column="input_params" property="inputParams"/>
+        <result column="output_type" property="outputType"/>
+        <result column="auth_required" property="authRequired"/>
+        <result column="content_type" property="contentType"/>
+        <result column="external_request" property="externalRequest"/>
+        <result column="file_operation" property="fileOperation"/>
+        <result column="db_operation" property="dbOperation"/>
+        <result column="inferred_vuln_types" property="inferredVulnTypes"/>
+        <result column="scan_status" property="scanStatus"/>
+        <result column="last_scan_time" property="lastScanTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, target_id, interface_name, interface_path, http_method, vuln_type, risk_level,
+        params_config, payload_config, match_rules, enabled, priority, defense_rule_status, defense_rule_count, defense_rule_note,
+        business_type, input_params, output_type, auth_required, content_type, external_request, file_operation, db_operation,
+        inferred_vuln_types, scan_status, last_scan_time, create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.ScanInterfaceEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_scan_interface (
+            target_id, interface_name, interface_path, http_method, vuln_type, risk_level,
+            params_config, payload_config, match_rules, enabled, priority, defense_rule_status, defense_rule_count, defense_rule_note,
+            business_type, input_params, output_type, auth_required, content_type, external_request, file_operation, db_operation,
+            inferred_vuln_types, scan_status, last_scan_time, create_time, update_time
+        ) VALUES (
+            #{targetId}, #{interfaceName}, #{interfacePath}, #{httpMethod}, #{vulnType}, #{riskLevel},
+            #{paramsConfig}, #{payloadConfig}, #{matchRules}, #{enabled}, #{priority}, #{defenseRuleStatus}, #{defenseRuleCount}, #{defenseRuleNote},
+            #{businessType}, #{inputParams}, #{outputType}, #{authRequired}, #{contentType}, #{externalRequest}, #{fileOperation}, #{dbOperation},
+            #{inferredVulnTypes}, #{scanStatus}, #{lastScanTime}, NOW(), NOW()
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY priority ASC, create_time DESC
+    </select>
+
+    <select id="selectByTargetId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        WHERE target_id = #{targetId} AND enabled = 1
+        ORDER BY priority ASC, create_time DESC
+    </select>
+
+    <select id="selectAllEnabled" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        WHERE enabled = 1
+        ORDER BY priority ASC, create_time DESC
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        ORDER BY priority ASC, create_time DESC
+    </select>
+
+    <select id="selectByVulnType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        WHERE vuln_type = #{vulnType} AND enabled = 1
+        ORDER BY priority ASC, create_time DESC
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        <where>
+            <if test="targetId != null">
+                AND target_id = #{targetId}
+            </if>
+            <if test="interfaceName != null and interfaceName != ''">
+                AND interface_name LIKE CONCAT('%', #{interfaceName}, '%')
+            </if>
+            <if test="vulnType != null and vulnType != ''">
+                AND vuln_type = #{vulnType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+        ORDER BY priority ASC, create_time DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_scan_interface
+        <where>
+            <if test="targetId != null">
+                AND target_id = #{targetId}
+            </if>
+            <if test="interfaceName != null and interfaceName != ''">
+                AND interface_name LIKE CONCAT('%', #{interfaceName}, '%')
+            </if>
+            <if test="vulnType != null and vulnType != ''">
+                AND vuln_type = #{vulnType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+    </select>
+
+    <update id="update" parameterType="com.network.monitor.entity.ScanInterfaceEntity">
+        UPDATE sys_scan_interface
+        SET target_id = #{targetId},
+            interface_name = #{interfaceName},
+            interface_path = #{interfacePath},
+            http_method = #{httpMethod},
+            vuln_type = #{vulnType},
+            risk_level = #{riskLevel},
+            params_config = #{paramsConfig},
+            payload_config = #{payloadConfig},
+            match_rules = #{matchRules},
+            enabled = #{enabled},
+            priority = #{priority},
+            defense_rule_status = #{defenseRuleStatus},
+            defense_rule_count = #{defenseRuleCount},
+            defense_rule_note = #{defenseRuleNote},
+            business_type = #{businessType},
+            input_params = #{inputParams},
+            output_type = #{outputType},
+            auth_required = #{authRequired},
+            content_type = #{contentType},
+            external_request = #{externalRequest},
+            file_operation = #{fileOperation},
+            db_operation = #{dbOperation},
+            inferred_vuln_types = #{inferredVulnTypes},
+            scan_status = #{scanStatus},
+            last_scan_time = #{lastScanTime},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_scan_interface WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByTargetId">
+        DELETE FROM sys_scan_interface WHERE target_id = #{targetId}
+    </delete>
+
+    <update id="updateEnabled">
+        UPDATE sys_scan_interface
+        SET enabled = #{enabled}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateDefenseRuleStatus">
+        UPDATE sys_scan_interface
+        SET defense_rule_status = #{defenseRuleStatus},
+            defense_rule_count = #{defenseRuleCount},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectByPathLike" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_scan_interface
+        WHERE interface_path LIKE CONCAT('%', #{interfacePath}, '%')
+        ORDER BY priority ASC, create_time DESC
+    </select>
+
+</mapper>

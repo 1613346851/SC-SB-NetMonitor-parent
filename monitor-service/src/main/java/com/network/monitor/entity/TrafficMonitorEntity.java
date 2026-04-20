@@ -22,6 +22,11 @@ public class TrafficMonitorEntity {
     private String trafficId;
 
     /**
+     * 关联攻击事件ID
+     */
+    private String eventId;
+
+    /**
      * 请求时间
      */
     private LocalDateTime requestTime;
@@ -105,6 +110,51 @@ public class TrafficMonitorEntity {
      * Cookie 信息
      */
     private String cookie;
+
+    /**
+     * 请求次数（聚合统计）
+     */
+    private Integer requestCount;
+
+    /**
+     * IP状态标签
+     */
+    private String stateTag;
+
+    /**
+     * 状态值（数字）
+     */
+    private Integer stateValue;
+
+    /**
+     * 置信度（0-100）
+     */
+    private Integer confidence;
+
+    /**
+     * 是否为聚合记录（0-否，1-是）
+     */
+    private Integer isAggregated;
+
+    /**
+     * 聚合开始时间
+     */
+    private LocalDateTime aggregateStartTime;
+
+    /**
+     * 聚合结束时间
+     */
+    private LocalDateTime aggregateEndTime;
+
+    /**
+     * 错误次数（聚合统计）
+     */
+    private Integer errorCount;
+
+    /**
+     * 平均处理时间（毫秒）
+     */
+    private Long avgProcessingTime;
 
     /**
      * 创建时间

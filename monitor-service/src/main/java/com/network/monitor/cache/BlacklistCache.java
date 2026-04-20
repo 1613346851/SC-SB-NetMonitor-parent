@@ -1,5 +1,6 @@
 package com.network.monitor.cache;
 
+import com.network.monitor.common.util.IpNormalizeUtil;
 import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.mapper.DefenseLogMapper;
 import com.network.monitor.service.LocalCacheService;
@@ -39,17 +40,18 @@ public class BlacklistCache {
             List<DefenseLogEntity> allBlacklists = defenseLogMapper.selectAllBlacklists();
             for (DefenseLogEntity entity : allBlacklists) {
                 if (entity.getDefenseTarget() != null) {
+                    String normalizedIp = IpNormalizeUtil.normalize(entity.getDefenseTarget());
                     BlacklistEntry entry = new BlacklistEntry(
                         entity.getId(),
-                        entity.getDefenseTarget(),
+                        normalizedIp,
                         entity.getDefenseReason(),
                         entity.getExpireTime(),
                         entity.getCreateTime(),
                         entity.getOperator()
                     );
-                    blacklistMap.put(entity.getDefenseTarget(), entry);
-                    
-                    String cacheKey = BLACKLIST_CACHE_PREFIX + entity.getDefenseTarget();
+                    blacklistMap.put(normalizedIp, entry);
+
+                    String cacheKey = BLACKLIST_CACHE_PREFIX + normalizedIp;
                     localCacheService.put(cacheKey, entry, -1);
                 }
             }
@@ -116,14 +118,15 @@ public class BlacklistCache {
             throw new IllegalArgumentException("IP 地址不能为空");
         }
 
-        BlacklistEntry entry = new BlacklistEntry(ip, reason, expireTime, operator);
-        blacklistMap.put(ip, entry);
+        String normalizedIp = IpNormalizeUtil.normalize(ip);
+        BlacklistEntry entry = new BlacklistEntry(normalizedIp, reason, expireTime, operator);
+        blacklistMap.put(normalizedIp, entry);
 
-        String cacheKey = BLACKLIST_CACHE_PREFIX + ip;
+        String cacheKey = BLACKLIST_CACHE_PREFIX + normalizedIp;
         localCacheService.put(cacheKey, entry, -1);
 
-        log.info("添加 IP 到黑名单：ip={}, reason={}, expireTime={}, operator={}", 
-                ip, reason, expireTime != null ? expireTime.format(TIME_FORMATTER) : "永久", operator);
+        log.info("添加 IP 到黑名单：ip={}, reason={}, expireTime={}, operator={}",
+                normalizedIp, reason, expireTime != null ? expireTime.format(TIME_FORMATTER) : "永久", operator);
     }
 
     public void remove(String ip) {
@@ -131,12 +134,13 @@ public class BlacklistCache {
             return;
         }
 
-        blacklistMap.remove(ip);
+        String normalizedIp = IpNormalizeUtil.normalize(ip);
+        blacklistMap.remove(normalizedIp);
 
-        String cacheKey = BLACKLIST_CACHE_PREFIX + ip;
+        String cacheKey = BLACKLIST_CACHE_PREFIX + normalizedIp;
         localCacheService.delete(cacheKey);
 
-        log.info("从黑名单移除 IP: ip={}", ip);
+        log.info("从黑名单移除 IP: ip={}", normalizedIp);
     }
 
     public boolean contains(String ip) {
@@ -144,19 +148,20 @@ public class BlacklistCache {
             return false;
         }
 
-        BlacklistEntry entry = blacklistMap.get(ip);
+        String normalizedIp = IpNormalizeUtil.normalize(ip);
+        BlacklistEntry entry = blacklistMap.get(normalizedIp);
         if (entry == null) {
-            String cacheKey = BLACKLIST_CACHE_PREFIX + ip;
+            String cacheKey = BLACKLIST_CACHE_PREFIX + normalizedIp;
             entry = (BlacklistEntry) localCacheService.get(cacheKey);
             if (entry != null) {
-                blacklistMap.put(ip, entry);
+                blacklistMap.put(normalizedIp, entry);
             } else {
                 return false;
             }
         }
 
         if (entry.isExpired()) {
-            remove(ip);
+            remove(normalizedIp);
             return false;
         }
 
@@ -168,12 +173,13 @@ public class BlacklistCache {
             return null;
         }
 
-        BlacklistEntry entry = blacklistMap.get(ip);
+        String normalizedIp = IpNormalizeUtil.normalize(ip);
+        BlacklistEntry entry = blacklistMap.get(normalizedIp);
         if (entry == null) {
-            String cacheKey = BLACKLIST_CACHE_PREFIX + ip;
+            String cacheKey = BLACKLIST_CACHE_PREFIX + normalizedIp;
             entry = (BlacklistEntry) localCacheService.get(cacheKey);
             if (entry != null) {
-                blacklistMap.put(ip, entry);
+                blacklistMap.put(normalizedIp, entry);
             } else {
                 return null;
             }
@@ -194,12 +200,13 @@ public class BlacklistCache {
             return null;
         }
 
-        BlacklistEntry entry = blacklistMap.get(ip);
+        String normalizedIp = IpNormalizeUtil.normalize(ip);
+        BlacklistEntry entry = blacklistMap.get(normalizedIp);
         if (entry == null) {
-            String cacheKey = BLACKLIST_CACHE_PREFIX + ip;
+            String cacheKey = BLACKLIST_CACHE_PREFIX + normalizedIp;
             entry = (BlacklistEntry) localCacheService.get(cacheKey);
             if (entry != null) {
-                blacklistMap.put(ip, entry);
+                blacklistMap.put(normalizedIp, entry);
             } else {
                 return null;
             }

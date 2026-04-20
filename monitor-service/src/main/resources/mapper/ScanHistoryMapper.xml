@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.ScanHistoryMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.ScanHistoryEntity">
+        <id column="id" property="id"/>
+        <result column="task_id" property="taskId"/>
+        <result column="scan_type" property="scanType"/>
+        <result column="target" property="target"/>
+        <result column="status" property="status"/>
+        <result column="discovered_count" property="discoveredCount"/>
+        <result column="completed_interfaces" property="completedInterfaces"/>
+        <result column="total_interfaces" property="totalInterfaces"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="duration_seconds" property="durationSeconds"/>
+        <result column="summary" property="summary"/>
+        <result column="error_message" property="errorMessage"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.ScanHistoryEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_scan_history (
+            task_id, scan_type, target, status,
+            discovered_count, completed_interfaces, total_interfaces,
+            start_time, end_time, duration_seconds,
+            summary, error_message
+        ) VALUES (
+            #{taskId}, #{scanType}, #{target}, #{status},
+            #{discoveredCount}, #{completedInterfaces}, #{totalInterfaces},
+            #{startTime}, #{endTime}, #{durationSeconds},
+            #{summary}, #{errorMessage}
+        )
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM sys_scan_history WHERE id = #{id}
+    </select>
+
+    <select id="selectByTaskId" resultMap="BaseResultMap">
+        SELECT * FROM sys_scan_history WHERE task_id = #{taskId}
+    </select>
+
+    <select id="selectRecent" resultMap="BaseResultMap">
+        SELECT * FROM sys_scan_history ORDER BY start_time DESC LIMIT #{limit}
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT * FROM sys_scan_history
+        <where>
+            <if test="scanType != null and scanType != ''">
+                AND scan_type = #{scanType}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        ORDER BY start_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*) FROM sys_scan_history
+        <where>
+            <if test="scanType != null and scanType != ''">
+                AND scan_type = #{scanType}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <update id="update" parameterType="com.network.monitor.entity.ScanHistoryEntity">
+        UPDATE sys_scan_history SET
+            scan_type = #{scanType},
+            target = #{target},
+            status = #{status},
+            discovered_count = #{discoveredCount},
+            completed_interfaces = #{completedInterfaces},
+            total_interfaces = #{totalInterfaces},
+            end_time = #{endTime},
+            duration_seconds = #{durationSeconds},
+            summary = #{summary},
+            error_message = #{errorMessage}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_scan_history WHERE id = #{id}
+    </delete>
+
+</mapper>

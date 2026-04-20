@@ -15,6 +15,11 @@ public class TrafficMonitorDTO {
     private String requestId;
 
     /**
+     * 关联攻击事件ID
+     */
+    private String eventId;
+
+    /**
      * 请求时间
      */
     private String requestTime;
@@ -98,4 +103,72 @@ public class TrafficMonitorDTO {
      * Cookie 信息
      */
     private String cookie;
+
+    /**
+     * 是否跳过推送（DEFENDED状态的IP不推送流量）
+     */
+    private Boolean skipPush;
+
+    /**
+     * 请求次数（聚合统计）
+     */
+    private Integer requestCount;
+
+    /**
+     * IP状态标签
+     */
+    private String stateTag;
+
+    /**
+     * 状态值（数字）
+     */
+    private Integer stateValue;
+
+    /**
+     * 置信度（0-100）
+     */
+    private Integer confidence;
+
+    /**
+     * 是否为聚合记录
+     */
+    private Boolean isAggregated;
+
+    /**
+     * 聚合开始时间
+     */
+    private String aggregateStartTime;
+
+    /**
+     * 聚合结束时间
+     */
+    private String aggregateEndTime;
+
+    /**
+     * 错误次数（聚合统计）
+     */
+    private Integer errorCount;
+
+    /**
+     * 平均处理时间（毫秒）
+     */
+    private Long avgProcessingTime;
+
+    /**
+     * 判断是否跳过推送
+     *
+     * @return true表示跳过推送
+     */
+    public boolean isSkipPush() {
+        return skipPush != null && skipPush;
+    }
+
+    /**
+     * 判断是否为聚合记录
+     *
+     * @return true表示为聚合记录
+     */
+    public boolean isAggregated() {
+        return isAggregated != null && isAggregated;
+    }
 }

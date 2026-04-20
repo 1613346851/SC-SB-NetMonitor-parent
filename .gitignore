@@ -3,6 +3,12 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+/gateway-service/src/test/
+/target-service/src/test/
+/monitor-service/src/test/
+logs/
+
+
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml
@@ -75,3 +81,7 @@ logs/gateway-service.log.2026-03-14.0.gz
 /logs/gateway-service.log.2026-03-13.0.gz
 /logs/gateway-service.log.2026-03-16.0.gz
 /logs/gateway-service.log.2026-03-17.0.gz
+/logs/gateway-service.log.2026-03-18.0.gz
+/logs/gateway-service.log.2026-03-19.0.gz
+/logs/gateway-service.log.2026-03-20.0.gz
+

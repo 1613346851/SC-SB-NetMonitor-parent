@@ -14,6 +14,16 @@ public class BlacklistInfoDTO {
     private Integer status;
     
     /**
+     * 封禁类型（SYSTEM-系统自动封禁，MANUAL-手动封禁）
+     */
+    private String banType;
+    
+    /**
+     * 封禁类型中文名
+     */
+    private String banTypeText;
+    
+    /**
      * 封禁历史记录列表（该IP的所有封禁记录）
      */
     private List<BlacklistHistoryDTO> history;
@@ -38,5 +48,15 @@ public class BlacklistInfoDTO {
         private String createTime;
         private String operator;
         private Integer status;
+        
+        /**
+         * 封禁类型（SYSTEM-系统自动封禁，MANUAL-手动封禁）
+         */
+        private String banType;
+        
+        /**
+         * 封禁类型中文名
+         */
+        private String banTypeText;
     }
 }

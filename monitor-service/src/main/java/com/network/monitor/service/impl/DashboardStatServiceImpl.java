@@ -36,25 +36,25 @@ public class DashboardStatServiceImpl implements DashboardStatService {
         Map<String, Object> stats = new HashMap<>();
 
         try {
-            long totalTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, null, null);
+            long totalTraffic = trafficMonitorMapper.sumRequestCountByCondition(null, null, null, null, null, null);
             stats.put("totalTraffic", totalTraffic);
 
-            long totalAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, null);
+            long totalAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, null, null);
             stats.put("totalAttack", totalAttacks);
 
-            long highRiskAttacks = attackMonitorMapper.countByCondition(null, "HIGH", null, null, null, null);
+            long highRiskAttacks = attackMonitorMapper.countByCondition(null, "HIGH", null, null, null, null, null);
             stats.put("highRiskAttacks", highRiskAttacks);
 
             LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
-            long todayTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, todayStart, null);
+            long todayTraffic = trafficMonitorMapper.sumRequestCountByCondition(null, null, null, null, todayStart, null);
             stats.put("todayTraffic", todayTraffic);
 
-            long todayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, todayStart, null);
+            long todayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, todayStart, null);
             stats.put("todayAttacks", todayAttacks);
 
             LocalDateTime yesterdayStart = todayStart.minusDays(1);
-            long yesterdayTraffic = trafficMonitorMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart);
-            long yesterdayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart);
+            long yesterdayTraffic = trafficMonitorMapper.sumRequestCountByCondition(null, null, null, null, yesterdayStart, todayStart);
+            long yesterdayAttacks = attackMonitorMapper.countByCondition(null, null, null, null, null, yesterdayStart, todayStart);
 
             double trafficChange = calculateGrowthRate(todayTraffic, yesterdayTraffic);
             double attackChange = calculateGrowthRate(todayAttacks, yesterdayAttacks);
@@ -62,19 +62,21 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             stats.put("trafficChange", trafficChange);
             stats.put("attackChange", attackChange);
 
-            long totalDefenses = defenseLogMapper.countAll();
+            long totalDefenses = defenseLogMapper.countAllExcludeAlertOnly();
             stats.put("totalDefense", totalDefenses);
 
-            long todayDefenses = defenseLogMapper.countByCondition(null, null, todayStart, null);
-            long yesterdayDefenses = defenseLogMapper.countByCondition(null, null, yesterdayStart, todayStart);
+            long todayDefenses = defenseLogMapper.countByCondition(null, null, null, null, todayStart, null) 
+                - defenseLogMapper.countByCondition(null, "ALERT_ONLY", null, null, todayStart, null);
+            long yesterdayDefenses = defenseLogMapper.countByCondition(null, null, null, null, yesterdayStart, todayStart)
+                - defenseLogMapper.countByCondition(null, "ALERT_ONLY", null, null, yesterdayStart, todayStart);
             double defenseChange = calculateGrowthRate(todayDefenses, yesterdayDefenses);
             stats.put("defenseChange", defenseChange);
 
-            long totalVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, null);
+            long totalVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, null, null);
             stats.put("totalVulnerability", totalVulnerabilities);
 
-            long highRiskVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, "HIGH", null);
-            long verifiedVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, 1);
+            long highRiskVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, "HIGH", null);
+            long verifiedVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, null, 1);
             stats.put("vulnerabilityChange", verifiedVulnerabilities);
 
             stats.put("updateTime", LocalDateTime.now().format(FORMATTER));
@@ -382,8 +384,9 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             List<Map<String, Object>> result = new ArrayList<>();
             for (AttackMonitorMapper.SourceIpStat stat : stats) {
                 Map<String, Object> item = new HashMap<>();
-                item.put("ip", stat.getSourceIp());
-                item.put("count", stat.getCount());
+                item.put("sourceIp", stat.getSourceIp());
+                item.put("attackCount", stat.getCount());
+                item.put("riskLevel", "HIGH");
                 result.add(item);
             }
             
@@ -469,7 +472,7 @@ public class DashboardStatServiceImpl implements DashboardStatService {
         try {
             LocalDateTime startDateTime = parseDateTime(startTime);
             LocalDateTime endDateTime = parseDateTime(endTime);
-            return trafficMonitorMapper.countByCondition(null, null, null, null, startDateTime, endDateTime);
+            return trafficMonitorMapper.sumRequestCountByCondition(null, null, null, null, startDateTime, endDateTime);
         } catch (Exception e) {
             log.error("获取总流量数失败：", e);
             return 0;
@@ -481,7 +484,7 @@ public class DashboardStatServiceImpl implements DashboardStatService {
         try {
             LocalDateTime startDateTime = parseDateTime(startTime);
             LocalDateTime endDateTime = parseDateTime(endTime);
-            return attackMonitorMapper.countByCondition(null, null, null, null, startDateTime, endDateTime);
+            return attackMonitorMapper.countByCondition(null, null, null, null, null, startDateTime, endDateTime);
         } catch (Exception e) {
             log.error("获取总攻击次数失败：", e);
             return 0;
@@ -491,7 +494,7 @@ public class DashboardStatServiceImpl implements DashboardStatService {
     @Override
     public long getTotalVulnerabilities(String startTime, String endTime) {
         try {
-            return vulnerabilityMonitorMapper.countByCondition(null, null, null);
+            return vulnerabilityMonitorMapper.countByCondition(null, null, null, null);
         } catch (Exception e) {
             log.error("获取总漏洞数失败：", e);
             return 0;

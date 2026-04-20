@@ -4,6 +4,7 @@
 
     <resultMap id="BaseResultMap" type="com.network.monitor.entity.AttackMonitorEntity">
         <id column="id" property="id"/>
+        <result column="event_id" property="eventId"/>
         <result column="traffic_id" property="trafficId"/>
         <result column="attack_type" property="attackType"/>
         <result column="risk_level" property="riskLevel"/>
@@ -21,16 +22,16 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, traffic_id, attack_type, risk_level, confidence, rule_id, rule_content, 
+        id, event_id, traffic_id, attack_type, risk_level, confidence, rule_id, rule_content, 
         source_ip, target_uri, attack_content, handled, handle_time, handle_remark, create_time, update_time
     </sql>
 
     <insert id="insert" parameterType="com.network.monitor.entity.AttackMonitorEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO sys_attack_monitor (
-            traffic_id, attack_type, risk_level, confidence, rule_id, rule_content,
+            event_id, traffic_id, attack_type, risk_level, confidence, rule_id, rule_content,
             source_ip, target_uri, attack_content, handled, handle_time, handle_remark, create_time, update_time
         ) VALUES (
-            #{trafficId}, #{attackType}, #{riskLevel}, #{confidence}, #{ruleId}, #{ruleContent},
+            #{eventId}, #{trafficId}, #{attackType}, #{riskLevel}, #{confidence}, #{ruleId}, #{ruleContent},
             #{sourceIp}, #{targetUri}, #{attackContent}, #{handled}, #{handleTime}, #{handleRemark}, #{createTime}, #{updateTime}
         )
     </insert>
@@ -45,6 +46,9 @@
         SELECT <include refid="Base_Column_List"/>
         FROM sys_attack_monitor
         <where>
+            <if test="eventId != null and eventId != ''">
+                AND event_id = #{eventId}
+            </if>
             <if test="attackType != null and attackType != ''">
                 AND attack_type = #{attackType}
             </if>
@@ -72,13 +76,18 @@
                 ORDER BY id DESC
             </otherwise>
         </choose>
-        LIMIT #{offset}, #{limit}
+        <if test="offset != null and limit != null">
+            LIMIT #{offset}, #{limit}
+        </if>
     </select>
 
     <select id="countByCondition" resultType="long">
         SELECT COUNT(*)
         FROM sys_attack_monitor
         <where>
+            <if test="eventId != null and eventId != ''">
+                AND event_id = #{eventId}
+            </if>
             <if test="attackType != null and attackType != ''">
                 AND attack_type = #{attackType}
             </if>
@@ -105,6 +114,11 @@
         SET handled = #{handled}, handle_time = NOW(), handle_remark = #{handleRemark}, update_time = NOW()
         WHERE id = #{id}
     </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_attack_monitor
+        WHERE id = #{id}
+    </delete>
 
     <select id="selectUnHandledHighRisk" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
@@ -144,16 +158,55 @@
 
     <select id="countAttackTrend" resultType="com.network.monitor.mapper.AttackMonitorMapper$TrendStat">
         SELECT 
-            STR_TO_DATE(time_str, '%Y-%m-%d %H:%i:%s') AS time,
-            count
-        FROM (
-            SELECT 
-                DATE_FORMAT(create_time, '%Y-%m-%d %H:00:00') AS time_str,
-                COUNT(*) AS count
-            FROM sys_attack_monitor
-            WHERE create_time &gt;= #{startTime} AND create_time &lt;= #{endTime}
-            GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d %H:00:00')
-        ) t
-        ORDER BY time ASC
+            create_time AS time,
+            1 AS count
+        FROM sys_attack_monitor
+        WHERE create_time &gt;= #{startTime} AND create_time &lt;= #{endTime}
+        ORDER BY create_time ASC
     </select>
+
+    <select id="selectBySourceIp" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_monitor
+        WHERE source_ip = #{sourceIp}
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+        <choose>
+            <when test="orderBy != null and orderBy != ''">
+                ORDER BY ${orderBy}
+            </when>
+            <otherwise>
+                ORDER BY create_time DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countBySourceIp" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_attack_monitor
+        WHERE source_ip = #{sourceIp}
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+    </select>
+
+    <update id="updateEventId">
+        UPDATE sys_attack_monitor
+        SET event_id = #{eventId}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+    
+    <update id="updateTrafficIdByEventId">
+        UPDATE sys_attack_monitor
+        SET traffic_id = #{trafficId}, update_time = NOW()
+        WHERE event_id = #{eventId}
+    </update>
 </mapper>

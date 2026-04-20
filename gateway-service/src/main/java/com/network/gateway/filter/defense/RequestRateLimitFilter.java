@@ -1,11 +1,17 @@
 package com.network.gateway.filter.defense;
 
 import com.network.gateway.bo.DefenseResultBO;
+import com.network.gateway.cache.GatewayConfigCache;
+import com.network.gateway.cache.IpAttackStateCache;
+import com.network.gateway.cache.IpAttackStateEntry;
 import com.network.gateway.cache.RequestRateLimitCache;
 import com.network.gateway.client.MonitorServiceDefenseClient;
-import com.network.gateway.constant.GatewayCacheConstant;
 import com.network.gateway.constant.GatewayFilterOrderConstant;
+import com.network.gateway.constant.IpAttackStateConstant;
+import com.network.gateway.dto.BlacklistEventDTO;
+import com.network.gateway.dto.DDoSAttackEventDTO;
 import com.network.gateway.dto.DefenseLogDTO;
+import com.network.gateway.traffic.TrafficAggregateService;
 import com.network.gateway.util.DefenseLogUtil;
 import com.network.gateway.util.DefenseResponseUtil;
 import com.network.gateway.util.ServerWebExchangeUtil;
@@ -20,13 +26,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-/**
- * 请求限流过滤器
- * 基于时间窗口的请求频率控制，防止单个IP的DDoS攻击
- *
- * @author network-monitor
- * @since 1.0.0
- */
 @Component
 public class RequestRateLimitFilter implements GlobalFilter, Ordered {
 
@@ -38,183 +37,499 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
     @Autowired
     private MonitorServiceDefenseClient defenseClient;
 
-    /**
-     * 过滤器核心方法
-     *
-     * @param exchange ServerWebExchange对象
-     * @param chain 过滤器链
-     * @return Mono<Void>
-     */
+    @Autowired
+    private IpAttackStateCache attackStateCache;
+
+    @Autowired
+    private GatewayConfigCache configCache;
+
+    @Autowired
+    private TrafficAggregateService aggregateService;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         long startTime = System.currentTimeMillis();
         String sourceIp = ServerWebExchangeUtil.extractSourceIp(exchange.getRequest());
 
         try {
-            // 检查请求频率是否超出限制
-            if (isRateLimited(sourceIp)) {
-                return handleRateLimitExceeded(exchange, sourceIp, startTime);
+            if (shouldSkipRateLimit(exchange)) {
+                return chain.filter(exchange);
             }
 
-            // 请求频率正常，继续执行过滤器链
-            return chain.filter(exchange);
+            if (!isRateLimitEnabled()) {
+                return chain.filter(exchange);
+            }
 
+            int currentState = attackStateCache.getState(sourceIp);
+            
+            if (currentState == IpAttackStateConstant.DEFENDED) {
+                logger.debug("IP已处于DEFENDED状态，拦截请求: ip={}", sourceIp);
+                return handleDefendedRequest(exchange, sourceIp, startTime, currentState);
+            }
+
+            if (currentState == IpAttackStateConstant.COOLDOWN) {
+                if (attackStateCache.isInCooldown(sourceIp)) {
+                    int threshold = getCurrentThreshold(sourceIp);
+                    boolean isRateLimited = isRateLimited(sourceIp, threshold);
+                    
+                    if (isRateLimited) {
+                        int rateLimitTriggerWindowSeconds = configCache.getDdosRateLimitTriggerWindowSeconds();
+                        long windowMs = rateLimitTriggerWindowSeconds * 1000L;
+                        int currentRateLimitCount = attackStateCache.incrementRateLimitCount(sourceIp, windowMs);
+                        
+                        int reattackThreshold = configCache.getStateCooldownToAttackingThresholdRps();
+                        logger.info("COOLDOWN期间限流触发: ip={}, currentRateLimitCount={}, reattackThreshold={}", 
+                                sourceIp, currentRateLimitCount, reattackThreshold);
+                        
+                        if (currentRateLimitCount >= reattackThreshold) {
+                            IpAttackStateCache.StateTransitionResult transitionResult = 
+                                attackStateCache.checkAndTransitionState(sourceIp, currentRateLimitCount, 
+                                    IpAttackStateConstant.SUSPICIOUS_RATE_LIMIT_THRESHOLD, 
+                                    configCache.getDdosRateLimitTriggerCount());
+                            
+                            if (transitionResult.isTransitioned() && transitionResult.getNewState() == IpAttackStateConstant.ATTACKING) {
+                                logger.warn("COOLDOWN期间再次攻击，转换状态: ip={}, newState=ATTACKING", sourceIp);
+                                handleStateTransition(sourceIp, transitionResult, exchange, startTime);
+                                return handleDefendedRequest(exchange, sourceIp, startTime, IpAttackStateConstant.ATTACKING);
+                            }
+                        }
+                    }
+                    
+                    logger.debug("IP处于COOLDOWN状态，放行请求: ip={}", sourceIp);
+                    return chain.filter(exchange);
+                }
+            }
+
+            int threshold = getCurrentThreshold(sourceIp);
+            boolean isRateLimited = isRateLimited(sourceIp, threshold);
+            
+            int currentRateLimitCount = attackStateCache.getRateLimitCount(sourceIp);
+            
+            logger.debug("限流检查: ip={}, threshold={}, isRateLimited={}, currentRateLimitCount={}", 
+                    sourceIp, threshold, isRateLimited, currentRateLimitCount);
+            
+            if (isRateLimited) {
+                int rateLimitTriggerWindowSeconds = configCache.getDdosRateLimitTriggerWindowSeconds();
+                long windowMs = rateLimitTriggerWindowSeconds * 1000L;
+                currentRateLimitCount = attackStateCache.incrementRateLimitCount(sourceIp, windowMs);
+                
+                int suspiciousThreshold = IpAttackStateConstant.SUSPICIOUS_RATE_LIMIT_THRESHOLD;
+                int attackingThreshold = configCache.getDdosRateLimitTriggerCount();
+                
+                logger.info("限流触发: ip={}, currentRateLimitCount={}, suspiciousThreshold={}, attackingThreshold={}", 
+                        sourceIp, currentRateLimitCount, suspiciousThreshold, attackingThreshold);
+                
+                IpAttackStateCache.StateTransitionResult transitionResult = 
+                    attackStateCache.checkAndTransitionState(sourceIp, currentRateLimitCount, suspiciousThreshold, attackingThreshold);
+                
+                if (transitionResult.isTransitioned()) {
+                    handleStateTransition(sourceIp, transitionResult, exchange, startTime);
+                    currentState = transitionResult.getNewState();
+                    
+                    if (currentState == IpAttackStateConstant.DEFENDED) {
+                        return handleDefendedRequest(exchange, sourceIp, startTime, currentState);
+                    }
+                } else {
+                    pushAttackMonitorRecord(sourceIp, currentRateLimitCount, exchange, currentState, transitionResult.getEventId());
+                }
+                
+                return handleRateLimitExceeded(exchange, sourceIp, startTime, threshold, currentRateLimitCount, currentState, transitionResult);
+            }
+
+            return chain.filter(exchange);
         } catch (Exception e) {
             logger.error("请求限流检查过程中发生异常，IP: {}", sourceIp, e);
-            // 发生异常时继续执行，避免影响正常请求
             return chain.filter(exchange);
         }
     }
 
-    /**
-     * 检查IP是否超出请求频率限制
-     *
-     * @param ip IP地址
-     * @return true表示超出限制
-     */
-    private boolean isRateLimited(String ip) {
-        return rateLimitCache.checkAndIncrement(ip, GatewayCacheConstant.RATE_LIMIT_THRESHOLD);
+    private void handleStateTransition(String sourceIp, 
+                                       IpAttackStateCache.StateTransitionResult transitionResult,
+                                       ServerWebExchange exchange,
+                                       long startTime) {
+        int newState = transitionResult.getNewState();
+        int previousState = transitionResult.getPreviousState();
+        String reason = transitionResult.getReason();
+        int stateRequestCount = transitionResult.getStateRequestCount();
+        int confidence = attackStateCache.getConfidence(sourceIp);
+        String eventId = transitionResult.getEventId();
+        
+        logger.info("IP状态转换完成: ip={}, {} -> {}, reason={}, stateRequestCount={}, confidence={}, eventId={}", 
+                sourceIp,
+                IpAttackStateConstant.getStateNameZh(previousState),
+                IpAttackStateConstant.getStateNameZh(newState),
+                reason,
+                stateRequestCount,
+                confidence,
+                eventId);
+        
+        aggregateService.onStateTransition(sourceIp, previousState, newState);
+        
+        DefenseResultBO.RiskLevel riskLevel = calculateRiskLevelByConfidence(confidence);
+        
+        if (newState == IpAttackStateConstant.SUSPICIOUS) {
+            pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "频率异常", confidence, eventId);
+            pushStateTransitionDefenseLog(sourceIp, exchange, eventId, "SUSPICIOUS", "频率异常检测", riskLevel, confidence);
+        } else if (newState == IpAttackStateConstant.ATTACKING) {
+            pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "攻击确认", confidence, eventId);
+            pushStateTransitionDefenseLog(sourceIp, exchange, eventId, "ATTACKING", "攻击行为确认", riskLevel, confidence);
+        } else if (newState == IpAttackStateConstant.DEFENDED) {
+            pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "执行防御", confidence, eventId);
+            pushBlacklistEvent(sourceIp, exchange, "攻击确认，自动拉黑", confidence, eventId);
+        }
+    }
+    
+    private void pushStateTransitionDefenseLog(String sourceIp, ServerWebExchange exchange, String eventId, 
+                                                String stateName, String reason, 
+                                                DefenseResultBO.RiskLevel riskLevel, int confidence) {
+        try {
+            DefenseResultBO defenseResult = new DefenseResultBO(
+                    DefenseResultBO.DefenseType.RATE_LIMIT,
+                    sourceIp,
+                    eventId,
+                    String.format("状态转换: %s, 原因: %s, 置信度: %d%%", stateName, reason, confidence)
+            );
+            
+            defenseResult.setRequestInfo(
+                    exchange.getRequest().getMethodValue(),
+                    exchange.getRequest().getURI().getPath(),
+                    ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest()))
+            );
+            defenseResult.setRiskLevel(riskLevel);
+            defenseResult.setAttackType("DDOS");
+            defenseResult.setSuccessResult(429, "Too Many Requests - " + stateName);
+            
+            DefenseLogDTO defenseLog = DefenseLogUtil.buildDefenseLog(defenseResult);
+            defenseClient.pushDefenseLog(defenseLog);
+            
+            logger.info("状态转换防御日志推送成功: ip={}, state={}, confidence={}, riskLevel={}, eventId={}", 
+                    sourceIp, stateName, confidence, riskLevel, eventId);
+        } catch (Exception e) {
+            logger.error("推送状态转换防御日志失败: ip={}, state={}, error={}", sourceIp, stateName, e.getMessage(), e);
+        }
     }
 
-    /**
-     * 处理请求频率超限的情况
-     *
-     * @param exchange ServerWebExchange对象
-     * @param sourceIp 源IP
-     * @param startTime 开始时间
-     * @return Mono<Void>
-     */
-    private Mono<Void> handleRateLimitExceeded(ServerWebExchange exchange, String sourceIp, long startTime) {
+    private Mono<Void> handleDefendedRequest(ServerWebExchange exchange, String sourceIp, long startTime, int currentState) {
         ServerHttpResponse response = exchange.getResponse();
-        int currentCount = rateLimitCache.getCurrentRequestCount(sourceIp);
         
-        // 构建防御结果
+        boolean skipDefenseLog = attackStateCache.shouldSkipDefenseAction(sourceIp);
+        String existingEventId = attackStateCache.getEventId(sourceIp);
+        int confidence = attackStateCache.getConfidence(sourceIp);
+        DefenseResultBO.RiskLevel riskLevel = calculateRiskLevelByConfidence(confidence);
+        
         DefenseResultBO defenseResult = new DefenseResultBO(
-                DefenseResultBO.DefenseType.RATE_LIMIT,
+                DefenseResultBO.DefenseType.BLACKLIST,
                 sourceIp,
-                "RATE_LIMIT_EVENT_" + System.currentTimeMillis(),
-                String.format("请求频率过高(%d次/秒 > %d次/秒)", 
-                            currentCount, GatewayCacheConstant.RATE_LIMIT_THRESHOLD)
+                existingEventId,
+                String.format("IP已被防御系统拦截, 置信度: %d%%", confidence)
         );
-        
+
         defenseResult.setRequestInfo(
                 exchange.getRequest().getMethodValue(),
                 exchange.getRequest().getURI().getPath(),
                 ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest()))
         );
-        defenseResult.setRiskLevel(currentCount > GatewayCacheConstant.RATE_LIMIT_THRESHOLD * 2 ? 
-                                 DefenseResultBO.RiskLevel.HIGH : DefenseResultBO.RiskLevel.MEDIUM);
+        defenseResult.setRiskLevel(riskLevel);
+        defenseResult.setAttackType("DDOS");
 
         try {
-            // 记录防御日志
+            defenseResult.setSuccessResult(403, "Forbidden - IP Defended");
+            
+            if (!skipDefenseLog) {
+                DefenseLogDTO defenseLog = DefenseLogUtil.buildDefenseLog(defenseResult);
+                defenseClient.pushDefenseLog(defenseLog);
+            }
+
+            logger.debug("拦截DEFENDED状态请求: IP[{}] URI[{}] skipLog={}", 
+                    sourceIp, exchange.getRequest().getURI().getPath(), skipDefenseLog);
+
+            return DefenseResponseUtil.buildForbiddenResponse(response, sourceIp, "IP已被防御系统拦截");
+        } catch (Exception e) {
+            logger.error("处理DEFENDED请求时发生异常", e);
+            defenseResult.setFailureResult(e.getMessage());
+            return DefenseResponseUtil.buildForbiddenResponse(response, sourceIp, "IP已被防御系统拦截");
+        } finally {
+            defenseResult.setProcessingTime(System.currentTimeMillis() - startTime);
+        }
+    }
+
+    private boolean shouldSkipRateLimit(ServerWebExchange exchange) {
+        if (ServerWebExchangeUtil.isStaticResource(exchange)) {
+            return true;
+        }
+        
+        if (ServerWebExchangeUtil.isHealthCheck(exchange) || 
+            ServerWebExchangeUtil.isManagementEndpoint(exchange)) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    private boolean isRateLimitEnabled() {
+        return configCache.isDefenseEnabled("rate-limit");
+    }
+
+    private boolean isRateLimited(String ip, int threshold) {
+        return rateLimitCache.checkAndIncrement(ip, threshold);
+    }
+
+    private int getCurrentThreshold(String ip) {
+        int defaultThreshold = configCache.getRateLimitThreshold();
+        return rateLimitCache.getEffectiveThreshold(ip, defaultThreshold);
+    }
+
+    private Mono<Void> handleRateLimitExceeded(ServerWebExchange exchange,
+                                               String sourceIp,
+                                               long startTime,
+                                               int threshold,
+                                               int rateLimitCount,
+                                               int currentState,
+                                               IpAttackStateCache.StateTransitionResult transitionResult) {
+        ServerHttpResponse response = exchange.getResponse();
+        int currentCount = rateLimitCache.getCurrentRequestCount(sourceIp);
+        if (currentCount <= 0) {
+            currentCount = threshold + 1;
+        }
+        
+        IpAttackStateEntry entry = attackStateCache.get(sourceIp);
+        if (entry != null) {
+            int storedPeakRps = entry.getPeakRps();
+            if (currentCount > storedPeakRps) {
+                entry.setPeakRps(currentCount);
+            }
+        }
+
+        String eventId = attackStateCache.getEventId(sourceIp);
+        if ((eventId == null || eventId.isEmpty()) && transitionResult != null) {
+            eventId = transitionResult.getEventId();
+        }
+        
+        int confidence = attackStateCache.getConfidence(sourceIp);
+
+        DefenseResultBO defenseResult = new DefenseResultBO(
+                DefenseResultBO.DefenseType.RATE_LIMIT,
+                sourceIp,
+                eventId,
+                String.format("请求频率过高(%d次/秒 > %d次/秒), 状态: %s, 置信度: %d%%", 
+                        currentCount, threshold, IpAttackStateConstant.getStateNameZh(currentState), confidence)
+        );
+
+        defenseResult.setRequestInfo(
+                exchange.getRequest().getMethodValue(),
+                exchange.getRequest().getURI().getPath(),
+                ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest()))
+        );
+        defenseResult.setRiskLevel(calculateRiskLevelByConfidence(confidence));
+        defenseResult.setAttackType("DDOS");
+
+        try {
+            defenseResult.setSuccessResult(429, "Too Many Requests");
+            
             DefenseLogDTO defenseLog = DefenseLogUtil.buildDefenseLog(defenseResult);
             defenseClient.pushDefenseLog(defenseLog);
-            
-            logger.warn("限流拦截请求: IP[{}] 当前频率{}次/秒 URI[{}] 方法[{}]", 
-                       sourceIp, currentCount,
-                       exchange.getRequest().getURI().getPath(),
-                       exchange.getRequest().getMethodValue());
 
-            // 构建并返回限流响应
-            defenseResult.setSuccessResult(429, "Too Many Requests");
-            return DefenseResponseUtil.buildRateLimitResponse(
-                    response, sourceIp, GatewayCacheConstant.RATE_LIMIT_THRESHOLD);
+            logger.warn("限流拦截请求: IP[{}] 状态[{}] 当前频率{}次/秒 阈值{}次/秒 URI[{}] 方法[{}] eventId={}",
+                    sourceIp, IpAttackStateConstant.getStateNameZh(currentState),
+                    currentCount, threshold,
+                    exchange.getRequest().getURI().getPath(),
+                    exchange.getRequest().getMethodValue(),
+                    eventId);
 
+            return DefenseResponseUtil.buildRateLimitResponse(response, sourceIp, threshold);
         } catch (Exception e) {
             logger.error("处理限流拦截时发生异常", e);
             defenseResult.setFailureResult(e.getMessage());
-            
-            // 即使日志推送失败，也要返回限流响应
-            return DefenseResponseUtil.buildRateLimitResponse(
-                    response, sourceIp, GatewayCacheConstant.RATE_LIMIT_THRESHOLD);
+            return DefenseResponseUtil.buildRateLimitResponse(response, sourceIp, threshold);
         } finally {
-            // 记录处理耗时
             defenseResult.setProcessingTime(System.currentTimeMillis() - startTime);
             logger.debug("限流防御执行完成: {}", DefenseLogUtil.buildExecutionSummary(defenseResult));
         }
     }
 
-    /**
-     * 获取过滤器优先级
-     *
-     * @return 优先级数值
-     */
+    private void pushDDoSEvent(String sourceIp, int rateLimitCount, ServerWebExchange exchange, String reason, int confidence, String eventId) {
+        try {
+            int effectiveConfidence = confidence;
+            if (effectiveConfidence <= 0 && rateLimitCount > 0) {
+                effectiveConfidence = Math.min(30 + rateLimitCount * 5, 65);
+            }
+            if (effectiveConfidence <= 0) {
+                effectiveConfidence = 30;
+            }
+            DDoSAttackEventDTO event = new DDoSAttackEventDTO(sourceIp, rateLimitCount, effectiveConfidence);
+            event.setHttpMethod(exchange.getRequest().getMethodValue());
+            event.setRequestUri(exchange.getRequest().getURI().getPath());
+            event.setUserAgent(ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest())));
+            if (eventId != null && !eventId.isEmpty()) {
+                event.setEventId(eventId);
+            }
+            
+            IpAttackStateEntry entry = attackStateCache.get(sourceIp);
+            int peakRps = 0;
+            if (entry != null) {
+                peakRps = entry.getPeakRps();
+                event.setAttackDuration(entry.getAttackDuration());
+                event.setRequestCount(entry.getAttackRequestCount());
+                event.setUniqueUriCount(entry.getUniqueUriCount());
+            }
+            
+            event.setSlidingWindowRps(peakRps);
+            event.setPeakRps(peakRps);
+            
+            defenseClient.pushDDoSAttackEvent(event);
+            logger.info("DDoS攻击事件推送成功: ip={}, rateLimitCount={}, confidence={} (original={}), reason={}, eventId={}, peakRps={}, requestCount={}", 
+                    sourceIp, rateLimitCount, effectiveConfidence, confidence, reason, eventId, peakRps, event.getRequestCount());
+        } catch (Exception e) {
+            logger.error("推送DDoS攻击事件失败: ip={}, error={}", sourceIp, e.getMessage(), e);
+        }
+    }
+
+    private void pushBlacklistEvent(String sourceIp, ServerWebExchange exchange, String reason, int confidence, String eventId) {
+        try {
+            long banDurationMs = calculateBanDuration(sourceIp, confidence);
+            
+            BlacklistEventDTO event = new BlacklistEventDTO(sourceIp, "SYSTEM", reason);
+            event.setDurationSeconds(banDurationMs / 1000);
+            event.setConfidence(confidence);
+            event.setFromState(IpAttackStateConstant.ATTACKING);
+            event.setToState(IpAttackStateConstant.DEFENDED);
+            if (eventId != null && !eventId.isEmpty()) {
+                event.setEventId(eventId);
+            }
+            defenseClient.pushBlacklistEvent(event);
+            logger.info("黑名单事件推送成功: ip={}, reason={}, duration={}s, confidence={}, eventId={}", sourceIp, reason, banDurationMs / 1000, confidence, eventId);
+        } catch (Exception e) {
+            logger.error("推送黑名单事件失败: ip={}, error={}", sourceIp, e.getMessage(), e);
+        }
+    }
+    
+    private void pushAttackMonitorRecord(String sourceIp, int rateLimitCount, ServerWebExchange exchange, 
+                                          int currentState, String eventId) {
+        try {
+            int confidence = attackStateCache.getConfidence(sourceIp);
+            if (confidence <= 0 && rateLimitCount > 0) {
+                confidence = Math.min(30 + rateLimitCount * 5, 65);
+            }
+            if (confidence <= 0) {
+                confidence = 30;
+            }
+            DDoSAttackEventDTO event = new DDoSAttackEventDTO(sourceIp, rateLimitCount, confidence);
+            event.setHttpMethod(exchange.getRequest().getMethodValue());
+            event.setRequestUri(exchange.getRequest().getURI().getPath());
+            event.setUserAgent(ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest())));
+            if (eventId != null && !eventId.isEmpty()) {
+                event.setEventId(eventId);
+            }
+            
+            IpAttackStateEntry entry = attackStateCache.get(sourceIp);
+            int peakRps = 0;
+            if (entry != null) {
+                peakRps = entry.getPeakRps();
+                event.setAttackDuration(entry.getAttackDuration());
+                event.setRequestCount(entry.getAttackRequestCount());
+                event.setUniqueUriCount(entry.getUniqueUriCount());
+            }
+            
+            event.setSlidingWindowRps(peakRps);
+            event.setPeakRps(peakRps);
+            
+            event.setDescription(String.format("连续触发限流%d次，置信度%d%%，状态: %s", 
+                    rateLimitCount, confidence, IpAttackStateConstant.getStateNameZh(currentState)));
+            defenseClient.pushDDoSAttackEvent(event);
+            logger.info("攻击监测记录推送成功: ip={}, rateLimitCount={}, confidence={}, state={}, eventId={}, peakRps={}, requestCount={}", 
+                    sourceIp, rateLimitCount, confidence, IpAttackStateConstant.getStateNameZh(currentState), eventId, peakRps, event.getRequestCount());
+        } catch (Exception e) {
+            logger.error("推送攻击监测记录失败: ip={}, error={}", sourceIp, e.getMessage(), e);
+        }
+    }
+
+    private long calculateBanDuration(String sourceIp, int confidence) {
+        long baseDurationMs = configCache.getBanDurationBaseMs();
+        int multiplier = configCache.getBanDurationMultiplier();
+        
+        IpAttackStateEntry entry = attackStateCache.get(sourceIp);
+        int attackHistoryCount = entry != null ? entry.getAttackHistoryCount() : 0;
+        
+        long duration = baseDurationMs;
+        
+        if (confidence >= 90) {
+            duration = baseDurationMs * multiplier;
+        } else if (confidence >= 80) {
+            duration = baseDurationMs * 3;
+        } else if (confidence >= 70) {
+            duration = baseDurationMs * 2;
+        }
+        
+        if (attackHistoryCount > 0) {
+            duration = duration * (1 + Math.min(attackHistoryCount, 3));
+        }
+        
+        long maxDurationMs = 24 * 60 * 60 * 1000L;
+        duration = Math.min(duration, maxDurationMs);
+        
+        logger.debug("计算封禁时长: ip={}, confidence={}, attackHistory={}, duration={}ms", 
+            sourceIp, confidence, attackHistoryCount, duration);
+        
+        return duration;
+    }
+    
+    private DefenseResultBO.RiskLevel calculateRiskLevelByConfidence(int confidence) {
+        if (confidence >= 90) {
+            return DefenseResultBO.RiskLevel.CRITICAL;
+        } else if (confidence >= 70) {
+            return DefenseResultBO.RiskLevel.HIGH;
+        } else if (confidence >= 50) {
+            return DefenseResultBO.RiskLevel.MEDIUM;
+        } else {
+            return DefenseResultBO.RiskLevel.LOW;
+        }
+    }
+
     @Override
     public int getOrder() {
         return GatewayFilterOrderConstant.REQUEST_RATE_LIMIT_FILTER_ORDER;
     }
 
-    /**
-     * 获取过滤器名称
-     *
-     * @return 过滤器名称
-     */
     public String getFilterName() {
         return "RequestRateLimitFilter";
     }
 
-    /**
-     * 获取当前活跃的IP数量
-     *
-     * @return 活跃IP数量
-     */
     public int getActiveIpCount() {
         return rateLimitCache.getSize();
     }
 
-    /**
-     * 获取指定IP的当前请求计数
-     *
-     * @param ip IP地址
-     * @return 当前请求数
-     */
     public int getCurrentRequestCount(String ip) {
         return rateLimitCache.getCurrentRequestCount(ip);
     }
 
-    /**
-     * 重置指定IP的请求计数
-     *
-     * @param ip IP地址
-     */
+    public int getDefaultThreshold() {
+        return configCache.getRateLimitThreshold();
+    }
+
+    public int getCurrentThresholdForIp(String ip) {
+        return getCurrentThreshold(ip);
+    }
+
     public void resetRequestCount(String ip) {
         rateLimitCache.resetRequestCount(ip);
     }
 
-    /**
-     * 清理过期的限流记录
-     */
     public void cleanupExpiredRecords() {
         rateLimitCache.cleanupExpired();
     }
 
-    /**
-     * 获取高频请求的IP列表
-     *
-     * @param ratio 阈值比例（相对于限流阈值）
-     * @return 高频IP集合
-     */
     public java.util.Set<String> getHighFrequencyIps(double ratio) {
-        return rateLimitCache.getHighFrequencyIps(GatewayCacheConstant.RATE_LIMIT_THRESHOLD, ratio);
+        int threshold = configCache.getRateLimitThreshold();
+        return rateLimitCache.getHighFrequencyIps(threshold, ratio);
     }
 
-    /**
-     * 获取限流统计信息
-     *
-     * @return 统计信息
-     */
     public String getStatistics() {
-        RequestRateLimitCache.RateLimitStatistics stats = 
-                rateLimitCache.getStatistics(GatewayCacheConstant.RATE_LIMIT_THRESHOLD);
-        return String.format("请求限流过滤器 - %s", stats.toString());
+        int threshold = configCache.getRateLimitThreshold();
+        RequestRateLimitCache.RateLimitStatistics stats = rateLimitCache.getStatistics(threshold);
+        return String.format("请求限流过滤器 - 动态阈值:%d次/秒 开关:%s %s", 
+                threshold, isRateLimitEnabled() ? "开启" : "关闭", stats.toString());
     }
 
-    /**
-     * 批量重置多个IP的请求计数
-     *
-     * @param ips IP地址集合
-     * @return 重置的IP数量
-     */
     public int batchResetRequestCounts(java.util.Set<String> ips) {
         return rateLimitCache.batchResetRequestCount(ips);
     }

@@ -1,11 +1,16 @@
 package com.network.gateway.filter.collect;
 
 import com.network.gateway.bo.RawTrafficBO;
+import com.network.gateway.cache.GatewayConfigCache;
+import com.network.gateway.cache.IpAttackStateCache;
 import com.network.gateway.cache.TrafficTempCache;
 import com.network.gateway.client.MonitorServiceTrafficClient;
 import com.network.gateway.constant.GatewayFilterOrderConstant;
+import com.network.gateway.constant.IpAttackStateConstant;
 import com.network.gateway.dto.TrafficMonitorDTO;
-import com.network.gateway.exception.GatewayBizException;
+import com.network.gateway.enums.TrafficPushStrategy;
+import com.network.gateway.handler.TrafficPushStrategyManager;
+import com.network.gateway.traffic.*;
 import com.network.gateway.util.ServerWebExchangeUtil;
 import com.network.gateway.util.TrafficPreProcessUtil;
 import org.slf4j.Logger;
@@ -18,13 +23,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
-/**
- * 流量采集全局过滤器
- * 网关的核心过滤器，负责采集全量请求信息并推送到监控服务
- *
- * @author network-monitor
- * @since 1.0.0
- */
 @Component
 public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
 
@@ -36,220 +34,212 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
     @Autowired
     private TrafficTempCache trafficTempCache;
 
-    /**
-     * 过滤器核心方法
-     *
-     * @param exchange ServerWebExchange对象
-     * @param chain 过滤器链
-     * @return Mono<Void>
-     */
+    @Autowired
+    private IpAttackStateCache attackStateCache;
+
+    @Autowired
+    private GatewayConfigCache configCache;
+
+    @Autowired
+    private TrafficPushStrategyManager strategyManager;
+
+    @Autowired
+    private TrafficQueueManager queueManager;
+
+    @Autowired
+    private PushRetryQueue retryQueue;
+
+    @Autowired
+    private PushDegradationHandler degradationHandler;
+
+    @Autowired
+    private TrafficEventProcessor eventProcessor;
+
+    @Autowired
+    private TrafficActivityService activityService;
+
+    @Autowired
+    private TrafficAggregateService aggregateService;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         long startTime = System.currentTimeMillis();
         
         try {
-            // 检查是否需要跳过采集（健康检查、管理端点等）
             if (shouldSkipCollection(exchange)) {
                 logger.debug("跳过流量采集：{}", exchange.getRequest().getURI().getPath());
                 return chain.filter(exchange);
             }
 
-            // 检查是否已经采集过该请求（防止重复采集）
             RawTrafficBO rawTraffic = ServerWebExchangeUtil.extractTrafficInfo(exchange);
             String requestId = rawTraffic.getRequestId();
+            String sourceIp = rawTraffic.getSourceIp();
             
             if (trafficTempCache.containsTraffic(requestId)) {
                 logger.debug("请求已采集，跳过：{}", requestId);
                 return chain.filter(exchange);
             }
+
+            attackStateCache.incrementRequestCount(sourceIp);
             
-            logger.debug("开始采集流量：{}", rawTraffic.getTrafficSummary());
+            logger.debug("开始采集流量：请求[{}] {} {} 来自IP[{}]", 
+                requestId, rawTraffic.getMethod(), rawTraffic.getUri(), sourceIp);
 
-            // 预处理流量数据
-            TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
-
-            // 存储到临时缓存（仅存储，不推送）
-            trafficTempCache.putTraffic(requestId, monitorDTO);
-
-            // 继续执行过滤器链（非阻塞）
-            return chain.filter(exchange)
-                    .doOnSuccess(unused -> {
-                        // 请求成功处理后的回调
-                        handleRequestSuccess(exchange, monitorDTO, startTime);
-                    })
-                    .doOnError(throwable -> {
-                        // 请求处理失败的回调
-                        handleRequestError(exchange, monitorDTO, throwable, startTime);
-                    });
+            return handleTraffic(exchange, chain, rawTraffic, sourceIp, startTime);
 
         } catch (Exception e) {
             logger.error("流量采集过程中发生异常", e);
-            // 发生异常时仍然继续执行过滤器链
             return chain.filter(exchange);
         }
     }
 
-    /**
-     * 判断是否应该跳过流量采集
-     *
-     * @param exchange ServerWebExchange对象
-     * @return true表示应该跳过
-     */
+    private Mono<Void> handleTraffic(ServerWebExchange exchange, GatewayFilterChain chain,
+                                     RawTrafficBO rawTraffic, String sourceIp, long startTime) {
+        return chain.filter(exchange)
+                .doOnTerminate(() -> {
+                    try {
+                        processTrafficAfterResponse(exchange, rawTraffic, sourceIp, startTime);
+                    } catch (Exception e) {
+                        logger.error("流量处理失败：ip={}", sourceIp, e);
+                    }
+                })
+                .doOnError(throwable -> {
+                    logger.warn("请求处理错误：ip={}, error={}", sourceIp, throwable.getMessage());
+                });
+    }
+
+    private void processTrafficAfterResponse(ServerWebExchange exchange, RawTrafficBO rawTraffic, 
+                                             String sourceIp, long startTime) {
+        Boolean attackIntercepted = exchange.getAttribute("attack_intercepted");
+        if (attackIntercepted != null && attackIntercepted) {
+            logger.debug("请求已被拦截，跳过流量推送：ip={}, uri={}", sourceIp, rawTraffic.getUri());
+            return;
+        }
+        
+        long endTime = System.currentTimeMillis();
+        int statusCode = exchange.getResponse().getStatusCode() != null ? 
+                       exchange.getResponse().getStatusCode().value() : 200;
+        
+        int finalState = attackStateCache.getState(sourceIp);
+        String finalEventId = attackStateCache.getEventId(sourceIp);
+        int confidence = attackStateCache.getConfidence(sourceIp);
+        
+        TrafficPushStrategy finalStrategy = getPushStrategy(finalState);
+        
+        logger.debug("流量处理：ip={}, uri={}, state={}, status={}, strategy={}", 
+            sourceIp, rawTraffic.getUri(), 
+            IpAttackStateConstant.getStateNameZh(finalState), statusCode, finalStrategy);
+        
+        if (finalStrategy == TrafficPushStrategy.REALTIME) {
+            doRealtimePush(rawTraffic, sourceIp, finalState, finalEventId, statusCode, endTime - startTime);
+        } else if (finalStrategy == TrafficPushStrategy.AGGREGATE) {
+            doAggregatePush(rawTraffic, sourceIp, finalState, finalEventId, confidence, statusCode, endTime - startTime);
+        }
+    }
+
+    private void doRealtimePush(RawTrafficBO rawTraffic, String sourceIp, int state, 
+                                String eventId, int statusCode, long processingTime) {
+        TrafficMonitorDTO monitorDTO = TrafficPreProcessUtil.preprocessTraffic(rawTraffic);
+        monitorDTO.setIsAggregated(false);
+        monitorDTO.setResponseInfo(statusCode, "", processingTime);
+        monitorDTO.setAvgProcessingTime(processingTime);
+        monitorDTO.setStateTag(IpAttackStateConstant.getStateName(state));
+        
+        if (eventId != null && !eventId.isEmpty()) {
+            monitorDTO.setEventId(eventId);
+        }
+        
+        try {
+            trafficClient.pushTraffic(monitorDTO);
+            logger.debug("实时推送完成：ip={}, uri={}, state={}, status={}, 耗时{}ms", 
+                sourceIp, rawTraffic.getUri(), 
+                IpAttackStateConstant.getStateNameZh(state), statusCode, processingTime);
+        } catch (Exception e) {
+            logger.error("实时推送失败：ip={}, uri={}, error={}", 
+                sourceIp, rawTraffic.getUri(), e.getMessage());
+        }
+    }
+
+    private void doAggregatePush(RawTrafficBO rawTraffic, String sourceIp, int state, 
+                                  String eventId, int confidence, int statusCode, long processingTime) {
+        TrafficSample sample = new TrafficSample();
+        sample.setRequestId(rawTraffic.getRequestId());
+        sample.setRequestUri(rawTraffic.getUri());
+        sample.setHttpMethod(rawTraffic.getMethod());
+        sample.setHeaders(rawTraffic.getHeaders());
+        sample.setRequestBody(rawTraffic.getRequestBody());
+        sample.setTimestamp(System.currentTimeMillis());
+        sample.setState(state);
+        sample.setStateName(IpAttackStateConstant.getStateNameZh(state));
+        sample.setConfidence(confidence);
+        sample.setResponseStatus(statusCode);
+        sample.setProcessingTime(processingTime);
+        sample.setError(statusCode >= 400);
+        sample.setTargetIp(rawTraffic.getTargetIp());
+        sample.setTargetPort(rawTraffic.getTargetPort());
+        sample.setProtocol(rawTraffic.getProtocol());
+        sample.setUserAgent(rawTraffic.getUserAgent());
+        sample.setSourcePort(rawTraffic.getSourcePort());
+        
+        if (eventId != null && !eventId.isEmpty()) {
+            sample.setEventId(eventId);
+        }
+        
+        aggregateService.addSample(sourceIp, sample);
+        
+        logger.debug("流量已加入聚合队列：ip={}, uri={}, state={}, status={}", 
+            sourceIp, sample.getRequestUri(), 
+            IpAttackStateConstant.getStateNameZh(state), statusCode);
+    }
+
+    private TrafficPushStrategy getPushStrategy(int state) {
+        switch (state) {
+            case IpAttackStateConstant.NORMAL:
+                return TrafficPushStrategy.REALTIME;
+            
+            case IpAttackStateConstant.SUSPICIOUS:
+            case IpAttackStateConstant.ATTACKING:
+            case IpAttackStateConstant.DEFENDED:
+            case IpAttackStateConstant.COOLDOWN:
+                return TrafficPushStrategy.AGGREGATE;
+            
+            default:
+                return TrafficPushStrategy.REALTIME;
+        }
+    }
+
     private boolean shouldSkipCollection(ServerWebExchange exchange) {
-        // 跳过健康检查请求
         if (ServerWebExchangeUtil.isHealthCheck(exchange)) {
             return true;
         }
 
-        // 跳过管理端点请求
         if (ServerWebExchangeUtil.isManagementEndpoint(exchange)) {
             return true;
         }
 
-        // 可以添加更多的跳过条件
-        String path = exchange.getRequest().getURI().getPath();
-        
-        // 跳过静态资源请求
-        if (path.endsWith(".css") || path.endsWith(".js") || 
-            path.endsWith(".png") || path.endsWith(".jpg") || 
-            path.endsWith(".ico")) {
+        if (ServerWebExchangeUtil.isStaticResource(exchange)) {
             return true;
         }
 
         return false;
     }
 
-    /**
-     * 处理请求成功的情况
-     *
-     * @param exchange ServerWebExchange 对象
-     * @param monitorDTO 流量监控 DTO
-     * @param startTime 开始时间
-     */
-    private void handleRequestSuccess(ServerWebExchange exchange, 
-                                    TrafficMonitorDTO monitorDTO, long startTime) {
-        try {
-            long endTime = System.currentTimeMillis();
-            int statusCode = exchange.getResponse().getStatusCode() != null ? 
-                           exchange.getResponse().getStatusCode().value() : 200;
-            
-            // 更新响应信息
-            monitorDTO.setResponseInfo(statusCode, "", endTime - startTime);
-
-            // 更新缓存
-            trafficTempCache.putTraffic(monitorDTO.getRequestId(), monitorDTO);
-
-            // 推送完整的流量数据（包含响应信息）
-            pushTraffic(monitorDTO);
-
-            logger.debug("流量采集完成：{} 耗时{}ms 状态码{}", 
-                        monitorDTO.getRequestId(), 
-                        endTime - startTime, 
-                        statusCode);
-
-        } catch (Exception e) {
-            logger.error("处理请求成功回调时发生异常", e);
-        }
-    }
-
-    /**
-     * 处理请求失败的情况
-     *
-     * @param exchange ServerWebExchange 对象
-     * @param monitorDTO 流量监控 DTO
-     * @param throwable 异常对象
-     * @param startTime 开始时间
-     */
-    private void handleRequestError(ServerWebExchange exchange, 
-                                  TrafficMonitorDTO monitorDTO, 
-                                  Throwable throwable, long startTime) {
-        try {
-            long endTime = System.currentTimeMillis();
-            
-            // 确定实际的状态码
-            int statusCode = exchange.getResponse().getStatusCode() != null ? 
-                           exchange.getResponse().getStatusCode().value() : 500;
-            
-            // 标记为处理失败
-            monitorDTO.markAsFailed(throwable.getMessage());
-            monitorDTO.setResponseInfo(statusCode, "", endTime - startTime);
-
-            // 更新缓存
-            trafficTempCache.putTraffic(monitorDTO.getRequestId(), monitorDTO);
-
-            // 推送完整的流量数据（包含响应信息）
-            pushTraffic(monitorDTO);
-
-            logger.warn("流量采集记录错误：{} 耗时{}ms 错误：{} 状态码{}", 
-                       monitorDTO.getRequestId(), 
-                       endTime - startTime, 
-                       throwable.getMessage(),
-                       statusCode);
-
-        } catch (Exception e) {
-            logger.error("处理请求错误回调时发生异常", e);
-        }
-    }
-
-    /**
-     * 推送流量数据到监控服务
-     *
-     * @param monitorDTO 流量监控 DTO
-     */
-    private void pushTraffic(TrafficMonitorDTO monitorDTO) {
-        try {
-            trafficClient.pushTraffic(monitorDTO);
-            logger.debug("推送流量数据成功：请求 ID[{}]", monitorDTO.getRequestId());
-        } catch (Exception e) {
-            logger.warn("推送流量数据失败：请求 ID[{}], 错误：{}", 
-                       monitorDTO.getRequestId(), e.getMessage());
-        }
-    }
-
-    /**
-     * 获取过滤器优先级
-     *
-     * @return 优先级数值（越小优先级越高）
-     */
     @Override
     public int getOrder() {
-        // 设置为最高优先级，确保最先执行
         return GatewayFilterOrderConstant.TRAFFIC_COLLECT_FILTER_ORDER;
     }
 
-    /**
-     * 获取过滤器名称
-     *
-     * @return 过滤器名称
-     */
     public String getFilterName() {
         return "TrafficCollectGlobalFilter";
     }
 
-    /**
-     * 获取当前缓存中的流量数量
-     *
-     * @return 流量数量
-     */
-    public int getCachedTrafficCount() {
-        return trafficTempCache.getSize();
-    }
-
-    /**
-     * 清理过期的流量缓存
-     */
-    public void cleanupExpiredTraffics() {
-        trafficTempCache.cleanupExpired();
-    }
-
-    /**
-     * 获取过滤器统计信息
-     *
-     * @return 统计信息
-     */
     public String getStatistics() {
-        return String.format("流量采集过滤器 - 缓存流量数:%d 缓存统计:%s", 
-                           getCachedTrafficCount(), 
-                           trafficTempCache.getStats());
+        StringBuilder sb = new StringBuilder();
+        sb.append("流量采集过滤器统计:\n");
+        sb.append(String.format("  - 缓存流量数: %d\n", trafficTempCache.getSize()));
+        sb.append(String.format("  - 缓存统计: %s\n", trafficTempCache.getStats()));
+        sb.append(String.format("  - 聚合服务: %s\n", aggregateService.getStatistics()));
+        sb.append(String.format("  - 事件处理器: %s\n", eventProcessor.getStatus()));
+        return sb.toString();
     }
 }

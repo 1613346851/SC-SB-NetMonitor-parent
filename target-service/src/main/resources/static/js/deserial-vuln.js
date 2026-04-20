@@ -7,7 +7,9 @@ const CONFIG = {
         VULN: '/target/deserial/parse',
         SAFE: '/target/deserial/safe-parse',
         GENERATE: '/target/deserial/generate-test-data',
-        ALLOWED: '/target/deserial/allowed-classes'
+        ALLOWED: '/target/deserial/allowed-classes',
+        STORED_OBJECTS: '/target/deserial/stored-objects',
+        RESET_DB: '/target/db/reset/deserial'
     }
 };
 
@@ -20,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     bindEventListeners();
     VulnCommon.updateStatus('ready', '就绪');
+    updateStoredCount();
     console.log('Java反序列化漏洞测试平台初始化完成');
 }
 
@@ -243,5 +246,157 @@ function clearOutput() {
                 <h4 class="fw-bold text-dark">欢迎使用Java反序列化漏洞测试平台</h4>
                 <p class="mb-0 lead">请输入序列化数据或点击测试用例开始反序列化测试</p>
             </div>`;
+    }
+}
+
+async function getStoredObjects() {
+    VulnCommon.showLoading(true);
+    VulnCommon.updateStatus('executing', '获取存储对象...');
+
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.STORED_OBJECTS);
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const objects = data.data.objects || [];
+            let content = '';
+
+            if (objects.length === 0) {
+                content = '<div class="alert alert-info mb-0"><i class="fas fa-info-circle me-2"></i>暂无存储的序列化对象</div>';
+            } else {
+                content = `
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>对象名称</th>
+                                    <th>对象类型</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                
+                objects.forEach(obj => {
+                    content += `
+                        <tr>
+                            <td>${obj.id}</td>
+                            <td><code>${VulnCommon.escapeHtml(obj.object_name)}</code></td>
+                            <td><small>${VulnCommon.escapeHtml(obj.object_type)}</small></td>
+                            <td><small>${obj.create_time}</small></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteStoredObject(${obj.id})">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>`;
+                });
+
+                content += '</tbody></table></div>';
+            }
+
+            const html = `
+                <div class="result-card border-info">
+                    <div class="result-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fas fa-database text-info me-2"></i>
+                            存储的序列化对象
+                        </h6>
+                        <small class="text-muted">共 ${objects.length} 条记录</small>
+                    </div>
+                    <div class="result-body">${content}</div>
+                </div>`;
+
+            VulnCommon.appendResult('outputContainer', html);
+        }
+    } catch (error) {
+        handleError(error);
+    } finally {
+        VulnCommon.showLoading(false);
+        VulnCommon.updateStatus('ready', '就绪');
+    }
+}
+
+async function deleteStoredObject(id) {
+    if (!confirm(`确定要删除ID为 ${id} 的存储对象吗？`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/target/deserial/stored-objects/${id}`, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+
+        if (data.code === 200) {
+            VulnCommon.showNotification('删除成功', 'success');
+            getStoredObjects();
+            updateStoredCount();
+        } else {
+            VulnCommon.showNotification(data.message || '删除失败', 'error');
+        }
+    } catch (error) {
+        VulnCommon.showNotification('删除失败: ' + error.message, 'error');
+    }
+}
+
+async function resetDatabase() {
+    if (!confirm('确定要重置反序列化数据表吗？这将删除所有存储的序列化对象！')) {
+        return;
+    }
+
+    VulnCommon.showLoading(true);
+    VulnCommon.updateStatus('executing', '重置数据库...');
+
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.RESET_DB, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const html = `
+                <div class="result-card border-success">
+                    <div class="result-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            数据表重置成功
+                        </h6>
+                    </div>
+                    <div class="result-body">
+                        <div class="alert alert-success mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            已删除 <strong>${data.data.deleted_count}</strong> 条记录
+                        </div>
+                    </div>
+                </div>`;
+
+            VulnCommon.appendResult('outputContainer', html);
+            VulnCommon.showNotification('数据表已重置', 'success');
+            updateStoredCount();
+        }
+    } catch (error) {
+        handleError(error);
+    } finally {
+        VulnCommon.showLoading(false);
+        VulnCommon.updateStatus('ready', '就绪');
+    }
+}
+
+async function updateStoredCount() {
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.STORED_OBJECTS);
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const count = (data.data.objects || []).length;
+            const countElement = document.getElementById('storedCount');
+            if (countElement) {
+                countElement.textContent = count;
+            }
+        }
+    } catch (error) {
+        console.error('获取存储数量失败:', error);
     }
 }

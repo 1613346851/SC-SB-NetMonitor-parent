@@ -47,18 +47,20 @@ public class GatewayGlobalExceptionHandler implements ErrorWebExceptionHandler {
     public Mono<Void> handle(ServerWebExchange exchange, Throwable ex) {
         ServerHttpResponse response = exchange.getResponse();
         
+        if (response.isCommitted()) {
+            logger.error("响应已提交，无法修改响应: 状态码[{}] 错误类型[{}] 错误信息[{}]", 
+                        response.getStatusCode(), ex.getClass().getSimpleName(), ex.getMessage());
+            return Mono.empty();
+        }
+        
         try {
-            // 构建错误响应
             Map<String, Object> errorResponse = buildErrorResponse(ex);
             
-            // 设置响应状态码
             HttpStatus status = determineHttpStatus(ex);
             response.setStatusCode(status);
             
-            // 设置响应头
             response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
             
-            // 构建响应体
             ObjectMapper objectMapper = new ObjectMapper();
             String jsonResponse = objectMapper.writeValueAsString(errorResponse);
             DataBuffer buffer = BUFFER_FACTORY.wrap(jsonResponse.getBytes(StandardCharsets.UTF_8));
@@ -66,21 +68,27 @@ public class GatewayGlobalExceptionHandler implements ErrorWebExceptionHandler {
             logger.error("网关异常处理: 状态码[{}] 错误类型[{}] 错误信息[{}]", 
                         status.value(), ex.getClass().getSimpleName(), ex.getMessage());
             
-            return response.writeWith(Mono.just(buffer))
-                    .then(response.setComplete());
+            return response.writeWith(Mono.just(buffer));
                     
         } catch (Exception e) {
             logger.error("构建错误响应时发生异常", e);
             
-            // 如果构建响应失败，返回最基本的错误信息
+            if (response.isCommitted()) {
+                return Mono.empty();
+            }
+            
             String basicError = "{\"error\":\"Internal Server Error\",\"message\":\"网关处理异常\"}";
             DataBuffer buffer = BUFFER_FACTORY.wrap(basicError.getBytes(StandardCharsets.UTF_8));
             
             response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
-            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
             
-            return response.writeWith(Mono.just(buffer))
-                    .then(response.setComplete());
+            try {
+                response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            } catch (UnsupportedOperationException ue) {
+                logger.warn("无法设置响应头，响应可能已提交");
+            }
+            
+            return response.writeWith(Mono.just(buffer));
         }
     }
 

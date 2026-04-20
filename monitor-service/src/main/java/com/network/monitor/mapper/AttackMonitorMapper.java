@@ -27,6 +27,7 @@ public interface AttackMonitorMapper {
      * 分页查询攻击记录
      */
     List<AttackMonitorEntity> selectByCondition(
+            @Param("eventId") String eventId,
             @Param("attackType") String attackType,
             @Param("riskLevel") String riskLevel,
             @Param("sourceIp") String sourceIp,
@@ -38,10 +39,8 @@ public interface AttackMonitorMapper {
             @Param("orderBy") String orderBy
     );
 
-    /**
-     * 统计总记录数
-     */
     long countByCondition(
+            @Param("eventId") String eventId,
             @Param("attackType") String attackType,
             @Param("riskLevel") String riskLevel,
             @Param("sourceIp") String sourceIp,
@@ -54,6 +53,11 @@ public interface AttackMonitorMapper {
      * 更新攻击记录处理状态
      */
     int updateHandled(@Param("id") Long id, @Param("handled") Integer handled, @Param("handleRemark") String handleRemark);
+
+    /**
+     * 根据ID删除攻击记录
+     */
+    int deleteById(@Param("id") Long id);
 
     /**
      * 查询未处理的高危攻击记录
@@ -183,6 +187,27 @@ public interface AttackMonitorMapper {
                                      @Param("endTime") LocalDateTime endTime);
 
     /**
+     * 根据源IP精确查询攻击记录（用于IP画像）
+     */
+    List<AttackMonitorEntity> selectBySourceIp(
+            @Param("sourceIp") String sourceIp,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("offset") Integer offset,
+            @Param("limit") Integer limit,
+            @Param("orderBy") String orderBy
+    );
+
+    /**
+     * 根据源IP精确统计攻击数量
+     */
+    long countBySourceIp(
+            @Param("sourceIp") String sourceIp,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
+
+    /**
      * 攻击趋势统计实体
      */
     class TrendStat {
@@ -205,4 +230,14 @@ public interface AttackMonitorMapper {
             this.count = count;
         }
     }
+
+    /**
+     * 更新攻击记录的事件ID
+     */
+    int updateEventId(@Param("id") Long id, @Param("eventId") String eventId);
+    
+    /**
+     * 根据事件ID更新攻击记录的流量ID
+     */
+    int updateTrafficIdByEventId(@Param("eventId") String eventId, @Param("trafficId") Long trafficId);
 }

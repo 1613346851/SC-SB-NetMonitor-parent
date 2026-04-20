@@ -11,14 +11,10 @@ import java.time.LocalDateTime;
 @Data
 public class AttackMonitorEntity {
 
-    /**
-     * 主键 ID
-     */
     private Long id;
 
-    /**
-     * 关联流量 ID
-     */
+    private String eventId;
+
     private Long trafficId;
 
     /**
@@ -124,7 +120,7 @@ public class AttackMonitorEntity {
     /**
      * 判断是否已处理
      */
-    public boolean isHandled() {
+    public boolean hasBeenHandled() {
         return this.handled != null && this.handled == 1;
     }
 

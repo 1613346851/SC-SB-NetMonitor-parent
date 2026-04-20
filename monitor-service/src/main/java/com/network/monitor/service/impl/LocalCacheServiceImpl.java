@@ -49,6 +49,7 @@ public class LocalCacheServiceImpl implements LocalCacheService {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public <T> T get(String key) {
         CacheEntry<?> entry = cacheData.get(key);
         if (entry == null) {

@@ -39,6 +39,16 @@ public class RoleServiceImpl implements RoleService {
     }
     
     @Override
+    public List<RoleEntity> listRoles(String roleName, Integer status, Integer offset, Integer limit) {
+        return roleMapper.selectListPaged(roleName, status, offset, limit);
+    }
+    
+    @Override
+    public long countRoles(String roleName, Integer status) {
+        return roleMapper.countList(roleName, status);
+    }
+    
+    @Override
     public List<RoleEntity> getRolesByUserId(Long userId) {
         return roleMapper.selectByUserId(userId);
     }

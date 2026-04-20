@@ -12,6 +12,9 @@ import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * 网关服务 API 调用客户端
  * 封装与网关服务的所有跨服务调用逻辑，支持失败重试机制
@@ -149,6 +152,116 @@ public class GatewayApiClient {
         } catch (Exception e) {
             log.error("同步防御日志到网关异常：", e);
             return false;
+        }
+    }
+
+    /**
+     * 推送单个配置到网关
+     *
+     * @param configKey 配置键
+     * @param configValue 配置值
+     * @return 是否成功
+     */
+    public boolean pushConfigToGateway(String configKey, String configValue) {
+        try {
+            String url = GATEWAY_BASE_URL + HttpConstant.GATEWAY_CONFIG_PUSH_ENDPOINT;
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-Auth-Token", gatewayAuthToken);
+            headers.set("X-Source-IP", monitorIp);
+            
+            Map<String, String> config = new HashMap<>();
+            config.put("configKey", configKey);
+            config.put("configValue", configValue);
+            
+            HttpEntity<Map<String, String>> request = new HttpEntity<>(config, headers);
+            
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("推送单个配置到网关成功：configKey={}", configKey);
+                return true;
+            } else {
+                log.warn("推送单个配置到网关失败：configKey={}, statusCode={}", configKey, response.getStatusCode());
+                return false;
+            }
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            log.warn("推送单个配置到网关失败，网关服务未就绪：configKey={}, error={}", configKey, e.getMessage());
+            return false;
+        } catch (Exception e) {
+            log.error("推送单个配置到网关异常：configKey={}", configKey, e);
+            return false;
+        }
+    }
+
+    /**
+     * 批量推送配置到网关
+     *
+     * @param configs 配置Map
+     * @return 是否成功
+     */
+    public boolean pushConfigsToGateway(Map<String, Object> configs) {
+        try {
+            String url = GATEWAY_BASE_URL + HttpConstant.GATEWAY_CONFIG_SYNC_ENDPOINT;
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-Auth-Token", gatewayAuthToken);
+            headers.set("X-Source-IP", monitorIp);
+            
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("configs", configs);
+            requestBody.put("timestamp", System.currentTimeMillis());
+            
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+            
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("批量推送配置到网关成功，共{}项", configs.size());
+                return true;
+            } else {
+                log.warn("批量推送配置到网关失败：statusCode={}", response.getStatusCode());
+                return false;
+            }
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            log.warn("批量推送配置到网关失败，网关服务未就绪：{}", e.getMessage());
+            return false;
+        } catch (Exception e) {
+            log.error("批量推送配置到网关异常", e);
+            return false;
+        }
+    }
+
+    /**
+     * 从网关获取当前配置状态
+     *
+     * @return 当前配置Map
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getGatewayCurrentConfigs() {
+        try {
+            String url = GATEWAY_BASE_URL + HttpConstant.GATEWAY_CONFIG_CURRENT_ENDPOINT;
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Auth-Token", gatewayAuthToken);
+            headers.set("X-Source-IP", monitorIp);
+            
+            HttpEntity<Void> request = new HttpEntity<>(headers);
+            
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, request, Map.class);
+            
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                log.info("获取网关当前配置成功");
+                return response.getBody();
+            } else {
+                log.error("获取网关当前配置失败：statusCode={}", response.getStatusCode());
+                return new HashMap<>();
+            }
+        } catch (Exception e) {
+            log.error("获取网关当前配置异常", e);
+            return new HashMap<>();
         }
     }
 }

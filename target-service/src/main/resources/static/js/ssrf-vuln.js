@@ -6,7 +6,9 @@ const CONFIG = {
     ENDPOINTS: {
         VULN: '/target/ssrf/request',
         SAFE: '/target/ssrf/safe-request',
-        LIST: '/target/ssrf/list-allowed'
+        LIST: '/target/ssrf/list-allowed',
+        LOGS: '/target/ssrf/logs',
+        RESET_DB: '/target/db/reset/ssrf'
     }
 };
 
@@ -17,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeApp() {
     bindEventListeners();
     VulnCommon.updateStatus('ready', '就绪');
+    updateLogCount();
     console.log('SSRF漏洞测试平台初始化完成');
 }
 
@@ -126,11 +129,40 @@ function handleResponse(data, url, type) {
     }
 
     if (data.data?.response_body) {
-        content += `
-            <div class="mb-3">
-                <span class="text-muted">响应内容：</span>
-                <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 300px; overflow-y: auto;">${VulnCommon.escapeHtml(data.data.response_body)}</pre>
-            </div>`;
+        let formattedBody = data.data.response_body;
+        try {
+            const jsonObj = JSON.parse(data.data.response_body);
+            formattedBody = JSON.stringify(jsonObj, null, 2);
+            if (jsonObj.data?.files) {
+                const filesList = jsonObj.data.files.map(f => 
+                    `<tr><td><code>${VulnCommon.escapeHtml(f.name)}</code></td><td>${VulnCommon.escapeHtml(f.description || '')}</td><td><span class="badge bg-secondary">${VulnCommon.escapeHtml(f.type || 'txt')}</span></td></tr>`
+                ).join('');
+                content += `
+                    <div class="mb-3">
+                        <span class="text-muted">响应内容：</span>
+                        <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 300px; overflow-y: auto;">${VulnCommon.escapeHtml(formattedBody)}</pre>
+                    </div>
+                    <div class="mb-3">
+                        <span class="text-muted">文件列表：</span>
+                        <table class="table table-striped table-hover table-sm mt-2">
+                            <thead class="table-dark"><tr><th>文件名</th><th>描述</th><th>类型</th></tr></thead>
+                            <tbody>${filesList}</tbody>
+                        </table>
+                    </div>`;
+            } else {
+                content += `
+                    <div class="mb-3">
+                        <span class="text-muted">响应内容：</span>
+                        <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 300px; overflow-y: auto;">${VulnCommon.escapeHtml(formattedBody)}</pre>
+                    </div>`;
+            }
+        } catch (e) {
+            content += `
+                <div class="mb-3">
+                    <span class="text-muted">响应内容：</span>
+                    <pre class="bg-dark text-light p-3 rounded mt-2" style="max-height: 300px; overflow-y: auto;">${VulnCommon.escapeHtml(formattedBody)}</pre>
+                </div>`;
+        }
     }
 
     if (data.data?.warning) {
@@ -191,5 +223,132 @@ function clearOutput() {
                 <h4 class="fw-bold text-dark">欢迎使用SSRF漏洞测试平台</h4>
                 <p class="mb-0 lead">请输入目标URL或点击测试用例开始请求测试</p>
             </div>`;
+    }
+}
+
+async function getSsrfLogs() {
+    VulnCommon.showLoading(true);
+    VulnCommon.updateStatus('executing', '获取请求日志...');
+
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.LOGS);
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const logs = data.data.logs || [];
+            let content = '';
+
+            if (logs.length === 0) {
+                content = '<div class="alert alert-info mb-0"><i class="fas fa-info-circle me-2"></i>暂无请求日志</div>';
+            } else {
+                content = `
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>请求URL</th>
+                                    <th>方法</th>
+                                    <th>状态码</th>
+                                    <th>来源IP</th>
+                                    <th>请求时间</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                
+                logs.forEach(log => {
+                    content += `
+                        <tr>
+                            <td>${log.id}</td>
+                            <td><code style="font-size: 0.75rem;">${VulnCommon.escapeHtml(log.requestUrl || '')}</code></td>
+                            <td><span class="badge bg-primary">${log.requestMethod || 'GET'}</span></td>
+                            <td><span class="badge ${log.responseCode >= 200 && log.responseCode < 400 ? 'bg-success' : 'bg-danger'}">${log.responseCode || 0}</span></td>
+                            <td><small>${log.sourceIp || '-'}</small></td>
+                            <td><small>${log.requestTime || '-'}</small></td>
+                        </tr>`;
+                });
+
+                content += '</tbody></table></div>';
+            }
+
+            const html = `
+                <div class="result-card border-info">
+                    <div class="result-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="fas fa-database text-info me-2"></i>
+                            SSRF请求日志
+                        </h6>
+                        <small class="text-muted">共 ${logs.length} 条记录</small>
+                    </div>
+                    <div class="result-body">${content}</div>
+                </div>`;
+
+            VulnCommon.appendResult('outputContainer', html);
+        }
+    } catch (error) {
+        handleError('', error);
+    } finally {
+        VulnCommon.showLoading(false);
+        VulnCommon.updateStatus('ready', '就绪');
+    }
+}
+
+async function resetDatabase() {
+    if (!confirm('确定要重置SSRF日志表吗？这将删除所有请求日志！')) {
+        return;
+    }
+
+    VulnCommon.showLoading(true);
+    VulnCommon.updateStatus('executing', '重置数据库...');
+
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.RESET_DB, {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const html = `
+                <div class="result-card border-success">
+                    <div class="result-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            数据表重置成功
+                        </h6>
+                    </div>
+                    <div class="result-body">
+                        <div class="alert alert-success mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            已删除 <strong>${data.data.deleted_count}</strong> 条记录
+                        </div>
+                    </div>
+                </div>`;
+
+            VulnCommon.appendResult('outputContainer', html);
+            VulnCommon.showNotification('数据表已重置', 'success');
+            updateLogCount();
+        }
+    } catch (error) {
+        handleError('', error);
+    } finally {
+        VulnCommon.showLoading(false);
+        VulnCommon.updateStatus('ready', '就绪');
+    }
+}
+
+async function updateLogCount() {
+    try {
+        const response = await fetch(CONFIG.ENDPOINTS.LOGS);
+        const data = await response.json();
+
+        if (data.code === 200) {
+            const count = (data.data.logs || []).length;
+            const countElement = document.getElementById('logCount');
+            if (countElement) {
+                countElement.textContent = count;
+            }
+        }
+    } catch (error) {
+        console.error('获取日志数量失败:', error);
     }
 }

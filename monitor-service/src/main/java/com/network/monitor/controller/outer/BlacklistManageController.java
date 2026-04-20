@@ -1,11 +1,16 @@
 package com.network.monitor.controller.outer;
 
+import com.network.monitor.cache.BlacklistCache;
 import com.network.monitor.cache.SysConfigCache;
 import com.network.monitor.common.ApiResponse;
+import com.network.monitor.common.util.IpNormalizeUtil;
 import com.network.monitor.dto.BlacklistAddDTO;
 import com.network.monitor.dto.BlacklistInfoDTO;
 import com.network.monitor.entity.IpBlacklistEntity;
 import com.network.monitor.entity.IpBlacklistHistoryEntity;
+import com.network.monitor.mapper.DefenseLogMapper;
+import com.network.monitor.mapper.IpBlacklistHistoryMapper;
+import com.network.monitor.mapper.IpBlacklistMapper;
 import com.network.monitor.service.AuthService;
 import com.network.monitor.service.BlacklistManageService;
 import com.network.monitor.service.IpBlacklistService;
@@ -42,12 +47,28 @@ public class BlacklistManageController {
     @Autowired
     private OperLogService operLogService;
 
+    @Autowired
+    private DefenseLogMapper defenseLogMapper;
+
+    @Autowired
+    private IpBlacklistMapper ipBlacklistMapper;
+
+    @Autowired
+    private IpBlacklistHistoryMapper ipBlacklistHistoryMapper;
+
+    @Autowired
+    private BlacklistCache blacklistCache;
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getBlacklist(
             @RequestParam(defaultValue = "1") int pageNum,
-            @RequestParam(defaultValue = "10") int pageSize) {
+            @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(defaultValue = "createTime") String sortField,
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            @RequestParam(required = false) String ip,
+            @RequestParam(required = false) Integer status) {
         try {
             List<IpBlacklistEntity> entities = ipBlacklistService.getAllBlacklists();
             
@@ -57,6 +78,9 @@ public class BlacklistManageController {
                 dto.setId(entity.getId());
                 dto.setIp(entity.getIpAddress());
                 dto.setReason(getLatestBanReason(entity.getId()));
+                String banType = getLatestBanType(entity.getId());
+                dto.setBanType(banType);
+                dto.setBanTypeText(getBanTypeText(banType));
                 dto.setExpireTime(entity.getCurrentExpireTime() != null ? 
                     entity.getCurrentExpireTime().format(TIME_FORMATTER) : null);
                 dto.setCreateTime(entity.getCreateTime() != null ? 
@@ -68,9 +92,53 @@ public class BlacklistManageController {
                 list.add(dto);
             }
             
+            if (ip != null && !ip.isEmpty()) {
+                list = list.stream()
+                    .filter(dto -> dto.getIp() != null && dto.getIp().contains(ip))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            if (status != null) {
+                list = list.stream()
+                    .filter(dto -> dto.getStatus() != null && dto.getStatus().equals(status))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            final String finalSortField = sortField;
+            final boolean isAsc = "asc".equalsIgnoreCase(sortOrder);
+            list.sort((a, b) -> {
+                int result = 0;
+                switch (finalSortField) {
+                    case "id":
+                        result = compareLongs(a.getId(), b.getId());
+                        break;
+                    case "ip":
+                        result = compareStrings(a.getIp(), b.getIp());
+                        break;
+                    case "status":
+                        result = compareIntegers(a.getStatus(), b.getStatus());
+                        break;
+                    case "expireTime":
+                        result = compareStrings(a.getExpireTime(), b.getExpireTime());
+                        break;
+                    case "totalBanCount":
+                        result = compareIntegers(a.getTotalBanCount(), b.getTotalBanCount());
+                        break;
+                    case "createTime":
+                    default:
+                        result = compareStrings(a.getCreateTime(), b.getCreateTime());
+                        break;
+                }
+                return isAsc ? result : -result;
+            });
+            
+            int total = list.size();
+            int start = (pageNum - 1) * pageSize;
+            int end = Math.min(start + pageSize, total);
+            List<BlacklistInfoDTO> pagedList = start < total ? list.subList(start, end) : new ArrayList<>();
+            
             Map<String, Object> result = new HashMap<>();
-            result.put("list", list);
-            result.put("total", list.size());
+            result.put("list", pagedList);
+            result.put("total", total);
             result.put("pageNum", pageNum);
             result.put("pageSize", pageSize);
             
@@ -80,12 +148,31 @@ public class BlacklistManageController {
             return ApiResponse.error("获取黑名单列表失败");
         }
     }
+    
+    private int compareStrings(String a, String b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return -1;
+        if (b == null) return 1;
+        return a.compareTo(b);
+    }
+    
+    private int compareIntegers(Integer a, Integer b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return -1;
+        if (b == null) return 1;
+        return a.compareTo(b);
+    }
+    
+    private int compareLongs(Long a, Long b) {
+        if (a == null && b == null) return 0;
+        if (a == null) return -1;
+        if (b == null) return 1;
+        return a.compareTo(b);
+    }
 
     private String getLatestBanReason(Long blacklistId) {
         try {
-            List<IpBlacklistHistoryEntity> historyList = ipBlacklistService.getHistoryByIp(
-                ipBlacklistService.getBlacklistByIp(null) != null ? 
-                    ipBlacklistService.getBlacklistByIp(null).getIpAddress() : null);
+            List<IpBlacklistHistoryEntity> historyList = ipBlacklistHistoryMapper.selectBanningByBlacklistId(blacklistId);
             if (historyList != null && !historyList.isEmpty()) {
                 return historyList.get(0).getBanReason();
             }
@@ -93,6 +180,28 @@ public class BlacklistManageController {
             log.warn("获取封禁原因失败", e);
         }
         return "手动添加";
+    }
+
+    private String getLatestBanType(Long blacklistId) {
+        try {
+            List<IpBlacklistHistoryEntity> historyList = ipBlacklistHistoryMapper.selectBanningByBlacklistId(blacklistId);
+            if (historyList != null && !historyList.isEmpty()) {
+                String banType = historyList.get(0).getBanType();
+                return banType != null ? banType : "MANUAL";
+            }
+        } catch (Exception e) {
+            log.warn("获取封禁类型失败", e);
+        }
+        return "MANUAL";
+    }
+
+    private String getBanTypeText(String banType) {
+        if ("SYSTEM".equals(banType)) {
+            return "系统自动";
+        } else if ("MANUAL".equals(banType)) {
+            return "手动添加";
+        }
+        return banType != null ? banType : "手动添加";
     }
 
     @GetMapping("/{ip}/history")
@@ -164,18 +273,48 @@ public class BlacklistManageController {
     }
 
     @DeleteMapping("/{ip}/all")
-    public ApiResponse<Map<String, Object>> deleteAllBlacklists(@PathVariable String ip) {
+    public ApiResponse<Map<String, Object>> deleteAllBlacklists(@PathVariable String ip, HttpServletRequest request) {
         try {
-            ipBlacklistService.removeFromBlacklist(ip, "删除所有封禁记录", "admin");
-            
+            String normalizedIp = IpNormalizeUtil.normalize(ip);
+
+            ipBlacklistMapper.deleteByIpAddress(normalizedIp);
+            blacklistCache.remove(normalizedIp);
+            defenseLogMapper.deleteAllBlacklistsByIp(normalizedIp);
+
+            ipBlacklistService.syncToGateway(normalizedIp, "REMOVE");
+
             Map<String, Object> result = new HashMap<>();
             result.put("deletedCount", 1);
-            
+
             log.info("删除 IP 的所有黑名单记录成功：ip={}", ip);
+
+            operLogService.logOperation(authService.getCurrentUsername(), "DELETE", "黑名单管理",
+                    "删除黑名单IP：" + ip, "delete", "/api/blacklist/" + ip + "/all", getClientIp(request), 0);
+
             return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("删除 IP 的所有黑名单记录失败：ip={}", ip, e);
             return ApiResponse.error("删除黑名单记录失败：" + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{ip}/unblock")
+    public ApiResponse<Void> unblockIp(@PathVariable String ip, @RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            String unbanReason = params.get("reason") != null ? (String) params.get("reason") : "手动解禁";
+            String operator = authService.getCurrentUsername();
+
+            ipBlacklistService.removeFromBlacklist(ip, unbanReason, operator);
+
+            log.info("解禁 IP 成功：ip={}, reason={}, operator={}", ip, unbanReason, operator);
+
+            operLogService.logOperation(authService.getCurrentUsername(), "UPDATE", "黑名单管理",
+                    "解禁IP：" + ip + "，原因：" + unbanReason, "unblock", "/api/blacklist/" + ip + "/unblock", getClientIp(request), 0);
+
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("解禁 IP 失败：ip={}", ip, e);
+            return ApiResponse.error("解禁失败：" + e.getMessage());
         }
     }
 

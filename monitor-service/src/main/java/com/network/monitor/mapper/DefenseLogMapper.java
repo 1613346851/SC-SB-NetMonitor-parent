@@ -15,17 +15,23 @@ public interface DefenseLogMapper {
     DefenseLogEntity selectById(@Param("id") Long id);
 
     List<DefenseLogEntity> selectByCondition(
+            @Param("eventId") String eventId,
             @Param("defenseType") String defenseType,
             @Param("defenseTarget") String defenseTarget,
+            @Param("executeStatus") Integer executeStatus,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
             @Param("offset") Integer offset,
-            @Param("limit") Integer limit
+            @Param("limit") Integer limit,
+            @Param("sortField") String sortField,
+            @Param("sortOrder") String sortOrder
     );
 
     long countByCondition(
+            @Param("eventId") String eventId,
             @Param("defenseType") String defenseType,
             @Param("defenseTarget") String defenseTarget,
+            @Param("executeStatus") Integer executeStatus,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime
     );
@@ -33,6 +39,8 @@ public interface DefenseLogMapper {
     int deleteById(@Param("id") Long id);
 
     long countAll();
+
+    long countAllExcludeAlertOnly();
 
     List<DefenseLogEntity> selectValidBlacklists();
 
@@ -43,6 +51,30 @@ public interface DefenseLogMapper {
     int deleteAllBlacklistsByIp(@Param("ip") String ip);
 
     List<TrendStat> countDefenseTrend(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    int countByEventId(@Param("eventId") String eventId);
+
+    List<DefenseLogEntity> selectByDefenseTarget(
+            @Param("defenseTarget") String defenseTarget,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("offset") Integer offset,
+            @Param("limit") Integer limit,
+            @Param("sortField") String sortField,
+            @Param("sortOrder") String sortOrder
+    );
+
+    long countByDefenseTarget(
+            @Param("defenseTarget") String defenseTarget,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime
+    );
+
+    long countBlocksByIp(
+            @Param("defenseTarget") String defenseTarget
+    );
+
+    int updateIsFirst(@Param("id") Long id, @Param("isFirst") Integer isFirst);
 
     class TrendStat {
         private LocalDateTime time;

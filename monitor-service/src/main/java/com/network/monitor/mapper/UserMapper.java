@@ -18,6 +18,14 @@ public interface UserMapper {
                                  @Param("status") Integer status,
                                  @Param("delFlag") Integer delFlag);
     
+    List<UserEntity> selectListPaged(@Param("username") String username,
+                                      @Param("status") Integer status,
+                                      @Param("offset") Integer offset,
+                                      @Param("limit") Integer limit);
+    
+    long countList(@Param("username") String username,
+                   @Param("status") Integer status);
+    
     int insert(UserEntity entity);
     
     int update(UserEntity entity);

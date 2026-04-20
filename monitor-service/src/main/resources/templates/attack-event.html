@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>态势感知 - 网络监测系统</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .event-id {
+            font-family: monospace;
+            color: #4f46e5;
+            cursor: pointer;
+        }
+        .event-full-id {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+            background: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stat-card .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        .stat-card .stat-label {
+            color: #6b7280;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .charts-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .chart-card .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+        .chart-container {
+            height: 250px;
+            position: relative;
+        }
+        .event-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+        .detail-section {
+            margin-bottom: 20px;
+        }
+        .detail-section h4 {
+            font-size: 14px;
+            color: #374151;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e5e7eb;
+            font-weight: 600;
+        }
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+        .detail-item label {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .detail-item span {
+            font-size: 14px;
+            color: #1f2937;
+            font-weight: 500;
+        }
+        .timeline {
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+        .timeline-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            position: relative;
+        }
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+        .timeline-marker {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 12px;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+        .timeline-item.start .timeline-marker {
+            background: #f59e0b;
+        }
+        .timeline-item.defense .timeline-marker {
+            background: #3b82f6;
+        }
+        .timeline-item.end .timeline-marker {
+            background: #10b981;
+        }
+        .timeline-content {
+            flex: 1;
+        }
+        .timeline-time {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .timeline-label {
+            font-size: 14px;
+            color: #1f2937;
+        }
+        .related-attacks {
+            margin-top: 20px;
+        }
+        .related-attacks h4 {
+            font-size: 14px;
+            color: #374151;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        .modal-body {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        #eventDetailModal .modal-content {
+            width: 70%;
+            max-width: 1200px;
+            min-width: 600px;
+        }
+        .rps-highlight {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div th:replace="~{fragments/common :: sidebar}"></div>
+
+        <div class="main-container">
+            <header class="header">
+                <div class="header-left">
+                    <div th:replace="~{fragments/common :: mobileMenuToggle}"></div>
+                    <h2>态势感知</h2>
+                </div>
+                <div class="header-right">
+                    <div th:replace="~{fragments/common :: userDropdown}"></div>
+                </div>
+            </header>
+
+            <main class="content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="totalEvents">0</div>
+                        <div class="stat-label">总事件数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="ongoingEvents">0</div>
+                        <div class="stat-label">进行中事件</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="endedEvents">0</div>
+                        <div class="stat-label">已结束事件</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="avgDuration">-</div>
+                        <div class="stat-label">平均持续时间</div>
+                    </div>
+                </div>
+
+                <div class="charts-row">
+                    <div class="chart-card">
+                        <div class="chart-title">攻击类型分布</div>
+                        <div class="chart-container" id="attackTypeChart"></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">风险等级分布</div>
+                        <div class="chart-container" id="riskLevelChart"></div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-bottom: 24px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div class="card-header" style="padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+                        <h3 class="card-title" style="font-size: 16px; font-weight: 600; color: #1f2937; margin: 0;">攻击事件趋势</h3>
+                        <div class="chart-controls" style="display: flex; align-items: center; gap: 12px;">
+                            <select id="eventTrendTimeRange" class="time-range-select" onchange="onEventTrendTimeRangeChange()" style="padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                                <option value="1h">最近 1 小时</option>
+                                <option value="6h">最近 6 小时</option>
+                                <option value="12h">最近 12 小时</option>
+                                <option value="24h" selected>最近 24 小时</option>
+                                <option value="3d">最近 3 天</option>
+                                <option value="7d">最近 7 天</option>
+                                <option value="14d">最近 14 天</option>
+                                <option value="30d">最近 30 天</option>
+                            </select>
+                            <span id="eventTrendIntervalDisplay" class="interval-display" style="color: #6b7280; font-size: 13px;">统计精度：1 小时</span>
+                        </div>
+                    </div>
+                    <div class="card-body" style="padding: 20px;">
+                        <div id="eventTrendChart" style="width: 100%; height: 300px;"></div>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <div class="form-inline">
+                        <div class="form-group">
+                            <label class="form-label">事件 ID</label>
+                            <input type="text" class="form-control" id="eventId" placeholder="输入事件ID" style="width: 160px;">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">源 IP</label>
+                            <input type="text" class="form-control" id="sourceIp" placeholder="请输入源 IP">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">攻击类型</label>
+                            <select class="form-control" id="attackType">
+                                <option value="">全部</option>
+                                <option value="SQL_INJECTION">SQL 注入</option>
+                                <option value="XSS">XSS 攻击</option>
+                                <option value="COMMAND_INJECTION">命令注入</option>
+                                <option value="DDOS">DDoS 攻击</option>
+                                <option value="PATH_TRAVERSAL">路径遍历</option>
+                                <option value="FILE_INCLUSION">文件包含</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">风险等级</label>
+                            <select class="form-control" id="riskLevel">
+                                <option value="">全部</option>
+                                <option value="CRITICAL">严重</option>
+                                <option value="HIGH">高风险</option>
+                                <option value="MEDIUM">中风险</option>
+                                <option value="LOW">低风险</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">状态</label>
+                            <select class="form-control" id="status">
+                                <option value="">全部</option>
+                                <option value="0">进行中</option>
+                                <option value="1">已结束</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御动作</label>
+                            <select class="form-control" id="defenseAction">
+                                <option value="">全部</option>
+                                <option value="BLOCK_IP">IP封禁</option>
+                                <option value="RATE_LIMIT">限流</option>
+                                <option value="BLOCK_REQUEST">请求拦截</option>
+                                <option value="ALERT_ONLY">仅告警</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">防御结果</label>
+                            <select class="form-control" id="defenseSuccess">
+                                <option value="">全部</option>
+                                <option value="1">成功</option>
+                                <option value="0">失败</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">开始日期</label>
+                            <input type="date" class="form-control" id="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">结束日期</label>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="form-group">
+                            <button class="btn btn-primary" onclick="searchEvents()">查询</button>
+                            <button class="btn btn-default" onclick="resetSearch()">重置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3 class="table-title">攻击事件列表</h3>
+                    </div>
+                    <div class="table-wrapper" style="position: relative;">
+                        <table class="data-table has-fixed-action">
+                            <thead>
+                                <tr>
+                                    <th data-sort="eventId" style="min-width: 140px;">事件ID</th>
+                                    <th data-sort="startTime" style="min-width: 150px;">开始时间</th>
+                                    <th data-sort="sourceIp" style="min-width: 120px;">源 IP</th>
+                                    <th data-sort="attackType" style="min-width: 100px;">攻击类型</th>
+                                    <th data-sort="riskLevel" style="min-width: 100px;">风险等级</th>
+                                    <th data-sort="duration" style="min-width: 100px;">持续时间</th>
+                                    <th data-sort="totalRequests" style="min-width: 80px;">总请求</th>
+                                    <th data-sort="peakRps" style="min-width: 80px;">峰值RPS</th>
+                                    <th data-sort="attackCount" style="min-width: 80px;">攻击节点</th>
+                                    <th data-sort="confidenceEnd" style="min-width: 80px;">置信度</th>
+                                    <th data-sort="status" style="min-width: 80px;">状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eventTableBody">
+                                <tr>
+                                    <td colspan="12" class="text-center">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-container" style="padding: 16px 24px;">
+                        <div class="pagination" id="pagination"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="eventDetailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>事件详情</h3>
+                <span class="event-full-id" id="modalEventId"></span>
+                <button class="modal-close" onclick="closeEventDetail()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="eventDetailContent"></div>
+                
+                <div class="timeline" id="eventTimeline"></div>
+                
+                <div class="related-attacks">
+                    <h4>关联攻击记录</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>类型</th>
+                                <th>风险</th>
+                                <th>置信度</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="relatedAttacksBody">
+                            <tr><td colspan="6" class="text-center">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="viewAttackList()">查看完整攻击列表</button>
+                <button class="btn btn-default" onclick="closeEventDetail()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/core/config.js}"></script>
+    <script th:src="@{/js/utils/storage.js}"></script>
+    <script th:src="@{/js/utils/date.js}"></script>
+    <script th:src="@{/js/utils/message.js}"></script>
+    <script th:src="@{/js/utils/validator.js}"></script>
+    <script th:src="@{/js/core/http.js}"></script>
+    <script th:src="@{/js/core/auth.js}"></script>
+    <script th:src="@{/js/core/resource-loader.js}"></script>
+    <script th:src="@{/js/core/page-init.js}"></script>
+    <script th:src="@{/js/core/table-utils.js}"></script>
+    <script th:src="@{/js/components/modal.js}"></script>
+    <script th:src="@{/js/components/table.js}"></script>
+    <script th:src="@{/js/components/pagination.js}"></script>
+    <script th:src="@{/js/components/chart.js}"></script>
+    <script th:src="@{/js/utils.js}"></script>
+    <script th:src="@{/js/attack-event.js}"></script>
+    <script>
+        ResourceLoader.loadEcharts().then(function() {
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
+        }).catch(function(e) {
+            console.error('ECharts 加载失败:', e);
+            PageInit.init({
+                requireAuth: true,
+                highlightMenu: true
+            });
+        });
+    </script>
+</body>
+</html>

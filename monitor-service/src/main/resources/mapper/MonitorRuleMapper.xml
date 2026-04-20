@@ -28,7 +28,7 @@
             hit_count, last_hit_time, create_time, update_time
         ) VALUES (
             #{ruleName}, #{attackType}, #{ruleContent}, #{description}, #{riskLevel}, #{enabled}, #{priority},
-            #{hitCount}, #{lastHitTime}, #{createTime}, #{updateTime}
+            COALESCE(#{hitCount}, 0), #{lastHitTime}, #{createTime}, #{updateTime}
         )
     </insert>
 
@@ -76,6 +76,50 @@
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
+    <select id="selectByConditionWithSort" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_monitor_rule
+        <where>
+            <if test="ruleName != null and ruleName != ''">
+                AND rule_name LIKE CONCAT('%', #{ruleName}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+        <choose>
+            <when test="sortField == 'id'">
+                ORDER BY id ${sortOrder}
+            </when>
+            <when test="sortField == 'ruleName'">
+                ORDER BY rule_name ${sortOrder}
+            </when>
+            <when test="sortField == 'attackType'">
+                ORDER BY attack_type ${sortOrder}
+            </when>
+            <when test="sortField == 'riskLevel'">
+                ORDER BY 
+                CASE risk_level
+                    WHEN 'CRITICAL' THEN 1
+                    WHEN 'HIGH' THEN 2
+                    WHEN 'MEDIUM' THEN 3
+                    WHEN 'LOW' THEN 4
+                    ELSE 5
+                END ${sortOrder}
+            </when>
+            <when test="sortField == 'enabled'">
+                ORDER BY enabled ${sortOrder}
+            </when>
+            <otherwise>
+                ORDER BY id DESC
+            </otherwise>
+        </choose>
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
     <select id="countByCondition" resultType="long">
         SELECT COUNT(*)
         FROM sys_monitor_rule
@@ -120,4 +164,9 @@
         SET hit_count = #{hitCount}, last_hit_time = NOW(), update_time = NOW()
         WHERE id = #{id}
     </update>
+
+    <select id="countByAttackType" resultType="long">
+        SELECT COUNT(*) FROM sys_monitor_rule
+        WHERE attack_type = #{attackType}
+    </select>
 </mapper>

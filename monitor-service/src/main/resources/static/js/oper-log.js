@@ -2,6 +2,8 @@
  * 操作日志页面 JavaScript
  */
 
+let operLogTable;
+
 document.addEventListener('DOMContentLoaded', function() {
     const today = new Date().toISOString().split('T')[0];
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -9,56 +11,44 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('searchEndDate').value = today;
     document.getElementById('searchStartDate').value = weekAgo;
     
-    loadLogs();
+    initOperLogTable();
 });
 
-async function loadLogs() {
-    try {
-        const username = document.getElementById('searchUsername').value;
-        const operType = document.getElementById('searchOperType').value;
-        const operStatus = document.getElementById('searchOperStatus').value;
-        const startTime = document.getElementById('searchStartDate').value;
-        const endTime = document.getElementById('searchEndDate').value;
-        
-        const params = {};
-        if (username) params.username = username;
-        if (operType) params.operType = operType;
-        if (operStatus !== '') params.operStatus = operStatus;
-        if (startTime) params.startTime = startTime + ' 00:00:00';
-        if (endTime) params.endTime = endTime + ' 23:59:59';
-        
-        const logs = await http.get('/system/log/list', params);
-        renderLogTable(logs);
-    } catch (error) {
-        console.error('加载日志列表失败:', error);
-        document.getElementById('logTableBody').innerHTML = 
-            '<tr><td colspan="9" class="text-center text-danger">加载失败</td></tr>';
-    }
-}
-
-function renderLogTable(logs) {
-    const tbody = document.getElementById('logTableBody');
+function initOperLogTable() {
+    operLogTable = TableUtils.createInstance({
+        instanceName: 'operLogTable',
+        apiUrl: '/system/log/list',
+        pageSize: 10,
+        defaultSortField: 'operTime',
+        defaultSortOrder: 'desc',
+        tableBodyEl: 'logTableBody',
+        paginationEl: 'pagination',
+        colspan: 9,
+        fixedAction: true,
+        enableTooltip: true,
+        renderRow: function(item) {
+            const cell = TableUtils.cell;
+            
+            return `
+                <tr>
+                    <td>${item.id || '-'}</td>
+                    ${cell.renderCell(item.username, { maxLength: 20 })}
+                    <td>${renderOperType(item.operType)}</td>
+                    ${cell.renderCell(item.operModule, { maxLength: 20 })}
+                    ${cell.renderCell(item.operContent, { maxLength: 30 })}
+                    ${cell.renderCell(item.operIp, { maxLength: 20 })}
+                    <td>${renderOperStatus(item.operStatus)}</td>
+                    <td>${dateFormat.format(item.operTime)}</td>
+                    ${cell.renderActionCell([
+                        { text: '详情', type: 'primary', onClick: `showDetail(${item.id})` }
+                    ])}
+                </tr>
+            `;
+        }
+    });
     
-    if (!logs || logs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center">暂无数据</td></tr>';
-        return;
-    }
-    
-    tbody.innerHTML = logs.map(log => `
-        <tr>
-            <td>${log.id}</td>
-            <td>${log.username || '-'}</td>
-            <td>${renderOperType(log.operType)}</td>
-            <td>${log.operModule || '-'}</td>
-            <td title="${log.operContent || ''}">${truncateText(log.operContent || '-', 30)}</td>
-            <td>${log.operIp || '-'}</td>
-            <td>${renderOperStatus(log.operStatus)}</td>
-            <td>${dateFormat.format(log.operTime)}</td>
-            <td>
-                <button class="btn btn-primary btn-sm" onclick="showDetail(${log.id})">详情</button>
-            </td>
-        </tr>
-    `).join('');
+    window.operLogTable = operLogTable;
+    operLogTable.loadData();
 }
 
 function renderOperType(type) {
@@ -79,14 +69,21 @@ function renderOperStatus(status) {
         '<span class="tag danger">失败</span>';
 }
 
-function truncateText(text, maxLength) {
-    if (!text) return '-';
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-}
-
 function searchLogs() {
-    loadLogs();
+    const username = operLogTable.getSearchValue('searchUsername');
+    const operType = operLogTable.getSearchSelectValue('searchOperType');
+    const operStatus = operLogTable.getSearchSelectValue('searchOperStatus');
+    const startTime = operLogTable.getSearchValue('searchStartDate');
+    const endTime = operLogTable.getSearchValue('searchEndDate');
+    
+    const params = {};
+    if (username) params.username = username;
+    if (operType) params.operType = operType;
+    if (operStatus !== '') params.operStatus = operStatus;
+    if (startTime) params.startTime = startTime + ' 00:00:00';
+    if (endTime) params.endTime = endTime + ' 23:59:59';
+    
+    operLogTable.search(params);
 }
 
 function resetSearch() {
@@ -99,7 +96,7 @@ function resetSearch() {
     document.getElementById('searchEndDate').value = today;
     document.getElementById('searchStartDate').value = weekAgo;
     
-    loadLogs();
+    operLogTable.resetSearch();
 }
 
 async function showDetail(id) {

@@ -4,14 +4,16 @@
 
 /* ==================== 表单组 ==================== */
 .form-group {
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-lg);
 }
 
 .form-label {
     display: block;
     margin-bottom: var(--spacing-sm);
     font-weight: 500;
-    color: var(--text-primary);
+    color: var(--text-secondary);
+    font-size: 13px;
+    letter-spacing: 0.3px;
 }
 
 .form-label .required {
@@ -22,19 +24,23 @@
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-base);
+    border-radius: var(--radius-sm);
     font-size: var(--font-size-base);
     transition: all var(--transition-base);
+    background: #fff;
+    color: var(--text-primary);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .form-control:focus {
     border-color: var(--primary-color);
     outline: none;
-    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    background: #fff;
 }
 
 .form-control::placeholder {
-    color: #bfbfbf;
+    color: var(--text-disabled);
 }
 
 /* ==================== 表单行 ==================== */
@@ -86,7 +92,7 @@
     left: var(--spacing-md);
     top: 50%;
     transform: translateY(-50%);
-    color: #bfbfbf;
+    color: var(--text-disabled);
     font-size: var(--font-size-md);
 }
 
@@ -96,9 +102,10 @@
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
-    color: #bfbfbf;
+    color: var(--text-disabled);
     font-size: var(--font-size-md);
     user-select: none;
+    transition: color var(--transition-base);
 }
 
 .password-toggle:hover {
@@ -114,6 +121,7 @@
     font-size: var(--font-size-sm);
     cursor: pointer;
     user-select: none;
+    color: var(--text-secondary);
 }
 
 .checkbox-label input[type="checkbox"],
@@ -121,6 +129,7 @@
     width: 16px;
     height: 16px;
     cursor: pointer;
+    accent-color: var(--primary-color);
 }
 
 /* ==================== 表单选项 ==================== */
@@ -137,12 +146,14 @@
     gap: var(--spacing-sm);
     cursor: pointer;
     user-select: none;
+    color: var(--text-secondary);
 }
 
 .remember-me input {
     width: 16px;
     height: 16px;
     cursor: pointer;
+    accent-color: var(--primary-color);
 }
 
 /* ==================== 搜索栏 ==================== */
@@ -159,4 +170,63 @@
 
 .search-bar .btn {
     white-space: nowrap;
+}
+
+/* ==================== 表单操作按钮 ==================== */
+.form-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+/* ==================== 快捷搜索 ==================== */
+.quick-search {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-light);
+}
+
+.quick-label {
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.quick-btn {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all var(--transition-base);
+}
+
+.quick-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.quick-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+/* ==================== 搜索表单 ==================== */
+.search-form {
+    width: 100%;
+}
+
+.search-form .form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.search-form .form-group {
+    margin-bottom: 0;
 }

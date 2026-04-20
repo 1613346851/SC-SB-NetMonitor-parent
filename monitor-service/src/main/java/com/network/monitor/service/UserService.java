@@ -12,6 +12,10 @@ public interface UserService {
     
     List<UserEntity> listUsers(String username, Integer status);
     
+    List<UserEntity> listUsers(String username, Integer status, Integer offset, Integer limit);
+    
+    long countUsers(String username, Integer status);
+    
     boolean createUser(UserEntity user, List<Long> roleIds);
     
     boolean updateUser(UserEntity user, List<Long> roleIds);

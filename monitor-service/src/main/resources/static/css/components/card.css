@@ -5,15 +5,18 @@
 /* ==================== 基础卡片 ==================== */
 .card {
     background: var(--bg-white);
-    border-radius: var(--radius-base);
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
+    border: 1px solid rgba(226, 232, 240, 0.6);
     padding: var(--spacing-xl);
     margin-bottom: var(--spacing-xl);
-    transition: box-shadow var(--transition-base);
+    transition: all var(--transition-base);
 }
 
 .card:hover {
     box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+    border-color: rgba(226, 232, 240, 0.9);
 }
 
 .card-header {
@@ -26,9 +29,10 @@
 }
 
 .card-title {
-    font-size: var(--font-size-md);
-    font-weight: 600;
+    font-size: var(--font-size-lg);
+    font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.01em;
 }
 
 .card-body {
@@ -38,59 +42,74 @@
 /* ==================== 统计卡片 ==================== */
 .stat-card {
     background: var(--bg-white);
-    border-radius: var(--radius-base);
+    border-radius: var(--radius-lg);
     box-shadow: var(--shadow-card);
+    border: 1px solid rgba(226, 232, 240, 0.6);
     padding: var(--spacing-xl);
     margin-bottom: var(--spacing-xl);
+    transition: all var(--transition-base);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+    border-color: rgba(99, 102, 241, 0.2);
 }
 
 .stat-card-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: var(--spacing-lg);
 }
 
 .stat-card-title {
     font-size: var(--font-size-base);
+    font-weight: 500;
     color: var(--text-secondary);
 }
 
 .stat-card-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: var(--radius-lg);
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: var(--font-size-xxl);
+    font-size: 28px;
+    transition: all var(--transition-base);
+}
+
+.stat-card:hover .stat-card-icon {
+    transform: scale(1.1) rotate(5deg);
 }
 
 .stat-card-icon.primary {
-    background: rgba(24, 144, 255, 0.1);
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(99, 102, 241, 0.05));
     color: var(--primary-color);
 }
 
 .stat-card-icon.success {
-    background: rgba(82, 196, 26, 0.1);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(52, 211, 153, 0.05));
     color: var(--success-color);
 }
 
 .stat-card-icon.warning {
-    background: rgba(250, 173, 20, 0.1);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.05));
     color: var(--warning-color);
 }
 
 .stat-card-icon.danger {
-    background: rgba(245, 34, 45, 0.1);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(248, 113, 113, 0.05));
     color: var(--danger-color);
 }
 
 .stat-card-value {
     font-size: var(--font-size-xxxl);
-    font-weight: 600;
+    font-weight: 800;
     color: var(--text-primary);
     margin-bottom: var(--spacing-sm);
+    letter-spacing: -0.03em;
 }
 
 .stat-card-footer {

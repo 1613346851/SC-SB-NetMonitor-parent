@@ -45,10 +45,14 @@
 @import url('components/pagination.css');
 @import url('components/message.css');
 @import url('components/dropdown.css');
+@import url('components/tab.css');
 @import url('components/special.css');
 
 /* 页面样式 */
 @import url('pages/login.css');
+@import url('pages/vuln-scan.css');
+@import url('pages/sys-config.css');
+
 
 /* 工具类 */
 @import url('utilities/helpers.css');

@@ -1,222 +1,241 @@
 package com.network.gateway.util;
 
 import com.network.gateway.bo.DefenseResultBO;
+import com.network.gateway.defense.DefenseAction;
+import com.network.gateway.defense.DefenseLogType;
+import com.network.gateway.defense.RateLimitCounter;
 import com.network.gateway.dto.DefenseLogDTO;
 
-/**
- * 防御日志封装工具类
- * 将防御执行结果转换为标准的日志DTO
- *
- * @author network-monitor
- * @since 1.0.0
- */
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
 public class DefenseLogUtil {
 
-    /**
-     * 从防御结果构建防御日志DTO
-     *
-     * @param defenseResult 防御结果对象
-     * @return DefenseLogDTO
-     */
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     public static DefenseLogDTO buildDefenseLog(DefenseResultBO defenseResult) {
         if (defenseResult == null) {
             throw new IllegalArgumentException("防御结果不能为空");
         }
 
-        // 转换防御结果为日志DTO
-        DefenseLogDTO logDTO = defenseResult.toDefenseLogDTO();
-        
-        // 补充额外的日志信息
-        enhanceDefenseLog(logDTO, defenseResult);
-        
-        return logDTO;
+        return defenseResult.toDefenseLogDTO();
     }
 
-    /**
-     * 增强防御日志信息
-     *
-     * @param logDTO 日志DTO
-     * @param defenseResult 防御结果
-     */
-    private static void enhanceDefenseLog(DefenseLogDTO logDTO, DefenseResultBO defenseResult) {
-        // 添加执行时间信息
-        if (defenseResult.getExecuteStartTime() != null && defenseResult.getExecuteEndTime() != null) {
-            logDTO.setProcessingTime(defenseResult.getExecuteEndTime() - defenseResult.getExecuteStartTime());
-        }
-
-        // 构建详细的结果描述
-        String detailedDescription = buildDetailedDescription(defenseResult);
-        logDTO.setResultDescription(detailedDescription);
-
-        // 设置风险等级
-        if (defenseResult.getRiskLevel() != null) {
-            logDTO.setRiskLevel(convertRiskLevel(defenseResult.getRiskLevel()));
-        } else {
-            logDTO.setRiskLevel(DefenseLogDTO.RiskLevel.MEDIUM);
-        }
-    }
-
-    /**
-     * 构建详细的结果描述
-     *
-     * @param defenseResult 防御结果
-     * @return 详细描述
-     */
-    private static String buildDetailedDescription(DefenseResultBO defenseResult) {
-        StringBuilder sb = new StringBuilder();
-        
-        if (defenseResult.getSuccess()) {
-            sb.append("成功执行");
-            sb.append(getDefenseTypeDescription(defenseResult.getDefenseType()));
-            sb.append("，");
-            
-            if (defenseResult.getResponseStatusCode() != null) {
-                sb.append("返回状态码: ").append(defenseResult.getResponseStatusCode());
-            }
-            
-            if (defenseResult.getProcessingTime() != null) {
-                sb.append("，处理耗时: ").append(defenseResult.getProcessingTime()).append("ms");
-            }
-        } else {
-            sb.append("执行失败: ").append(defenseResult.getErrorMessage());
-        }
-
-        return sb.toString();
-    }
-
-    /**
-     * 获取防御类型描述
-     *
-     * @param defenseType 防御类型
-     * @return 描述文本
-     */
-    private static String getDefenseTypeDescription(DefenseResultBO.DefenseType defenseType) {
-        return switch (defenseType) {
-            case BLACKLIST -> "IP黑名单拦截";
-            case RATE_LIMIT -> "请求限流控制";
-            case BLOCK -> "恶意请求拦截";
-        };
-    }
-
-    /**
-     * 转换风险等级
-     *
-     * @param riskLevel 业务对象风险等级
-     * @return DTO风险等级
-     */
-    private static DefenseLogDTO.RiskLevel convertRiskLevel(DefenseResultBO.RiskLevel riskLevel) {
-        return switch (riskLevel) {
-            case LOW -> DefenseLogDTO.RiskLevel.LOW;
-            case MEDIUM -> DefenseLogDTO.RiskLevel.MEDIUM;
-            case HIGH -> DefenseLogDTO.RiskLevel.HIGH;
-            case CRITICAL -> DefenseLogDTO.RiskLevel.CRITICAL;
-        };
-    }
-
-    /**
-     * 构建IP黑名单防御日志
-     *
-     * @param targetIp 目标IP
-     * @param eventId 事件ID
-     * @param riskLevel 风险等级
-     * @param triggerReason 触发原因
-     * @return DefenseLogDTO
-     */
     public static DefenseLogDTO buildBlacklistLog(String targetIp, String eventId, 
                                                 DefenseResultBO.RiskLevel riskLevel, String triggerReason) {
-        DefenseLogDTO logDTO = new DefenseLogDTO(
-                DefenseLogDTO.DefenseType.BLACKLIST,
-                targetIp,
-                eventId,
-                triggerReason
-        );
-        
-        logDTO.setResponseInfo(403, "IP已被加入黑名单，拒绝访问");
-        logDTO.setRiskLevel(convertRiskLevel(riskLevel));
-        logDTO.setProcessingTime(System.currentTimeMillis());
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.ADD_BLACKLIST.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setDefenseAction(DefenseLogType.ADD_BLACKLIST.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("IP已被加入黑名单，拒绝访问");
+        logDTO.setOperator("SYSTEM");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        if (riskLevel != null) {
+            logDTO.setRiskLevel(riskLevel.name());
+        }
         
         return logDTO;
     }
 
-    /**
-     * 构建请求限流防御日志
-     *
-     * @param targetIp 目标IP
-     * @param eventId 事件ID
-     * @param riskLevel 风险等级
-     * @param triggerReason 触发原因
-     * @param currentRate 当前请求速率
-     * @param limitRate 限制速率
-     * @return DefenseLogDTO
-     */
+    public static DefenseLogDTO buildBlacklistLog(String targetIp, String eventId, 
+                                                String triggerReason, Integer confidence,
+                                                Long expireTimestamp) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.ADD_BLACKLIST.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setDefenseAction(DefenseLogType.ADD_BLACKLIST.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("IP已被加入黑名单，拒绝访问");
+        logDTO.setOperator("SYSTEM");
+        logDTO.setConfidence(confidence);
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        logDTO.setRiskLevel(calculateRiskLevelByConfidence(confidence).name());
+        
+        if (expireTimestamp != null) {
+            LocalDateTime expireDateTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(expireTimestamp), ZoneId.systemDefault());
+            logDTO.setExpireTime(expireDateTime.format(FORMATTER));
+        }
+        
+        return logDTO;
+    }
+
     public static DefenseLogDTO buildRateLimitLog(String targetIp, String eventId,
                                                 DefenseResultBO.RiskLevel riskLevel, String triggerReason,
                                                 int currentRate, int limitRate) {
-        DefenseLogDTO logDTO = new DefenseLogDTO(
-                DefenseLogDTO.DefenseType.RATE_LIMIT,
-                targetIp,
-                eventId,
-                triggerReason
-        );
-        
-        String resultDesc = String.format("请求频率过高(%d次/秒 > %d次/秒)，已实施限流措施", currentRate, limitRate);
-        logDTO.setResponseInfo(429, resultDesc);
-        logDTO.setRiskLevel(convertRiskLevel(riskLevel));
-        logDTO.setProcessingTime(System.currentTimeMillis());
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.RATE_LIMIT.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setDefenseAction(DefenseLogType.RATE_LIMIT.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult(String.format("请求频率过高(%d次/秒 > %d次/秒)，已实施限流措施", currentRate, limitRate));
+        logDTO.setOperator("SYSTEM");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        if (riskLevel != null) {
+            logDTO.setRiskLevel(riskLevel.name());
+        }
         
         return logDTO;
     }
 
-    /**
-     * 构建恶意请求拦截日志
-     *
-     * @param targetIp 目标IP
-     * @param eventId 事件ID
-     * @param riskLevel 风险等级
-     * @param triggerReason 触发原因
-     * @return DefenseLogDTO
-     */
+    public static DefenseLogDTO buildRateLimitAggregatedLog(String targetIp, String eventId,
+                                                            String triggerReason, Integer confidence,
+                                                            RateLimitCounter counter) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.RATE_LIMIT.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setDefenseAction(DefenseLogType.RATE_LIMIT.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setConfidence(confidence);
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        logDTO.setRiskLevel(calculateRiskLevelByConfidence(confidence).name());
+        
+        if (counter != null) {
+            logDTO.setRateLimitCount(counter.getCount());
+            logDTO.setTimeWindow(counter.getTimeWindow());
+            logDTO.setExecuteResult(String.format("时间段内累计限流 %d 次", counter.getCount()));
+        } else {
+            logDTO.setExecuteResult("已实施限流措施");
+        }
+        
+        logDTO.setOperator("SYSTEM");
+        
+        return logDTO;
+    }
+
     public static DefenseLogDTO buildBlockLog(String targetIp, String eventId,
                                             DefenseResultBO.RiskLevel riskLevel, String triggerReason) {
-        DefenseLogDTO logDTO = new DefenseLogDTO(
-                DefenseLogDTO.DefenseType.BLOCK,
-                targetIp,
-                eventId,
-                triggerReason
-        );
-        
-        logDTO.setResponseInfo(400, "检测到恶意请求，已拦截");
-        logDTO.setRiskLevel(convertRiskLevel(riskLevel));
-        logDTO.setProcessingTime(System.currentTimeMillis());
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.BLOCK_REQUEST.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setDefenseAction(DefenseLogType.BLOCK_REQUEST.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("检测到恶意请求，已拦截");
+        logDTO.setOperator("SYSTEM");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        if (riskLevel != null) {
+            logDTO.setRiskLevel(riskLevel.name());
+        }
         
         return logDTO;
     }
 
-    /**
-     * 格式化防御日志为可读字符串
-     *
-     * @param logDTO 防御日志DTO
-     * @return 格式化字符串
-     */
-    public static String formatDefenseLog(DefenseLogDTO logDTO) {
-        return String.format(
-                "防御日志 - 类型:%s IP:%s 事件:%s 风险:%s 状态:%s 耗时:%dms 描述:%s",
-                logDTO.getDefenseType(),
-                logDTO.getTargetIp(),
-                logDTO.getEventId(),
-                logDTO.getRiskLevel(),
-                logDTO.getSuccess() ? "成功" : "失败",
-                logDTO.getProcessingTime(),
-                logDTO.getResultDescription()
-        );
+    public static DefenseLogDTO buildAlertLog(String targetIp, String eventId,
+                                            DefenseResultBO.RiskLevel riskLevel, String triggerReason) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.ALERT_ONLY.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setDefenseAction(DefenseLogType.ALERT_ONLY.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("检测到漏洞访问，仅告警不拦截");
+        logDTO.setOperator("SYSTEM");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        if (riskLevel != null) {
+            logDTO.setRiskLevel(riskLevel.name());
+        }
+        
+        return logDTO;
     }
 
-    /**
-     * 构建防御执行摘要
-     *
-     * @param defenseResult 防御结果
-     * @return 执行摘要
-     */
+    public static DefenseLogDTO buildBlockLog(String targetIp, String eventId,
+                                            String triggerReason, Integer confidence,
+                                            String requestUri, String httpMethod) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.BLOCK_REQUEST.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setDefenseAction(DefenseLogType.BLOCK_REQUEST.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("检测到恶意请求，已拦截");
+        logDTO.setOperator("SYSTEM");
+        logDTO.setConfidence(confidence);
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        logDTO.setRequestUri(requestUri);
+        logDTO.setHttpMethod(httpMethod);
+        logDTO.setRiskLevel(calculateRiskLevelByConfidence(confidence).name());
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildCompositeLog(String targetIp, String eventId, Long attackId,
+                                                  String triggerReason, Integer confidence,
+                                                  List<DefenseAction> actions) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setAttackId(attackId);
+        logDTO.setDefenseType(DefenseLogType.COMPOSITE.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(triggerReason);
+        logDTO.setExecuteStatus(1);
+        logDTO.setConfidence(confidence);
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        logDTO.setOperator("SYSTEM");
+        logDTO.setRiskLevel(calculateRiskLevelByConfidence(confidence).name());
+        
+        logDTO.setDefenseAction(buildDefenseActionSummary(actions));
+        logDTO.setExecuteResult(buildCompositeDescription(actions));
+        
+        for (DefenseAction action : actions) {
+            if (DefenseLogType.ADD_BLACKLIST.getCode().equals(action.getType()) 
+                && action.getExpireTime() != null) {
+                logDTO.setExpireTime(action.getExpireTime());
+                break;
+            }
+            if (DefenseLogType.RATE_LIMIT.getCode().equals(action.getType())) {
+                logDTO.setRateLimitCount(action.getCount());
+                logDTO.setTimeWindow(action.getTimeWindow());
+            }
+        }
+        
+        return logDTO;
+    }
+
+    private static String buildCompositeDescription(List<DefenseAction> actions) {
+        StringBuilder sb = new StringBuilder("组合防御措施: ");
+        for (int i = 0; i < actions.size(); i++) {
+            if (i > 0) {
+                sb.append("; ");
+            }
+            DefenseAction action = actions.get(i);
+            sb.append(action.getDescription());
+            if (action.getCount() > 1) {
+                sb.append("(").append(action.getCount()).append("次)");
+            }
+        }
+        return sb.toString();
+    }
+
+    private static String buildDefenseActionSummary(List<DefenseAction> actions) {
+        StringBuilder sb = new StringBuilder();
+        for (DefenseAction action : actions) {
+            if (sb.length() > 0) {
+                sb.append(",");
+            }
+            sb.append(action.getType());
+            if (action.getCount() > 1) {
+                sb.append("(").append(action.getCount()).append(")");
+            }
+        }
+        return sb.toString();
+    }
+
     public static String buildExecutionSummary(DefenseResultBO defenseResult) {
         StringBuilder sb = new StringBuilder();
         sb.append("防御执行摘要: ");
@@ -236,35 +255,162 @@ public class DefenseLogUtil {
         return sb.toString();
     }
 
-    /**
-     * 验证防御日志的有效性
-     *
-     * @param logDTO 防御日志DTO
-     * @return true表示有效
-     */
     public static boolean isValidDefenseLog(DefenseLogDTO logDTO) {
         if (logDTO == null) {
             return false;
         }
 
-        return logDTO.getTargetIp() != null && !logDTO.getTargetIp().isEmpty() &&
-               logDTO.getEventId() != null && !logDTO.getEventId().isEmpty() &&
-               logDTO.getDefenseType() != null &&
-               logDTO.getExecuteTimestamp() != null;
+        return logDTO.getDefenseTarget() != null && !logDTO.getDefenseTarget().isEmpty() &&
+               logDTO.getDefenseType() != null && !logDTO.getDefenseType().isEmpty();
     }
 
-    /**
-     * 获取风险等级的中文描述
-     *
-     * @param riskLevel 风险等级
-     * @return 中文描述
-     */
-    public static String getRiskLevelDescription(DefenseLogDTO.RiskLevel riskLevel) {
-        return switch (riskLevel) {
-            case LOW -> "低风险";
-            case MEDIUM -> "中风险";
-            case HIGH -> "高风险";
-            case CRITICAL -> "严重风险";
-        };
+    public static String formatTimestamp(Long timestamp) {
+        if (timestamp == null) {
+            return null;
+        }
+        LocalDateTime dateTime = LocalDateTime.ofInstant(
+            Instant.ofEpochMilli(timestamp), ZoneId.systemDefault());
+        return dateTime.format(FORMATTER);
+    }
+
+    public static DefenseLogDTO buildManualBanLog(String targetIp, String eventId,
+                                                  String operator, String reason,
+                                                  Long expireTimestamp) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.MANUAL_BAN.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.MANUAL_BAN.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("管理员手动封禁IP");
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        if (expireTimestamp != null) {
+            LocalDateTime expireDateTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(expireTimestamp), ZoneId.systemDefault());
+            logDTO.setExpireTime(expireDateTime.format(FORMATTER));
+        }
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildManualUnbanLog(String targetIp, String eventId,
+                                                    String operator, String reason) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.MANUAL_UNBAN.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.MANUAL_UNBAN.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("管理员手动解封IP");
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildTempBanLog(String targetIp, String eventId,
+                                                String reason, Integer confidence,
+                                                Long expireTimestamp) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.TEMP_BAN.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.TEMP_BAN.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("临时封禁IP，到期自动解封");
+        logDTO.setOperator("SYSTEM");
+        logDTO.setConfidence(confidence);
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        if (expireTimestamp != null) {
+            LocalDateTime expireDateTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(expireTimestamp), ZoneId.systemDefault());
+            logDTO.setExpireTime(expireDateTime.format(FORMATTER));
+        }
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildStateResetLog(String targetIp, String eventId,
+                                                   String operator, String reason,
+                                                   int fromState, int toState) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.STATE_RESET.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.STATE_RESET.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult(String.format("状态重置: %s -> %s", 
+            getStateNameZh(fromState), getStateNameZh(toState)));
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        logDTO.setFromState(fromState);
+        logDTO.setToState(toState);
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildWhitelistAddLog(String targetIp, String eventId,
+                                                     String operator, String reason) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.WHITELIST_ADD.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.WHITELIST_ADD.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("IP已加入白名单");
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        return logDTO;
+    }
+
+    public static DefenseLogDTO buildWhitelistRemoveLog(String targetIp, String eventId,
+                                                        String operator, String reason) {
+        DefenseLogDTO logDTO = new DefenseLogDTO();
+        logDTO.setEventId(eventId);
+        logDTO.setDefenseType(DefenseLogType.WHITELIST_REMOVE.getCode());
+        logDTO.setDefenseTarget(targetIp);
+        logDTO.setDefenseReason(reason);
+        logDTO.setDefenseAction(DefenseLogType.WHITELIST_REMOVE.getCode());
+        logDTO.setExecuteStatus(1);
+        logDTO.setExecuteResult("IP已从白名单移除");
+        logDTO.setOperator(operator != null ? operator : "ADMIN");
+        logDTO.setExecuteTime(System.currentTimeMillis());
+        
+        return logDTO;
+    }
+
+    private static String getStateNameZh(int state) {
+        switch (state) {
+            case 0: return "正常";
+            case 1: return "可疑";
+            case 2: return "攻击中";
+            case 3: return "已防御";
+            case 4: return "冷却期";
+            default: return "未知";
+        }
+    }
+
+    private static DefenseResultBO.RiskLevel calculateRiskLevelByConfidence(Integer confidence) {
+        if (confidence == null) {
+            return DefenseResultBO.RiskLevel.MEDIUM;
+        }
+        if (confidence >= 90) {
+            return DefenseResultBO.RiskLevel.CRITICAL;
+        } else if (confidence >= 70) {
+            return DefenseResultBO.RiskLevel.HIGH;
+        } else if (confidence >= 50) {
+            return DefenseResultBO.RiskLevel.MEDIUM;
+        } else {
+            return DefenseResultBO.RiskLevel.LOW;
+        }
     }
 }

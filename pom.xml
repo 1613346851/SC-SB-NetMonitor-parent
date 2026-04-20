@@ -98,6 +98,13 @@
                 <artifactId>pagehelper-spring-boot-starter</artifactId>
                 <version>1.4.7</version>
             </dependency>
+            
+            <!-- Javassist 字节码操作库（解决旧版本 POM 警告） -->
+            <dependency>
+                <groupId>org.javassist</groupId>
+                <artifactId>javassist</artifactId>
+                <version>3.29.2-GA</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

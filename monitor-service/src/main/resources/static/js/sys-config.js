@@ -1,83 +1,548 @@
-/**
- * 系统配置管理页面
- */
-
 let configList = [];
+let filteredConfigList = [];
+let currentFilterMode = 'ALL';
+let sortField = 'id';
+let sortOrder = 'desc';
+
+const GATEWAY_CONFIG_PREFIX = 'gateway.';
+const DDOS_CONFIG_PREFIX = 'ddos.';
+const DEFENSE_CONFIG_PREFIX = 'defense.';
+const TRAFFIC_CONFIG_PREFIX = 'traffic.push.';
+
+const GATEWAY_SYNC_CONFIG_KEYS = [
+    'gateway.defense.blacklist.enabled',
+    'gateway.defense.rate-limit.enabled',
+    'gateway.defense.malicious-request.enabled',
+    'gateway.defense.rate-limit.default-threshold',
+    'gateway.defense.rate-limit.window-size',
+    'gateway.defense.blacklist.default-expire-seconds',
+    'gateway.defense.malicious.user-agents',
+    'gateway.defense.malicious.uri-patterns',
+    'gateway.cache.traffic-expire-ms',
+    'gateway.cache.blacklist-expire-ms',
+    'gateway.cache.cleanup-interval-ms',
+    'gateway.attack-state.cooldown-duration-ms',
+    'gateway.attack-state.state-expire-ms',
+    'gateway.request.max-body-size',
+    'gateway.request.abnormal-response-threshold-ms',
+    'gateway.defense.rate-limit.peak-threshold',
+    'gateway.defense.ban.duration-base-ms',
+    'gateway.defense.ban.duration-multiplier',
+    'ddos.threshold',
+    'ddos.detection.window-ms',
+    'ddos.rate-limit-trigger-count',
+    'ddos.rate-limit-trigger-window-seconds',
+    'ddos.slow-attack.threshold-rps',
+    'ddos.global-attack.related-ip-threshold',
+    'defense.decision.rate-limit-threshold',
+    'state.normal-to-suspicious.threshold-rps',
+    'state.normal-to-suspicious.window-ms',
+    'state.normal-to-suspicious.slide-step-ms',
+    'state.suspicious-to-attacking.duration-ms',
+    'state.suspicious-to-attacking.min-requests',
+    'state.suspicious-to-attacking.uri-diversity-threshold',
+    'state.suspicious-to-normal.quiet-duration-ms',
+    'state.suspicious.timeout-ms',
+    'state.defended-to-cooldown.quiet-duration-ms',
+    'state.cooldown.base-duration-ms',
+    'state.cooldown.max-duration-ms',
+    'state.cooldown.attack-intensity-multiplier',
+    'state.cooldown.timeout-ms',
+    'state.cooldown-to-attacking.threshold-rps',
+    'state.slow-attack.duration-ms',
+    'state.slow-attack.threshold-rps',
+    'state.global-attack.related-ip-threshold',
+    'state.global-attack.network-mask',
+    'state.manual-reset.log-required',
+    'state.manual-reset.operator-required',
+    'cooldown.dynamic.enabled',
+    'cooldown.base-duration-ms',
+    'cooldown.max-duration-ms',
+    'cooldown.intensity-multiplier',
+    'cooldown.history-multiplier',
+    'cooldown.history-max-multiplier',
+    'confidence.base-score',
+    'confidence.frequency.max-score',
+    'confidence.frequency.per-exceed-score',
+    'confidence.diversity.max-score',
+    'confidence.diversity.per-uri-score',
+    'confidence.persistence.max-score',
+    'confidence.persistence.per-10s-score',
+    'confidence.pattern.max-score',
+    'confidence.pattern.partial-score',
+    'confidence.normal-behavior.max-deduction',
+    'confidence.normal-behavior.no-history-deduction',
+    'confidence.normal-behavior.normal-requests-deduction',
+    'confidence.smooth.strategy',
+    'confidence.smooth.alpha',
+    'confidence.history.max-score',
+    'confidence.history.no-attack-deduction',
+    'confidence.history.has-attack-score',
+    'confidence.history.normal-rate-deduction',
+    'confidence.slow-attack.max-score',
+    'confidence.slow-attack.per-minute-score',
+    'confidence.global-attack.max-score',
+    'confidence.global-attack.per-ip-score',
+    'confidence.no-decrease.enabled',
+    'confidence.min-value',
+    'confidence.blocked.rate-limit-score',
+    'confidence.blocked.blacklist-score',
+    'confidence.blocked.max-daily-score',
+    'traffic.push.normal.strategy',
+    'traffic.push.suspicious.strategy',
+    'traffic.push.attacking.strategy',
+    'traffic.push.defended.strategy',
+    'traffic.push.cooldown.strategy',
+    'traffic.push.batch-interval-ms',
+    'traffic.push.sampling-rate',
+    'traffic.push.enabled',
+    'traffic.push.interval-ms',
+    'traffic.push.interval-low-ms',
+    'traffic.push.retry.max-count',
+    'traffic.push.retry.delay-ms',
+    'traffic.push.retry.max-queue-size',
+    'traffic.push.retry-interval-ms',
+    'traffic.push.memory.max-usage-percent',
+    'traffic.push.memory.force-flush-threshold',
+    'traffic.push.degradation.enabled',
+    'traffic.push.degradation.local-cache-size',
+    'traffic.push.degradation.health-check-interval-ms',
+    'traffic.push.fallback-enabled',
+    'traffic.sample.max-per-uri',
+    'traffic.sample.max-total',
+    'traffic.sample.abnormal-priority',
+    'traffic.sample.desensitize-enabled',
+    'traffic.aggregate.uri-pattern-depth',
+    'traffic.aggregate.max-uri-groups',
+    'traffic.aggregate.batch-threshold',
+    'traffic.queue.single-ip-capacity',
+    'traffic.queue.global-capacity',
+    'traffic.queue.overflow-strategy',
+    'traffic.business-peak.enabled',
+    'traffic.business-peak.threshold-multiplier',
+    'traffic.business-peak.time-ranges'
+];
+
+const GATEWAY_DEFENSE_KEYS = [
+    'gateway.defense.blacklist.enabled',
+    'gateway.defense.rate-limit.enabled',
+    'gateway.defense.malicious-request.enabled'
+];
+const DDOS_CONFIG_KEYS = [
+    'ddos.threshold',
+    'ddos.detection.window-ms',
+    'ddos.rate-limit-trigger-count',
+    'ddos.rate-limit-trigger-window-seconds'
+];
+const DEFENSE_STRATEGY_KEYS = [
+    'defense.blacklist.default-duration-seconds',
+    'defense.blacklist.high-risk-duration-seconds',
+    'defense.blacklist.critical-risk-duration-seconds',
+    'defense.blacklist.auto-unban.enabled'
+];
+const TRAFFIC_PUSH_KEYS = [
+    'traffic.push.normal.strategy',
+    'traffic.push.suspicious.strategy',
+    'traffic.push.attacking.strategy',
+    'traffic.push.defended.strategy',
+    'traffic.push.sampling-rate'
+];
 
 document.addEventListener('DOMContentLoaded', function() {
+    bindConfigModal();
+    initTableSorting();
     loadConfigList();
+    checkGatewayStatus();
 });
+
+function bindConfigModal() {
+    const modal = document.getElementById('configModal');
+    modal?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeConfigModal();
+        }
+    });
+    
+    const gatewayModal = document.getElementById('gatewayDefenseModal');
+    gatewayModal?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeGatewayDefenseModal();
+        }
+    });
+    
+    const ddosModal = document.getElementById('ddosConfigModal');
+    ddosModal?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeDdosConfigModal();
+        }
+    });
+    
+    const defenseModal = document.getElementById('defenseStrategyModal');
+    defenseModal?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeDefenseStrategyModal();
+        }
+    });
+    
+    const trafficModal = document.getElementById('trafficPushModal');
+    trafficModal?.addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeTrafficPushModal();
+        }
+    });
+}
+
+function initTableSorting() {
+    const table = document.querySelector('.data-table');
+    if (!table) return;
+    
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        header.classList.add('sortable');
+        if (!header.querySelector('.sort-icon')) {
+            header.innerHTML += `<span class="sort-icon"><span class="up">▲</span><span class="down">▼</span></span>`;
+        }
+        
+        header.addEventListener('click', (e) => {
+            if (e.target.classList.contains('th-resizer')) return;
+            const field = header.dataset.sort;
+            if (sortField === field) {
+                sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortField = field;
+                sortOrder = 'asc';
+            }
+            updateSortIcons(table);
+            applyFilters();
+        });
+    });
+    
+    initColumnResizer(table);
+    updateSortIcons(table);
+}
+
+function initColumnResizer(table) {
+    const cols = table.querySelectorAll('th');
+    cols.forEach(th => {
+        if (th.querySelector('.th-resizer')) return;
+        const resizer = document.createElement('div');
+        resizer.classList.add('th-resizer');
+        th.appendChild(resizer);
+        
+        let startX, startWidth;
+        
+        const onMouseMove = (e) => {
+            const newWidth = startWidth + (e.pageX - startX);
+            if (newWidth >= 60) {
+                th.style.width = `${newWidth}px`;
+                th.style.minWidth = `${newWidth}px`;
+            }
+        };
+        
+        const onMouseUp = () => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            resizer.classList.remove('th-resizing');
+        };
+        
+        resizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startX = e.pageX;
+            startWidth = th.offsetWidth;
+            resizer.classList.add('th-resizing');
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
+}
+
+function updateSortIcons(table) {
+    const headers = table.querySelectorAll('th[data-sort]');
+    headers.forEach(header => {
+        const icon = header.querySelector('.sort-icon');
+        if (icon) {
+            icon.className = 'sort-icon';
+            if (header.dataset.sort === sortField) {
+                icon.classList.add(sortOrder);
+            }
+        }
+    });
+}
 
 async function loadConfigList() {
     try {
-        const configKey = document.getElementById('configKey').value.trim();
-        const url = configKey ? `/config/list?key=${encodeURIComponent(configKey)}` : '/config/list';
-        
-        configList = await http.get(url);
-        renderConfigTable(configList);
+        configList = await http.get('/config/list');
+        applyFilters();
+        updateGatewayDefenseDisplay();
     } catch (error) {
         console.error('加载配置列表失败:', error);
+        configList = [];
+        filteredConfigList = [];
         renderConfigTable([]);
+        renderOverview([]);
+        message.error('加载配置列表失败：' + (error.message || '未知错误'));
     }
+}
+
+function applyFilters() {
+    const keyword = document.getElementById('configKey')?.value.trim().toLowerCase() || '';
+    const category = document.getElementById('configCategory')?.value || 'ALL';
+    let list = [...configList];
+
+    if (currentFilterMode === 'GATEWAY_ONLY') {
+        list = list.filter(item => GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
+    } else if (currentFilterMode === 'DDOS_ONLY') {
+        list = list.filter(item => item.configKey && item.configKey.startsWith(DDOS_CONFIG_PREFIX));
+    } else if (currentFilterMode === 'DEFENSE_ONLY') {
+        list = list.filter(item => item.configKey && item.configKey.startsWith(DEFENSE_CONFIG_PREFIX));
+    } else if (currentFilterMode === 'TRAFFIC_ONLY') {
+        list = list.filter(item => item.configKey && item.configKey.startsWith(TRAFFIC_CONFIG_PREFIX));
+    }
+
+    if (category === 'GATEWAY') {
+        list = list.filter(item => GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
+    } else if (category === 'MONITOR') {
+        list = list.filter(item => !GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
+    }
+
+    if (keyword) {
+        list = list.filter(item => {
+            const key = (item.configKey || '').toLowerCase();
+            const desc = (item.description || '').toLowerCase();
+            return key.includes(keyword) || desc.includes(keyword);
+        });
+    }
+
+    list = sortConfigList(list);
+
+    filteredConfigList = list;
+
+    renderOverview(filteredConfigList);
+    renderConfigTable(filteredConfigList);
+}
+
+function sortConfigList(list) {
+    return list.sort((a, b) => {
+        let valueA = a[sortField];
+        let valueB = b[sortField];
+
+        if (valueA === null || valueA === undefined) valueA = '';
+        if (valueB === null || valueB === undefined) valueB = '';
+
+        if (sortField === 'createTime' || sortField === 'updateTime') {
+            valueA = valueA ? new Date(valueA).getTime() : 0;
+            valueB = valueB ? new Date(valueB).getTime() : 0;
+        } else if (typeof valueA === 'string') {
+            valueA = valueA.toLowerCase();
+            valueB = valueB.toLowerCase();
+        }
+
+        let result = 0;
+        if (valueA < valueB) result = -1;
+        else if (valueA > valueB) result = 1;
+
+        return sortOrder === 'asc' ? result : -result;
+    });
+}
+
+function renderOverview(list) {
+    const latestConfig = [...configList].sort((a, b) => new Date(b.updateTime || 0) - new Date(a.updateTime || 0))[0];
+    const gatewayConfigs = configList.filter(item => GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey));
+
+    setText('configTotalCount', configList.length);
+    setText('configGatewayCount', gatewayConfigs.length);
+    setText('configFilteredCount', list.length);
+    setText('configLastUpdated', latestConfig ? formatTime(latestConfig.updateTime) : '--');
+    
+    renderDdosConfigPanel();
+    renderDefenseStrategyPanel();
+    renderTrafficPushPanel();
+}
+
+function renderDdosConfigPanel() {
+    const thresholdConfig = configList.find(item => item.configKey === 'ddos.threshold');
+    const windowConfig = configList.find(item => item.configKey === 'ddos.detection.window-ms');
+    const triggerConfig = configList.find(item => item.configKey === 'ddos.rate-limit-trigger-count');
+    const triggerWindowConfig = configList.find(item => item.configKey === 'ddos.rate-limit-trigger-window-seconds');
+
+    setText('ddosThresholdValue', thresholdConfig?.configValue || '--');
+    setText('ddosWindowValue', windowConfig?.configValue || '--');
+    setText('ddosRateLimitTriggerValue', triggerConfig?.configValue || '--');
+    setText('ddosRateLimitWindowValue', triggerWindowConfig?.configValue || '--');
+}
+
+function renderDefenseStrategyPanel() {
+    const defaultDuration = configList.find(item => item.configKey === 'defense.blacklist.default-duration-seconds');
+    const highRiskDuration = configList.find(item => item.configKey === 'defense.blacklist.high-risk-duration-seconds');
+    const criticalDuration = configList.find(item => item.configKey === 'defense.blacklist.critical-risk-duration-seconds');
+    const autoUnban = configList.find(item => item.configKey === 'defense.blacklist.auto-unban.enabled');
+
+    setText('defenseDefaultDurationValue', defaultDuration?.configValue || '--');
+    setText('defenseHighRiskDurationValue', highRiskDuration?.configValue || '--');
+    setText('defenseCriticalDurationValue', criticalDuration?.configValue || '--');
+    setText('defenseAutoUnbanValue', autoUnban?.configValue === 'true' ? '已启用' : (autoUnban?.configValue === 'false' ? '已禁用' : '--'));
+}
+
+function renderTrafficPushPanel() {
+    const normalStrategy = configList.find(item => item.configKey === 'traffic.push.normal.strategy');
+    const suspiciousStrategy = configList.find(item => item.configKey === 'traffic.push.suspicious.strategy');
+    const attackingStrategy = configList.find(item => item.configKey === 'traffic.push.attacking.strategy');
+    const samplingRate = configList.find(item => item.configKey === 'traffic.push.sampling-rate');
+
+    setText('trafficNormalStrategyValue', formatStrategyName(normalStrategy?.configValue));
+    setText('trafficSuspiciousStrategyValue', formatStrategyName(suspiciousStrategy?.configValue));
+    setText('trafficAttackingStrategyValue', formatStrategyName(attackingStrategy?.configValue));
+    setText('trafficSamplingRateValue', samplingRate?.configValue || '--');
+}
+
+function formatStrategyName(value) {
+    if (!value) return '--';
+    const strategyMap = {
+        'realtime': '实时推送',
+        'sampling': '采样推送',
+        'batch': '批量推送',
+        'skip': '跳过推送'
+    };
+    return strategyMap[value] || value;
+}
+
+function updateGatewayDefenseDisplay() {
+    const blacklistConfig = configList.find(item => item.configKey === 'gateway.defense.blacklist.enabled');
+    const rateLimitConfig = configList.find(item => item.configKey === 'gateway.defense.rate-limit.enabled');
+    const maliciousConfig = configList.find(item => item.configKey === 'gateway.defense.malicious-request.enabled');
+
+    setHtml('gatewayBlacklistEnabled', formatEnabledStatusHtml(blacklistConfig?.configValue));
+    setHtml('gatewayRateLimitEnabled', formatEnabledStatusHtml(rateLimitConfig?.configValue));
+    setHtml('gatewayMaliciousEnabled', formatEnabledStatusHtml(maliciousConfig?.configValue));
+}
+
+function formatEnabledStatus(value) {
+    if (value === 'true') return '已开启';
+    if (value === 'false') return '已关闭';
+    return '--';
+}
+
+function formatEnabledStatusHtml(value) {
+    if (value === 'true') return '<span class="defense-switch-value enabled">已开启</span>';
+    if (value === 'false') return '<span class="defense-switch-value disabled">已关闭</span>';
+    return '<span class="defense-switch-value">--</span>';
+}
+
+function setHtml(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = value;
 }
 
 function renderConfigTable(list) {
     const tbody = document.getElementById('configTableBody');
-    
+    if (!tbody) return;
+
     if (!list || list.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7" class="text-center">暂无数据</td>
-            </tr>
-        `;
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">暂无数据</td></tr>';
         return;
     }
+
+    const cell = TableUtils.cell;
+    cell._currentTableBodyId = 'configTableBody';
     
-    tbody.innerHTML = list.map(config => `
-        <tr>
-            <td>${config.id}</td>
-            <td><code>${config.configKey}</code></td>
-            <td>${config.configValue}</td>
-            <td>${config.description || '-'}</td>
-            <td>${dateFormat.format(config.createTime)}</td>
-            <td>${dateFormat.format(config.updateTime)}</td>
-            <td>
-                <button class="btn btn-sm btn-primary" onclick="showEditConfigModal(${config.id})">编辑</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteConfig(${config.id})">删除</button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = list.map(config => {
+        const isGatewayConfig = GATEWAY_SYNC_CONFIG_KEYS.includes(config.configKey);
+        const badgeHtml = isGatewayConfig ? '<span class="gateway-badge">网关</span>' : '';
+        const actionButtons = getActionButtons(config);
+        const buttonCount = actionButtons.filter(btn => btn.visible !== false).length;
+        const actionWidth = buttonCount >= 3 ? '220px' : '160px';
+        
+        return `
+            <tr>
+                <td>${config.id}</td>
+                <td>
+                    <div class="config-table-key">
+                        <code>${cell.escapeHtml(config.configKey)}</code>
+                        ${badgeHtml}
+                    </div>
+                </td>
+                ${cell.renderCell(formatConfigValue(config), { maxLength: 40, showTooltip: true })}
+                ${cell.renderCell(config.description, { maxLength: 40 })}
+                <td>${formatTime(config.createTime)}</td>
+                <td>${formatTime(config.updateTime)}</td>
+                ${cell.renderActionCell(actionButtons, { width: actionWidth })}
+            </tr>
+        `;
+    }).join('');
+    
+    cell._currentTableBodyId = null;
+    TableUtils.bindTooltip(tbody);
+}
+
+function getActionButtons(config) {
+    const buttons = [
+        { text: '编辑', type: 'primary', onClick: `showEditConfigModal(${config.id})` },
+        { text: '删除', type: 'danger', onClick: `deleteConfig(${config.id})` }
+    ];
+    
+    if (GATEWAY_SYNC_CONFIG_KEYS.includes(config.configKey)) {
+        buttons.splice(1, 0, { text: '推送', type: 'warning', onClick: `pushSingleConfig(${config.id})` });
+    }
+    
+    return buttons;
 }
 
 function searchConfig() {
-    loadConfigList();
+    currentFilterMode = 'ALL';
+    applyFilters();
 }
 
 function resetSearch() {
+    currentFilterMode = 'ALL';
     document.getElementById('configKey').value = '';
-    loadConfigList();
+    document.getElementById('configCategory').value = 'ALL';
+    applyFilters();
 }
 
-function showAddConfigModal() {
+function filterByCategory() {
+    currentFilterMode = 'ALL';
+    applyFilters();
+}
+
+function filterAiConfigs() {
+    currentFilterMode = 'AI_ONLY';
+    document.getElementById('configCategory').value = 'AI';
+    applyFilters();
+    scrollToConfigList();
+}
+
+function filterGatewayConfigs() {
+    currentFilterMode = 'GATEWAY_ONLY';
+    document.getElementById('configCategory').value = 'GATEWAY';
+    applyFilters();
+    scrollToConfigList();
+}
+
+function showAddConfigModal(preset = {}) {
     document.getElementById('modalTitle').textContent = '添加配置';
     document.getElementById('configForm').reset();
     document.getElementById('configId').value = '';
+    document.getElementById('configKeyInput').value = preset.configKey || '';
+    document.getElementById('configValueInput').value = preset.configValue || '';
+    document.getElementById('descriptionInput').value = preset.description || '';
+    document.getElementById('configKeyInput').readOnly = false;
     document.getElementById('configModal').style.display = 'flex';
 }
 
 function showEditConfigModal(id) {
-    const config = configList.find(c => c.id === id);
+    const config = configList.find(item => item.id === id);
     if (!config) {
         message.error('配置不存在');
         return;
     }
-    
+
     document.getElementById('modalTitle').textContent = '编辑配置';
     document.getElementById('configId').value = config.id;
     document.getElementById('configKeyInput').value = config.configKey;
-    document.getElementById('configValueInput').value = config.configValue;
+    document.getElementById('configValueInput').value = config.configValue || '';
     document.getElementById('descriptionInput').value = config.description || '';
-    
+    document.getElementById('configKeyInput').readOnly = false;
     document.getElementById('configModal').style.display = 'flex';
 }
 
@@ -90,51 +555,44 @@ async function saveConfig() {
     const configKey = document.getElementById('configKeyInput').value.trim();
     const configValue = document.getElementById('configValueInput').value.trim();
     const description = document.getElementById('descriptionInput').value.trim();
-    
+
     if (!configKey) {
         message.error('配置键不能为空');
         return;
     }
-    
     if (!configValue) {
         message.error('配置值不能为空');
         return;
     }
-    
+
+    const data = { configKey, configValue, description };
     try {
-        const data = {
-            configKey,
-            configValue,
-            description
-        };
-        
         if (configId) {
-            data.id = parseInt(configId);
+            data.id = parseInt(configId, 10);
             await http.post('/config/update', data);
             message.success('更新配置成功');
         } else {
             await http.post('/config/add', data);
             message.success('添加配置成功');
         }
-        
         closeConfigModal();
-        loadConfigList();
+        await loadConfigList();
     } catch (error) {
         console.error('保存配置失败:', error);
+        message.error('保存配置失败：' + (error.message || '未知错误'));
     }
 }
 
 async function deleteConfig(id) {
-    if (!confirm('确定要删除该配置吗？')) {
-        return;
-    }
-    
+    if (!confirm('确定要删除该配置吗？')) return;
+
     try {
         await http.delete(`/config/${id}`);
         message.success('删除配置成功');
-        loadConfigList();
+        await loadConfigList();
     } catch (error) {
         console.error('删除配置失败:', error);
+        message.error('删除配置失败：' + (error.message || '未知错误'));
     }
 }
 
@@ -142,8 +600,387 @@ async function refreshConfig() {
     try {
         await http.post('/config/refresh');
         message.success('配置缓存刷新成功');
-        loadConfigList();
+        await loadConfigList();
     } catch (error) {
         console.error('刷新配置缓存失败:', error);
+        message.error('刷新配置缓存失败：' + (error.message || '未知错误'));
+    }
+}
+
+async function checkGatewayStatus() {
+    const statusEl = document.getElementById('gatewaySyncStatus');
+    const countEl = document.getElementById('gatewayConfigCount');
+    const lastSyncEl = document.getElementById('gatewayLastSync');
+    const resultEl = document.getElementById('gatewaySyncResult');
+    
+    statusEl.textContent = '检测中...';
+    statusEl.className = 'gateway-badge';
+    
+    try {
+        const syncStatus = await http.get('/gateway/config/sync/status');
+        const healthResponse = await http.get('/gateway/config/health');
+        
+        if (healthResponse.success) {
+            statusEl.textContent = syncStatus.gatewayConnected ? '在线' : '离线';
+            statusEl.classList.add(syncStatus.gatewayConnected ? 'online' : 'offline');
+            countEl.textContent = syncStatus.totalConfigCount || healthResponse.configCount || '--';
+            
+            if (syncStatus.lastSyncTime) {
+                lastSyncEl.textContent = formatTime(new Date(syncStatus.lastSyncTime).getTime());
+            } else {
+                lastSyncEl.textContent = '--';
+            }
+            
+            let resultText = '';
+            const status = syncStatus.syncStatus || 'NORMAL';
+            const successCount = syncStatus.syncSuccessCount || 0;
+            const failureCount = syncStatus.syncFailureCount || 0;
+            
+            if (status === 'SUCCESS' || status === 'NORMAL') {
+                if (failureCount > 0) {
+                    resultText = `部分成功 (成功:${successCount}/失败:${failureCount})`;
+                } else if (successCount > 0) {
+                    resultText = '同步成功';
+                } else {
+                    resultText = '正常';
+                }
+            } else if (status === 'FAILURE') {
+                resultText = '同步失败';
+            } else if (status === 'CONNECTING') {
+                resultText = '连接中...';
+            } else {
+                resultText = status;
+            }
+            
+            resultEl.textContent = resultText;
+        } else {
+            throw new Error('健康检查失败');
+        }
+    } catch (error) {
+        console.error('检查网关状态失败:', error);
+        statusEl.textContent = '离线';
+        statusEl.classList.add('offline');
+        countEl.textContent = '--';
+        lastSyncEl.textContent = '--';
+        resultEl.textContent = '无法连接';
+    }
+}
+
+async function pushSingleConfig(id) {
+    const config = configList.find(item => item.id === id);
+    if (!config) {
+        message.error('配置不存在');
+        return;
+    }
+    
+    if (!confirm(`确定要将配置 "${config.configKey}" 推送到网关吗？`)) return;
+    
+    try {
+        await http.post('/gateway/config/push', {
+            configKey: config.configKey,
+            configValue: config.configValue
+        });
+        
+        message.success('配置推送成功');
+        checkGatewayStatus();
+    } catch (error) {
+        console.error('推送配置失败:', error);
+        message.error('推送配置失败：' + (error.message || '未知错误'));
+    }
+}
+
+async function pushGatewayConfigs() {
+    const gatewayConfigs = configList.filter(item => 
+        GATEWAY_SYNC_CONFIG_KEYS.includes(item.configKey)
+    );
+    
+    if (gatewayConfigs.length === 0) {
+        message.warning('没有网关配置需要推送');
+        return;
+    }
+    
+    if (!confirm(`确定要将 ${gatewayConfigs.length} 项网关配置推送到网关吗？`)) return;
+    
+    try {
+        const configs = {};
+        gatewayConfigs.forEach(item => {
+            configs[item.configKey] = item.configValue;
+        });
+        
+        await http.post('/gateway/config/sync', { configs });
+        
+        message.success(`成功推送 ${gatewayConfigs.length} 项网关配置`);
+        checkGatewayStatus();
+    } catch (error) {
+        console.error('推送网关配置失败:', error);
+        message.error('推送网关配置失败：' + (error.message || '未知错误'));
+    }
+}
+
+async function pushAllToGateway() {
+    if (!confirm('确定要将所有配置推送到网关吗？这将同步所有网关配置项。')) return;
+    
+    try {
+        const result = await http.post('/gateway/config/sync/all');
+        
+        if (result && result.syncStatus === 'SUCCESS') {
+            message.success(`配置已成功推送到网关，共${result.syncedConfigCount || 0}项`);
+        } else {
+            message.warning('配置推送完成：' + (result?.message || '状态未知'));
+        }
+        checkGatewayStatus();
+    } catch (error) {
+        console.error('推送全部配置失败:', error);
+        message.error('推送全部配置失败：' + (error.message || '未知错误'));
+    }
+}
+
+function showGatewayDefenseModal() {
+    const blacklistConfig = configList.find(item => item.configKey === 'gateway.defense.blacklist.enabled');
+    const rateLimitConfig = configList.find(item => item.configKey === 'gateway.defense.rate-limit.enabled');
+    const maliciousConfig = configList.find(item => item.configKey === 'gateway.defense.malicious-request.enabled');
+    const thresholdConfig = configList.find(item => item.configKey === 'gateway.defense.rate-limit.default-threshold');
+    const expireConfig = configList.find(item => item.configKey === 'gateway.defense.blacklist.default-expire-seconds');
+
+    document.getElementById('gatewayBlacklistSwitch').value = blacklistConfig?.configValue || 'true';
+    document.getElementById('gatewayRateLimitSwitch').value = rateLimitConfig?.configValue || 'true';
+    document.getElementById('gatewayMaliciousSwitch').value = maliciousConfig?.configValue || 'true';
+    document.getElementById('gatewayRateLimitThreshold').value = thresholdConfig?.configValue || '10';
+    document.getElementById('gatewayBlacklistExpire').value = expireConfig?.configValue || '600';
+
+    document.getElementById('gatewayDefenseModal').style.display = 'flex';
+}
+
+function closeGatewayDefenseModal() {
+    document.getElementById('gatewayDefenseModal').style.display = 'none';
+}
+
+async function saveGatewayDefenseConfig() {
+    const configs = {
+        'gateway.defense.blacklist.enabled': document.getElementById('gatewayBlacklistSwitch').value,
+        'gateway.defense.rate-limit.enabled': document.getElementById('gatewayRateLimitSwitch').value,
+        'gateway.defense.malicious-request.enabled': document.getElementById('gatewayMaliciousSwitch').value,
+        'gateway.defense.rate-limit.default-threshold': document.getElementById('gatewayRateLimitThreshold').value,
+        'gateway.defense.blacklist.default-expire-seconds': document.getElementById('gatewayBlacklistExpire').value
+    };
+
+    try {
+        let successCount = 0;
+        for (const [key, value] of Object.entries(configs)) {
+            const existingConfig = configList.find(item => item.configKey === key);
+            if (existingConfig) {
+                await http.post('/config/update', { id: existingConfig.id, configKey: key, configValue: value });
+            } else {
+                await http.post('/config/add', { configKey: key, configValue: value });
+            }
+            successCount++;
+        }
+
+        await http.post('/gateway/config/sync', { configs });
+        
+        message.success(`已保存 ${successCount} 项配置并推送到网关`);
+        closeGatewayDefenseModal();
+        await loadConfigList();
+        checkGatewayStatus();
+    } catch (error) {
+        console.error('保存网关防御配置失败:', error);
+        message.error('保存配置失败：' + (error.message || '未知错误'));
+    }
+}
+
+function formatConfigValue(config) {
+    return config?.configValue || '-';
+}
+
+function maskConfigValue(value) {
+    if (!value) return '未配置';
+    if (value.length <= 8) return '*'.repeat(value.length);
+    return `${value.slice(0, 4)}****${value.slice(-4)}`;
+}
+
+function formatTime(value) {
+    return value ? dateFormat.format(value) : '--';
+}
+
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+
+function scrollToConfigList() {
+    const section = document.getElementById('configListSection');
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function filterDdosConfigs() {
+    currentFilterMode = 'DDOS_ONLY';
+    document.getElementById('configCategory').value = 'ALL';
+    document.getElementById('configKey').value = 'ddos.';
+    applyFilters();
+    scrollToConfigList();
+}
+
+function filterDefenseConfigs() {
+    currentFilterMode = 'DEFENSE_ONLY';
+    document.getElementById('configCategory').value = 'ALL';
+    document.getElementById('configKey').value = 'defense.';
+    applyFilters();
+    scrollToConfigList();
+}
+
+function filterTrafficConfigs() {
+    currentFilterMode = 'TRAFFIC_ONLY';
+    document.getElementById('configCategory').value = 'ALL';
+    document.getElementById('configKey').value = 'traffic.push.';
+    applyFilters();
+    scrollToConfigList();
+}
+
+function showDdosConfigModal() {
+    const thresholdConfig = configList.find(item => item.configKey === 'ddos.threshold');
+    const windowConfig = configList.find(item => item.configKey === 'ddos.detection.window-ms');
+    const triggerConfig = configList.find(item => item.configKey === 'ddos.rate-limit-trigger-count');
+    const triggerWindowConfig = configList.find(item => item.configKey === 'ddos.rate-limit-trigger-window-seconds');
+
+    document.getElementById('ddosThresholdInput').value = thresholdConfig?.configValue || '20';
+    document.getElementById('ddosWindowInput').value = windowConfig?.configValue || '1000';
+    document.getElementById('ddosRateLimitTriggerInput').value = triggerConfig?.configValue || '3';
+    document.getElementById('ddosRateLimitWindowInput').value = triggerWindowConfig?.configValue || '60';
+
+    document.getElementById('ddosConfigModal').style.display = 'flex';
+}
+
+function closeDdosConfigModal() {
+    document.getElementById('ddosConfigModal').style.display = 'none';
+}
+
+async function saveDdosConfig() {
+    const configs = {
+        'ddos.threshold': document.getElementById('ddosThresholdInput').value,
+        'ddos.detection.window-ms': document.getElementById('ddosWindowInput').value,
+        'ddos.rate-limit-trigger-count': document.getElementById('ddosRateLimitTriggerInput').value,
+        'ddos.rate-limit-trigger-window-seconds': document.getElementById('ddosRateLimitWindowInput').value
+    };
+
+    try {
+        let successCount = 0;
+        for (const [key, value] of Object.entries(configs)) {
+            const existingConfig = configList.find(item => item.configKey === key);
+            if (existingConfig) {
+                await http.post('/config/update', { id: existingConfig.id, configKey: key, configValue: value });
+            } else {
+                await http.post('/config/add', { configKey: key, configValue: value });
+            }
+            successCount++;
+        }
+
+        message.success(`已保存 ${successCount} 项DDoS配置`);
+        closeDdosConfigModal();
+        await loadConfigList();
+    } catch (error) {
+        console.error('保存DDoS配置失败:', error);
+        message.error('保存配置失败：' + (error.message || '未知错误'));
+    }
+}
+
+function showDefenseStrategyModal() {
+    const defaultDuration = configList.find(item => item.configKey === 'defense.blacklist.default-duration-seconds');
+    const highRiskDuration = configList.find(item => item.configKey === 'defense.blacklist.high-risk-duration-seconds');
+    const criticalDuration = configList.find(item => item.configKey === 'defense.blacklist.critical-risk-duration-seconds');
+    const autoUnban = configList.find(item => item.configKey === 'defense.blacklist.auto-unban.enabled');
+
+    document.getElementById('defenseDefaultDurationInput').value = defaultDuration?.configValue || '1800';
+    document.getElementById('defenseHighRiskDurationInput').value = highRiskDuration?.configValue || '3600';
+    document.getElementById('defenseCriticalDurationInput').value = criticalDuration?.configValue || '86400';
+    document.getElementById('defenseAutoUnbanInput').value = autoUnban?.configValue || 'true';
+
+    document.getElementById('defenseStrategyModal').style.display = 'flex';
+}
+
+function closeDefenseStrategyModal() {
+    document.getElementById('defenseStrategyModal').style.display = 'none';
+}
+
+async function saveDefenseStrategyConfig() {
+    const configs = {
+        'defense.blacklist.default-duration-seconds': document.getElementById('defenseDefaultDurationInput').value,
+        'defense.blacklist.high-risk-duration-seconds': document.getElementById('defenseHighRiskDurationInput').value,
+        'defense.blacklist.critical-risk-duration-seconds': document.getElementById('defenseCriticalDurationInput').value,
+        'defense.blacklist.auto-unban.enabled': document.getElementById('defenseAutoUnbanInput').value
+    };
+
+    try {
+        let successCount = 0;
+        for (const [key, value] of Object.entries(configs)) {
+            const existingConfig = configList.find(item => item.configKey === key);
+            if (existingConfig) {
+                await http.post('/config/update', { id: existingConfig.id, configKey: key, configValue: value });
+            } else {
+                await http.post('/config/add', { configKey: key, configValue: value });
+            }
+            successCount++;
+        }
+
+        message.success(`已保存 ${successCount} 项防御策略配置`);
+        closeDefenseStrategyModal();
+        await loadConfigList();
+    } catch (error) {
+        console.error('保存防御策略配置失败:', error);
+        message.error('保存配置失败：' + (error.message || '未知错误'));
+    }
+}
+
+function showTrafficPushModal() {
+    const normalStrategy = configList.find(item => item.configKey === 'traffic.push.normal.strategy');
+    const suspiciousStrategy = configList.find(item => item.configKey === 'traffic.push.suspicious.strategy');
+    const attackingStrategy = configList.find(item => item.configKey === 'traffic.push.attacking.strategy');
+    const defendedStrategy = configList.find(item => item.configKey === 'traffic.push.defended.strategy');
+    const samplingRate = configList.find(item => item.configKey === 'traffic.push.sampling-rate');
+    const batchInterval = configList.find(item => item.configKey === 'traffic.push.batch-interval-ms');
+
+    document.getElementById('trafficNormalStrategyInput').value = normalStrategy?.configValue || 'realtime';
+    document.getElementById('trafficSuspiciousStrategyInput').value = suspiciousStrategy?.configValue || 'sampling';
+    document.getElementById('trafficAttackingStrategyInput').value = attackingStrategy?.configValue || 'batch';
+    document.getElementById('trafficDefendedStrategyInput').value = defendedStrategy?.configValue || 'skip';
+    document.getElementById('trafficSamplingRateInput').value = samplingRate?.configValue || '10';
+    document.getElementById('trafficBatchIntervalInput').value = batchInterval?.configValue || '5000';
+
+    document.getElementById('trafficPushModal').style.display = 'flex';
+}
+
+function closeTrafficPushModal() {
+    document.getElementById('trafficPushModal').style.display = 'none';
+}
+
+async function saveTrafficPushConfig() {
+    const configs = {
+        'traffic.push.normal.strategy': document.getElementById('trafficNormalStrategyInput').value,
+        'traffic.push.suspicious.strategy': document.getElementById('trafficSuspiciousStrategyInput').value,
+        'traffic.push.attacking.strategy': document.getElementById('trafficAttackingStrategyInput').value,
+        'traffic.push.defended.strategy': document.getElementById('trafficDefendedStrategyInput').value,
+        'traffic.push.sampling-rate': document.getElementById('trafficSamplingRateInput').value,
+        'traffic.push.batch-interval-ms': document.getElementById('trafficBatchIntervalInput').value
+    };
+
+    try {
+        let successCount = 0;
+        for (const [key, value] of Object.entries(configs)) {
+            const existingConfig = configList.find(item => item.configKey === key);
+            if (existingConfig) {
+                await http.post('/config/update', { id: existingConfig.id, configKey: key, configValue: value });
+            } else {
+                await http.post('/config/add', { configKey: key, configValue: value });
+            }
+            successCount++;
+        }
+
+        message.success(`已保存 ${successCount} 项流量推送配置`);
+        closeTrafficPushModal();
+        await loadConfigList();
+    } catch (error) {
+        console.error('保存流量推送配置失败:', error);
+        message.error('保存配置失败：' + (error.message || '未知错误'));
     }
 }

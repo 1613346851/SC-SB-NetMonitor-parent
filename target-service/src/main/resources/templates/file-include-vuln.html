@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${pageTitle}">文件包含漏洞测试平台</title>
     <link rel="stylesheet" th:href="@{/css/file-include-vuln.css}">
-    <link href="https://cdn.staticfile.org/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
 <div class="container-fluid vh-100 p-0">
@@ -146,8 +144,15 @@
     <p class="mt-3 text-white fw-medium">文件加载中，请稍候...</p>
 </div>
 
+<script th:src="@{/js/resource-loader.js}"></script>
 <script th:src="@{/js/common.js}"></script>
 <script th:src="@{/js/file-include-vuln.js}"></script>
-<script src="https://lib.baomitu.com/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
+<script>
+    ResourceLoader.loadAll().then(function() {
+        console.log('所有资源加载完成，初始化应用');
+    }).catch(function(e) {
+        console.warn('部分资源加载失败，但继续初始化:', e);
+    });
+</script>
 </body>
 </html>

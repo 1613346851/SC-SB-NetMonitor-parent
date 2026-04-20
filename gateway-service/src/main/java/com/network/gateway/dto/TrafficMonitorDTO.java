@@ -27,6 +27,11 @@ public class TrafficMonitorDTO implements Serializable {
     private String requestId;
 
     /**
+     * 关联攻击事件ID
+     */
+    private String eventId;
+
+    /**
      * 源IP地址
      */
     private String sourceIp;
@@ -137,6 +142,51 @@ public class TrafficMonitorDTO implements Serializable {
     private String errorMessage;
 
     /**
+     * 是否跳过推送（DEFENDED状态的IP不推送流量）
+     */
+    private Boolean skipPush;
+
+    /**
+     * 请求次数（聚合统计）
+     */
+    private Integer requestCount;
+
+    /**
+     * IP状态标签
+     */
+    private String stateTag;
+
+    /**
+     * 是否为聚合记录
+     */
+    private Boolean isAggregated;
+
+    /**
+     * 聚合开始时间
+     */
+    private String aggregateStartTime;
+
+    /**
+     * 聚合结束时间
+     */
+    private String aggregateEndTime;
+
+    /**
+     * 错误次数（聚合统计）
+     */
+    private Integer errorCount;
+
+    /**
+     * 平均处理时间（毫秒）
+     */
+    private Long avgProcessingTime;
+
+    /**
+     * 峰值请求数/秒（聚合统计）
+     */
+    private Long peakRps;
+
+    /**
      * 构造函数（用于创建新的流量监控记录）
      *
      * @param requestId 请求 ID
@@ -186,5 +236,14 @@ public class TrafficMonitorDTO implements Serializable {
     public void markAsFailed(String errorMessage) {
         this.success = false;
         this.errorMessage = errorMessage;
+    }
+
+    /**
+     * 判断是否跳过推送
+     *
+     * @return true表示跳过推送
+     */
+    public boolean isSkipPush() {
+        return skipPush != null && skipPush;
     }
 }

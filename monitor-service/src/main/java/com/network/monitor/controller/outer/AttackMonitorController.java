@@ -35,10 +35,30 @@ public class AttackMonitorController {
     private SysConfigCache sysConfigCache;
 
     /**
+     * 获取风险等级选项列表
+     */
+    @GetMapping("/risk-levels")
+    public ApiResponse<List<Map<String, String>>> getRiskLevels() {
+        try {
+            List<Map<String, String>> riskLevels = List.of(
+                Map.of("value", "CRITICAL", "label", "严重"),
+                Map.of("value", "HIGH", "label", "高风险"),
+                Map.of("value", "MEDIUM", "label", "中风险"),
+                Map.of("value", "LOW", "label", "低风险")
+            );
+            return ApiResponse.success(riskLevels);
+        } catch (Exception e) {
+            log.error("获取风险等级列表失败：", e);
+            return ApiResponse.error("获取失败");
+        }
+    }
+
+    /**
      * 分页查询攻击记录
      */
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> getAttackList(
+            @RequestParam(required = false) String eventId,
             @RequestParam(required = false) String attackType,
             @RequestParam(required = false) String riskLevel,
             @RequestParam(required = false) String sourceIp,
@@ -51,6 +71,13 @@ public class AttackMonitorController {
             @RequestParam(defaultValue = "desc") String sortOrder) {
 
         try {
+            if (pageNum < 1) {
+                pageNum = 1;
+            }
+            if (pageSize < 1 || pageSize > 100) {
+                pageSize = 10;
+            }
+            
             int offset = (pageNum - 1) * pageSize;
             
             LocalDateTime startDateTime = parseDateTime(startTime);
@@ -58,11 +85,11 @@ public class AttackMonitorController {
             String orderBy = buildOrderBy(sortField, sortOrder);
             
             List<AttackMonitorEntity> list = attackMonitorMapper.selectByCondition(
-                attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime, offset, pageSize, orderBy
+                eventId, attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime, offset, pageSize, orderBy
             );
             
             long total = attackMonitorMapper.countByCondition(
-                attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime
+                eventId, attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime
             );
 
             Map<String, Object> result = new HashMap<>();
@@ -92,9 +119,20 @@ public class AttackMonitorController {
         }
     }
 
-    /**
-     * 处理攻击记录
-     */
+    @GetMapping("/{id}")
+    public ApiResponse<AttackMonitorEntity> getAttackById(@PathVariable Long id) {
+        try {
+            AttackMonitorEntity entity = attackMonitorMapper.selectById(id);
+            if (entity == null) {
+                return ApiResponse.error("攻击记录不存在");
+            }
+            return ApiResponse.success(entity);
+        } catch (Exception e) {
+            log.error("查询攻击记录失败：id={}", id, e);
+            return ApiResponse.error("查询失败");
+        }
+    }
+
     @PutMapping("/{id}/handle")
     public ApiResponse<Void> handleAttack(
             @PathVariable Long id,
@@ -106,6 +144,38 @@ public class AttackMonitorController {
         } catch (Exception e) {
             log.error("处理攻击记录失败：", e);
             return ApiResponse.error("处理失败");
+        }
+    }
+
+    @PutMapping("/batch-handle")
+    public ApiResponse<Void> batchHandleAttack(@RequestBody List<Long> ids) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要处理的攻击记录");
+            }
+            for (Long id : ids) {
+                attackMonitorMapper.updateHandled(id, 1, "批量处理");
+            }
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量处理攻击记录失败：", e);
+            return ApiResponse.error("批量处理失败");
+        }
+    }
+
+    @DeleteMapping("/batch")
+    public ApiResponse<Void> batchDeleteAttack(@RequestBody List<Long> ids) {
+        try {
+            if (ids == null || ids.isEmpty()) {
+                return ApiResponse.error("请选择要删除的攻击记录");
+            }
+            for (Long id : ids) {
+                attackMonitorMapper.deleteById(id);
+            }
+            return ApiResponse.success();
+        } catch (Exception e) {
+            log.error("批量删除攻击记录失败：", e);
+            return ApiResponse.error("批量删除失败");
         }
     }
 
@@ -130,7 +200,7 @@ public class AttackMonitorController {
             String orderBy = buildOrderBy(sortField, sortOrder);
             
             List<AttackMonitorEntity> list = attackMonitorMapper.selectByCondition(
-                attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime, 0, 10000, orderBy
+                null, attackType, riskLevel, sourceIp, handled, startDateTime, endDateTime, 0, 10000, orderBy
             );
             
             response.setContentType("text/csv;charset=UTF-8");

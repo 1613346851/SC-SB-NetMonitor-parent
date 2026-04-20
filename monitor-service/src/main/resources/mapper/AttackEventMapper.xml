@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.network.monitor.mapper.AttackEventMapper">
+
+    <resultMap id="BaseResultMap" type="com.network.monitor.entity.AttackEventEntity">
+        <id column="id" property="id"/>
+        <result column="event_id" property="eventId"/>
+        <result column="source_ip" property="sourceIp"/>
+        <result column="attack_type" property="attackType"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="start_time" property="startTime"/>
+        <result column="end_time" property="endTime"/>
+        <result column="duration_seconds" property="durationSeconds"/>
+        <result column="total_requests" property="totalRequests"/>
+        <result column="peak_rps" property="peakRps"/>
+        <result column="attack_count" property="attackCount"/>
+        <result column="confidence_start" property="confidenceStart"/>
+        <result column="confidence_end" property="confidenceEnd"/>
+        <result column="defense_action" property="defenseAction"/>
+        <result column="defense_expire_time" property="defenseExpireTime"/>
+        <result column="defense_success" property="defenseSuccess"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, event_id, source_ip, attack_type, risk_level, start_time, end_time, 
+        duration_seconds, total_requests, peak_rps, attack_count, confidence_start, 
+        confidence_end, defense_action, defense_expire_time, defense_success, status, 
+        create_time, update_time
+    </sql>
+
+    <insert id="insert" parameterType="com.network.monitor.entity.AttackEventEntity" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_attack_event (
+            event_id, source_ip, attack_type, risk_level, start_time, end_time,
+            duration_seconds, total_requests, peak_rps, attack_count, confidence_start,
+            confidence_end, defense_action, defense_expire_time, defense_success, status,
+            create_time, update_time
+        ) VALUES (
+            #{eventId}, #{sourceIp}, #{attackType}, #{riskLevel}, #{startTime}, #{endTime},
+            #{durationSeconds}, #{totalRequests}, #{peakRps}, #{attackCount}, #{confidenceStart},
+            #{confidenceEnd}, #{defenseAction}, #{defenseExpireTime}, #{defenseSuccess}, #{status},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.network.monitor.entity.AttackEventEntity">
+        UPDATE sys_attack_event
+        SET source_ip = #{sourceIp},
+            attack_type = #{attackType},
+            risk_level = #{riskLevel},
+            end_time = #{endTime},
+            duration_seconds = #{durationSeconds},
+            total_requests = #{totalRequests},
+            peak_rps = #{peakRps},
+            attack_count = #{attackCount},
+            confidence_start = #{confidenceStart},
+            confidence_end = #{confidenceEnd},
+            defense_action = #{defenseAction},
+            defense_expire_time = #{defenseExpireTime},
+            defense_success = #{defenseSuccess},
+            status = #{status},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByEventId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        WHERE event_id = #{eventId}
+    </select>
+
+    <select id="selectOngoingEventByIp" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        WHERE source_ip = #{sourceIp} AND status = 0
+        ORDER BY start_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectOngoingEventByIpAndType" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        WHERE source_ip = #{sourceIp} AND attack_type = #{attackType} AND status = 0
+        ORDER BY start_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        <where>
+            <if test="eventId != null and eventId != ''">
+                AND event_id LIKE CONCAT('%', #{eventId}, '%')
+            </if>
+            <if test="sourceIp != null and sourceIp != ''">
+                AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="riskLevel != null and riskLevel != ''">
+                AND risk_level = #{riskLevel}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="startTime != null">
+                AND start_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND start_time &lt;= #{endTime}
+            </if>
+        </where>
+        <choose>
+            <when test="orderBy != null and orderBy != ''">
+                ORDER BY ${orderBy}
+            </when>
+            <otherwise>
+                ORDER BY id DESC
+            </otherwise>
+        </choose>
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <select id="countByCondition" resultType="long">
+        SELECT COUNT(*)
+        FROM sys_attack_event
+        <where>
+            <if test="eventId != null and eventId != ''">
+                AND event_id LIKE CONCAT('%', #{eventId}, '%')
+            </if>
+            <if test="sourceIp != null and sourceIp != ''">
+                AND source_ip LIKE CONCAT('%', #{sourceIp}, '%')
+            </if>
+            <if test="attackType != null and attackType != ''">
+                AND attack_type = #{attackType}
+            </if>
+            <if test="riskLevel != null and riskLevel != ''">
+                AND risk_level = #{riskLevel}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="startTime != null">
+                AND start_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND start_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <update id="updateStatus">
+        UPDATE sys_attack_event
+        SET status = #{status}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="incrementAttackCount">
+        UPDATE sys_attack_event
+        SET attack_count = attack_count + 1,
+            total_requests = total_requests + 1,
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatistics">
+        UPDATE sys_attack_event
+        SET peak_rps = GREATEST(COALESCE(peak_rps, 0), #{peakRps}),
+            total_requests = #{totalRequests},
+            confidence_end = #{confidenceEnd},
+            risk_level = CASE 
+                WHEN #{confidenceEnd} >= 90 THEN 'CRITICAL'
+                WHEN #{confidenceEnd} >= 65 THEN 'HIGH'
+                WHEN #{confidenceEnd} >= 30 THEN 'MEDIUM'
+                ELSE 'LOW'
+            END,
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateTotalRequests">
+        UPDATE sys_attack_event
+        SET total_requests = #{totalRequests},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="markAsEnded">
+        UPDATE sys_attack_event
+        SET end_time = #{endTime},
+            duration_seconds = #{durationSeconds},
+            status = 1,
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="countByAttackType" resultType="com.network.monitor.mapper.AttackEventMapper$EventTypeStat">
+        SELECT attack_type AS attackType, COUNT(*) AS count
+        FROM sys_attack_event
+        GROUP BY attack_type
+    </select>
+
+    <select id="countByRiskLevel" resultType="com.network.monitor.mapper.AttackEventMapper$EventRiskStat">
+        SELECT risk_level AS riskLevel, COUNT(*) AS count
+        FROM sys_attack_event
+        GROUP BY risk_level
+    </select>
+
+    <select id="countEventTrend" resultType="com.network.monitor.mapper.AttackEventMapper$EventTrendStat">
+        SELECT 
+            start_time AS time,
+            1 AS count
+        FROM sys_attack_event
+        WHERE start_time &gt;= #{startTime} AND start_time &lt;= #{endTime}
+        ORDER BY start_time ASC
+    </select>
+
+    <select id="selectRecentEvents" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        ORDER BY start_time DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countOngoingEvents" resultType="int">
+        SELECT COUNT(*)
+        FROM sys_attack_event
+        WHERE status = 0
+    </select>
+
+    <select id="countEventsByIp" resultType="int">
+        SELECT COUNT(*)
+        FROM sys_attack_event
+        WHERE source_ip = #{sourceIp}
+    </select>
+
+    <select id="selectAvgDuration" resultType="java.lang.Double">
+        SELECT AVG(duration_seconds)
+        FROM sys_attack_event
+        WHERE duration_seconds IS NOT NULL AND duration_seconds > 0
+    </select>
+
+    <select id="selectOngoingEventsNotUpdatedSince" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_attack_event
+        WHERE status = 0 AND update_time &lt; #{thresholdTime}
+    </select>
+</mapper>

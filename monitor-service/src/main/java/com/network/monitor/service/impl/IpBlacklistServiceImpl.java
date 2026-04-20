@@ -1,5 +1,6 @@
 package com.network.monitor.service.impl;
 
+import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.client.GatewayApiClient;
 import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.entity.DefenseLogEntity;
@@ -41,6 +42,9 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     @Autowired
     private GatewayApiClient gatewayApiClient;
 
+    @Autowired
+    private IpAttackStateCache attackStateCache;
+
     private static final String BLACKLIST_CACHE_PREFIX = "cache:blacklist:";
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -69,6 +73,12 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
     @Override
     @Transactional
     public void addToBlacklist(String ip, String reason, LocalDateTime expireTime, String operator, String banType, Long attackId, Long trafficId, Long ruleId) {
+        addToBlacklist(ip, reason, expireTime, operator, banType, attackId, trafficId, ruleId, null);
+    }
+
+    @Override
+    @Transactional
+    public void addToBlacklist(String ip, String reason, LocalDateTime expireTime, String operator, String banType, Long attackId, Long trafficId, Long ruleId, String eventId) {
         if (ip == null || ip.isEmpty()) {
             throw new IllegalArgumentException("IP 地址不能为空");
         }
@@ -106,7 +116,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
                 }
 
                 createHistoryRecord(existingEntity.getId(), attackId, trafficId, ruleId, banType, reason, null, null, operator);
-                recordDefenseLog("BLOCK_IP", "ADD", ip, attackId, trafficId, ruleId, reason, null, 1, "永久封禁成功", operator);
+                recordDefenseLog("BLOCK_IP", "ADD", ip, attackId, trafficId, ruleId, reason, null, 1, "永久封禁成功", operator, eventId);
 
                 blacklistCache.put(ip, existingEntity);
                 syncToGateway(ip, "ADD");
@@ -164,7 +174,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
 
             Long banDuration = java.time.Duration.between(now, finalExpireTime).getSeconds();
             createHistoryRecord(existingEntity.getId(), attackId, trafficId, ruleId, banType, reason, banDuration, finalExpireTime, operator);
-            recordDefenseLog("BLOCK_IP", "ADD", ip, attackId, trafficId, ruleId, reason, finalExpireTime, 1, "封禁成功", operator);
+            recordDefenseLog("BLOCK_IP", "ADD", ip, attackId, trafficId, ruleId, reason, finalExpireTime, 1, "封禁成功", operator, eventId);
 
             blacklistCache.put(ip, existingEntity);
             syncToGateway(ip, "ADD");
@@ -221,8 +231,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
                 ipBlacklistMapper.updateById(existingEntity);
             }
 
-            Long banDuration = java.time.Duration.between(now, newExpireTime).getSeconds();
-            createHistoryRecord(existingEntity.getId(), null, null, null, "MANUAL", "延长封禁时间", banDuration, newExpireTime, operator);
+            createHistoryRecord(existingEntity.getId(), null, null, null, "MANUAL", "延长封禁时间", extendSeconds, newExpireTime, operator);
             recordDefenseLog("BLOCK_IP", "UPDATE", ip, null, null, null, "延长封禁时间", newExpireTime, 1, "延长成功", operator);
 
             blacklistCache.put(ip, existingEntity);
@@ -266,6 +275,10 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
             recordDefenseLog("BLOCK_IP", "REMOVE", ip, null, null, null, unbanReason, null, 1, "解封成功", operator);
 
             blacklistCache.remove(ip);
+            
+            attackStateCache.markAsCooldown(ip);
+            log.info("IP状态已更新为COOLDOWN: ip={}", ip);
+            
             syncToGateway(ip, "REMOVE");
 
             log.info("从黑名单移除 IP 成功：ip={}, unbanReason={}, operator={}", ip, unbanReason, operator);
@@ -369,8 +382,9 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
         try {
             DefenseCommandDTO commandDTO = new DefenseCommandDTO();
             commandDTO.setSourceIp(ip);
-            commandDTO.setDefenseType("BLACKLIST");
-            commandDTO.setRiskLevel("HIGH");
+            commandDTO.setDefenseType(DefenseCommandDTO.DefenseType.BLACKLIST);
+            commandDTO.setRiskLevel(DefenseCommandDTO.RiskLevel.HIGH);
+            commandDTO.setAction(action);
 
             if ("ADD".equals(action)) {
                 IpBlacklistEntity entity = ipBlacklistMapper.selectByIpAddress(ip);
@@ -451,7 +465,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
         ipBlacklistHistoryMapper.insert(history);
     }
 
-    private void recordDefenseLog(String defenseType, String defenseAction, String defenseTarget, Long attackId, Long trafficId, Long ruleId, String defenseReason, LocalDateTime expireTime, Integer executeStatus, String executeResult, String operator) {
+    private void recordDefenseLog(String defenseType, String defenseAction, String defenseTarget, Long attackId, Long trafficId, Long ruleId, String defenseReason, LocalDateTime expireTime, Integer executeStatus, String executeResult, String operator, String eventId) {
         try {
             DefenseLogEntity defenseLog = new DefenseLogEntity();
             defenseLog.setDefenseType(defenseType);
@@ -465,6 +479,7 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
             defenseLog.setExecuteStatus(executeStatus);
             defenseLog.setExecuteResult(executeResult);
             defenseLog.setOperator(operator);
+            defenseLog.setEventId(eventId);
             defenseLog.setExecuteTime(LocalDateTime.now());
             defenseLog.setCreateTime(LocalDateTime.now());
             defenseLog.setUpdateTime(LocalDateTime.now());
@@ -472,5 +487,9 @@ public class IpBlacklistServiceImpl implements IpBlacklistService {
         } catch (Exception e) {
             log.error("记录防御日志失败：defenseTarget={}", defenseTarget, e);
         }
+    }
+
+    private void recordDefenseLog(String defenseType, String defenseAction, String defenseTarget, Long attackId, Long trafficId, Long ruleId, String defenseReason, LocalDateTime expireTime, Integer executeStatus, String executeResult, String operator) {
+        recordDefenseLog(defenseType, defenseAction, defenseTarget, attackId, trafficId, ruleId, defenseReason, expireTime, executeStatus, executeResult, operator, null);
     }
 }
