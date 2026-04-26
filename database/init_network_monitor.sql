@@ -1608,123 +1608,42 @@ INSERT INTO `sys_role` (`role_name`, `role_code`, `role_desc`, `status`, `create
 
 -- ------------------------------------------------------------
 -- 4.5 初始化菜单权限数据
+-- 菜单权限只分各个主页面，不细分页面中的功能
 -- ------------------------------------------------------------
--- 一级菜单
 INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(1, 0, '系统概览', 1, 'dashboard', '/', '/dashboard', 'dashboard', 1, 0, 0, 'system'),
-(2, 0, '流量监测', 0, 'traffic', '/traffic', NULL, 'monitor', 2, 0, 0, 'system'),
-(3, 0, '攻击监测', 0, 'attack', '/attack', NULL, 'warning', 3, 0, 0, 'system'),
-(4, 0, '防御管理', 0, 'defense', '/defense', NULL, 'security', 4, 0, 0, 'system'),
-(5, 0, '漏洞监测', 0, 'vulnerability', '/vulnerability', NULL, 'bug', 5, 0, 0, 'system'),
-(6, 0, '数据报表', 1, 'report', '/report', '/report', 'chart', 6, 0, 0, 'system'),
-(7, 0, '系统管理', 0, 'system', '/system', NULL, 'setting', 7, 0, 0, 'system');
-
--- 二级菜单 - 流量监测
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(21, 2, '流量列表', 1, 'traffic:list', '/traffic/list', '/traffic-list', 'list', 1, 0, 0, 'system'),
-(22, 2, 'IP画像', 1, 'traffic:ip-profile', '/traffic/ip-profile', '/ip-profile', 'user', 2, 0, 0, 'system');
-
--- 二级菜单 - 攻击监测
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(31, 3, '攻击列表', 1, 'attack:list', '/attack/list', '/attack-list', 'list', 1, 0, 0, 'system'),
-(32, 3, '溯源查询', 1, 'attack:trace', '/attack/trace', '/trace-search', 'search', 2, 0, 0, 'system');
-
--- 二级菜单 - 防御管理
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(41, 4, '黑名单管理', 1, 'blacklist:list', '/defense/blacklist', '/blacklist-manage', 'lock', 1, 0, 0, 'system'),
-(42, 4, '防御日志', 1, 'defense:log', '/defense/log', '/defense-log', 'file-text', 2, 0, 0, 'system'),
-(43, 4, '规则管理', 1, 'rule:list', '/defense/rule', '/rule-manage', 'tool', 3, 0, 0, 'system'),
-(44, 4, '白名单管理', 1, 'whitelist:list', '/defense/whitelist', '/whitelist-manage', 'unlock', 4, 0, 0, 'system'),
-(45, 4, '防御效果评估', 1, 'defense:evaluation', '/defense/evaluation', '/defense-evaluation', 'bar-chart', 5, 0, 0, 'system');
-
--- 二级菜单 - 漏洞监测
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(51, 5, '漏洞列表', 1, 'vulnerability:list', '/vulnerability/list', '/vulnerability-monitor', 'list', 1, 0, 0, 'system'),
-(52, 5, '漏洞扫描', 1, 'vulnerability:scan', '/vulnerability/scan', '/vuln-scan', 'scan', 2, 0, 0, 'system'),
-(53, 5, '扫描目标', 1, 'vulnerability:target', '/vulnerability/target', '/scan-target-manage', 'target', 3, 0, 0, 'system');
-
--- 二级菜单 - 系统管理
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(71, 7, '系统配置', 1, 'config:list', '/system/config', '/sys-config', 'setting', 1, 0, 0, 'system'),
-(72, 7, '用户管理', 1, 'user:list', '/system/user', '/user-manage', 'user', 2, 0, 0, 'system'),
-(73, 7, '角色管理', 1, 'role:list', '/system/role', '/role-manage', 'team', 3, 0, 0, 'system'),
-(74, 7, '菜单管理', 1, 'menu:list', '/system/menu', '/menu-manage', 'menu', 4, 0, 0, 'system'),
-(75, 7, '操作日志', 1, 'operlog:list', '/system/log', '/oper-log', 'history', 5, 0, 0, 'system');
-
--- 按钮权限 - 黑名单管理
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(411, 41, '新增黑名单', 2, 'blacklist:add', NULL, 1, 0, 0, 'system'),
-(412, 41, '编辑黑名单', 2, 'blacklist:edit', NULL, 2, 0, 0, 'system'),
-(413, 41, '删除黑名单', 2, 'blacklist:delete', NULL, 3, 0, 0, 'system'),
-(414, 41, '解封IP', 2, 'blacklist:unblock', NULL, 4, 0, 0, 'system');
-
--- 按钮权限 - 规则管理
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(431, 43, '新增规则', 2, 'rule:add', NULL, 1, 0, 0, 'system'),
-(432, 43, '编辑规则', 2, 'rule:edit', NULL, 2, 0, 0, 'system'),
-(433, 43, '删除规则', 2, 'rule:delete', NULL, 3, 0, 0, 'system'),
-(434, 43, '启用/禁用规则', 2, 'rule:toggle', NULL, 4, 0, 0, 'system');
-
--- 按钮权限 - 用户管理
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(721, 72, '新增用户', 2, 'user:add', NULL, 1, 0, 0, 'system'),
-(722, 72, '编辑用户', 2, 'user:edit', NULL, 2, 0, 0, 'system'),
-(723, 72, '删除用户', 2, 'user:delete', NULL, 3, 0, 0, 'system'),
-(724, 72, '重置密码', 2, 'user:resetPwd', NULL, 4, 0, 0, 'system'),
-(725, 72, '分配角色', 2, 'user:assignRole', NULL, 5, 0, 0, 'system');
-
--- 按钮权限 - 角色管理
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(731, 73, '新增角色', 2, 'role:add', NULL, 1, 0, 0, 'system'),
-(732, 73, '编辑角色', 2, 'role:edit', NULL, 2, 0, 0, 'system'),
-(733, 73, '删除角色', 2, 'role:delete', NULL, 3, 0, 0, 'system'),
-(734, 73, '分配权限', 2, 'role:assignPerm', NULL, 4, 0, 0, 'system');
-
--- 按钮权限 - 白名单管理
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(441, 44, '新增白名单', 2, 'whitelist:add', NULL, 1, 0, 0, 'system'),
-(442, 44, '编辑白名单', 2, 'whitelist:edit', NULL, 2, 0, 0, 'system'),
-(443, 44, '删除白名单', 2, 'whitelist:delete', NULL, 3, 0, 0, 'system');
-
--- 按钮权限 - 漏洞扫描
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(521, 52, '启动扫描', 2, 'vulnerability:scan:start', NULL, 1, 0, 0, 'system'),
-(522, 52, '停止扫描', 2, 'vulnerability:scan:stop', NULL, 2, 0, 0, 'system'),
-(523, 52, '导出报告', 2, 'vulnerability:scan:export', NULL, 3, 0, 0, 'system');
-
--- 按钮权限 - 扫描目标管理
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(531, 53, '新增目标', 2, 'vulnerability:target:add', NULL, 1, 0, 0, 'system'),
-(532, 53, '编辑目标', 2, 'vulnerability:target:edit', NULL, 2, 0, 0, 'system'),
-(533, 53, '删除目标', 2, 'vulnerability:target:delete', NULL, 3, 0, 0, 'system');
+(1, 0, '仪表盘', 1, 'dashboard', '/', NULL, '📊', 1, 0, 0, 'system'),
+(2, 0, '流量列表', 1, 'traffic', '/traffic', NULL, '🌐', 2, 0, 0, 'system'),
+(3, 0, '态势感知', 1, 'event', '/event', NULL, '🎯', 3, 0, 0, 'system'),
+(4, 0, '攻击监测', 1, 'attack', '/attack', NULL, '⚠️', 4, 0, 0, 'system'),
+(5, 0, '漏洞监测', 1, 'vulnerability', '/vulnerability', NULL, '🔓', 5, 0, 0, 'system'),
+(6, 0, '漏洞扫描', 1, 'scan', '/scan', NULL, 'SC', 6, 0, 0, 'system'),
+(7, 0, '防御日志', 1, 'defense', '/defense', NULL, '🛡️', 7, 0, 0, 'system'),
+(8, 0, '防御效果评估', 1, 'defense-evaluation', '/defense-evaluation', NULL, '📈', 8, 0, 0, 'system'),
+(9, 0, '规则管理', 1, 'rule', '/rule', NULL, '📋', 9, 0, 0, 'system'),
+(10, 0, '黑名单管理', 1, 'blacklist', '/blacklist', NULL, '🚫', 10, 0, 0, 'system'),
+(11, 0, '告警管理', 1, 'alert', '/alert', NULL, '🔔', 11, 0, 0, 'system'),
+(12, 0, '溯源查询', 1, 'trace', '/trace', NULL, '🔍', 12, 0, 0, 'system'),
+(13, 0, '数据报表', 1, 'report', '/report', NULL, '📉', 13, 0, 0, 'system'),
+(14, 0, '系统配置', 1, 'config', '/config', NULL, '⚙️', 14, 0, 0, 'system'),
+(15, 0, '用户管理', 1, 'user', '/system/user', NULL, '👥', 15, 0, 0, 'system'),
+(16, 0, '角色管理', 1, 'role', '/system/role', NULL, '🔑', 16, 0, 0, 'system'),
+(17, 0, '操作日志', 1, 'operlog', '/system/log', NULL, '📝', 17, 0, 0, 'system');
 
 -- ------------------------------------------------------------
 -- 4.6 初始化角色权限关联
--- 超级管理员拥有所有权限
 -- ------------------------------------------------------------
+-- 超级管理员拥有所有权限
 INSERT INTO `sys_role_menu` (`role_id`, `menu_id`)
 SELECT 1, id FROM `sys_menu` WHERE del_flag = 0;
 
--- 安全管理员权限（监控、防御操作）
+-- 安全管理员权限（监控、防御操作相关页面）
 INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
-(2, 1), (2, 2), (2, 21), (2, 22), 
-(2, 3), (2, 31), (2, 32), 
-(2, 4), (2, 41), (2, 42), (2, 43), (2, 44), (2, 45),
-(2, 411), (2, 412), (2, 413), (2, 414), 
-(2, 431), (2, 432), (2, 433), (2, 434),
-(2, 441), (2, 442), (2, 443),
-(2, 5), (2, 51), (2, 52), (2, 53),
-(2, 521), (2, 522), (2, 523),
-(2, 531), (2, 532), (2, 533),
-(2, 6);
+(2, 1), (2, 2), (2, 3), (2, 4), (2, 5), (2, 6),
+(2, 7), (2, 8), (2, 9), (2, 10), (2, 11), (2, 12);
 
--- 审计管理员权限（仅查看）
+-- 审计管理员权限（仅查看日志和基础监控）
 INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
-(3, 1), (3, 2), (3, 21), (3, 22), 
-(3, 3), (3, 31), (3, 32), 
-(3, 4), (3, 41), (3, 42), (3, 43), (3, 44), (3, 45),
-(3, 5), (3, 51), (3, 52), (3, 53),
-(3, 6), (3, 75);
+(3, 1), (3, 2), (3, 3), (3, 4), (3, 7), (3, 17);
 
 -- ------------------------------------------------------------
 -- 4.7 管理员账号初始化说明
@@ -1850,30 +1769,6 @@ INSERT INTO `sys_alert_rule` (`rule_name`, `rule_code`, `attack_type`, `risk_lev
 ('XSS攻击告警', 'XSS_ATTACK', 'XSS', NULL, 'MEDIUM', 3, 60, 180, 1, 30, '检测到XSS攻击时告警'),
 ('命令注入攻击告警', 'COMMAND_INJECTION_ATTACK', 'COMMAND_INJECTION', NULL, 'CRITICAL', 1, 60, 600, 1, 10, '检测到命令注入攻击时告警'),
 ('暴力破解告警', 'BRUTE_FORCE_ATTACK', 'BRUTE_FORCE', NULL, 'MEDIUM', 5, 60, 300, 1, 25, '检测到暴力破解行为时告警');
-
--- ------------------------------------------------------------
--- 4.11 告警相关菜单权限
--- ------------------------------------------------------------
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(8, 0, '告警管理', 0, 'alert', '/alert', NULL, 'bell', 8, 0, 0, 'system');
-
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `component`, `icon`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(81, 8, '告警列表', 1, 'alert:list', '/alert/list', '/alert-list', 'list', 1, 0, 0, 'system'),
-(82, 8, '告警配置', 1, 'alert:config', '/alert/config', '/alert-config', 'setting', 2, 0, 0, 'system');
-
-INSERT INTO `sys_menu` (`id`, `parent_id`, `menu_name`, `menu_type`, `permission`, `path`, `sort_order`, `visible`, `status`, `create_by`) VALUES
-(811, 81, '确认告警', 2, 'alert:confirm', NULL, 1, 0, 0, 'system'),
-(812, 81, '忽略告警', 2, 'alert:ignore', NULL, 2, 0, 0, 'system'),
-(813, 81, '批量确认', 2, 'alert:batch-confirm', NULL, 3, 0, 0, 'system'),
-(823, 82, '测试通知', 2, 'alert:config:test', NULL, 3, 0, 0, 'system');
-
--- 安全管理员告警权限
-INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
-(2, 8), (2, 81), (2, 82), (2, 811), (2, 812), (2, 813), (2, 821), (2, 822), (2, 823);
-
--- 审计管理员告警权限（仅查看）
-INSERT INTO `sys_role_menu` (`role_id`, `menu_id`) VALUES
-(3, 8), (3, 81);
 
 -- ============================================================
 -- 5. 完成提示

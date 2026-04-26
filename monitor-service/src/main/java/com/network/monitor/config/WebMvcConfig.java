@@ -2,6 +2,7 @@ package com.network.monitor.config;
 
 import com.network.monitor.interceptor.AuthInterceptor;
 import com.network.monitor.interceptor.CrossServiceSecurityInterceptor;
+import com.network.monitor.interceptor.PageAuthInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
@@ -17,6 +18,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Autowired
     private CrossServiceSecurityInterceptor crossServiceSecurityInterceptor;
     
+    @Autowired
+    private PageAuthInterceptor pageAuthInterceptor;
+    
     @Override
     public void addInterceptors(@NonNull InterceptorRegistry registry) {
         registry.addInterceptor(crossServiceSecurityInterceptor)
@@ -27,11 +31,27 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
                         "/api/auth/login",
-                        "/api/auth/logout",
                         "/api/config/public/**",
                         "/api/config/alert.sound",
                         "/api/inner/**"
                 )
                 .order(1);
+        
+        registry.addInterceptor(pageAuthInterceptor)
+                .addPathPatterns("/**")
+                .excludePathPatterns(
+                        "/login",
+                        "/api/**",
+                        "/static/**",
+                        "/css/**",
+                        "/js/**",
+                        "/lib/**",
+                        "/images/**",
+                        "/fonts/**",
+                        "/webfonts/**",
+                        "/favicon.ico",
+                        "/error"
+                )
+                .order(2);
     }
 }
