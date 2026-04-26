@@ -75,7 +75,6 @@ public class DashboardStatServiceImpl implements DashboardStatService {
             long totalVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, null, null);
             stats.put("totalVulnerability", totalVulnerabilities);
 
-            long highRiskVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, "HIGH", null);
             long verifiedVulnerabilities = vulnerabilityMonitorMapper.countByCondition(null, null, null, 1);
             stats.put("vulnerabilityChange", verifiedVulnerabilities);
 

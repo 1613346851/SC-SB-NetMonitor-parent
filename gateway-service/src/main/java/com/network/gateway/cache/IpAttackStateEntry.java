@@ -47,7 +47,6 @@ public class IpAttackStateEntry implements Serializable {
     private int peakRps;
 
     private static final int MAX_SAMPLE_SIZE = 5;
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public IpAttackStateEntry() {
         this.state = IpAttackStateConstant.NORMAL;

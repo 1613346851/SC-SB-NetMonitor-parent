@@ -4,7 +4,6 @@ import com.network.monitor.cache.IpAttackStateCache;
 import com.network.monitor.dto.AttackChainDTO;
 import com.network.monitor.dto.GeoIpDTO;
 import com.network.monitor.dto.IpProfileDTO;
-import com.network.monitor.entity.AttackEventEntity;
 import com.network.monitor.entity.AttackMonitorEntity;
 import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.entity.IpBlacklistEntity;

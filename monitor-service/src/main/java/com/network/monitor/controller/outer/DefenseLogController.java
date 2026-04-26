@@ -119,7 +119,6 @@ public class DefenseLogController {
             }
             
             List<Map<String, Object>> result = new ArrayList<>();
-            DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("MM-dd");
             for (Map.Entry<String, Map<String, Long>> entry : dailyStats.entrySet()) {
                 Map<String, Object> item = new HashMap<>();
                 item.put("date", entry.getKey().substring(5));

@@ -1,7 +1,6 @@
 package com.network.gateway.filter.defense;
 
 import com.network.gateway.cache.IpAttackStateCache;
-import com.network.gateway.constant.GatewayFilterOrderConstant;
 import com.network.gateway.constant.IpAttackStateConstant;
 import com.network.gateway.util.ServerWebExchangeUtil;
 import org.slf4j.Logger;

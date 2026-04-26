@@ -16,7 +16,6 @@ public class GatewayMetrics implements Serializable {
 
     private final Map<String, AtomicLong> counters = new ConcurrentHashMap<>();
     private final Map<String, AtomicLong> gauges = new ConcurrentHashMap<>();
-    private final Map<String, AtomicInteger> stateCounters = new ConcurrentHashMap<>();
     
     private final AtomicLong totalRequests = new AtomicLong(0);
     private final AtomicLong totalBlocked = new AtomicLong(0);

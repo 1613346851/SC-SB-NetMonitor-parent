@@ -1,7 +1,6 @@
 package com.network.monitor.service;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 本地内存缓存管理服务接口

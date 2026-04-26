@@ -21,11 +21,6 @@ public class AttackContentDecodeUtil {
     private static final Pattern UNICODE_ENCODE_PATTERN = Pattern.compile("\\\\u[0-9A-Fa-f]{4}");
 
     /**
-     * HTML 实体编码正则匹配
-     */
-    private static final Pattern HTML_ENTITY_PATTERN = Pattern.compile("&#?[0-9A-Za-z]+;");
-
-    /**
      * 解码攻击内容（URL 解码、Unicode 解码、HTML 实体解码）
      *
      * @param content 原始攻击内容

@@ -5,7 +5,6 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 import java.io.Serializable;
-import java.util.Map;
 import java.util.concurrent.Callable;
 
 @Data

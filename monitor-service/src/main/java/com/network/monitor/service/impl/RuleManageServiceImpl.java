@@ -1,6 +1,5 @@
 package com.network.monitor.service.impl;
 
-import com.network.monitor.common.constant.AttackTypeConstant;
 import com.network.monitor.common.util.AttackContentDecodeUtil;
 import com.network.monitor.entity.MonitorRuleEntity;
 import com.network.monitor.mapper.MonitorRuleMapper;

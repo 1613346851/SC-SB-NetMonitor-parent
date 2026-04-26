@@ -1,7 +1,6 @@
 package com.network.monitor.service;
 
 import com.network.monitor.dto.AttackMonitorDTO;
-import com.network.monitor.dto.TrafficMonitorDTO;
 import com.network.monitor.entity.AttackMonitorEntity;
 
 /**

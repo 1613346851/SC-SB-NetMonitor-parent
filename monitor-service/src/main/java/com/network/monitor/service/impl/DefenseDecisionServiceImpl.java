@@ -7,7 +7,6 @@ import com.network.monitor.common.constant.IpAttackStateConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.DefenseCommandDTO;
 import com.network.monitor.entity.AttackEventEntity;
-import com.network.monitor.entity.DefenseLogEntity;
 import com.network.monitor.event.BlacklistSyncEvent;
 import com.network.monitor.mapper.AttackMonitorMapper;
 import com.network.monitor.mapper.DefenseLogMapper;

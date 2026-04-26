@@ -2,9 +2,7 @@ package com.network.monitor.controller.outer;
 
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.common.constant.DefenseRuleStatusConstant;
-import com.network.monitor.entity.InterfaceRuleEntity;
 import com.network.monitor.entity.MonitorRuleEntity;
-import com.network.monitor.entity.ScanInterfaceEntity;
 import com.network.monitor.entity.VulnerabilityMonitorEntity;
 import com.network.monitor.entity.VulnerabilityRuleEntity;
 import com.network.monitor.mapper.InterfaceRuleMapper;

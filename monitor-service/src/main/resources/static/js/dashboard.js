@@ -5,8 +5,35 @@
 
 let recentAttacksTable;
 
+function waitForEcharts(maxWait = 5000) {
+    return new Promise((resolve) => {
+        if (typeof echarts !== 'undefined') {
+            resolve(true);
+            return;
+        }
+        
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+            if (typeof echarts !== 'undefined') {
+                clearInterval(checkInterval);
+                resolve(true);
+            } else if (Date.now() - startTime > maxWait) {
+                clearInterval(checkInterval);
+                console.error('ECharts 加载超时');
+                resolve(false);
+            }
+        }, 100);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
     initRecentAttacksTable();
+    
+    const echartsLoaded = await waitForEcharts();
+    if (!echartsLoaded) {
+        console.error('ECharts 未加载，图表功能不可用');
+        return;
+    }
     
     await Promise.all([
         loadDashboardStats(),

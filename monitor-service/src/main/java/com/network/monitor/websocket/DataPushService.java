@@ -1,6 +1,5 @@
 package com.network.monitor.websocket;
 
-import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.entity.AlertEntity;
 import com.network.monitor.entity.AttackMonitorEntity;
 import org.slf4j.Logger;
@@ -13,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
+@SuppressWarnings("null")
 public class DataPushService {
 
     private static final Logger logger = LoggerFactory.getLogger(DataPushService.class);

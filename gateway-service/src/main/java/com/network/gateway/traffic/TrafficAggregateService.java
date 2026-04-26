@@ -6,7 +6,6 @@ import com.network.gateway.client.MonitorServiceTrafficClient;
 import com.network.gateway.constant.IpAttackStateConstant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -42,22 +41,25 @@ public class TrafficAggregateService {
     
     private final AtomicBoolean isShutdown = new AtomicBoolean(false);
 
-    @Autowired
-    private GatewayConfigCache configCache;
-
-    @Autowired
-    private IpAttackStateCache attackStateCache;
-
-    @Autowired
-    private MonitorServiceTrafficClient trafficClient;
-
-    @Autowired
-    private PushDegradationHandler degradationHandler;
-
-    @Autowired
-    private NetworkCongestionDetector congestionDetector;
+    private final GatewayConfigCache configCache;
+    private final IpAttackStateCache attackStateCache;
+    private final MonitorServiceTrafficClient trafficClient;
+    private final PushDegradationHandler degradationHandler;
+    private final NetworkCongestionDetector congestionDetector;
 
     private long aggregateIntervalMs = 5000;
+
+    public TrafficAggregateService(GatewayConfigCache configCache,
+                                   IpAttackStateCache attackStateCache,
+                                   MonitorServiceTrafficClient trafficClient,
+                                   PushDegradationHandler degradationHandler,
+                                   NetworkCongestionDetector congestionDetector) {
+        this.configCache = configCache;
+        this.attackStateCache = attackStateCache;
+        this.trafficClient = trafficClient;
+        this.degradationHandler = degradationHandler;
+        this.congestionDetector = congestionDetector;
+    }
 
     @PostConstruct
     public void init() {

@@ -38,25 +38,7 @@ public class TrafficCollectGlobalFilter implements GlobalFilter, Ordered {
     private IpAttackStateCache attackStateCache;
 
     @Autowired
-    private GatewayConfigCache configCache;
-
-    @Autowired
-    private TrafficPushStrategyManager strategyManager;
-
-    @Autowired
-    private TrafficQueueManager queueManager;
-
-    @Autowired
-    private PushRetryQueue retryQueue;
-
-    @Autowired
-    private PushDegradationHandler degradationHandler;
-
-    @Autowired
     private TrafficEventProcessor eventProcessor;
-
-    @Autowired
-    private TrafficActivityService activityService;
 
     @Autowired
     private TrafficAggregateService aggregateService;

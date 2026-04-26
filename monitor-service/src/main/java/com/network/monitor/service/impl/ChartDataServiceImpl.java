@@ -2,8 +2,6 @@ package com.network.monitor.service.impl;
 
 import com.network.monitor.bo.ChartDataBO;
 import com.network.monitor.mapper.AttackMonitorMapper;
-import com.network.monitor.mapper.TrafficMonitorMapper;
-import com.network.monitor.mapper.VulnerabilityMonitorMapper;
 import com.network.monitor.service.ChartDataService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,13 +23,7 @@ import java.util.Map;
 public class ChartDataServiceImpl implements ChartDataService {
 
     @Autowired
-    private TrafficMonitorMapper trafficMonitorMapper;
-
-    @Autowired
     private AttackMonitorMapper attackMonitorMapper;
-
-    @Autowired
-    private VulnerabilityMonitorMapper vulnerabilityMonitorMapper;
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -84,7 +76,7 @@ public class ChartDataServiceImpl implements ChartDataService {
             List<String> levels = List.of("CRITICAL", "HIGH", "MEDIUM", "LOW");
             List<Number> counts = new ArrayList<>();
 
-            for (String level : levels) {
+            for (String ignored : levels) {
                 // TODO: 从数据库查询各等级漏洞数量
                 // 暂时返回示例数据
                 counts.add((int) (Math.random() * 50));

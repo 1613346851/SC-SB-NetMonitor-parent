@@ -30,8 +30,6 @@ public class LogQueryService {
         "(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}) \\[(.+?)\\] (\\w+) (.+?) - (.+)"
     );
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
-    
-    private final Map<String, List<LogEntry>> traceLogCache = new ConcurrentHashMap<>();
 
     public LogQueryResult queryByTraceId(String traceId, int limit) {
         LogQueryResult result = new LogQueryResult();

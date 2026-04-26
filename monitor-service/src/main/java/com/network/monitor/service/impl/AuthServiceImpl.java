@@ -26,7 +26,6 @@ public class AuthServiceImpl implements AuthService {
     private static final ThreadLocal<Long> currentUserId = new ThreadLocal<>();
     private static final ThreadLocal<String> currentUsername = new ThreadLocal<>();
     
-    private static final int STATUS_NORMAL = 0;
     private static final int STATUS_DISABLED = 1;
     private static final int STATUS_LOCKED = 2;
     
@@ -41,9 +40,6 @@ public class AuthServiceImpl implements AuthService {
     
     @Autowired
     private RoleMenuMapper roleMenuMapper;
-    
-    @Autowired
-    private JwtUtil jwtUtil;
     
     @Autowired
     private PasswordEncoder passwordEncoder;

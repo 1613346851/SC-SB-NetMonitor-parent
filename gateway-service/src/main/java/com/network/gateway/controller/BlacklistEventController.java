@@ -2,7 +2,6 @@ package com.network.gateway.controller;
 
 import com.network.gateway.cache.IpAttackStateCache;
 import com.network.gateway.cache.IpBlacklistCache;
-import com.network.gateway.defense.DefenseLogType;
 import com.network.gateway.dto.BlacklistEventDTO;
 import com.network.gateway.dto.DefenseLogDTO;
 import com.network.gateway.service.BlacklistDegradationService;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/inner/blacklist")
@@ -199,7 +197,6 @@ public class BlacklistEventController {
         try {
             @SuppressWarnings("unchecked")
             List<String> ips = (List<String>) request.get("ips");
-            String reason = (String) request.getOrDefault("reason", "批量人工解封");
             
             if (ips == null || ips.isEmpty()) {
                 response.put("success", false);
@@ -259,7 +256,6 @@ public class BlacklistEventController {
             
             int total = allIps.size();
             int start = (page - 1) * size;
-            int end = Math.min(start + size, total);
             
             List<String> ipList = allIps.stream()
                 .skip(start)

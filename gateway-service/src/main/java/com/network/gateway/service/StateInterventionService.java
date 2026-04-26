@@ -8,7 +8,6 @@ import com.network.gateway.dto.StateInterventionLog;
 import com.network.gateway.event.StateTransitionEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -26,7 +25,6 @@ public class StateInterventionService {
     private final StateTransitionEventPublisher eventPublisher;
     private final Map<String, List<StateInterventionLog>> interventionLogs = new ConcurrentHashMap<>();
 
-    @Autowired
     public StateInterventionService(IpAttackStateCache stateCache,
                                     ConfidenceService confidenceService,
                                     StateTransitionEventPublisher eventPublisher) {

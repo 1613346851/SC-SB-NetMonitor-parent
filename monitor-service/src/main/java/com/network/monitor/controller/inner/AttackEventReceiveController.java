@@ -43,9 +43,7 @@ public class AttackEventReceiveController {
                 ((Number) eventData.get("confidence")).intValue() : 85;
             Integer rateLimitCount = eventData.get("rateLimitCount") != null ? 
                 ((Number) eventData.get("rateLimitCount")).intValue() : 0;
-            String httpMethod = (String) eventData.get("httpMethod");
             String requestUri = (String) eventData.get("requestUri");
-            String userAgent = (String) eventData.get("userAgent");
             String description = (String) eventData.get("description");
             String reason = (String) eventData.get("reason");
             String gatewayEventId = (String) eventData.get("eventId");
@@ -58,8 +56,6 @@ public class AttackEventReceiveController {
                 ((Number) eventData.get("slidingWindowRps")).intValue() : null;
             Integer peakRps = eventData.get("peakRps") != null ?
                 ((Number) eventData.get("peakRps")).intValue() : null;
-            Integer currentRps = eventData.get("currentRps") != null ?
-                ((Number) eventData.get("currentRps")).intValue() : null;
             Integer attackDuration = eventData.get("attackDuration") != null ?
                 ((Number) eventData.get("attackDuration")).intValue() : null;
             Integer requestCountFromGateway = eventData.get("requestCount") != null ?

@@ -1,6 +1,5 @@
 package com.network.gateway.cache;
 
-import com.network.gateway.cache.GatewayConfigCache;
 import com.network.gateway.confidence.ConfidenceContext;
 import com.network.gateway.confidence.ConfidenceResult;
 import com.network.gateway.confidence.ConfidenceService;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Component;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component

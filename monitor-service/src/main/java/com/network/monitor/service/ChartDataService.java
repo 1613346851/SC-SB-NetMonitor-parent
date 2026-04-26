@@ -2,12 +2,6 @@ package com.network.monitor.service;
 
 import com.network.monitor.bo.ChartDataBO;
 
-import java.util.List;
-import java.util.Map;
-
-/**
- * ECharts 图表数据格式化服务接口
- */
 public interface ChartDataService {
 
     /**
