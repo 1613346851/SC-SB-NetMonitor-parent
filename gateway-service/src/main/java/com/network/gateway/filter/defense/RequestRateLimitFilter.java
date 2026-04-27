@@ -11,6 +11,8 @@ import com.network.gateway.constant.IpAttackStateConstant;
 import com.network.gateway.dto.BlacklistEventDTO;
 import com.network.gateway.dto.DDoSAttackEventDTO;
 import com.network.gateway.dto.DefenseLogDTO;
+import com.network.gateway.service.DistributedAttackDetector;
+import com.network.gateway.service.SlowAttackDetector;
 import com.network.gateway.traffic.TrafficAggregateService;
 import com.network.gateway.util.DefenseLogUtil;
 import com.network.gateway.util.DefenseResponseUtil;
@@ -45,6 +47,12 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
 
     @Autowired
     private TrafficAggregateService aggregateService;
+
+    @Autowired
+    private SlowAttackDetector slowAttackDetector;
+
+    @Autowired
+    private DistributedAttackDetector distributedAttackDetector;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -89,7 +97,7 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                             
                             if (transitionResult.isTransitioned() && transitionResult.getNewState() == IpAttackStateConstant.ATTACKING) {
                                 logger.warn("COOLDOWN期间再次攻击，转换状态: ip={}, newState=ATTACKING", sourceIp);
-                                handleStateTransition(sourceIp, transitionResult, exchange, startTime);
+                                handleStateTransition(sourceIp, transitionResult, exchange, startTime, true);
                                 return handleDefendedRequest(exchange, sourceIp, startTime, IpAttackStateConstant.ATTACKING);
                             }
                         }
@@ -123,7 +131,7 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                     attackStateCache.checkAndTransitionState(sourceIp, currentRateLimitCount, suspiciousThreshold, attackingThreshold);
                 
                 if (transitionResult.isTransitioned()) {
-                    handleStateTransition(sourceIp, transitionResult, exchange, startTime);
+                    handleStateTransition(sourceIp, transitionResult, exchange, startTime, true);
                     currentState = transitionResult.getNewState();
                     
                     if (currentState == IpAttackStateConstant.DEFENDED) {
@@ -136,6 +144,26 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
                 return handleRateLimitExceeded(exchange, sourceIp, startTime, threshold, currentRateLimitCount, currentState, transitionResult);
             }
 
+            if (currentState == IpAttackStateConstant.NORMAL || currentState == IpAttackStateConstant.SUSPICIOUS) {
+                SlowAttackDetector.SlowAttackResult slowAttackResult = checkSlowAttack(sourceIp);
+                logger.info("慢速攻击检测结果: ip={}, isSlowAttack={}, reason={}, duration={}ms, totalRequests={}, averageRps={}", 
+                        sourceIp, slowAttackResult.isSlowAttack(), slowAttackResult.getReason(), 
+                        slowAttackResult.getDuration(), slowAttackResult.getTotalRequests(), slowAttackResult.getAverageRps());
+                if (slowAttackResult.isSlowAttack()) {
+                    logger.warn("检测到慢速攻击: ip={}, reason={}, averageRps={}", 
+                            sourceIp, slowAttackResult.getReason(), slowAttackResult.getAverageRps());
+                    
+                    IpAttackStateCache.StateTransitionResult slowTransitionResult = 
+                        handleSlowAttack(sourceIp, slowAttackResult, exchange, startTime);
+                    
+                    if (slowTransitionResult != null && slowTransitionResult.isTransitioned()) {
+                        if (slowTransitionResult.getNewState() == IpAttackStateConstant.DEFENDED) {
+                            return handleDefendedRequest(exchange, sourceIp, startTime, slowTransitionResult.getNewState());
+                        }
+                    }
+                }
+            }
+
             return chain.filter(exchange);
         } catch (Exception e) {
             logger.error("请求限流检查过程中发生异常，IP: {}", sourceIp, e);
@@ -146,7 +174,8 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
     private void handleStateTransition(String sourceIp, 
                                        IpAttackStateCache.StateTransitionResult transitionResult,
                                        ServerWebExchange exchange,
-                                       long startTime) {
+                                       long startTime,
+                                       boolean isHighFrequencyAttack) {
         int newState = transitionResult.getNewState();
         int previousState = transitionResult.getPreviousState();
         String reason = transitionResult.getReason();
@@ -154,28 +183,53 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         int confidence = attackStateCache.getConfidence(sourceIp);
         String eventId = transitionResult.getEventId();
         
-        logger.info("IP状态转换完成: ip={}, {} -> {}, reason={}, stateRequestCount={}, confidence={}, eventId={}", 
+        DistributedAttackDetector.DistributedAttackResult distributedResult = null;
+        if (newState == IpAttackStateConstant.SUSPICIOUS || newState == IpAttackStateConstant.ATTACKING) {
+            distributedResult = checkAndRecordDistributedAttack(sourceIp);
+            if (distributedResult.isDistributedAttack()) {
+                confidence = Math.min(confidence + 15, 100);
+                attackStateCache.updateConfidence(sourceIp, confidence);
+                logger.warn("检测到分布式攻击: ip={}, networkSegment={}, relatedIpCount={}, confidence={}", 
+                        sourceIp, distributedResult.getNetworkSegment(), 
+                        distributedResult.getRelatedIpCount(), confidence);
+            }
+        }
+        
+        logger.info("IP状态转换完成: ip={}, {} -> {}, reason={}, stateRequestCount={}, confidence={}, eventId={}, distributed={}", 
                 sourceIp,
                 IpAttackStateConstant.getStateNameZh(previousState),
                 IpAttackStateConstant.getStateNameZh(newState),
                 reason,
                 stateRequestCount,
                 confidence,
-                eventId);
+                eventId,
+                distributedResult != null && distributedResult.isDistributedAttack());
         
         aggregateService.onStateTransition(sourceIp, previousState, newState);
         
         DefenseResultBO.RiskLevel riskLevel = calculateRiskLevelByConfidence(confidence);
         
+        StringBuilder attackTypeDesc = new StringBuilder();
+        attackTypeDesc.append(isHighFrequencyAttack ? "高频DDoS攻击" : "低频DDoS攻击");
+        if (distributedResult != null && distributedResult.isDistributedAttack()) {
+            attackTypeDesc.append("(分布式)");
+        }
+        
         if (newState == IpAttackStateConstant.SUSPICIOUS) {
-            pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "频率异常", confidence, eventId);
-            pushStateTransitionDefenseLog(sourceIp, exchange, eventId, "SUSPICIOUS", "频率异常检测", riskLevel, confidence);
+            String eventReason = isHighFrequencyAttack ? "频率异常" : "慢速攻击";
+            pushDDoSEventWithDistributed(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, 
+                    eventReason, confidence, eventId, distributedResult, attackTypeDesc.toString());
+            pushStateTransitionDefenseLog(sourceIp, exchange, eventId, "SUSPICIOUS", eventReason + "检测", riskLevel, confidence);
         } else if (newState == IpAttackStateConstant.ATTACKING) {
-            pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "攻击确认", confidence, eventId);
-            pushStateTransitionDefenseLog(sourceIp, exchange, eventId, "ATTACKING", "攻击行为确认", riskLevel, confidence);
+            String eventReason = isHighFrequencyAttack ? "攻击确认" : "慢速攻击确认";
+            pushDDoSEventWithDistributed(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, 
+                    eventReason, confidence, eventId, distributedResult, attackTypeDesc.toString());
+            pushStateTransitionDefenseLog(sourceIp, exchange, eventId, "ATTACKING", eventReason, riskLevel, confidence);
         } else if (newState == IpAttackStateConstant.DEFENDED) {
-            pushDDoSEvent(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, "执行防御", confidence, eventId);
-            pushBlacklistEvent(sourceIp, exchange, "攻击确认，自动拉黑", confidence, eventId);
+            String eventReason = isHighFrequencyAttack ? "攻击确认，自动拉黑" : "慢速攻击确认，自动拉黑";
+            pushDDoSEventWithDistributed(sourceIp, attackStateCache.getRateLimitCount(sourceIp), exchange, 
+                    "执行防御", confidence, eventId, distributedResult, attackTypeDesc.toString());
+            pushBlacklistEventWithDistributed(sourceIp, exchange, eventReason, confidence, eventId, distributedResult);
         }
     }
     
@@ -483,6 +537,207 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
         } else {
             return DefenseResultBO.RiskLevel.LOW;
         }
+    }
+
+    private SlowAttackDetector.SlowAttackResult checkSlowAttack(String ip) {
+        int currentCount = rateLimitCache.getCurrentRequestCount(ip);
+        double currentRps = currentCount > 0 ? currentCount : 1.0;
+        return slowAttackDetector.detectSlowAttack(ip, currentRps);
+    }
+
+    private IpAttackStateCache.StateTransitionResult handleSlowAttack(String sourceIp, 
+                                                                        SlowAttackDetector.SlowAttackResult slowAttackResult,
+                                                                        ServerWebExchange exchange,
+                                                                        long startTime) {
+        int currentState = attackStateCache.getState(sourceIp);
+        
+        if (currentState == IpAttackStateConstant.DEFENDED) {
+            logger.debug("IP已处于DEFENDED状态，跳过慢速攻击处理: ip={}", sourceIp);
+            return null;
+        }
+        
+        int confidence = attackStateCache.getConfidence(sourceIp);
+        confidence = Math.max(confidence, 50);
+        confidence = Math.min(confidence + 15, 100);
+        
+        IpAttackStateCache.StateTransitionResult transitionResult;
+        
+        if (currentState == IpAttackStateConstant.NORMAL) {
+            String eventId = generateEventId(sourceIp);
+            attackStateCache.updateState(sourceIp, IpAttackStateConstant.SUSPICIOUS, eventId);
+            attackStateCache.updateConfidence(sourceIp, confidence);
+            
+            transitionResult = new IpAttackStateCache.StateTransitionResult();
+            transitionResult.setPreviousState(IpAttackStateConstant.NORMAL);
+            transitionResult.setNewState(IpAttackStateConstant.SUSPICIOUS);
+            transitionResult.setTransitioned(true);
+            transitionResult.setReason("慢速攻击检测");
+            transitionResult.setEventId(eventId);
+            
+            logger.warn("慢速攻击触发状态转换: ip={}, NORMAL -> SUSPICIOUS, confidence={}, reason={}", 
+                    sourceIp, confidence, slowAttackResult.getReason());
+        } else if (currentState == IpAttackStateConstant.SUSPICIOUS) {
+            if (confidence >= 80) {
+                String eventId = attackStateCache.getEventId(sourceIp);
+                attackStateCache.updateState(sourceIp, IpAttackStateConstant.DEFENDED);
+                attackStateCache.updateConfidence(sourceIp, confidence);
+                
+                transitionResult = new IpAttackStateCache.StateTransitionResult();
+                transitionResult.setPreviousState(IpAttackStateConstant.SUSPICIOUS);
+                transitionResult.setNewState(IpAttackStateConstant.DEFENDED);
+                transitionResult.setTransitioned(true);
+                transitionResult.setReason("慢速攻击确认，置信度达到防御阈值");
+                transitionResult.setEventId(eventId);
+                
+                logger.warn("慢速攻击触发防御: ip={}, SUSPICIOUS -> DEFENDED, confidence={}", 
+                        sourceIp, confidence);
+            } else if (confidence >= 60) {
+                String eventId = attackStateCache.getEventId(sourceIp);
+                attackStateCache.updateState(sourceIp, IpAttackStateConstant.ATTACKING);
+                attackStateCache.updateConfidence(sourceIp, confidence);
+                
+                transitionResult = new IpAttackStateCache.StateTransitionResult();
+                transitionResult.setPreviousState(IpAttackStateConstant.SUSPICIOUS);
+                transitionResult.setNewState(IpAttackStateConstant.ATTACKING);
+                transitionResult.setTransitioned(true);
+                transitionResult.setReason("慢速攻击持续");
+                transitionResult.setEventId(eventId);
+                
+                logger.warn("慢速攻击持续触发状态转换: ip={}, SUSPICIOUS -> ATTACKING, confidence={}", 
+                        sourceIp, confidence);
+            } else {
+                attackStateCache.updateConfidence(sourceIp, confidence);
+                transitionResult = new IpAttackStateCache.StateTransitionResult();
+                transitionResult.setPreviousState(currentState);
+                transitionResult.setNewState(currentState);
+                transitionResult.setTransitioned(false);
+                transitionResult.setEventId(attackStateCache.getEventId(sourceIp));
+            }
+        } else if (currentState == IpAttackStateConstant.ATTACKING) {
+            if (confidence >= 80) {
+                String eventId = attackStateCache.getEventId(sourceIp);
+                attackStateCache.updateState(sourceIp, IpAttackStateConstant.DEFENDED);
+                attackStateCache.updateConfidence(sourceIp, confidence);
+                
+                transitionResult = new IpAttackStateCache.StateTransitionResult();
+                transitionResult.setPreviousState(IpAttackStateConstant.ATTACKING);
+                transitionResult.setNewState(IpAttackStateConstant.DEFENDED);
+                transitionResult.setTransitioned(true);
+                transitionResult.setReason("慢速攻击确认，置信度达到防御阈值");
+                transitionResult.setEventId(eventId);
+                
+                logger.warn("慢速攻击触发防御: ip={}, ATTACKING -> DEFENDED, confidence={}", 
+                        sourceIp, confidence);
+            } else {
+                confidence = Math.min(confidence + 5, 100);
+                attackStateCache.updateConfidence(sourceIp, confidence);
+                transitionResult = new IpAttackStateCache.StateTransitionResult();
+                transitionResult.setPreviousState(currentState);
+                transitionResult.setNewState(currentState);
+                transitionResult.setTransitioned(false);
+                transitionResult.setEventId(attackStateCache.getEventId(sourceIp));
+            }
+        } else {
+            transitionResult = new IpAttackStateCache.StateTransitionResult();
+            transitionResult.setPreviousState(currentState);
+            transitionResult.setNewState(currentState);
+            transitionResult.setTransitioned(false);
+            transitionResult.setEventId(attackStateCache.getEventId(sourceIp));
+        }
+        
+        if (transitionResult.isTransitioned()) {
+            handleStateTransition(sourceIp, transitionResult, exchange, startTime, false);
+        }
+        
+        return transitionResult;
+    }
+
+    private DistributedAttackDetector.DistributedAttackResult checkAndRecordDistributedAttack(String ip) {
+        distributedAttackDetector.recordAttack(ip);
+        return distributedAttackDetector.detectDistributedAttack(ip);
+    }
+
+    private void pushDDoSEventWithDistributed(String sourceIp, int rateLimitCount, ServerWebExchange exchange, 
+                                               String reason, int confidence, String eventId,
+                                               DistributedAttackDetector.DistributedAttackResult distributedResult,
+                                               String attackTypeDesc) {
+        try {
+            int effectiveConfidence = confidence;
+            if (effectiveConfidence <= 0 && rateLimitCount > 0) {
+                effectiveConfidence = Math.min(30 + rateLimitCount * 5, 65);
+            }
+            if (effectiveConfidence <= 0) {
+                effectiveConfidence = 30;
+            }
+            
+            DDoSAttackEventDTO event = new DDoSAttackEventDTO(sourceIp, rateLimitCount, effectiveConfidence);
+            event.setHttpMethod(exchange.getRequest().getMethodValue());
+            event.setRequestUri(exchange.getRequest().getURI().getPath());
+            event.setUserAgent(ServerWebExchangeUtil.extractUserAgent(ServerWebExchangeUtil.extractHeaders(exchange.getRequest())));
+            if (eventId != null && !eventId.isEmpty()) {
+                event.setEventId(eventId);
+            }
+            
+            IpAttackStateEntry entry = attackStateCache.get(sourceIp);
+            int peakRps = 0;
+            if (entry != null) {
+                peakRps = entry.getPeakRps();
+                event.setAttackDuration(entry.getAttackDuration());
+                event.setRequestCount(entry.getAttackRequestCount());
+                event.setUniqueUriCount(entry.getUniqueUriCount());
+            }
+            
+            event.setSlidingWindowRps(peakRps);
+            event.setPeakRps(peakRps);
+            event.setAttackType("DDOS");
+            
+            String description = String.format("[%s] %s", attackTypeDesc, event.getDescription());
+            if (distributedResult != null && distributedResult.isDistributedAttack()) {
+                description += String.format(" [分布式攻击: 网段=%s, 关联IP数=%d]", 
+                        distributedResult.getNetworkSegment(), distributedResult.getRelatedIpCount());
+            }
+            event.setDescription(description);
+            
+            defenseClient.pushDDoSAttackEvent(event);
+            logger.info("DDoS攻击事件推送成功: ip={}, rateLimitCount={}, confidence={}, reason={}, eventId={}, attackTypeDesc={}, distributed={}", 
+                    sourceIp, rateLimitCount, effectiveConfidence, reason, eventId, attackTypeDesc, 
+                    distributedResult != null && distributedResult.isDistributedAttack());
+        } catch (Exception e) {
+            logger.error("推送DDoS攻击事件失败: ip={}, error={}", sourceIp, e.getMessage(), e);
+        }
+    }
+
+    private void pushBlacklistEventWithDistributed(String sourceIp, ServerWebExchange exchange, String reason, 
+                                                    int confidence, String eventId,
+                                                    DistributedAttackDetector.DistributedAttackResult distributedResult) {
+        try {
+            long banDurationMs = calculateBanDuration(sourceIp, confidence);
+            
+            BlacklistEventDTO event = new BlacklistEventDTO(sourceIp, "SYSTEM", reason);
+            event.setDurationSeconds(banDurationMs / 1000);
+            event.setConfidence(confidence);
+            event.setFromState(IpAttackStateConstant.ATTACKING);
+            event.setToState(IpAttackStateConstant.DEFENDED);
+            if (eventId != null && !eventId.isEmpty()) {
+                event.setEventId(eventId);
+            }
+            
+            if (distributedResult != null && distributedResult.isDistributedAttack()) {
+                event.setBanReason(String.format("%s [分布式攻击: 网段=%s, 关联IP数=%d]", 
+                        reason, distributedResult.getNetworkSegment(), distributedResult.getRelatedIpCount()));
+            }
+            
+            defenseClient.pushBlacklistEvent(event);
+            logger.info("黑名单事件推送成功: ip={}, reason={}, duration={}s, confidence={}, eventId={}, distributed={}", 
+                    sourceIp, reason, banDurationMs / 1000, confidence, eventId, 
+                    distributedResult != null && distributedResult.isDistributedAttack());
+        } catch (Exception e) {
+            logger.error("推送黑名单事件失败: ip={}, error={}", sourceIp, e.getMessage(), e);
+        }
+    }
+
+    private String generateEventId(String ip) {
+        return "DDOS_" + System.currentTimeMillis() + "_" + ip.hashCode();
     }
 
     @Override

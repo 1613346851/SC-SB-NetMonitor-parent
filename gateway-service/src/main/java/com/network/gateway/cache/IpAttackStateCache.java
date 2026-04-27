@@ -541,6 +541,12 @@ public class IpAttackStateCache {
         return entry != null ? entry.getConfidence() : 0;
     }
 
+    public void updateConfidence(String ip, int confidence) {
+        IpAttackStateEntry entry = getOrCreate(ip);
+        entry.setConfidence(confidence);
+        logger.debug("更新IP置信度: ip={}, confidence={}", ip, confidence);
+    }
+
     public boolean isInDefendedState(String ip) {
         return getState(ip) == IpAttackStateConstant.DEFENDED;
     }
