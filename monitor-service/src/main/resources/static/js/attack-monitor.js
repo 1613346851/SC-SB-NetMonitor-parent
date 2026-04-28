@@ -10,6 +10,7 @@ let currentEventId = null;
 let selectedIds = [];
 
 document.addEventListener('DOMContentLoaded', function() {
+    loadStats();
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     
@@ -31,6 +32,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     initDataUpdateHandler();
 });
+
+function loadStats() {
+    http.get('/attack/stats')
+        .then(function(stats) {
+            document.getElementById('statCritical').textContent = stats.critical || 0;
+            document.getElementById('statHigh').textContent = stats.high || 0;
+            document.getElementById('statMedium').textContent = stats.medium || 0;
+            document.getElementById('statLow').textContent = stats.low || 0;
+            document.getElementById('statPending').textContent = stats.pending || 0;
+        })
+        .catch(function(error) {
+            console.error('加载统计数据失败:', error);
+        });
+}
 
 function initDataUpdateHandler() {
     if (typeof DataUpdateHandler === 'undefined') {

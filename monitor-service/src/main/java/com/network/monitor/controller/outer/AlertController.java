@@ -27,9 +27,6 @@ public class AlertController {
 
     @Autowired
     private AlertService alertService;
-
-    @Autowired
-    private AlertMapper alertMapper;
     
     @Autowired
     private OperLogService operLogService;

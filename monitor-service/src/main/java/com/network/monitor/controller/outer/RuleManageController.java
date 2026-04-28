@@ -2,9 +2,7 @@ package com.network.monitor.controller.outer;
 
 import com.network.monitor.common.ApiResponse;
 import com.network.monitor.common.constant.DefenseRuleStatusConstant;
-import com.network.monitor.entity.InterfaceRuleEntity;
 import com.network.monitor.entity.MonitorRuleEntity;
-import com.network.monitor.entity.ScanInterfaceEntity;
 import com.network.monitor.entity.VulnerabilityMonitorEntity;
 import com.network.monitor.entity.VulnerabilityRuleEntity;
 import com.network.monitor.mapper.InterfaceRuleMapper;
@@ -503,6 +501,37 @@ public class RuleManageController {
             log.info("更新漏洞[{}]防御状态: status={}, ruleCount={}", vulnerabilityId, status, ruleCount);
         } catch (Exception e) {
             log.error("更新漏洞防御状态失败: vulnerabilityId={}", vulnerabilityId, e);
+        }
+    }
+
+    @GetMapping("/stats")
+    public ApiResponse<Map<String, Object>> getRuleStats() {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+            
+            long totalRules = monitorRuleMapper.countByCondition(null, null, null);
+            long enabledRules = monitorRuleMapper.countByCondition(null, null, 1);
+            long disabledRules = monitorRuleMapper.countByCondition(null, null, 0);
+            
+            long sqlInjectionRules = monitorRuleMapper.countByAttackType("SQL_INJECTION");
+            long xssRules = monitorRuleMapper.countByAttackType("XSS");
+            long commandInjectionRules = monitorRuleMapper.countByAttackType("COMMAND_INJECTION");
+            long ddosRules = monitorRuleMapper.countByAttackType("DDOS");
+            long pathTraversalRules = monitorRuleMapper.countByAttackType("PATH_TRAVERSAL");
+            
+            stats.put("totalRules", totalRules);
+            stats.put("enabledRules", enabledRules);
+            stats.put("disabledRules", disabledRules);
+            stats.put("sqlInjectionRules", sqlInjectionRules);
+            stats.put("xssRules", xssRules);
+            stats.put("commandInjectionRules", commandInjectionRules);
+            stats.put("ddosRules", ddosRules);
+            stats.put("pathTraversalRules", pathTraversalRules);
+            
+            return ApiResponse.success(stats);
+        } catch (Exception e) {
+            log.error("获取规则统计失败：", e);
+            return ApiResponse.error("获取统计失败");
         }
     }
     

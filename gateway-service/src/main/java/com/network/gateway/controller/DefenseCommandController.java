@@ -1,6 +1,5 @@
 package com.network.gateway.controller;
 
-import com.network.gateway.bo.DefenseResultBO;
 import com.network.gateway.cache.IpAttackStateCache;
 import com.network.gateway.cache.IpBlacklistCache;
 import com.network.gateway.cache.RequestRateLimitCache;

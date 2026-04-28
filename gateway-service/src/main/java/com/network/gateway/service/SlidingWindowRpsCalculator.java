@@ -1,9 +1,6 @@
 package com.network.gateway.service;
 
 import com.network.gateway.cache.GatewayConfigCache;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -12,11 +9,8 @@ import java.util.concurrent.atomic.AtomicLong;
 @Component
 public class SlidingWindowRpsCalculator {
 
-    private static final Logger logger = LoggerFactory.getLogger(SlidingWindowRpsCalculator.class);
-
     private final GatewayConfigCache configCache;
 
-    @Autowired
     public SlidingWindowRpsCalculator(GatewayConfigCache configCache) {
         this.configCache = configCache;
     }

@@ -25,10 +25,6 @@ public class ConfigSyncService {
 
     private static final Logger logger = LoggerFactory.getLogger(ConfigSyncService.class);
 
-    private static final int HANDSHAKE_STEP_1 = 1;
-    private static final int HANDSHAKE_STEP_2 = 2;
-    private static final int HANDSHAKE_STEP_3 = 3;
-
     @Value("${spring.application.name:gateway-service}")
     private String applicationName;
 

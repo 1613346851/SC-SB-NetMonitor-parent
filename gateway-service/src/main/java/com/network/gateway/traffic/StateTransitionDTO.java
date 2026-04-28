@@ -3,7 +3,6 @@ package com.network.gateway.traffic;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.List;
 
 @Data
 public class StateTransitionDTO implements Serializable {

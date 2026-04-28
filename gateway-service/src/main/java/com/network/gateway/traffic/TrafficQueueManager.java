@@ -191,7 +191,6 @@ public class TrafficQueueManager {
 
     public List<TrafficAggregateData> flushPeriodic() {
         List<TrafficAggregateData> flushData = new ArrayList<>();
-        long now = System.currentTimeMillis();
         
         for (Map.Entry<String, IpTrafficQueue> entry : ipQueues.entrySet()) {
             String ip = entry.getKey();
@@ -254,7 +253,6 @@ public class TrafficQueueManager {
     }
 
     public void cleanupExpiredQueues(long expireMs) {
-        long now = System.currentTimeMillis();
         List<String> toRemove = new ArrayList<>();
         
         for (Map.Entry<String, IpTrafficQueue> entry : ipQueues.entrySet()) {

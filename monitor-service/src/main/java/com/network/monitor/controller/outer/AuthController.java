@@ -5,17 +5,23 @@ import com.network.monitor.entity.MenuEntity;
 import com.network.monitor.entity.UserEntity;
 import com.network.monitor.service.AuthService;
 import com.network.monitor.service.OperLogService;
+import com.network.monitor.service.impl.AuthServiceImpl;
 import com.network.monitor.util.JwtUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
+@Slf4j
 public class AuthController {
 
     @Autowired
@@ -26,10 +32,23 @@ public class AuthController {
     
     @Autowired
     private OperLogService operLogService;
+    
+    @Value("${jwt.cookie.name:auth_token}")
+    private String cookieName;
+    
+    @Value("${jwt.cookie.max-age:86400}")
+    private int cookieMaxAge;
+    
+    @Value("${jwt.cookie.secure:false}")
+    private boolean cookieSecure;
+    
+    @Value("${jwt.cookie.http-only:true}")
+    private boolean cookieHttpOnly;
 
     @PostMapping("/login")
     public ApiResponse<Map<String, Object>> login(@RequestBody Map<String, String> loginForm,
-                                                   HttpServletRequest request) {
+                                                   HttpServletRequest request,
+                                                   HttpServletResponse response) {
         String username = loginForm.get("username");
         String password = loginForm.get("password");
         
@@ -57,17 +76,31 @@ public class AuthController {
         
         String token = jwtUtil.generateToken(user.getId(), user.getUsername(), "USER");
         
+        AuthServiceImpl.setCurrentUser(user.getId(), user.getUsername());
+        
+        setAuthCookie(response, token);
+        
+        String defaultPage = authService.getDefaultPage();
+        List<String> permittedPaths = authService.getPermittedPaths();
+        
         Map<String, Object> result = new HashMap<>();
         result.put("token", token);
         result.put("user", buildUserInfo(user));
+        result.put("defaultPage", defaultPage);
+        result.put("permittedPaths", permittedPaths);
         
         return ApiResponse.success(result);
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(HttpServletRequest request) {
+    public ApiResponse<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        clearAuthCookie(response);
         String clientIp = getClientIp(request);
-        authService.logout(clientIp);
+        String username = authService.getCurrentUsername();
+        if (username != null) {
+            operLogService.logLogout(username, clientIp);
+            log.info("用户退出登录：username={}, ip={}", username, clientIp);
+        }
         return ApiResponse.success();
     }
 
@@ -115,6 +148,22 @@ public class AuthController {
             return ApiResponse.success();
         }
         return ApiResponse.error("当前密码错误");
+    }
+    
+    private void setAuthCookie(HttpServletResponse response, String token) {
+        Cookie cookie = new Cookie(cookieName, token);
+        cookie.setPath("/");
+        cookie.setMaxAge(cookieMaxAge);
+        cookie.setHttpOnly(cookieHttpOnly);
+        cookie.setSecure(cookieSecure);
+        response.addCookie(cookie);
+    }
+    
+    private void clearAuthCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie(cookieName, null);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
     }
 
     private Map<String, Object> buildUserInfo(UserEntity user) {

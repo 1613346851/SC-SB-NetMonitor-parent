@@ -3,7 +3,6 @@ package com.network.gateway.service;
 import com.network.gateway.cache.GatewayConfigCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -18,7 +17,6 @@ public class SlowAttackDetector {
     private final Map<String, SlowAttackTracker> trackerMap;
     private final SlidingWindowRpsCalculator rpsCalculator;
 
-    @Autowired
     public SlowAttackDetector(GatewayConfigCache configCache, SlidingWindowRpsCalculator rpsCalculator) {
         this.configCache = configCache;
         this.rpsCalculator = rpsCalculator;

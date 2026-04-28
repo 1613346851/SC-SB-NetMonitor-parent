@@ -3,7 +3,6 @@ package com.network.gateway.handler;
 import com.network.gateway.enums.TrafficPushStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -17,7 +16,6 @@ public class TrafficPushStrategyManager {
 
     private final Map<String, TrafficPushHandler> handlerMap = new HashMap<>();
 
-    @Autowired
     public TrafficPushStrategyManager(List<TrafficPushHandler> handlers) {
         for (TrafficPushHandler handler : handlers) {
             handlerMap.put(handler.getStrategyName(), handler);

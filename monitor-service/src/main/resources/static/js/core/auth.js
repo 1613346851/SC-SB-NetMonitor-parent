@@ -50,7 +50,15 @@
                     if (response.user) {
                         this.setUser(response.user);
                     }
-                    return { success: true, user: response.user };
+                    if (window.PageInit) {
+                        PageInit.clearMenuCache();
+                    }
+                    return { 
+                        success: true, 
+                        user: response.user,
+                        defaultPage: response.defaultPage,
+                        permittedPaths: response.permittedPaths || []
+                    };
                 }
                 
                 return { success: false, message: '登录失败' };
@@ -68,6 +76,9 @@
             } finally {
                 this.removeToken();
                 this.removeUser();
+                if (window.PageInit) {
+                    PageInit.clearMenuCache();
+                }
                 this.redirectToLogin();
             }
         },

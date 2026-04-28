@@ -1,6 +1,5 @@
 package com.network.monitor.mapper;
 
-import com.network.monitor.entity.UserRoleEntity;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

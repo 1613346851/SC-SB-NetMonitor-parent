@@ -6,6 +6,38 @@
     <title>攻击监测 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <style>
+        .stats-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .stat-critical .stat-value { color: #ef4444; }
+        .stat-high .stat-value { color: #f97316; }
+        .stat-medium .stat-value { color: #eab308; }
+        .stat-low .stat-value { color: #3b82f6; }
         .event-link {
             color: #4f46e5;
             text-decoration: none;
@@ -40,6 +72,31 @@
             </header>
 
             <main class="content">
+                <div class="stats-card">
+                    <div class="stats-grid">
+                        <div class="stat-item stat-critical">
+                            <div class="stat-value" id="statCritical">0</div>
+                            <div class="stat-label">严重攻击</div>
+                        </div>
+                        <div class="stat-item stat-high">
+                            <div class="stat-value" id="statHigh">0</div>
+                            <div class="stat-label">高风险攻击</div>
+                        </div>
+                        <div class="stat-item stat-medium">
+                            <div class="stat-value" id="statMedium">0</div>
+                            <div class="stat-label">中风险攻击</div>
+                        </div>
+                        <div class="stat-item stat-low">
+                            <div class="stat-value" id="statLow">0</div>
+                            <div class="stat-label">低风险攻击</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="statPending">0</div>
+                            <div class="stat-label">待处理</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="filter-bar">
                     <div class="form-inline">
                         <div class="form-group">

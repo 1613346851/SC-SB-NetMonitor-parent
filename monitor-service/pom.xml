@@ -111,6 +111,13 @@
             <version>4.2.0</version>
         </dependency>
 
+        <!-- ip2region 用于IP地理位置查询（中国地区精确到市） -->
+        <dependency>
+            <groupId>org.lionsoul</groupId>
+            <artifactId>ip2region</artifactId>
+            <version>3.3.7</version>
+        </dependency>
+
         <!-- WebSocket 支持 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

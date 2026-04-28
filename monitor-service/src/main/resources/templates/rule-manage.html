@@ -6,6 +6,39 @@
     <title>规则管理 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <style>
+        .stats-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .stat-primary .stat-value { color: #4f46e5; }
+        .stat-success .stat-value { color: #10b981; }
+        .stat-warning .stat-value { color: #f97316; }
+        .stat-danger .stat-value { color: #ef4444; }
+        .stat-info .stat-value { color: #3b82f6; }
         .batch-actions {
             display: flex;
             gap: 8px;
@@ -153,6 +186,31 @@
                 </div>
 
                 <div id="rules-content">
+                    <div class="stats-card" id="rulesStatsCard">
+                        <div class="stats-grid">
+                            <div class="stat-item stat-primary">
+                                <div class="stat-value" id="statTotalRules">0</div>
+                                <div class="stat-label">规则总数</div>
+                            </div>
+                            <div class="stat-item stat-success">
+                                <div class="stat-value" id="statEnabledRules">0</div>
+                                <div class="stat-label">已启用</div>
+                            </div>
+                            <div class="stat-item stat-warning">
+                                <div class="stat-value" id="statDisabledRules">0</div>
+                                <div class="stat-label">已禁用</div>
+                            </div>
+                            <div class="stat-item stat-danger">
+                                <div class="stat-value" id="statSqlInjectionRules">0</div>
+                                <div class="stat-label">SQL注入规则</div>
+                            </div>
+                            <div class="stat-item stat-info">
+                                <div class="stat-value" id="statXssRules">0</div>
+                                <div class="stat-label">XSS规则</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="filter-bar">
                         <div class="form-inline">
                             <div class="form-group">
@@ -228,6 +286,31 @@
                 </div>
 
                 <div id="whitelist-content" style="display: none;">
+                    <div class="stats-card" id="whitelistStatsCard">
+                        <div class="stats-grid">
+                            <div class="stat-item stat-primary">
+                                <div class="stat-value" id="statTotalWhitelists">0</div>
+                                <div class="stat-label">白名单总数</div>
+                            </div>
+                            <div class="stat-item stat-success">
+                                <div class="stat-value" id="statEnabledWhitelists">0</div>
+                                <div class="stat-label">已启用</div>
+                            </div>
+                            <div class="stat-item stat-warning">
+                                <div class="stat-value" id="statDisabledWhitelists">0</div>
+                                <div class="stat-label">已禁用</div>
+                            </div>
+                            <div class="stat-item stat-info">
+                                <div class="stat-value" id="statPathWhitelists">0</div>
+                                <div class="stat-label">路径白名单</div>
+                            </div>
+                            <div class="stat-item stat-danger">
+                                <div class="stat-value" id="statIpWhitelists">0</div>
+                                <div class="stat-label">IP白名单</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="filter-bar">
                         <div class="form-inline">
                             <div class="form-group">

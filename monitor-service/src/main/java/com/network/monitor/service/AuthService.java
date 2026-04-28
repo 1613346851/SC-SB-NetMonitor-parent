@@ -21,6 +21,12 @@ public interface AuthService {
     
     boolean hasPermission(String permission);
     
+    boolean isSuperAdmin();
+    
+    String getDefaultPage();
+    
+    List<String> getPermittedPaths();
+    
     void logout(String clientIp);
     
     boolean changePassword(String currentPassword, String newPassword, String clientIp);

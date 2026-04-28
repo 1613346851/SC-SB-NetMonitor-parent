@@ -12,6 +12,9 @@ public interface OperLogService {
     List<OperLogEntity> listLogs(String username, String operType, Integer operStatus, 
                                   String startTime, String endTime);
     
+    List<OperLogEntity> listAllLogsForExport(String username, String operType, Integer operStatus,
+                                              String startTime, String endTime);
+    
     Map<String, Object> listLogsWithPaging(String username, String operType, Integer operStatus,
                                             String startTime, String endTime, int pageNum, int pageSize,
                                             String sortField, String sortOrder);

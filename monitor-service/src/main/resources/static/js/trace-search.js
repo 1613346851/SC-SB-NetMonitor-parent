@@ -30,7 +30,7 @@ function initTraceTable() {
             return `
                 <tr>
                     <td>${dateFormat.format(item.createTime)}</td>
-                    <td><a class="link" href="/ip-profile?ip=${item.sourceIp}">${item.sourceIp}</a></td>
+                    <td><a class="link" href="javascript:void(0)" onclick="viewProfile('${item.sourceIp}')">${item.sourceIp}</a></td>
                     <td>${cell.renderAttackType(item.attackType)}</td>
                     ${cell.renderCell(item.targetUri, { maxLength: 40 })}
                     <td>${cell.renderRiskLevel(item.riskLevel)}</td>

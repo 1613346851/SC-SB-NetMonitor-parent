@@ -3,7 +3,6 @@ package com.network.gateway.service;
 import com.network.gateway.cache.GatewayConfigCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
@@ -20,7 +19,6 @@ public class DistributedAttackDetector {
     private final Map<String, NetworkSegmentTracker> networkSegmentMap;
     private final Map<String, String> ipToNetworkMap;
 
-    @Autowired
     public DistributedAttackDetector(GatewayConfigCache configCache) {
         this.configCache = configCache;
         this.networkSegmentMap = new ConcurrentHashMap<>();

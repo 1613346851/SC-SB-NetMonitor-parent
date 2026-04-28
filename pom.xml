@@ -35,7 +35,7 @@
         <spring-cloud.version>2021.0.8</spring-cloud.version>
         <!-- 持久层依赖版本 -->
         <mybatis.version>2.3.1</mybatis.version>
-        <!-- MySQL驱动（9.5.0 兼容MySQL 5.7+/8.0+，适配JDBC） -->
+        <!-- MySQL驱动（9.5.0 兼容MySQL 8.0.12，适配JDBC） -->
         <mysql-connector.version>9.5.0</mysql-connector.version>
         <!-- 接口文档依赖 -->
         <springdoc.version>2.1.0</springdoc.version>

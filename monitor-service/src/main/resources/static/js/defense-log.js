@@ -6,6 +6,7 @@
 let defenseTable;
 
 document.addEventListener('DOMContentLoaded', function() {
+    loadStats();
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     
@@ -17,6 +18,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     initDefenseTable();
 });
+
+function loadStats() {
+    http.get('/defense/statistics')
+        .then(function(stats) {
+            document.getElementById('statBlock').textContent = stats.blockCount || 0;
+            document.getElementById('statRateLimit').textContent = stats.rateLimitCount || 0;
+            document.getElementById('statBlockRequest').textContent = stats.redirectCount || 0;
+            document.getElementById('statAlertOnly').textContent = stats.alertOnlyCount || 0;
+            document.getElementById('statSuccess').textContent = stats.successCount || 0;
+        })
+        .catch(function(error) {
+            console.error('加载统计数据失败:', error);
+        });
+}
 
 function initDefenseTable() {
     defenseTable = TableUtils.createInstance({

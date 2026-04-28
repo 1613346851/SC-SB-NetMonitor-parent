@@ -1,12 +1,14 @@
 package com.network.monitor.service.impl;
 
 import com.network.monitor.entity.MenuEntity;
+import com.network.monitor.entity.RoleEntity;
 import com.network.monitor.entity.UserEntity;
 import com.network.monitor.mapper.MenuMapper;
 import com.network.monitor.mapper.RoleMenuMapper;
 import com.network.monitor.mapper.UserMapper;
 import com.network.monitor.service.AuthService;
 import com.network.monitor.service.OperLogService;
+import com.network.monitor.service.RoleService;
 import com.network.monitor.util.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,9 +28,10 @@ public class AuthServiceImpl implements AuthService {
     private static final ThreadLocal<Long> currentUserId = new ThreadLocal<>();
     private static final ThreadLocal<String> currentUsername = new ThreadLocal<>();
     
-    private static final int STATUS_NORMAL = 0;
     private static final int STATUS_DISABLED = 1;
     private static final int STATUS_LOCKED = 2;
+    
+    private static final String SUPER_ADMIN_CODE = "SUPER_ADMIN";
     
     @Value("${auth.login.max-fail-count:5}")
     private int maxFailCount;
@@ -43,7 +46,7 @@ public class AuthServiceImpl implements AuthService {
     private RoleMenuMapper roleMenuMapper;
     
     @Autowired
-    private JwtUtil jwtUtil;
+    private RoleService roleService;
     
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -145,8 +148,66 @@ public class AuthServiceImpl implements AuthService {
             return false;
         }
         
+        if (isSuperAdmin()) {
+            return true;
+        }
+        
         List<String> permissions = roleMenuMapper.selectPermissionsByUserId(userId);
         return permissions.contains(permission) || permissions.contains("*:*:*");
+    }
+    
+    @Override
+    public boolean isSuperAdmin() {
+        Long userId = currentUserId.get();
+        if (userId == null) {
+            return false;
+        }
+        
+        List<RoleEntity> roles = roleService.getRolesByUserId(userId);
+        if (roles == null || roles.isEmpty()) {
+            return false;
+        }
+        
+        return roles.stream()
+                .anyMatch(role -> SUPER_ADMIN_CODE.equals(role.getRoleCode()));
+    }
+    
+    @Override
+    public String getDefaultPage() {
+        if (isSuperAdmin()) {
+            return "/";
+        }
+        
+        List<MenuEntity> menus = getCurrentUserMenus();
+        if (menus == null || menus.isEmpty()) {
+            return "/forbidden";
+        }
+        
+        menus.sort((a, b) -> {
+            if (a.getSortOrder() == null) return 1;
+            if (b.getSortOrder() == null) return -1;
+            return a.getSortOrder().compareTo(b.getSortOrder());
+        });
+        
+        return menus.get(0).getPath();
+    }
+    
+    @Override
+    public List<String> getPermittedPaths() {
+        if (isSuperAdmin()) {
+            return menuMapper.selectAllMenus().stream()
+                    .map(MenuEntity::getPath)
+                    .collect(java.util.stream.Collectors.toList());
+        }
+        
+        List<MenuEntity> menus = getCurrentUserMenus();
+        if (menus == null || menus.isEmpty()) {
+            return Collections.emptyList();
+        }
+        
+        return menus.stream()
+                .map(MenuEntity::getPath)
+                .collect(java.util.stream.Collectors.toList());
     }
     
     @Override

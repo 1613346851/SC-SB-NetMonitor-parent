@@ -9,14 +9,41 @@ let attackTypeChart = null;
 let riskLevelChart = null;
 let eventTrendChart = null;
 
-document.addEventListener('DOMContentLoaded', function() {
+function waitForEcharts(maxWait = 5000) {
+    return new Promise((resolve) => {
+        if (typeof echarts !== 'undefined') {
+            resolve(true);
+            return;
+        }
+        
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+            if (typeof echarts !== 'undefined') {
+                clearInterval(checkInterval);
+                resolve(true);
+            } else if (Date.now() - startTime > maxWait) {
+                clearInterval(checkInterval);
+                console.error('ECharts 加载超时');
+                resolve(false);
+            }
+        }, 100);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = dateFormat.daysAgo(7);
     
     initEventTable();
     loadEventStatistics();
     
-    initChartsWhenReady();
+    const echartsLoaded = await waitForEcharts();
+    if (echartsLoaded) {
+        loadCharts();
+        loadEventTrendChart();
+    } else {
+        console.error('ECharts 未加载，图表功能不可用');
+    }
     
     const urlParams = new URLSearchParams(window.location.search);
     const eventIdFromUrl = urlParams.get('id');
@@ -31,14 +58,6 @@ document.addEventListener('DOMContentLoaded', function() {
         loadEventStatistics();
     }, 10000);
 });
-
-async function initChartsWhenReady() {
-    if (typeof ResourceLoader !== 'undefined') {
-        await ResourceLoader.loadEcharts();
-    }
-    loadCharts();
-    loadEventTrendChart();
-}
 
 function initEventTable() {
     eventTable = TableUtils.createInstance({

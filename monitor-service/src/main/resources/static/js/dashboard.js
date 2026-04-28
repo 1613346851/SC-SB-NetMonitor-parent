@@ -5,8 +5,35 @@
 
 let recentAttacksTable;
 
+function waitForEcharts(maxWait = 5000) {
+    return new Promise((resolve) => {
+        if (typeof echarts !== 'undefined') {
+            resolve(true);
+            return;
+        }
+        
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+            if (typeof echarts !== 'undefined') {
+                clearInterval(checkInterval);
+                resolve(true);
+            } else if (Date.now() - startTime > maxWait) {
+                clearInterval(checkInterval);
+                console.error('ECharts 加载超时');
+                resolve(false);
+            }
+        }, 100);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
     initRecentAttacksTable();
+    
+    const echartsLoaded = await waitForEcharts();
+    if (!echartsLoaded) {
+        console.error('ECharts 未加载，图表功能不可用');
+        return;
+    }
     
     await Promise.all([
         loadDashboardStats(),
@@ -524,29 +551,71 @@ async function loadAttackTypeDistribution() {
             return;
         }
         
-        const seriesData = (chartData && chartData.length > 0) ? chartData : [{
-            name: '无数据',
-            value: 1
-        }];
+        const typeNameMap = {
+            'SQL_INJECTION': 'SQL注入',
+            'XSS': 'XSS攻击',
+            'COMMAND_INJECTION': '命令注入',
+            'PATH_TRAVERSAL': '路径遍历',
+            'FILE_INCLUSION': '文件包含',
+            'DDOS': 'DDoS攻击',
+            'BRUTE_FORCE': '暴力破解',
+            'SCANNER': '扫描器探测',
+            'RATE_LIMIT': '限流触发',
+            'CSRF': 'CSRF攻击',
+            'SSRF': 'SSRF攻击',
+            'XXE': 'XXE攻击',
+            'DESERIALIZATION': '反序列化'
+        };
+        
+        const typeColorMap = {
+            'SQL注入': '#5470c6',
+            'XSS攻击': '#91cc75',
+            '命令注入': '#ee6666',
+            '路径遍历': '#fac858',
+            '文件包含': '#73c0de',
+            'DDoS攻击': '#3ba272',
+            '暴力破解': '#fc8452',
+            '扫描器探测': '#9a60b4',
+            '限流触发': '#ea7ccc',
+            'CSRF攻击': '#48b8d0',
+            'SSRF攻击': '#73c0de',
+            'XXE攻击': '#fc8452',
+            '反序列化': '#9a60b4'
+        };
+        
+        let seriesData = [];
+        if (chartData && chartData.length > 0) {
+            seriesData = chartData.map(item => {
+                const name = typeNameMap[item.name] || item.name || '未知';
+                return {
+                    name: name,
+                    value: item.value,
+                    itemStyle: {
+                        color: typeColorMap[name] || undefined
+                    }
+                };
+            });
+        } else {
+            seriesData = [{ name: '无数据', value: 1, itemStyle: { color: '#d9d9d9' } }];
+        }
         
         const option = {
             tooltip: {
-                trigger: 'item'
+                trigger: 'item',
+                formatter: chartData && chartData.length > 0 ? '{b}: {c} ({d}%)' : '{b}'
             },
             legend: {
-                orient: 'vertical',
-                left: 'left'
+                orient: 'horizontal',
+                top: 'bottom'
             },
             series: [{
                 type: 'pie',
                 radius: '50%',
+                center: ['50%', '45%'],
                 data: seriesData,
                 label: {
                     show: true,
                     formatter: chartData && chartData.length > 0 ? '{b}: {c}' : '{b}'
-                },
-                itemStyle: {
-                    color: chartData && chartData.length > 0 ? undefined : '#d9d9d9'
                 },
                 emphasis: {
                     itemStyle: {

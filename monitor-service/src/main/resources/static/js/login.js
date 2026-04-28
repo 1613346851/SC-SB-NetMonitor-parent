@@ -6,6 +6,11 @@
 (function() {
     'use strict';
     
+    StorageUtil.remove('user_menus');
+    StorageUtil.remove('user_menus_uid');
+    StorageUtil.remove('auth_token');
+    StorageUtil.remove('user_info');
+    
     if (AuthService.isAuthenticated()) {
         const returnUrl = getReturnUrl();
         window.location.href = returnUrl || '/';
@@ -108,8 +113,16 @@ async function handleLogin(event) {
             MessageUtil.success('登录成功，正在跳转...');
             
             setTimeout(() => {
+                const defaultPage = result.defaultPage || '/';
+                const permittedPaths = result.permittedPaths || [];
                 const returnUrl = getReturnUrl();
-                window.location.href = returnUrl || '/';
+                
+                let targetPage = defaultPage;
+                if (returnUrl && permittedPaths.includes(returnUrl)) {
+                    targetPage = returnUrl;
+                }
+                
+                window.location.href = targetPage;
             }, 500);
         } else {
             showError(result.message || '登录失败，请检查用户名和密码');

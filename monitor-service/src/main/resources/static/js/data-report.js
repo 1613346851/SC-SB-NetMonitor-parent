@@ -7,21 +7,39 @@ let topAttackersData = [];
 let topAttackersSortField = 'attackCount';
 let topAttackersSortOrder = 'desc';
 
-function initReportCharts() {
-    if (typeof echarts === 'undefined') {
-        console.warn('ECharts not loaded yet, retrying...');
-        setTimeout(initReportCharts, 100);
-        return;
-    }
-    loadReportData();
+function waitForEcharts(maxWait = 5000) {
+    return new Promise((resolve) => {
+        if (typeof echarts !== 'undefined') {
+            resolve(true);
+            return;
+        }
+        
+        const startTime = Date.now();
+        const checkInterval = setInterval(() => {
+            if (typeof echarts !== 'undefined') {
+                clearInterval(checkInterval);
+                resolve(true);
+            } else if (Date.now() - startTime > maxWait) {
+                clearInterval(checkInterval);
+                console.error('ECharts 加载超时');
+                resolve(false);
+            }
+        }, 100);
+    });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('startDate').value = DateUtil.daysAgo(30);
     
     initTopAttackersTableSorting();
-    initReportCharts();
+    
+    const echartsLoaded = await waitForEcharts();
+    if (echartsLoaded) {
+        loadReportData();
+    } else {
+        console.error('ECharts 未加载，图表功能不可用');
+    }
 });
 
 function initTopAttackersTableSorting() {

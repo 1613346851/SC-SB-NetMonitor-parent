@@ -3,7 +3,6 @@ package com.network.monitor.service;
 import com.network.monitor.entity.SysConfigEntity;
 
 import java.util.List;
-import java.util.Map;
 
 public interface SysConfigService {
 

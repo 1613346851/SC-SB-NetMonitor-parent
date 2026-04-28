@@ -53,12 +53,6 @@ public class TrafficEventProcessor {
     private PushDegradationHandler degradationHandler;
 
     @Autowired
-    private GatewayConfigCache configCache;
-
-    @Autowired
-    private IpAttackStateCache ipAttackStateCache;
-
-    @Autowired
     private TrafficActivityService activityService;
 
     @Autowired

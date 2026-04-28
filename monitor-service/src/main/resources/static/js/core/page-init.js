@@ -6,8 +6,31 @@
 (function() {
     const SIDEBAR_STATE_KEY = 'sidebar_collapsed';
     const SIDEBAR_SCROLL_KEY = 'sidebar_scroll_position';
+    const USER_MENUS_KEY = 'user_menus';
+    
+    const ALL_MENUS = [
+        { id: 1, name: '仪表盘', path: '/', icon: '📊', permission: 'dashboard' },
+        { id: 2, name: '流量列表', path: '/traffic', icon: '🌐', permission: 'traffic' },
+        { id: 3, name: '态势感知', path: '/event', icon: '🎯', permission: 'event' },
+        { id: 4, name: '攻击监测', path: '/attack', icon: '⚠️', permission: 'attack' },
+        { id: 5, name: '漏洞监测', path: '/vulnerability', icon: '🔓', permission: 'vulnerability' },
+        { id: 6, name: '漏洞扫描', path: '/scan', icon: 'SC', permission: 'scan' },
+        { id: 7, name: '防御日志', path: '/defense', icon: '🛡️', permission: 'defense' },
+        { id: 8, name: '防御效果评估', path: '/defense-evaluation', icon: '📈', permission: 'defense-evaluation' },
+        { id: 9, name: '规则管理', path: '/rule', icon: '📋', permission: 'rule' },
+        { id: 10, name: '黑名单管理', path: '/blacklist', icon: '🚫', permission: 'blacklist' },
+        { id: 11, name: '告警管理', path: '/alert', icon: '🔔', permission: 'alert' },
+        { id: 12, name: '溯源查询', path: '/trace', icon: '🔍', permission: 'trace' },
+        { id: 13, name: '数据报表', path: '/report', icon: '📉', permission: 'report' },
+        { id: 14, name: '系统配置', path: '/config', icon: '⚙️', permission: 'config', dividerBefore: true, groupTitle: '系统管理' },
+        { id: 15, name: '用户管理', path: '/system/user', icon: '👥', permission: 'user' },
+        { id: 16, name: '角色管理', path: '/system/role', icon: '🔑', permission: 'role' },
+        { id: 17, name: '操作日志', path: '/system/log', icon: '📝', permission: 'operlog' }
+    ];
     
     const PageInit = {
+        _userMenus: null,
+        
         init(options = {}) {
             const {
                 requireAuth = true,
@@ -22,15 +45,17 @@
             
             this.restoreSidebarState();
             
-            if (highlightMenu) {
-                this.highlightCurrentMenu();
-            }
+            this.loadAndRenderMenus().then(() => {
+                if (highlightMenu) {
+                    this.highlightCurrentMenu();
+                }
+                this.initMobileSidebar();
+            });
             
             this.initUserInfo();
             this.initLogout();
             this.initLogoRipple();
             this.initSidebarToggle();
-            this.initMobileSidebar();
             this.saveScrollPositionOnLeave();
             
             if (enableAlertNotification) {
@@ -40,6 +65,91 @@
             document.addEventListener('DOMContentLoaded', () => {
                 onPageLoad();
             });
+        },
+        
+        async loadAndRenderMenus() {
+            try {
+                const menus = await this.loadUserMenus();
+                this._userMenus = menus;
+                this.renderSidebarMenu(menus);
+            } catch (error) {
+                console.error('[PageInit] 加载菜单权限失败:', error);
+                this.renderSidebarMenu([]);
+            }
+        },
+        
+        async loadUserMenus() {
+            try {
+                const currentUser = StorageUtil.get(AppConfig.AUTH.USER_KEY);
+                const cachedUserId = StorageUtil.get(USER_MENUS_KEY + '_uid');
+                const currentUserId = currentUser ? String(currentUser.id) : null;
+                
+                if (currentUserId && cachedUserId === currentUserId) {
+                    const cachedMenus = StorageUtil.get(USER_MENUS_KEY);
+                    if (cachedMenus && Array.isArray(cachedMenus) && cachedMenus.length > 0) {
+                        return cachedMenus;
+                    }
+                }
+                
+                const menus = await HttpClient.get('/auth/menus');
+                if (menus && Array.isArray(menus)) {
+                    StorageUtil.set(USER_MENUS_KEY, menus);
+                    if (currentUserId) {
+                        StorageUtil.set(USER_MENUS_KEY + '_uid', currentUserId);
+                    }
+                    return menus;
+                }
+                return [];
+            } catch (error) {
+                console.error('[PageInit] 获取用户菜单失败:', error);
+                return [];
+            }
+        },
+        
+        renderSidebarMenu(userMenus) {
+            const container = document.getElementById('sidebarMenu');
+            if (!container) return;
+            
+            const userPaths = new Set(userMenus.map(m => m.path));
+            const isSuperAdmin = userMenus.length >= ALL_MENUS.length;
+            
+            let html = '';
+            
+            ALL_MENUS.forEach(menu => {
+                if (menu.dividerBefore) {
+                    html += '<div class="menu-divider"></div>';
+                }
+                if (menu.groupTitle) {
+                    html += `<div class="menu-group-title">${menu.groupTitle}</div>`;
+                }
+                
+                const hasPermission = isSuperAdmin || userPaths.has(menu.path);
+                if (!hasPermission) return;
+                
+                html += `
+                    <a href="${menu.path}" class="menu-item" data-title="${menu.name}" data-permission="${menu.permission}">
+                        <span class="menu-icon">${menu.icon}</span>
+                        <span>${menu.name}</span>
+                    </a>
+                `;
+            });
+            
+            container.innerHTML = html;
+        },
+        
+        hasMenuPermission(permission) {
+            if (!this._userMenus) return true;
+            return this._userMenus.some(m => m.permission === permission);
+        },
+        
+        getUserMenus() {
+            return this._userMenus || [];
+        },
+        
+        clearMenuCache() {
+            StorageUtil.remove(USER_MENUS_KEY);
+            StorageUtil.remove(USER_MENUS_KEY + '_uid');
+            this._userMenus = null;
         },
         
         async initAlertNotification() {

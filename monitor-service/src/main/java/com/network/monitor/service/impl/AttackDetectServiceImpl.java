@@ -1,7 +1,6 @@
 package com.network.monitor.service.impl;
 
 import com.network.monitor.bo.DefenseResultBO;
-import com.network.monitor.common.constant.AttackTypeConstant;
 import com.network.monitor.common.constant.RiskLevelConstant;
 import com.network.monitor.dto.AttackMonitorDTO;
 import com.network.monitor.dto.TrafficMonitorDTO;

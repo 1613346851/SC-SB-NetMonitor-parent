@@ -6,9 +6,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
-import java.net.InetSocketAddress;
-import java.net.Proxy;
-
 /**
  * RestTemplate配置类
  * 配置用于跨服务调用的RestTemplate客户端

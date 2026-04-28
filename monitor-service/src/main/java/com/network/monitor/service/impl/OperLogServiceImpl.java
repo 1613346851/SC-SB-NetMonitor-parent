@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,27 @@ public class OperLogServiceImpl implements OperLogService {
     public List<OperLogEntity> listLogs(String username, String operType, Integer operStatus, 
                                          String startTime, String endTime) {
         return operLogMapper.selectList(username, operType, operStatus, startTime, endTime);
+    }
+    
+    @Override
+    public List<OperLogEntity> listAllLogsForExport(String username, String operType, Integer operStatus,
+                                                     String startTime, String endTime) {
+        List<OperLogEntity> allLogs = new ArrayList<>();
+        int pageSize = 1000;
+        int pageNum = 1;
+        long total;
+        
+        do {
+            int offset = (pageNum - 1) * pageSize;
+            List<OperLogEntity> page = operLogMapper.selectListWithPaging(
+                username, operType, operStatus, startTime, endTime, offset, pageSize, "oper_time", "desc"
+            );
+            allLogs.addAll(page);
+            total = operLogMapper.countList(username, operType, operStatus, startTime, endTime);
+            pageNum++;
+        } while ((long) (pageNum - 1) * pageSize < total);
+        
+        return allLogs;
     }
     
     @Override

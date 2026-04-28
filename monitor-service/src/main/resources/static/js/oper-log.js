@@ -58,9 +58,9 @@ function renderOperType(type) {
         'INSERT': '<span class="tag success">新增</span>',
         'UPDATE': '<span class="tag warning">修改</span>',
         'DELETE': '<span class="tag danger">删除</span>',
-        'EXPORT': '<span class="tag">导出</span>'
+        'EXPORT': '<span class="tag secondary">导出</span>'
     };
-    return typeMap[type] || `<span class="tag">${type || '-'}</span>`;
+    return typeMap[type] || `<span class="tag secondary">${type || '-'}</span>`;
 }
 
 function renderOperStatus(status) {
@@ -97,6 +97,71 @@ function resetSearch() {
     document.getElementById('searchStartDate').value = weekAgo;
     
     operLogTable.resetSearch();
+}
+
+function getExportParams() {
+    const params = new URLSearchParams();
+    const searchParams = operLogTable.searchParams || {};
+    
+    if (searchParams.username) params.append('username', searchParams.username);
+    if (searchParams.operType) params.append('operType', searchParams.operType);
+    if (searchParams.operStatus !== undefined && searchParams.operStatus !== '') params.append('operStatus', searchParams.operStatus);
+    if (searchParams.startTime) params.append('startTime', searchParams.startTime);
+    if (searchParams.endTime) params.append('endTime', searchParams.endTime);
+    
+    return params.toString();
+}
+
+async function exportLogs() {
+    const exportBtn = document.getElementById('exportBtn');
+    const originalText = exportBtn.innerHTML;
+    
+    try {
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '<span>⏳</span> 导出中...';
+        
+        const params = getExportParams();
+        const token = AuthService.getToken();
+        const url = `${AppConfig.API_BASE_URL}/system/log/export${params ? '?' + params : ''}`;
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `${AppConfig.AUTH.TOKEN_PREFIX}${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('导出失败');
+        }
+        
+        const blob = await response.blob();
+        
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let fileName = 'oper_log.csv';
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (match && match[1]) {
+                fileName = decodeURIComponent(match[1].replace(/['"]/g, ''));
+            }
+        }
+        
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(link.href);
+        
+        message.success('导出成功');
+    } catch (error) {
+        console.error('导出操作日志失败:', error);
+        message.error('导出失败，请稍后重试');
+    } finally {
+        exportBtn.disabled = false;
+        exportBtn.innerHTML = originalText;
+    }
 }
 
 async function showDetail(id) {

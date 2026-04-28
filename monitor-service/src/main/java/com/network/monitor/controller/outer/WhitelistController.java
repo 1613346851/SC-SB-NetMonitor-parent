@@ -231,6 +231,33 @@ public class WhitelistController {
         }
     }
 
+    @GetMapping("/stats")
+    public ApiResponse<Map<String, Object>> getWhitelistStats() {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+            
+            long totalWhitelists = whitelistService.countByCondition(null, null, null);
+            long enabledWhitelists = whitelistService.countByCondition(null, null, 1);
+            long disabledWhitelists = whitelistService.countByCondition(null, null, 0);
+            
+            long pathWhitelists = whitelistService.countByCondition("PATH", null, null);
+            long headerWhitelists = whitelistService.countByCondition("HEADER", null, null);
+            long ipWhitelists = whitelistService.countByCondition("IP", null, null);
+            
+            stats.put("totalWhitelists", totalWhitelists);
+            stats.put("enabledWhitelists", enabledWhitelists);
+            stats.put("disabledWhitelists", disabledWhitelists);
+            stats.put("pathWhitelists", pathWhitelists);
+            stats.put("headerWhitelists", headerWhitelists);
+            stats.put("ipWhitelists", ipWhitelists);
+            
+            return ApiResponse.success(stats);
+        } catch (Exception e) {
+            log.error("获取白名单统计失败：", e);
+            return ApiResponse.error("获取统计失败");
+        }
+    }
+
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {

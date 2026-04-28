@@ -221,15 +221,25 @@ public class TraceStatsServiceImpl implements TraceStatsService {
         for (AttackMonitorEntity attack : attacks) {
             try {
                 var geoInfo = geoIpService.lookup(attack.getSourceIp());
-                if (geoInfo != null && geoInfo.isValid()) {
-                    String location = geoInfo.getCountry();
-                    if (geoInfo.getProvince() != null && !geoInfo.getProvince().isEmpty()) {
+                String location = "未知位置";
+                
+                if (geoInfo != null) {
+                    if (geoInfo.getProvince() != null && !geoInfo.getProvince().isEmpty() 
+                            && !"未知".equals(geoInfo.getProvince()) && !"0".equals(geoInfo.getProvince())) {
                         location = geoInfo.getProvince();
+                    } else if (geoInfo.getCountry() != null && !geoInfo.getCountry().isEmpty() 
+                            && !"未知".equals(geoInfo.getCountry()) && !"0".equals(geoInfo.getCountry())) {
+                        location = geoInfo.getCountry();
+                    } else if (geoInfo.getCity() != null && !geoInfo.getCity().isEmpty() 
+                            && !"未知".equals(geoInfo.getCity()) && !"0".equals(geoInfo.getCity())) {
+                        location = geoInfo.getCity();
                     }
-                    locationCount.merge(location, 1L, Long::sum);
                 }
+                
+                locationCount.merge(location, 1L, Long::sum);
             } catch (Exception e) {
                 log.debug("获取地理位置失败: ip={}", attack.getSourceIp());
+                locationCount.merge("未知位置", 1L, Long::sum);
             }
         }
         

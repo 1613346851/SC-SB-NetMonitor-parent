@@ -1,6 +1,5 @@
 package com.network.gateway.cache;
 
-import com.network.gateway.cache.GatewayConfigCache;
 import com.network.gateway.confidence.ConfidenceContext;
 import com.network.gateway.confidence.ConfidenceResult;
 import com.network.gateway.confidence.ConfidenceService;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Component;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -541,6 +539,12 @@ public class IpAttackStateCache {
     public int getConfidence(String ip) {
         IpAttackStateEntry entry = get(ip);
         return entry != null ? entry.getConfidence() : 0;
+    }
+
+    public void updateConfidence(String ip, int confidence) {
+        IpAttackStateEntry entry = getOrCreate(ip);
+        entry.setConfidence(confidence);
+        logger.debug("更新IP置信度: ip={}, confidence={}", ip, confidence);
     }
 
     public boolean isInDefendedState(String ip) {

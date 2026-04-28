@@ -179,6 +179,39 @@ public class AttackMonitorController {
         }
     }
 
+    @GetMapping("/stats")
+    public ApiResponse<Map<String, Object>> getAttackStats() {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+            
+            stats.put("pending", attackMonitorMapper.countByCondition(null, null, null, null, 0, null, null));
+            
+            List<AttackMonitorMapper.RiskLevelStat> riskLevelStats = attackMonitorMapper.countByRiskLevel();
+            long critical = 0, high = 0, medium = 0, low = 0;
+            for (AttackMonitorMapper.RiskLevelStat stat : riskLevelStats) {
+                if ("CRITICAL".equals(stat.getRiskLevel())) {
+                    critical = stat.getCount();
+                } else if ("HIGH".equals(stat.getRiskLevel())) {
+                    high = stat.getCount();
+                } else if ("MEDIUM".equals(stat.getRiskLevel())) {
+                    medium = stat.getCount();
+                } else if ("LOW".equals(stat.getRiskLevel())) {
+                    low = stat.getCount();
+                }
+            }
+            stats.put("critical", critical);
+            stats.put("high", high);
+            stats.put("medium", medium);
+            stats.put("low", low);
+            stats.put("riskLevelStats", riskLevelStats);
+            
+            return ApiResponse.success(stats);
+        } catch (Exception e) {
+            log.error("获取攻击统计失败：", e);
+            return ApiResponse.error("获取统计失败");
+        }
+    }
+
     /**
      * 导出攻击数据为CSV
      */
