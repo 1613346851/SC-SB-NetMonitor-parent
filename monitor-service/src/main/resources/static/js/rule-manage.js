@@ -8,10 +8,39 @@ let selectedVulnIds = [];
 let vulnSearchTimeout = null;
 
 document.addEventListener('DOMContentLoaded', function() {
+    loadRuleStats();
     initRuleTable();
     initWhitelistTable();
     initVulnSelectEvents();
 });
+
+function loadRuleStats() {
+    http.get('/rule/stats')
+        .then(function(stats) {
+            document.getElementById('statTotalRules').textContent = stats.totalRules || 0;
+            document.getElementById('statEnabledRules').textContent = stats.enabledRules || 0;
+            document.getElementById('statDisabledRules').textContent = stats.disabledRules || 0;
+            document.getElementById('statSqlInjectionRules').textContent = stats.sqlInjectionRules || 0;
+            document.getElementById('statXssRules').textContent = stats.xssRules || 0;
+        })
+        .catch(function(error) {
+            console.error('加载规则统计失败:', error);
+        });
+}
+
+function loadWhitelistStats() {
+    http.get('/whitelist/stats')
+        .then(function(stats) {
+            document.getElementById('statTotalWhitelists').textContent = stats.totalWhitelists || 0;
+            document.getElementById('statEnabledWhitelists').textContent = stats.enabledWhitelists || 0;
+            document.getElementById('statDisabledWhitelists').textContent = stats.disabledWhitelists || 0;
+            document.getElementById('statPathWhitelists').textContent = stats.pathWhitelists || 0;
+            document.getElementById('statIpWhitelists').textContent = stats.ipWhitelists || 0;
+        })
+        .catch(function(error) {
+            console.error('加载白名单统计失败:', error);
+        });
+}
 
 function switchTab(tab) {
     currentTab = tab;
@@ -23,9 +52,11 @@ function switchTab(tab) {
     if (tab === 'rules') {
         document.getElementById('rules-content').style.display = 'block';
         document.getElementById('whitelist-content').style.display = 'none';
+        loadRuleStats();
     } else {
         document.getElementById('rules-content').style.display = 'none';
         document.getElementById('whitelist-content').style.display = 'block';
+        loadWhitelistStats();
         if (whitelistTable) {
             whitelistTable.refresh();
         }

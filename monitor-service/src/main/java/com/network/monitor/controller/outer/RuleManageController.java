@@ -503,6 +503,37 @@ public class RuleManageController {
             log.error("更新漏洞防御状态失败: vulnerabilityId={}", vulnerabilityId, e);
         }
     }
+
+    @GetMapping("/stats")
+    public ApiResponse<Map<String, Object>> getRuleStats() {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+            
+            long totalRules = monitorRuleMapper.countByCondition(null, null, null);
+            long enabledRules = monitorRuleMapper.countByCondition(null, null, 1);
+            long disabledRules = monitorRuleMapper.countByCondition(null, null, 0);
+            
+            long sqlInjectionRules = monitorRuleMapper.countByAttackType("SQL_INJECTION");
+            long xssRules = monitorRuleMapper.countByAttackType("XSS");
+            long commandInjectionRules = monitorRuleMapper.countByAttackType("COMMAND_INJECTION");
+            long ddosRules = monitorRuleMapper.countByAttackType("DDOS");
+            long pathTraversalRules = monitorRuleMapper.countByAttackType("PATH_TRAVERSAL");
+            
+            stats.put("totalRules", totalRules);
+            stats.put("enabledRules", enabledRules);
+            stats.put("disabledRules", disabledRules);
+            stats.put("sqlInjectionRules", sqlInjectionRules);
+            stats.put("xssRules", xssRules);
+            stats.put("commandInjectionRules", commandInjectionRules);
+            stats.put("ddosRules", ddosRules);
+            stats.put("pathTraversalRules", pathTraversalRules);
+            
+            return ApiResponse.success(stats);
+        } catch (Exception e) {
+            log.error("获取规则统计失败：", e);
+            return ApiResponse.error("获取统计失败");
+        }
+    }
     
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");

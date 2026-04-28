@@ -6,6 +6,38 @@
     <title>防御日志 - 网络监测系统</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <style>
+        .stats-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        .stat-item {
+            text-align: center;
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .stat-danger .stat-value { color: #ef4444; }
+        .stat-warning .stat-value { color: #f97316; }
+        .stat-info .stat-value { color: #3b82f6; }
+        .stat-success .stat-value { color: #10b981; }
         .event-link {
             color: #4f46e5;
             text-decoration: none;
@@ -32,6 +64,31 @@
             </header>
 
             <main class="content">
+                <div class="stats-card">
+                    <div class="stats-grid">
+                        <div class="stat-item stat-danger">
+                            <div class="stat-value" id="statBlock">0</div>
+                            <div class="stat-label">IP封禁</div>
+                        </div>
+                        <div class="stat-item stat-warning">
+                            <div class="stat-value" id="statRateLimit">0</div>
+                            <div class="stat-label">限流</div>
+                        </div>
+                        <div class="stat-item stat-info">
+                            <div class="stat-value" id="statBlockRequest">0</div>
+                            <div class="stat-label">请求拦截</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="statAlertOnly">0</div>
+                            <div class="stat-label">仅告警</div>
+                        </div>
+                        <div class="stat-item stat-success">
+                            <div class="stat-value" id="statSuccess">0</div>
+                            <div class="stat-label">成功防御</div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="filter-bar">
                     <div class="form-inline">
                         <div class="form-group">
@@ -46,8 +103,7 @@
                             <label class="form-label">防御类型</label>
                             <select class="form-control" id="defenseType">
                                 <option value="">全部</option>
-                                <option value="BLOCK_IP">封禁 IP</option>
-                                <option value="ADD_BLACKLIST">加入黑名单</option>
+                                <option value="BLOCK_IP">IP封禁</option>
                                 <option value="RATE_LIMIT">限流</option>
                                 <option value="BLOCK_REQUEST">请求拦截</option>
                                 <option value="ALERT_ONLY">仅告警</option>
