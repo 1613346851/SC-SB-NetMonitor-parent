@@ -56,6 +56,12 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Actuator 监控端点依赖 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
 		<!-- Prometheus 监控依赖 -->
 		<dependency>
 			<groupId>io.micrometer</groupId>
