@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -26,6 +27,9 @@ public class GeoIpServiceImpl implements GeoIpService {
     private Ip2Region ip2Region;
 
     private static final Map<String, String> IP_LOCATION_MAP = new HashMap<>();
+    
+    private final Map<String, GeoIpDTO> geoCache = new ConcurrentHashMap<>();
+    private static final int MAX_CACHE_SIZE = 10000;
     
     static {
         IP_LOCATION_MAP.put("127.0.0.1", "本地回环");
@@ -58,11 +62,26 @@ public class GeoIpServiceImpl implements GeoIpService {
             return GeoIpDTO.unknown("未知");
         }
 
+        GeoIpDTO cached = geoCache.get(ip);
+        if (cached != null) {
+            return cached;
+        }
+
         GeoIpDTO simpleLocation = getSimpleLocation(ip);
         if (simpleLocation != null) {
             return simpleLocation;
         }
 
+        GeoIpDTO result = doLookup(ip);
+        
+        if (geoCache.size() < MAX_CACHE_SIZE) {
+            geoCache.put(ip, result);
+        }
+        
+        return result;
+    }
+    
+    private GeoIpDTO doLookup(String ip) {
         GeoIpDTO ip2regionResult = lookupByIp2Region(ip);
         if (ip2regionResult != null && ip2regionResult.isValid()) {
             return ip2regionResult;

@@ -45,12 +45,13 @@ public class XssVulnController {
             log.warn("【存储型XSS漏洞】向MySQL插入未过滤的恶意评论：{}，评论ID：{}", commentDTO.getContent(), commentId);
 
             // 3. 返回包含恶意内容的响应
+            // 注意：使用escapeJson保证JSON格式正确，但内容本身未做HTML转义（保留XSS漏洞特性）
             return "{\n" +
                     "  \"code\": 200,\n" +
                     "  \"msg\": \"评论提交成功\",\n" +
                     "  \"data\": {\n" +
                     "    \"comment_id\": \"" + commentId + "\",\n" +
-                    "    \"comment_content\": \"" + commentDTO.getContent() + "\",\n" +
+                    "    \"comment_content\": \"" + escapeJson(commentDTO.getContent()) + "\",\n" +
                     "    \"user\": \"" + currentUser + "\",\n" +
                     "    \"warning\": \"存储型XSS漏洞：恶意内容已存入MySQL！\"\n" +
                     "  }\n" +
@@ -79,13 +80,14 @@ public class XssVulnController {
             response.append("    \"comment_list\": [");
 
             // 漏洞核心：直接遍历MySQL返回的内容，未转义拼接到响应
+            // 注意：使用escapeJson保证JSON格式正确，但内容本身未做HTML转义（保留XSS漏洞特性）
             for (int i = 0; i < commentList.size(); i++) {
                 Map<String, Object> comment = commentList.get(i);
                 response.append("\n      {\n");
-                response.append("        \"comment_id\": \"").append(comment.get("id")).append("\",\n");
-                response.append("        \"content\": \"").append(comment.get("content")).append("\",\n");
-                response.append("        \"user\": \"").append(comment.get("username")).append("\",\n");
-                response.append("        \"create_time\": \"").append(comment.get("create_time")).append("\"\n");
+                response.append("        \"comment_id\": \"").append(escapeJson(String.valueOf(comment.get("id")))).append("\",\n");
+                response.append("        \"content\": \"").append(escapeJson(String.valueOf(comment.get("content")))).append("\",\n");
+                response.append("        \"user\": \"").append(escapeJson(String.valueOf(comment.get("username")))).append("\",\n");
+                response.append("        \"create_time\": \"").append(escapeJson(String.valueOf(comment.get("create_time")))).append("\"\n");
                 response.append("      }");
                 if (i < commentList.size() - 1) {
                     response.append(",");
@@ -110,13 +112,14 @@ public class XssVulnController {
     @GetMapping("/search")
     public String search(@RequestParam("keyword") String keyword) {
         log.warn("【反射型XSS漏洞】接收未过滤的搜索关键词：{}", keyword);
+        // 注意：使用escapeJson保证JSON格式正确，但内容本身未做HTML转义（保留XSS漏洞特性）
         return "{\n" +
                 "  \"code\": 200,\n" +
                 "  \"msg\": \"搜索成功\",\n" +
                 "  \"data\": {\n" +
-                "    \"keyword\": \"" + keyword + "\",\n" +
+                "    \"keyword\": \"" + escapeJson(keyword) + "\",\n" +
                 "    \"result_count\": 0,\n" +
-                "    \"tip\": \"你搜索的关键词：" + keyword + " 暂无结果\",\n" +
+                "    \"tip\": \"你搜索的关键词：" + escapeJson(keyword) + " 暂无结果\",\n" +
                 "    \"warning\": \"反射型XSS漏洞！\"\n" +
                 "  }\n" +
                 "}";
@@ -184,8 +187,8 @@ public class XssVulnController {
                     "  \"msg\": \"评论提交成功（安全版）\",\n" +
                     "  \"data\": {\n" +
                     "    \"comment_id\": \"" + commentId + "\",\n" +
-                    "    \"original_content\": \"" + commentDTO.getContent() + "\",\n" +
-                    "    \"safe_content\": \"" + safeContent + "\",\n" +
+                    "    \"original_content\": \"" + escapeJson(commentDTO.getContent()) + "\",\n" +
+                    "    \"safe_content\": \"" + escapeJson(safeContent) + "\",\n" +
                     "    \"tip\": \"已转义HTML特殊字符，防护存储型XSS攻击\"\n" +
                     "  }\n" +
                     "}";
@@ -206,6 +209,18 @@ public class XssVulnController {
                 .replace("\"", "&quot;")
                 .replace("'", "&#39;")
                 .replace("/", "&#x2F;");
+    }
+
+    // 工具方法：JSON字符串转义（修复JSON格式问题，但保留XSS漏洞）
+    private String escapeJson(String content) {
+        if (content == null) {
+            return "";
+        }
+        return content.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     // 工具方法：构建统一错误响应

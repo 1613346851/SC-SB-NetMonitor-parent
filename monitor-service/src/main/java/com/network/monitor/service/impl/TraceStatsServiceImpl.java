@@ -38,37 +38,33 @@ public class TraceStatsServiceImpl implements TraceStatsService {
     public TraceStatsDTO getTraceStats(LocalDateTime startTime, LocalDateTime endTime) {
         TraceStatsDTO stats = new TraceStatsDTO();
         
-        stats.setOverview(calculateOverviewStats(startTime, endTime));
-        stats.setAttackTypeStats(calculateAttackTypeStats(startTime, endTime));
-        stats.setTrendStats(calculateTrendStats(startTime, endTime));
-        stats.setRiskLevelStats(calculateRiskLevelStats(startTime, endTime));
-        stats.setGeoStats(calculateGeoStats(startTime, endTime));
+        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
+            null, null, null, null, null, startTime, endTime,
+            null, null, null
+        );
+        
+        stats.setOverview(calculateOverviewStats(startTime, endTime, attacks));
+        stats.setAttackTypeStats(calculateAttackTypeStats(attacks));
+        stats.setTrendStats(calculateTrendStats(startTime, endTime, attacks));
+        stats.setRiskLevelStats(calculateRiskLevelStats(attacks));
+        stats.setGeoStats(calculateGeoStats(attacks));
         stats.setTraceDepth(calculateTraceDepth());
         
         return stats;
     }
 
-    private TraceStatsDTO.OverviewStats calculateOverviewStats(LocalDateTime startTime, LocalDateTime endTime) {
+    private TraceStatsDTO.OverviewStats calculateOverviewStats(LocalDateTime startTime, LocalDateTime endTime, 
+                                                                List<AttackMonitorEntity> attacks) {
         TraceStatsDTO.OverviewStats overview = new TraceStatsDTO.OverviewStats();
         
-        long totalAttacks = attackMonitorMapper.countByCondition(
-            null, null, null, null, null, startTime, endTime
-        );
+        long totalAttacks = attacks.size();
         
         long defenseSuccessCount = defenseLogMapper.countByCondition(
             null, null, null, 1, startTime, endTime
         );
         
-        List<AttackMonitorEntity> highRiskAttacks = attackMonitorMapper.selectByCondition(
-            null, null, "HIGH", null, null, startTime, endTime,
-            null, null, null
-        );
-        highRiskAttacks.addAll(attackMonitorMapper.selectByCondition(
-            null, null, "CRITICAL", null, null, startTime, endTime,
-            null, null, null
-        ));
-        
-        Set<String> highRiskIps = highRiskAttacks.stream()
+        Set<String> highRiskIps = attacks.stream()
+            .filter(a -> "HIGH".equals(a.getRiskLevel()) || "CRITICAL".equals(a.getRiskLevel()))
             .map(AttackMonitorEntity::getSourceIp)
             .collect(Collectors.toSet());
         
@@ -90,12 +86,7 @@ public class TraceStatsServiceImpl implements TraceStatsService {
         return overview;
     }
 
-    private List<TraceStatsDTO.AttackTypeStats> calculateAttackTypeStats(LocalDateTime startTime, LocalDateTime endTime) {
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-            null, null, null, null, null, startTime, endTime,
-            null, null, null
-        );
-        
+    private List<TraceStatsDTO.AttackTypeStats> calculateAttackTypeStats(List<AttackMonitorEntity> attacks) {
         Map<String, Long> typeCount = attacks.stream()
             .collect(Collectors.groupingBy(
                 a -> a.getAttackType() != null ? a.getAttackType() : "UNKNOWN",
@@ -128,18 +119,14 @@ public class TraceStatsServiceImpl implements TraceStatsService {
         return stats;
     }
 
-    private List<TraceStatsDTO.TrendStats> calculateTrendStats(LocalDateTime startTime, LocalDateTime endTime) {
+    private List<TraceStatsDTO.TrendStats> calculateTrendStats(LocalDateTime startTime, LocalDateTime endTime, 
+                                                                 List<AttackMonitorEntity> attacks) {
         if (startTime == null) {
             startTime = LocalDateTime.now().minusDays(7);
         }
         if (endTime == null) {
             endTime = LocalDateTime.now();
         }
-        
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-            null, null, null, null, null, startTime, endTime,
-            null, null, null
-        );
         
         Map<LocalDate, List<AttackMonitorEntity>> groupedByDate = attacks.stream()
             .collect(Collectors.groupingBy(
@@ -171,11 +158,7 @@ public class TraceStatsServiceImpl implements TraceStatsService {
         return trendStats;
     }
 
-    private List<TraceStatsDTO.RiskLevelStats> calculateRiskLevelStats(LocalDateTime startTime, LocalDateTime endTime) {
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-            null, null, null, null, null, startTime, endTime,
-            null, null, null
-        );
+    private List<TraceStatsDTO.RiskLevelStats> calculateRiskLevelStats(List<AttackMonitorEntity> attacks) {
         
         Map<String, Long> levelCount = attacks.stream()
             .collect(Collectors.groupingBy(
@@ -210,17 +193,16 @@ public class TraceStatsServiceImpl implements TraceStatsService {
         return stats;
     }
 
-    private List<TraceStatsDTO.GeoStats> calculateGeoStats(LocalDateTime startTime, LocalDateTime endTime) {
-        List<AttackMonitorEntity> attacks = attackMonitorMapper.selectByCondition(
-            null, null, null, null, null, startTime, endTime,
-            null, null, null
-        );
+    private List<TraceStatsDTO.GeoStats> calculateGeoStats(List<AttackMonitorEntity> attacks) {
+        Map<String, String> ipLocationCache = new HashMap<>();
         
-        Map<String, Long> locationCount = new HashMap<>();
+        Set<String> uniqueIps = attacks.stream()
+            .map(AttackMonitorEntity::getSourceIp)
+            .collect(Collectors.toSet());
         
-        for (AttackMonitorEntity attack : attacks) {
+        for (String ip : uniqueIps) {
             try {
-                var geoInfo = geoIpService.lookup(attack.getSourceIp());
+                var geoInfo = geoIpService.lookup(ip);
                 String location = "未知位置";
                 
                 if (geoInfo != null) {
@@ -235,12 +217,17 @@ public class TraceStatsServiceImpl implements TraceStatsService {
                         location = geoInfo.getCity();
                     }
                 }
-                
-                locationCount.merge(location, 1L, Long::sum);
+                ipLocationCache.put(ip, location);
             } catch (Exception e) {
-                log.debug("获取地理位置失败: ip={}", attack.getSourceIp());
-                locationCount.merge("未知位置", 1L, Long::sum);
+                log.debug("获取地理位置失败: ip={}", ip);
+                ipLocationCache.put(ip, "未知位置");
             }
+        }
+        
+        Map<String, Long> locationCount = new HashMap<>();
+        for (AttackMonitorEntity attack : attacks) {
+            String location = ipLocationCache.getOrDefault(attack.getSourceIp(), "未知位置");
+            locationCount.merge(location, 1L, Long::sum);
         }
         
         long total = attacks.size();
