@@ -737,7 +737,7 @@ public class RequestRateLimitFilter implements GlobalFilter, Ordered {
     }
 
     private String generateEventId(String ip) {
-        return "DDOS_" + System.currentTimeMillis() + "_" + ip.hashCode();
+        return "EVT_" + System.currentTimeMillis() + "_" + ip.hashCode();
     }
 
     @Override

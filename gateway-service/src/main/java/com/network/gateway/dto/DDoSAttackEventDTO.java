@@ -72,7 +72,7 @@ public class DDoSAttackEventDTO implements Serializable {
     }
 
     private String generateEventId() {
-        return "DDOS_" + System.currentTimeMillis() + "_" + traceId;
+        return "EVT_" + System.currentTimeMillis() + "_" + traceId;
     }
 
     public void updateDescription() {
